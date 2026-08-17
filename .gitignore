@@ -3,6 +3,12 @@
 *.log
 scratch/
 
+# Dependencies & Build Output
+node_modules/
+dist/
+dist-ssr/
+*.local
+
 # OS / Editor Files
 .DS_Store
 Thumbs.db
