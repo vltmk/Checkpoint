@@ -1,0 +1,10 @@
+# Logs & Scratch
+.system_generated/
+*.log
+scratch/
+
+# OS / Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
