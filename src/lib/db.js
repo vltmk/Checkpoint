@@ -1,9 +1,9 @@
 /**
- * db.js - StorageDB IndexedDB wrapper for Nodra Pay
+ * db.js - StorageDB IndexedDB wrapper for Nodra Vault
  * Persistent client-side database supporting screenshot attachments and zero quota limit.
  */
 
-const DB_NAME = 'NodraPayDB_v2';
+const DB_NAME = 'NodraVaultDB_v1';
 const DB_VERSION = 1;
 const STORE_ENTRIES = 'work_entries';
 

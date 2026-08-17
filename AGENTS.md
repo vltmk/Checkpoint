@@ -1,12 +1,12 @@
-# AGENTS.md - Nodra Pay Collaboration & Architecture Guide
+# AGENTS.md - Nodra Vault Collaboration & Architecture Guide
 
-Welcome to the **Nodra Pay** project! This guide is written for AI agents and human developers to keep context, conventions, and implementation workflows smooth for future extensions.
+Welcome to the **Nodra Vault** project! This guide is written for AI agents and human developers to keep context, conventions, and implementation workflows smooth for future extensions.
 
 ---
 
 ## 1. Project Mission & Overview
 
-**Nodra Pay** is a monochromatic, high-density Shadcn-styled freelance ledger application specifically tailored for **freelancers, gaming boosters, raid runners, addon devs, and digital creators**.
+**Vault** (by Nodra) is a monochromatic, high-density Shadcn-styled freelance ledger application specifically tailored for **freelancers, gaming boosters, raid runners, addon devs, and digital creators**.
 
 ### Key Value Propositions
 - **Tablet-Width Mini-App Frame**: Centered desktop layout (`max-w-5xl`) with minimal left sidebar and mobile bottom tab navigation.
@@ -100,7 +100,7 @@ To ensure full control over commits and pushes, all git operations are performed
 ```bash
 git status
 git add .
-git commit -m "feat: monochromatic shadcn mini-app rework with tablet desktop sidebar, mobile nav, bi-directional gold engine, and nodra-pay branding"
+git commit -m "feat: rename project to Nodra Vault with Vault primary title and updated branding"
 
 # Push to remote
 git push

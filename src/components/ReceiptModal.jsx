@@ -53,7 +53,7 @@ export function ReceiptModal({
   };
 
   const handleCopyText = () => {
-    const text = `=== NODRA PAY WORK RECEIPT ===
+    const text = `=== NODRA VAULT WORK RECEIPT ===
 Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${entry.game || 'World of Warcraft'}
@@ -70,7 +70,7 @@ Notes: ${entry.notes || 'None'}
 
   const handleCopyDiscordMarkdown = () => {
     const md = `\`\`\`ini
-[ NODRA PAY - PROOF OF WORK RECEIPT ]
+[ NODRA VAULT - PROOF OF WORK RECEIPT ]
 ID      = ${receiptId}
 Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
@@ -104,15 +104,15 @@ Notes   = ${entry.notes || 'None'}
             <div className="flex items-center gap-2.5">
               <img
                 src={nodraLogo}
-                alt="Nodra Pay"
+                alt="Nodra Vault"
                 className="w-6 h-6 object-contain invert brightness-200"
               />
               <div>
                 <h4 className="text-sm font-bold tracking-tight text-zinc-100">
-                  Nodra Pay
+                  Vault
                 </h4>
                 <p className="text-[10px] text-zinc-500 font-mono">
-                  Freelance Ledger Slip
+                  Nodra Freelance Ledger
                 </p>
               </div>
             </div>

@@ -1,5 +1,5 @@
 /**
- * currencies.js - Currency definitions, formatters, and conversion engine for Nodra Pay
+ * currencies.js - Currency definitions, formatters, and conversion engine for Nodra Vault
  */
 
 export const CURRENCIES = {

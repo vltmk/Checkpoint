@@ -236,7 +236,7 @@ export default function App() {
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `nodrapay_ledger_${new Date().toISOString().slice(0, 10)}.csv`
+      `nodravault_ledger_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -252,7 +252,7 @@ export default function App() {
     }
 
     const backupData = {
-      app: 'Nodra Pay',
+      app: 'Nodra Vault',
       version: '3.0.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
@@ -268,7 +268,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `nodrapay_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `nodravault_backup_${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

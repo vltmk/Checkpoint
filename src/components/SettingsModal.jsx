@@ -89,7 +89,7 @@ export function SettingsModal({
             Data Backup & Portability
           </label>
           <p className="text-[11px] text-zinc-500">
-            Nodra Pay stores all work records and screenshot proofs securely in local IndexedDB.
+            Nodra Vault stores all work records and screenshot proofs securely in local IndexedDB.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">

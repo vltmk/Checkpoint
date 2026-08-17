@@ -16,15 +16,20 @@ export function MobileHeader({
 }) {
   return (
     <header className="md:hidden sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <img
           src={nodraLogo}
-          alt="Nodra Pay"
+          alt="Nodra Vault"
           className="w-5 h-5 object-contain invert brightness-200"
         />
-        <span className="text-sm font-bold tracking-tight text-zinc-100">
-          Nodra Pay
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-bold tracking-tight text-zinc-100">
+            Vault
+          </span>
+          <span className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-zinc-800 text-zinc-400">
+            NODRA
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

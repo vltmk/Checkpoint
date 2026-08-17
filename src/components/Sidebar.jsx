@@ -59,13 +59,16 @@ export function Sidebar({
         <div className="flex items-center gap-2.5">
           <img
             src={nodraLogo}
-            alt="Nodra Pay"
+            alt="Nodra Vault"
             className="w-6 h-6 object-contain invert brightness-200"
           />
           <div>
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-bold tracking-tight text-zinc-100">
-                Nodra Pay
+                Vault
+              </span>
+              <span className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-zinc-800 text-zinc-400">
+                NODRA
               </span>
             </div>
             <p className="text-[10px] text-zinc-500 font-medium leading-none mt-0.5">
