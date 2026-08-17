@@ -84,34 +84,19 @@ export function WorkModal({
         });
         setProofs(editingEntry.proofs ? [...editingEntry.proofs] : []);
       } else {
-        // Check for local draft autosave
-        const savedDraft = localStorage.getItem('nodrapay_work_draft');
-        if (savedDraft) {
-          try {
-            const parsed = JSON.parse(savedDraft);
-            setFormData({
-              ...parsed,
-              dateTime: parsed.dateTime || toLocalISOString(new Date()),
-            });
-            if (parsed.proofs) setProofs(parsed.proofs);
-          } catch (e) {
-            console.error('Failed to parse draft:', e);
-          }
-        } else {
-          setFormData({
-            title: '',
-            dateTime: toLocalISOString(new Date()),
-            game: 'World of Warcraft',
-            isCustomGame: false,
-            customGameText: '',
-            currency: globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD',
-            income: '',
-            status: 'Paid',
-            hours: '',
-            notes: '',
-          });
-          setProofs([]);
-        }
+        setFormData({
+          title: '',
+          dateTime: toLocalISOString(new Date()),
+          game: 'World of Warcraft',
+          isCustomGame: false,
+          customGameText: '',
+          currency: globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD',
+          income: '',
+          status: 'Paid',
+          hours: '',
+          notes: '',
+        });
+        setProofs([]);
       }
 
       setTimeout(() => {
@@ -119,16 +104,6 @@ export function WorkModal({
       }, 100);
     }
   }, [isOpen, editingEntry, globalCurrency]);
-
-  // Draft autosave effect
-  useEffect(() => {
-    if (isOpen && !editingEntry && (formData.title || formData.income || formData.notes)) {
-      localStorage.setItem(
-        'nodrapay_work_draft',
-        JSON.stringify({ ...formData, proofs })
-      );
-    }
-  }, [formData, proofs, isOpen, editingEntry]);
 
   // Clipboard Paste Handler (Ctrl+V) while modal is active
   useEffect(() => {
@@ -260,7 +235,6 @@ export function WorkModal({
       updatedAt: new Date().toISOString(),
     };
 
-    localStorage.removeItem('nodrapay_work_draft');
     onSave(entryToSave);
   };
 

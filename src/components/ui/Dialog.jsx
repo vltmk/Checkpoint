@@ -29,7 +29,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -37,17 +37,17 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 bg-black/75 backdrop-blur-xl"
           />
 
           {/* Dialog Container */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className={cn(
-              'relative z-10 w-full max-w-[440px] sm:max-w-lg bg-[#0c0c0f] border-t sm:border border-white/15 rounded-t-[32px] sm:rounded-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.95),inset_0_1px_0_0_rgba(255,255,255,0.2)] overflow-hidden my-0 sm:my-auto max-h-[90vh] flex flex-col',
+              'relative z-10 w-full bg-[#08080a]/90 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9),inset_0_1px_0_0_rgba(255,255,255,0.12)] overflow-hidden my-auto',
               maxWidth,
               className
             )}
