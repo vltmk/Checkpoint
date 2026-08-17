@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG } from './lib/currencies';
 import { Header } from './components/Header';
+import { GoldConversionBar } from './components/GoldConversionBar';
 import { MetricStrip } from './components/MetricStrip';
 import { AnalyticsDrawer } from './components/AnalyticsDrawer';
 import { Toolbar } from './components/Toolbar';
@@ -11,8 +12,18 @@ import { WorkModal } from './components/WorkModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
+import { FloatingControls } from './components/FloatingControls';
+import { toLocalISOString } from './components/ui/DateTimePicker';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+
+const DEFAULT_VISIBLE_ELEMENTS = {
+  avgRate: false,
+  topGame: false,
+  chartMonthly: true,
+  chartCategory: false,
+  chartClients: false,
+};
 
 export default function App() {
   const [entries, setEntries] = useState([]);
@@ -27,9 +38,41 @@ export default function App() {
     return localStorage.getItem('nodrapay_view') || 'dense';
   });
 
+  // Gold Conversion State
+  const [goldCurrency, setGoldCurrency] = useState(() => {
+    return localStorage.getItem('nodrapay_gold_currency') || 'USD';
+  });
+
+  const [goldRate, setGoldRate] = useState(() => {
+    const saved = localStorage.getItem('nodrapay_gold_rate');
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      return !isNaN(parsed) ? parsed : 0.035;
+    }
+    return 0.035;
+  });
+
+  const [isConversionEnabled, setIsConversionEnabled] = useState(() => {
+    const saved = localStorage.getItem('nodrapay_gold_conversion');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  // Visible Elements Customization
+  const [visibleElements, setVisibleElements] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nodrapay_visible_elements');
+      if (saved) {
+        return { ...DEFAULT_VISIBLE_ELEMENTS, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error('Failed to parse saved visible elements:', e);
+    }
+    return DEFAULT_VISIBLE_ELEMENTS;
+  });
+
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [gameFilter, setGameFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [proofFilter, setProofFilter] = useState('');
   const [sortOption, setSortOption] = useState('date_desc');
@@ -80,7 +123,38 @@ export default function App() {
     loadData();
   }, [loadData]);
 
-  // Handle Currency Preference Change
+  // Handlers for Gold Conversion
+  const handleGoldRateChange = (newRate) => {
+    setGoldRate(newRate);
+    localStorage.setItem('nodrapay_gold_rate', String(newRate));
+  };
+
+  const handleGoldCurrencyChange = (newCurr) => {
+    setGoldCurrency(newCurr);
+    localStorage.setItem('nodrapay_gold_currency', newCurr);
+  };
+
+  const handleToggleConversion = (enabled) => {
+    setIsConversionEnabled(enabled);
+    localStorage.setItem('nodrapay_gold_conversion', String(enabled));
+  };
+
+  // Handlers for Visible Elements
+  const handleToggleVisibleElement = (key, val) => {
+    setVisibleElements((prev) => {
+      const updated = { ...prev, [key]: val };
+      localStorage.setItem('nodrapay_visible_elements', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleResetVisibleDefaults = () => {
+    setVisibleElements(DEFAULT_VISIBLE_ELEMENTS);
+    localStorage.setItem('nodrapay_visible_elements', JSON.stringify(DEFAULT_VISIBLE_ELEMENTS));
+    showToast('Reset views to defaults');
+  };
+
+  // Handle Global Currency Preference Change
   const handleCurrencyChange = (newCurr) => {
     setGlobalCurrency(newCurr);
     localStorage.setItem('nodrapay_currency', newCurr);
@@ -119,8 +193,8 @@ export default function App() {
       ...original,
       id: 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       title: `${original.title} (Copy)`,
-      dateTime: new Date().toISOString().slice(0, 16),
-      status: 'In Progress',
+      dateTime: toLocalISOString(new Date()),
+      status: original.status || 'Paid',
       updatedAt: new Date().toISOString(),
     };
 
@@ -175,16 +249,12 @@ export default function App() {
     const headers = [
       'ID',
       'Date & Time',
-      'Game / Client',
+      'Game',
       'Work Title',
-      'Category',
-      'Platform',
       'Currency',
       'Income Amount',
       'Status',
       'Hours',
-      'Deliverable URL',
-      'Tags',
       'Notes',
       'Has Proof Attached',
     ];
@@ -194,14 +264,10 @@ export default function App() {
       e.dateTime,
       `"${(e.game || '').replace(/"/g, '""')}"`,
       `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.category || '').replace(/"/g, '""')}"`,
-      `"${(e.platform || '').replace(/"/g, '""')}"`,
       `"${e.currency || globalCurrency}"`,
       e.income,
       e.status,
       e.hours || '',
-      `"${(e.deliverableUrl || '').replace(/"/g, '""')}"`,
-      `"${(Array.isArray(e.tags) ? e.tags.join(', ') : '').replace(/"/g, '""')}"`,
       `"${(e.notes || '').replace(/"/g, '""')}"`,
       e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
     ]);
@@ -234,6 +300,9 @@ export default function App() {
       exportDate: new Date().toISOString(),
       version: '2.0',
       currency: globalCurrency,
+      goldRate,
+      goldCurrency,
+      isConversionEnabled,
       entries: entries,
     };
 
@@ -283,7 +352,6 @@ export default function App() {
   // Global Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't trigger letter shortcuts when focused in inputs / textareas
       const isInputFocused =
         ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
         document.activeElement?.isContentEditable;
@@ -376,16 +444,12 @@ export default function App() {
         const titleMatch = (item.title || '').toLowerCase().includes(q);
         const gameMatch = (item.game || '').toLowerCase().includes(q);
         const notesMatch = (item.notes || '').toLowerCase().includes(q);
-        const platformMatch = (item.platform || '').toLowerCase().includes(q);
-        const tagsMatch =
-          Array.isArray(item.tags) &&
-          item.tags.some((t) => (t || '').toLowerCase().includes(q));
-        return titleMatch || gameMatch || notesMatch || platformMatch || tagsMatch;
+        return titleMatch || gameMatch || notesMatch;
       });
     }
 
-    if (categoryFilter) {
-      list = list.filter((item) => item.category === categoryFilter);
+    if (gameFilter) {
+      list = list.filter((item) => item.game === gameFilter);
     }
 
     if (statusFilter) {
@@ -409,7 +473,7 @@ export default function App() {
     });
 
     return list;
-  }, [entries, searchQuery, categoryFilter, statusFilter, proofFilter, sortOption]);
+  }, [entries, searchQuery, gameFilter, statusFilter, proofFilter, sortOption]);
 
   return (
     <div className="relative min-h-screen bg-[#000000] text-zinc-100 flex flex-col selection:bg-white/20">
@@ -428,8 +492,26 @@ export default function App() {
         totalEntriesCount={entries.length}
       />
 
+      {/* Live WoW Gold Conversion Bar */}
+      <GoldConversionBar
+        goldRate={goldRate}
+        onGoldRateChange={handleGoldRateChange}
+        goldCurrency={goldCurrency}
+        onGoldCurrencyChange={handleGoldCurrencyChange}
+        isConversionEnabled={isConversionEnabled}
+        onToggleConversion={handleToggleConversion}
+        entries={entries}
+      />
+
       {/* High Density Metric Strip */}
-      <MetricStrip entries={entries} globalCurrency={globalCurrency} />
+      <MetricStrip
+        entries={entries}
+        globalCurrency={globalCurrency}
+        goldRate={goldRate}
+        goldCurrency={goldCurrency}
+        isConversionEnabled={isConversionEnabled}
+        visibleElements={visibleElements}
+      />
 
       {/* Analytics Drawer */}
       <AnalyticsDrawer
@@ -437,6 +519,10 @@ export default function App() {
         onToggle={() => setIsAnalyticsOpen((prev) => !prev)}
         entries={entries}
         globalCurrency={globalCurrency}
+        goldRate={goldRate}
+        goldCurrency={goldCurrency}
+        isConversionEnabled={isConversionEnabled}
+        visibleElements={visibleElements}
       />
 
       {/* Main Ledger Control & Listing */}
@@ -444,8 +530,8 @@ export default function App() {
         <Toolbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          categoryFilter={categoryFilter}
-          onCategoryFilterChange={setCategoryFilter}
+          gameFilter={gameFilter}
+          onGameFilterChange={setGameFilter}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           proofFilter={proofFilter}
@@ -463,6 +549,9 @@ export default function App() {
           <LedgerTable
             entries={filteredEntries}
             globalCurrency={globalCurrency}
+            goldRate={goldRate}
+            goldCurrency={goldCurrency}
+            isConversionEnabled={isConversionEnabled}
             onEditEntry={handleOpenWorkModal}
             onDuplicateEntry={handleDuplicateEntry}
             onDeleteEntry={handleDeleteEntry}
@@ -475,6 +564,9 @@ export default function App() {
           <LedgerCards
             entries={filteredEntries}
             globalCurrency={globalCurrency}
+            goldRate={goldRate}
+            goldCurrency={goldCurrency}
+            isConversionEnabled={isConversionEnabled}
             onEditEntry={handleOpenWorkModal}
             onDuplicateEntry={handleDuplicateEntry}
             onDeleteEntry={handleDeleteEntry}
@@ -485,6 +577,17 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Floating Controls at bottom-left */}
+      <FloatingControls
+        visibleElements={visibleElements}
+        onToggleElement={handleToggleVisibleElement}
+        onResetDefaults={handleResetVisibleDefaults}
+        onExportCsv={handleExportCsv}
+        onExportJson={handleExportJson}
+        onImportJson={handleImportJson}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
+      />
 
       {/* Modals */}
       <WorkModal

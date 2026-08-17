@@ -1,17 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CATEGORIES, STATUSES, CURRENCIES, GAMING_PRESETS } from '../lib/currencies';
+import { GAMING_PRESETS } from '../lib/currencies';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
-import { Input, Select, Textarea } from './ui/Input';
+import { Input, Textarea } from './ui/Input';
+import { Select } from './ui/Select';
+import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { Kbd } from './ui/Tooltip';
 import {
   UploadCloud,
   X,
-  Sparkles,
   Zap,
-  Image as ImageIcon,
   Check,
 } from 'lucide-react';
+
+const GAME_OPTIONS = [
+  { value: 'World of Warcraft', label: 'World of Warcraft' },
+  { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
+  { value: '__custom__', label: '+ Custom Game / Realm' },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: 'WOW_GOLD', label: 'WoW Gold (g)', icon: '🟡' },
+  { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
+  { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
+  { value: 'EUR', label: 'EUR (€)', flag: '🇪🇺' },
+  { value: 'GBP', label: 'GBP (£)', flag: '🇬🇧' },
+  { value: 'USDT', label: 'USDT (₮)', flag: '🌐' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'Paid', label: 'Paid' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Working', label: 'Working' },
+  { value: 'On Hold', label: 'On Hold' },
+];
 
 export function WorkModal({
   isOpen,
@@ -25,15 +47,13 @@ export function WorkModal({
   const [formData, setFormData] = useState({
     title: '',
     dateTime: '',
-    game: '',
-    category: 'Game Dev / Code',
-    platform: '',
-    currency: 'DEFAULT',
+    game: 'World of Warcraft',
+    isCustomGame: false,
+    customGameText: '',
+    currency: 'WOW_GOLD',
     income: '',
     status: 'Paid',
     hours: '',
-    deliverableUrl: '',
-    tags: '',
     notes: '',
   });
 
@@ -46,41 +66,34 @@ export function WorkModal({
   useEffect(() => {
     if (isOpen) {
       if (editingEntry) {
+        const isStandardGame =
+          editingEntry.game === 'World of Warcraft' ||
+          editingEntry.game === 'World of Warcraft Classic';
+
         setFormData({
           title: editingEntry.title || '',
-          dateTime: editingEntry.dateTime || '',
-          game: editingEntry.game || '',
-          category: editingEntry.category || 'Game Dev / Code',
-          platform: editingEntry.platform || '',
-          currency: editingEntry.currency || 'DEFAULT',
-          income: editingEntry.income !== undefined ? editingEntry.income : '',
+          dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
+          game: isStandardGame ? editingEntry.game : '__custom__',
+          isCustomGame: !isStandardGame && Boolean(editingEntry.game),
+          customGameText: isStandardGame ? '' : editingEntry.game || '',
+          currency: editingEntry.currency || (globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD'),
+          income: editingEntry.income !== undefined && editingEntry.income !== null ? editingEntry.income : '',
           status: editingEntry.status || 'Paid',
           hours: editingEntry.hours !== undefined && editingEntry.hours !== null ? editingEntry.hours : '',
-          deliverableUrl: editingEntry.deliverableUrl || '',
-          tags: Array.isArray(editingEntry.tags)
-            ? editingEntry.tags.join(', ')
-            : editingEntry.tags || '',
           notes: editingEntry.notes || '',
         });
         setProofs(editingEntry.proofs ? [...editingEntry.proofs] : []);
       } else {
-        const now = new Date();
-        const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-          .toISOString()
-          .slice(0, 16);
-
         setFormData({
           title: '',
-          dateTime: localIso,
-          game: '',
-          category: 'Game Dev / Code',
-          platform: '',
-          currency: 'DEFAULT',
+          dateTime: toLocalISOString(new Date()),
+          game: 'World of Warcraft',
+          isCustomGame: false,
+          customGameText: '',
+          currency: globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD',
           income: '',
           status: 'Paid',
           hours: '',
-          deliverableUrl: '',
-          tags: '',
           notes: '',
         });
         setProofs([]);
@@ -88,9 +101,9 @@ export function WorkModal({
 
       setTimeout(() => {
         titleInputRef.current?.focus();
-      }, 80);
+      }, 100);
     }
-  }, [isOpen, editingEntry]);
+  }, [isOpen, editingEntry, globalCurrency]);
 
   // Clipboard Paste Handler (Ctrl+V) while modal is active
   useEffect(() => {
@@ -106,14 +119,14 @@ export function WorkModal({
           const blob = items[i].getAsFile();
           if (blob) {
             hasImage = true;
-            readImageBlob(blob, `Clipboard Screenshot (${new Date().toLocaleTimeString()})`);
+            readImageBlob(blob, `Screenshot (${new Date().toLocaleTimeString()})`);
           }
         }
       }
 
       if (hasImage) {
         e.preventDefault();
-        onToast?.('⚡ Screenshot captured and attached as proof!');
+        onToast?.('⚡ Screenshot pasted as proof!');
       }
     };
 
@@ -160,35 +173,51 @@ export function WorkModal({
 
   const handleApplyPreset = (preset) => {
     const d = preset.data;
+    const isStandardGame =
+      d.game === 'World of Warcraft' || d.game === 'World of Warcraft Classic';
+
     setFormData((prev) => ({
       ...prev,
       title: d.title,
-      game: d.game,
-      category: d.category,
-      platform: d.platform,
+      game: isStandardGame ? d.game : '__custom__',
+      isCustomGame: !isStandardGame,
+      customGameText: isStandardGame ? '' : d.game,
       currency: d.currency,
       income: d.income,
-      hours: d.hours,
-      tags: d.tags.join(', '),
-      notes: d.notes,
+      hours: d.hours || '',
+      notes: d.notes || '',
     }));
     onToast?.(`⚡ Applied preset: ${preset.name}`);
+  };
+
+  const handleGameSelect = (val) => {
+    if (val === '__custom__') {
+      setFormData((prev) => ({
+        ...prev,
+        game: '__custom__',
+        isCustomGame: true,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        game: val,
+        isCustomGame: false,
+        customGameText: '',
+      }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!formData.title.trim() || !formData.game.trim() || !formData.dateTime) {
+    const selectedGame = formData.isCustomGame
+      ? formData.customGameText.trim() || 'Custom'
+      : formData.game;
+
+    if (!formData.title.trim() || !selectedGame.trim() || !formData.dateTime) {
       onToast?.('Please fill required fields (Title, Game, Date)');
       return;
     }
-
-    const tags = formData.tags
-      ? formData.tags
-          .split(',')
-          .map((t) => t.trim().replace(/^#/, ''))
-          .filter(Boolean)
-      : [];
 
     const entryToSave = {
       id:
@@ -196,15 +225,11 @@ export function WorkModal({
         'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       title: formData.title.trim(),
       dateTime: formData.dateTime,
-      game: formData.game.trim(),
-      category: formData.category,
-      platform: formData.platform.trim(),
+      game: selectedGame,
       currency: formData.currency,
       income: parseFloat(formData.income) || 0,
       status: formData.status,
       hours: formData.hours ? parseFloat(formData.hours) : null,
-      deliverableUrl: formData.deliverableUrl.trim(),
-      tags,
       notes: formData.notes.trim(),
       proofs,
       updatedAt: new Date().toISOString(),
@@ -218,10 +243,10 @@ export function WorkModal({
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
           <DialogTitle>
-            {editingEntry ? 'Edit Work Entry' : 'Log Gaming Work'}
+            {editingEntry ? 'Edit Work' : 'Log Work'}
           </DialogTitle>
           <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white/[0.08] text-zinc-300 border border-white/[0.1]">
-            {editingEntry ? 'EDITING' : 'NEW ENTRY'}
+            {editingEntry ? 'EDIT' : 'NEW'}
           </span>
         </div>
       </DialogHeader>
@@ -234,7 +259,7 @@ export function WorkModal({
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
                   <Zap className="w-3 h-3 text-amber-400" />
-                  Quick Gaming Presets
+                  Quick Presets
                 </span>
                 <span className="text-[10px] text-zinc-400">1-click autofill</span>
               </div>
@@ -254,130 +279,93 @@ export function WorkModal({
             </div>
           )}
 
-          {/* Row 1: Title & Date */}
+          {/* Row 1: Game & Work Title */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Game *
+              </label>
+              <Select
+                value={formData.game}
+                onChange={handleGameSelect}
+                options={GAME_OPTIONS}
+              />
+              {formData.isCustomGame && (
+                <div className="mt-2">
+                  <Input
+                    required
+                    value={formData.customGameText}
+                    onChange={(e) =>
+                      setFormData({ ...formData, customGameText: e.target.value })
+                    }
+                    placeholder="Enter custom game / realm..."
+                  />
+                </div>
+              )}
+            </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Work Title / Task Description *
+                Work Title *
               </label>
               <Input
                 ref={titleInputRef}
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Boss AI Behavior Trees, Radiant Coaching, 3D Pet Models"
+                placeholder="e.g. Mythic+ +20 Boost, Raid Clear, Leveling"
               />
             </div>
+          </div>
+
+          {/* Row 2: Date & Time + Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Date & Time *
               </label>
-              <Input
-                type="datetime-local"
-                required
+              <DateTimePicker
                 value={formData.dateTime}
-                onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Game, Category, Platform */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Game / Client / Studio *
-              </label>
-              <Input
-                required
-                value={formData.game}
-                onChange={(e) => setFormData({ ...formData, game: e.target.value })}
-                placeholder="e.g. Valorant, Pet Royale, Indie Client"
+                onChange={(val) => setFormData({ ...formData, dateTime: val })}
               />
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Category *
-              </label>
-              <Select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} className="bg-[#0c0c0e]">
-                    {cat}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Platform / Engine
-              </label>
-              <Input
-                value={formData.platform}
-                onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                placeholder="e.g. Unreal 5.4, Roblox Studio, Discord"
-              />
-            </div>
-          </div>
-
-          {/* Row 3: Income, Currency, Status, Hours */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Income Amount & Currency *
-              </label>
-              <div className="flex gap-1.5">
-                <select
-                  value={formData.currency}
-                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="bg-white/[0.04] border border-white/[0.08] hover:border-white/20 text-xs text-zinc-200 rounded-lg px-2 py-2 focus:outline-none cursor-pointer max-w-[100px]"
-                >
-                  <option value="DEFAULT" className="bg-[#0c0c0e]">Default</option>
-                  <optgroup label="Fiat & Crypto" className="bg-[#0c0c0e]">
-                    <option value="USD">USD ($)</option>
-                    <option value="TOMAN">Toman (تومان)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="GBP">GBP (£)</option>
-                    <option value="USDT">USDT (₮)</option>
-                  </optgroup>
-                  <optgroup label="In-Game" className="bg-[#0c0c0e]">
-                    <option value="ROBUX">Robux</option>
-                    <option value="VP">VP</option>
-                    <option value="VBUCKS">V-Bucks</option>
-                    <option value="WOW_GOLD">WoW Gold</option>
-                    <option value="OSRS_GP">OSRS GP</option>
-                    <option value="TF2_KEYS">TF2 Keys</option>
-                    <option value="MINECOINS">Minecoins</option>
-                  </optgroup>
-                </select>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  required
-                  value={formData.income}
-                  onChange={(e) => setFormData({ ...formData, income: e.target.value })}
-                  placeholder="0.00"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Status
+                Status *
               </label>
               <Select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              >
-                {STATUSES.map((st) => (
-                  <option key={st} value={st} className="bg-[#0c0c0e]">
-                    {st}
-                  </option>
-                ))}
-              </Select>
+                onChange={(val) => setFormData({ ...formData, status: val })}
+                options={STATUS_OPTIONS}
+              />
+            </div>
+          </div>
+
+          {/* Row 3: Income Amount & Currency + Time Spent */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Income Amount & Currency *
+              </label>
+              <div className="grid grid-cols-5 gap-2">
+                <div className="col-span-2">
+                  <Select
+                    value={formData.currency}
+                    onChange={(val) => setFormData({ ...formData, currency: val })}
+                    options={CURRENCY_OPTIONS}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    required
+                    value={formData.income}
+                    onChange={(e) => setFormData({ ...formData, income: e.target.value })}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -390,46 +378,21 @@ export function WorkModal({
                 min="0"
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                placeholder="e.g. 4.5"
+                placeholder="e.g. 2.5"
               />
             </div>
           </div>
 
-          {/* Row 4: Deliverable URL & Tags */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Deliverable / Repository Link
-              </label>
-              <Input
-                type="url"
-                value={formData.deliverableUrl}
-                onChange={(e) => setFormData({ ...formData, deliverableUrl: e.target.value })}
-                placeholder="https://github.com/..., https://artstation.com/..."
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Tags (Comma Separated)
-              </label>
-              <Input
-                value={formData.tags}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                placeholder="e.g. shader, boss-fight, urgent, milestone-1"
-              />
-            </div>
-          </div>
-
-          {/* Row 5: Notes */}
+          {/* Row 4: Work Notes */}
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Work Notes / Changelog / Scope Specs
+              Work Notes
             </label>
             <Textarea
               rows={2}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Document client feedback, bugs fixed, match IDs, or delivery specs..."
+              placeholder="Add any details, client name, or notes..."
             />
           </div>
 
@@ -437,10 +400,10 @@ export function WorkModal({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Proof of Completion (Screenshots / Files)
+                Proof of Completion
               </label>
               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                ⚡ Press Ctrl+V anytime to paste screenshot
+                ⚡ Press Ctrl+V to paste screenshot
               </span>
             </div>
 
@@ -477,7 +440,7 @@ export function WorkModal({
                   <span className="font-semibold text-white">Click to browse</span> or drag images here
                 </div>
                 <div className="text-[10px] text-zinc-400">
-                  Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> directly from Snipping Tool / Lightshot
+                  Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> directly from Snipping Tool
                 </div>
               </div>
             </div>
@@ -525,10 +488,12 @@ export function WorkModal({
           </Button>
           <Button variant="primary" size="sm" type="submit">
             <Check className="w-3.5 h-3.5" />
-            <span>{editingEntry ? 'Update Work Entry' : 'Save Work Entry'}</span>
+            <span>Save Work</span>
           </Button>
         </DialogFooter>
       </form>
     </Dialog>
   );
 }
+
+export default WorkModal;

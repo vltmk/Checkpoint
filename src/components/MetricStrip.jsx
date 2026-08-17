@@ -1,45 +1,69 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { formatMoney } from '../lib/currencies';
+import { formatMoney, convertToFiat } from '../lib/currencies';
 import { CheckCircle2, Clock, DollarSign, TrendingUp, Trophy } from 'lucide-react';
 
-export function MetricStrip({ entries = [], globalCurrency = 'USD' }) {
+export function MetricStrip({
+  entries = [],
+  globalCurrency = 'USD',
+  goldRate = 0.035,
+  goldCurrency = 'USD',
+  isConversionEnabled = true,
+  visibleElements = { avgRate: false, topGame: false },
+}) {
+  const displayCurrency = isConversionEnabled ? (goldCurrency || globalCurrency) : globalCurrency;
+
   const metrics = useMemo(() => {
     let totalPaid = 0;
     let paidCount = 0;
+    let paidGold = 0;
+
     let totalPending = 0;
     let pendingCount = 0;
-    let totalLogged = 0;
+    let pendingGold = 0;
+
+    let totalValue = 0;
     let totalHours = 0;
     const gameRevMap = {};
 
     entries.forEach((e) => {
       const inc = parseFloat(e.income) || 0;
-      totalLogged += inc;
+      const isGold = e.currency === 'WOW_GOLD';
 
-      if (e.status === 'Paid') {
-        totalPaid += inc;
-        paidCount++;
-      } else if (
-        e.status === 'Escrow' ||
-        e.status === 'Invoiced' ||
-        e.status === 'Pending' ||
-        e.status === 'In Progress'
-      ) {
-        totalPending += inc;
-        pendingCount++;
+      let convertedInc = inc;
+      if (isGold && isConversionEnabled && Number(goldRate) > 0) {
+        convertedInc = convertToFiat(inc, goldRate, displayCurrency);
       }
+
+      totalValue += convertedInc;
 
       if (e.hours) {
         totalHours += parseFloat(e.hours);
       }
 
+      if (e.status === 'Paid') {
+        totalPaid += convertedInc;
+        paidCount++;
+        if (isGold) paidGold += inc;
+      } else if (
+        e.status === 'Pending' ||
+        e.status === 'Working' ||
+        e.status === 'On Hold' ||
+        e.status === 'Escrow' ||
+        e.status === 'Invoiced' ||
+        e.status === 'In Progress'
+      ) {
+        totalPending += convertedInc;
+        pendingCount++;
+        if (isGold) pendingGold += inc;
+      }
+
       const g = e.game || 'Uncategorized';
-      gameRevMap[g] = (gameRevMap[g] || 0) + inc;
+      gameRevMap[g] = (gameRevMap[g] || 0) + convertedInc;
     });
 
-    const avgRate = entries.length > 0 ? totalLogged / entries.length : 0;
-    const avgHourly = totalHours > 0 ? totalLogged / totalHours : 0;
+    const avgRate = entries.length > 0 ? totalValue / entries.length : 0;
+    const avgHourly = totalHours > 0 ? totalValue / totalHours : 0;
 
     let topGame = 'None';
     let topGameRev = 0;
@@ -53,79 +77,114 @@ export function MetricStrip({ entries = [], globalCurrency = 'USD' }) {
     return {
       totalPaid,
       paidCount,
+      paidGold,
       totalPending,
       pendingCount,
-      totalLogged,
-      totalCount: entries.length,
+      pendingGold,
+      totalValue,
       avgRate,
       avgHourly,
       totalHours,
       topGame,
       topGameRev,
     };
-  }, [entries]);
+  }, [entries, displayCurrency, goldRate, isConversionEnabled]);
 
-  const cards = [
+  const allCards = [
     {
-      label: 'TOTAL EARNED (PAID)',
-      value: formatMoney(metrics.totalPaid, globalCurrency),
-      subtext: `${metrics.paidCount} payout${metrics.paidCount === 1 ? '' : 's'} completed`,
+      id: 'totalEarned',
+      label: 'Total Earned',
+      value: formatMoney(metrics.totalPaid, displayCurrency),
+      subtext: `${metrics.paidCount} job${metrics.paidCount === 1 ? '' : 's'} completed${
+        metrics.paidGold > 0 && isConversionEnabled
+          ? ` (${formatMoney(metrics.paidGold, 'WOW_GOLD')} conv.)`
+          : ''
+      }`,
       icon: CheckCircle2,
       accentClass: 'text-emerald-400',
       borderGlow: 'hover:border-emerald-500/30',
       dotGlow: 'bg-emerald-500/20 text-emerald-400',
     },
     {
-      label: 'PENDING / ESCROW',
-      value: formatMoney(metrics.totalPending, globalCurrency),
-      subtext: `${metrics.pendingCount} active in escrow / milestone`,
+      id: 'pendingPayment',
+      label: 'Pending Payment',
+      value: formatMoney(metrics.totalPending, displayCurrency),
+      subtext: `${metrics.pendingCount} job${metrics.pendingCount === 1 ? '' : 's'} pending / working`,
       icon: Clock,
-      accentClass: 'text-blue-400',
-      borderGlow: 'hover:border-blue-500/30',
-      dotGlow: 'bg-blue-500/20 text-blue-400',
+      accentClass: 'text-amber-400',
+      borderGlow: 'hover:border-amber-500/30',
+      dotGlow: 'bg-amber-500/20 text-amber-400',
     },
     {
-      label: 'TOTAL LOGGED INCOME',
-      value: formatMoney(metrics.totalLogged, globalCurrency),
-      subtext: `${metrics.totalCount} total logged jobs`,
+      id: 'totalValue',
+      label: 'Total Work Value',
+      value: formatMoney(metrics.totalValue, displayCurrency),
+      subtext: `${entries.length} total logged jobs`,
       icon: DollarSign,
       accentClass: 'text-zinc-100',
       borderGlow: 'hover:border-white/20',
       dotGlow: 'bg-white/10 text-zinc-300',
     },
     {
-      label: 'AVG REALIZATION / RATE',
-      value: formatMoney(metrics.avgRate, globalCurrency),
+      id: 'avgRate',
+      label: 'Average Rate',
+      value: formatMoney(metrics.avgRate, displayCurrency),
       unit: '/ job',
       subtext:
         metrics.totalHours > 0
-          ? `${formatMoney(metrics.avgHourly, globalCurrency)}/hr (${metrics.totalHours.toFixed(1)}h logged)`
+          ? `${formatMoney(metrics.avgHourly, displayCurrency)}/hr (${metrics.totalHours.toFixed(1)}h)`
           : '--/hr (no hours logged)',
       icon: TrendingUp,
-      accentClass: 'text-amber-400',
-      borderGlow: 'hover:border-amber-500/30',
-      dotGlow: 'bg-amber-500/20 text-amber-400',
+      accentClass: 'text-blue-400',
+      borderGlow: 'hover:border-blue-500/30',
+      dotGlow: 'bg-blue-500/20 text-blue-400',
     },
     {
-      label: 'TOP GAME / CLIENT',
+      id: 'topGame',
+      label: 'Top Client',
       value: metrics.topGame,
-      subtext: `${formatMoney(metrics.topGameRev, globalCurrency)} total revenue`,
+      isTextValue: true,
+      subtext:
+        metrics.topGame !== 'None'
+          ? `${formatMoney(metrics.topGameRev, displayCurrency)} total revenue`
+          : 'No data yet',
       icon: Trophy,
       accentClass: 'text-purple-400',
       borderGlow: 'hover:border-purple-500/30',
       dotGlow: 'bg-purple-500/20 text-purple-400',
-      isTextValue: true,
     },
   ];
 
+  const visibleCards = allCards.filter((card) => {
+    if (card.id === 'avgRate') return Boolean(visibleElements?.avgRate);
+    if (card.id === 'topGame') return Boolean(visibleElements?.topGame);
+    return true;
+  });
+
+  const getGridColsClass = (count) => {
+    switch (count) {
+      case 1:
+        return 'grid-cols-1';
+      case 2:
+        return 'grid-cols-1 sm:grid-cols-2';
+      case 3:
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+      case 4:
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+      case 5:
+      default:
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5';
+    }
+  };
+
   return (
     <section className="w-full max-w-7xl mx-auto px-4 lg:px-8 pt-4 pb-2">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        {cards.map((card, i) => {
+      <div className={`grid gap-3 ${getGridColsClass(visibleCards.length)}`}>
+        {visibleCards.map((card, i) => {
           const Icon = card.icon;
           return (
             <motion.div
-              key={card.label}
+              key={card.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04, duration: 0.2 }}
@@ -163,3 +222,5 @@ export function MetricStrip({ entries = [], globalCurrency = 'USD' }) {
     </section>
   );
 }
+
+export default MetricStrip;

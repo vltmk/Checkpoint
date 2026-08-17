@@ -14,7 +14,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  // Lock scroll
+  // Lock scroll when dialog is open
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
@@ -37,7 +37,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            className="fixed inset-0 bg-black/75 backdrop-blur-xl"
           />
 
           {/* Dialog Container */}
@@ -47,7 +47,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className={cn(
-              'relative z-10 w-full bg-[#08080a] border border-white/[0.1] rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_20px_60px_rgba(0,0,0,0.9)] overflow-hidden my-auto',
+              'relative z-10 w-full bg-[#08080a]/90 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9),inset_0_1px_0_0_rgba(255,255,255,0.12)] overflow-hidden my-auto',
               maxWidth,
               className
             )}

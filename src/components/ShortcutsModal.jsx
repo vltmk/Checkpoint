@@ -2,29 +2,29 @@ import React from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Kbd } from './ui/Tooltip';
-import { Keyboard, Sparkles } from 'lucide-react';
+import { Keyboard } from 'lucide-react';
 
 export function ShortcutsModal({ isOpen, onClose }) {
   const shortcutGroups = [
     {
-      group: 'Workflow & Creation',
+      group: 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: 'Open Log Work modal' },
-        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot from clipboard into modal' },
-        { keys: ['Esc'], desc: 'Close open modal, lightbox or clear search' },
+        { keys: ['N'], desc: 'New work entry' },
+        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot as proof in modal' },
+        { keys: ['Esc'], desc: 'Close open dialogs or clear search' },
       ],
     },
     {
-      group: 'Navigation & Views',
+      group: 'Views & Search',
       items: [
-        { keys: ['/'], desc: 'Focus global search input' },
-        { keys: ['V'], desc: 'Toggle Table view vs Compact Cards' },
-        { keys: ['A'], desc: 'Toggle Analytics charts drawer' },
-        { keys: ['?'], desc: 'Show this keyboard shortcuts modal' },
+        { keys: ['/'], desc: 'Focus search bar' },
+        { keys: ['V'], desc: 'Toggle Table vs Cards view' },
+        { keys: ['A'], desc: 'Toggle Analytics drawer' },
+        { keys: ['?'], desc: 'Open keyboard shortcuts' },
       ],
     },
     {
-      group: 'Data & Backup',
+      group: 'Export & Backup',
       items: [
         { keys: ['E'], desc: 'Export ledger to CSV' },
         { keys: ['B'], desc: 'Backup full ledger with screenshots as JSON' },
@@ -79,3 +79,5 @@ export function ShortcutsModal({ isOpen, onClose }) {
     </Dialog>
   );
 }
+
+export default ShortcutsModal;

@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
-import { formatMoney } from '../lib/currencies';
+import { formatMoney, convertToFiat } from '../lib/currencies';
 import { ChevronDown, BarChart3, PieChart } from 'lucide-react';
 import { Kbd } from './ui/Tooltip';
 
@@ -31,7 +31,13 @@ export function AnalyticsDrawer({
   onToggle,
   entries = [],
   globalCurrency = 'USD',
+  goldRate = 0.035,
+  goldCurrency = 'USD',
+  isConversionEnabled = true,
+  visibleElements = { chartMonthly: true, chartCategory: false, chartClients: false },
 }) {
+  const displayCurrency = isConversionEnabled ? (goldCurrency || globalCurrency) : globalCurrency;
+
   const chartData = useMemo(() => {
     // 1. Monthly Velocity (Last 6 months)
     const monthMap = {};
@@ -42,29 +48,30 @@ export function AnalyticsDrawer({
       monthMap[key] = 0;
     }
 
-    const catMap = {};
     const gameMap = {};
     let totalIncome = 0;
     let totalHours = 0;
 
     entries.forEach((e) => {
       const inc = parseFloat(e.income) || 0;
-      totalIncome += inc;
+      let convertedInc = inc;
+      if (e.currency === 'WOW_GOLD' && isConversionEnabled && Number(goldRate) > 0) {
+        convertedInc = convertToFiat(inc, goldRate, displayCurrency);
+      }
+
+      totalIncome += convertedInc;
       if (e.hours) totalHours += parseFloat(e.hours);
 
       const dt = new Date(e.dateTime);
       if (!isNaN(dt)) {
         const key = dt.toLocaleString('en-US', { month: 'short', year: '2-digit' });
         if (monthMap[key] !== undefined) {
-          monthMap[key] += inc;
+          monthMap[key] += convertedInc;
         }
       }
 
-      const cat = e.category || 'Other';
-      catMap[cat] = (catMap[cat] || 0) + inc;
-
-      const gm = e.game || 'Uncategorized';
-      gameMap[gm] = (gameMap[gm] || 0) + inc;
+      const gm = e.game || 'World of Warcraft';
+      gameMap[gm] = (gameMap[gm] || 0) + convertedInc;
     });
 
     const monthlyData = {
@@ -82,23 +89,19 @@ export function AnalyticsDrawer({
       ],
     };
 
-    const catLabels = Object.keys(catMap);
+    const gameLabels = Object.keys(gameMap);
     const categoryData = {
-      labels: catLabels,
+      labels: gameLabels,
       datasets: [
         {
-          data: Object.values(catMap),
+          data: Object.values(gameMap),
           backgroundColor: [
+            '#f59e0b',
             '#3b82f6',
             '#10b981',
-            '#f59e0b',
             '#8b5cf6',
             '#06b6d4',
             '#f43f5e',
-            '#ec4899',
-            '#6366f1',
-            '#14b8a6',
-            '#64748b',
           ],
           borderWidth: 0,
           hoverOffset: 4,
@@ -133,7 +136,7 @@ export function AnalyticsDrawer({
       totalHours,
       gameCount: Object.keys(gameMap).length,
     };
-  }, [entries]);
+  }, [entries, displayCurrency, goldRate, isConversionEnabled]);
 
   const baseOptions = {
     responsive: true,
@@ -154,7 +157,7 @@ export function AnalyticsDrawer({
         padding: 8,
         displayColors: false,
         callbacks: {
-          label: (ctx) => ` ${formatMoney(ctx.raw, globalCurrency)}`,
+          label: (ctx) => ` ${formatMoney(ctx.raw, displayCurrency)}`,
         },
       },
     },
@@ -172,7 +175,7 @@ export function AnalyticsDrawer({
         ticks: {
           color: '#71717a',
           font: { size: 9.5 },
-          callback: (val) => formatMoney(val, globalCurrency),
+          callback: (val) => formatMoney(val, displayCurrency),
         },
       },
     },
@@ -187,7 +190,7 @@ export function AnalyticsDrawer({
         ticks: {
           color: '#71717a',
           font: { size: 9.5 },
-          callback: (val) => formatMoney(val, globalCurrency),
+          callback: (val) => formatMoney(val, displayCurrency),
         },
       },
       y: {
@@ -215,10 +218,22 @@ export function AnalyticsDrawer({
       tooltip: {
         ...baseOptions.plugins.tooltip,
         callbacks: {
-          label: (ctx) => ` ${ctx.label}: ${formatMoney(ctx.raw, globalCurrency)}`,
+          label: (ctx) => ` ${ctx.label}: ${formatMoney(ctx.raw, displayCurrency)}`,
         },
       },
     },
+  };
+
+  const showMonthly = visibleElements?.chartMonthly !== false;
+  const showCategory = Boolean(visibleElements?.chartCategory);
+  const showClients = Boolean(visibleElements?.chartClients);
+
+  const visibleChartCount = [showMonthly, showCategory, showClients].filter(Boolean).length;
+
+  const getGridClass = (count) => {
+    if (count === 1) return 'grid grid-cols-1 gap-4 p-4';
+    if (count === 2) return 'grid grid-cols-1 md:grid-cols-2 gap-4 p-4';
+    return 'grid grid-cols-1 md:grid-cols-3 gap-4 p-4';
   };
 
   return (
@@ -240,7 +255,7 @@ export function AnalyticsDrawer({
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-wider text-zinc-300 uppercase flex items-center gap-1.5">
                 <BarChart3 className="w-3.5 h-3.5 text-zinc-400" />
-                Analytics & Breakdowns
+                Analytics & Breakdown
               </span>
               <Kbd className="hidden sm:inline-flex">A</Kbd>
             </div>
@@ -248,7 +263,7 @@ export function AnalyticsDrawer({
 
           <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-400">
             <span className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
-              💰 {formatMoney(chartData.totalIncome, globalCurrency)}
+              💰 {formatMoney(chartData.totalIncome, displayCurrency)}
             </span>
             <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
               🎮 {chartData.gameCount} Games
@@ -269,59 +284,71 @@ export function AnalyticsDrawer({
               transition={{ duration: 0.25, ease: 'easeInOut' }}
               className="overflow-hidden border-t border-white/[0.06]"
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-                {/* 1. Monthly Velocity */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase">
-                      Monthly Velocity
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-mono">Last 6 Mos</span>
-                  </div>
-                  <div className="h-44 w-full relative">
-                    <Bar data={chartData.monthlyData} options={monthlyOptions} />
-                  </div>
+              {visibleChartCount === 0 ? (
+                <div className="p-6 text-center text-xs text-zinc-400">
+                  No charts currently visible. Toggle chart visibility in bottom-left controls.
                 </div>
-
-                {/* 2. Revenue by Category */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5">
-                      <PieChart className="w-3 h-3 text-zinc-400" />
-                      By Category
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-mono">All Time</span>
-                  </div>
-                  <div className="h-44 w-full relative">
-                    {chartData.categoryData.labels.length > 0 ? (
-                      <Doughnut data={chartData.categoryData} options={categoryOptions} />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-xs text-zinc-400">
-                        No category data yet
+              ) : (
+                <div className={getGridClass(visibleChartCount)}>
+                  {/* 1. Monthly Velocity */}
+                  {showMonthly && (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase">
+                          Monthly Income
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono">Last 6 Months</span>
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Top Games Breakdown */}
-                <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase">
-                      Top Games / Clients
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-mono">Top 5</span>
-                  </div>
-                  <div className="h-44 w-full relative">
-                    {chartData.gameData.labels.length > 0 ? (
-                      <Bar data={chartData.gameData} options={gameOptions} />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-xs text-zinc-400">
-                        No game data yet
+                      <div className="h-44 w-full relative">
+                        <Bar data={chartData.monthlyData} options={monthlyOptions} />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* 2. Revenue by Game */}
+                  {showCategory && (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5">
+                          <PieChart className="w-3 h-3 text-zinc-400" />
+                          By Game
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono">All Time</span>
+                      </div>
+                      <div className="h-44 w-full relative">
+                        {chartData.categoryData.labels.length > 0 ? (
+                          <Doughnut data={chartData.categoryData} options={categoryOptions} />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-xs text-zinc-400">
+                            No game data yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Top Clients / Games Breakdown */}
+                  {showClients && (
+                    <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-zinc-300 tracking-wide uppercase">
+                          Top Clients
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono">Top 5</span>
+                      </div>
+                      <div className="h-44 w-full relative">
+                        {chartData.gameData.labels.length > 0 ? (
+                          <Bar data={chartData.gameData} options={gameOptions} />
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-xs text-zinc-400">
+                            No client data yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -329,3 +356,5 @@ export function AnalyticsDrawer({
     </section>
   );
 }
+
+export default AnalyticsDrawer;

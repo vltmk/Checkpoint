@@ -27,7 +27,6 @@ export class StorageDB {
           const store = db.createObjectStore(STORE_ENTRIES, { keyPath: 'id' });
           store.createIndex('dateTime', 'dateTime', { unique: false });
           store.createIndex('game', 'game', { unique: false });
-          store.createIndex('category', 'category', { unique: false });
           store.createIndex('status', 'status', { unique: false });
         }
       };
@@ -145,73 +144,70 @@ export class StorageDB {
     if (existing.length === 0) {
       const now = new Date();
       const d1 = new Date(now.getTime() - 1 * 86400000).toISOString().slice(0, 16);
-      const d2 = new Date(now.getTime() - 4 * 86400000).toISOString().slice(0, 16);
-      const d3 = new Date(now.getTime() - 8 * 86400000).toISOString().slice(0, 16);
-      const d4 = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 16);
+      const d2 = new Date(now.getTime() - 3 * 86400000).toISOString().slice(0, 16);
+      const d3 = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 16);
+      const d4 = new Date(now.getTime() - 10 * 86400000).toISOString().slice(0, 16);
+      const d5 = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 16);
 
       const sampleEntries = [
         {
           id: 'job_' + Date.now() + '_1',
-          title: 'Roblox Simulator Map & Pet 3D Assets',
-          game: 'Pet Royale [Roblox]',
-          category: '3D Art / Assets',
-          platform: 'Roblox Studio / Blender',
-          income: 45000,
-          currency: 'ROBUX',
+          title: 'Mythic+ +20 Boost (Key Run)',
+          game: 'World of Warcraft',
+          income: 450000,
+          currency: 'WOW_GOLD',
           status: 'Paid',
           dateTime: d1,
-          hours: 14.0,
-          deliverableUrl: 'https://www.roblox.com',
-          tags: ['roblox', '3d-assets', 'pets', 'low-poly'],
-          notes: 'Modeled 6 custom mythical eggs, hatching animations, and spawn island environment.',
+          hours: 2.5,
+          notes: 'Timed +20 dungeon run with specific loot funnel.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_2',
-          title: 'Unreal Engine 5 Boss Encounter AI & Behavior Trees',
-          game: 'Aethelgard RPG',
-          category: 'Game Dev / Code',
-          platform: 'Unreal 5.4 / C++',
-          income: 650.0,
-          currency: 'USD',
+          title: 'Ulduar 25-man GDKP Raid Run',
+          game: 'World of Warcraft Classic',
+          income: 850000,
+          currency: 'WOW_GOLD',
           status: 'Paid',
           dateTime: d2,
-          hours: 12.5,
-          deliverableUrl: 'https://github.com/example/boss-ai-module',
-          tags: ['ai', 'boss-fight', 'c++', 'blueprints'],
-          notes: 'Implemented Phase 2 rage mechanic, custom navmesh query filter, and spell telegraphing system.',
+          hours: 4.0,
+          notes: 'Full clear GDKP raid with gold pot split.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_3',
-          title: 'Valorant Radiant Coaching & Duo VOD Review (4 Sessions)',
-          game: 'Valorant',
-          category: 'Coaching / Boosting',
-          platform: 'Discord / Riot',
-          income: 8500000,
+          title: 'Leveling 1-80 Service',
+          game: 'World of Warcraft Classic',
+          income: 3500000,
           currency: 'TOMAN',
-          status: 'Paid',
+          status: 'Working',
           dateTime: d3,
-          hours: 8.0,
-          deliverableUrl: '',
-          tags: ['coaching', 'vod-review', 'radiant', 'toman'],
-          notes: 'Full utility guide for Sova and Fade lineups on Lotus and Sunset.',
+          hours: 12.0,
+          notes: 'Fast 1-80 questing and dungeon leveling service.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_4',
-          title: 'Custom World of Warcraft UI / WeakAuras Suite',
+          title: 'Custom WeakAuras UI Setup',
           game: 'World of Warcraft',
-          category: 'Game Dev / Code',
-          platform: 'Lua / Addon',
-          income: 1250000,
-          currency: 'WOW_GOLD',
-          status: 'Escrow',
+          income: 180,
+          currency: 'USD',
+          status: 'Pending',
           dateTime: d4,
+          hours: 5.0,
+          notes: 'Custom Mythic raid aura suite and action bar integration.',
+          proofs: [],
+        },
+        {
+          id: 'job_' + Date.now() + '_5',
+          title: 'Gold Farming / Crafting Order',
+          game: 'World of Warcraft',
+          income: 600000,
+          currency: 'WOW_GOLD',
+          status: 'On Hold',
+          dateTime: d5,
           hours: 6.0,
-          deliverableUrl: 'https://wago.io',
-          tags: ['weakauras', 'mythic-plus', 'lua'],
-          notes: 'Custom cooldown trackers and raid warning sound triggers for Mythic progression.',
+          notes: 'Profession craft orders fulfilled; awaiting client trade.',
           proofs: [],
         },
       ];

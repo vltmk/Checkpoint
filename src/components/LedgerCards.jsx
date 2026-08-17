@@ -1,9 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatMoney } from '../lib/currencies';
-import { StatusBadge, CategoryBadge, TagBadge } from './ui/Badge';
+import { formatMoney, convertToFiat } from '../lib/currencies';
+import { StatusBadge } from './ui/Badge';
 import {
-  ExternalLink,
   Receipt,
   Edit3,
   Copy,
@@ -15,6 +14,9 @@ import {
 export function LedgerCards({
   entries = [],
   globalCurrency = 'USD',
+  goldRate = 0.035,
+  goldCurrency = 'USD',
+  isConversionEnabled = true,
   onEditEntry,
   onDuplicateEntry,
   onDeleteEntry,
@@ -30,13 +32,13 @@ export function LedgerCards({
           <div className="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-2xl mb-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]">
             🎮
           </div>
-          <h3 className="text-base font-semibold text-white mb-1">No gaming work entries found</h3>
+          <h3 className="text-base font-semibold text-white mb-1">No work entries found</h3>
           <p className="text-xs text-zinc-400 max-w-md mb-6">
-            Log your freelance jobs, bounties, coaching sessions, 3D assets, and paste screenshot proof.
+            Log your freelance jobs, boosts, GDKP runs, and paste screenshot proof.
           </p>
           <button
             type="button"
-            onClick={() => onOpenWorkModal()}
+            onClick={() => onOpenWorkModal?.()}
             className="inline-flex items-center gap-2 bg-white text-black font-semibold text-xs px-4 py-2 rounded-lg hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)]"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -68,6 +70,16 @@ export function LedgerCards({
 
             const formattedIncome = formatMoney(entry.income, entryCurrency);
 
+            const isWoWGold = entryCurrency === 'WOW_GOLD';
+            const showConverted =
+              isWoWGold &&
+              isConversionEnabled &&
+              Number(goldRate) > 0;
+
+            const convertedFiatVal = showConverted
+              ? convertToFiat(entry.income, goldRate, goldCurrency)
+              : 0;
+
             return (
               <motion.div
                 key={entry.id}
@@ -82,14 +94,19 @@ export function LedgerCards({
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
                       <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                        {entry.game || 'Gaming'}
+                        {entry.game || 'World of Warcraft'}
                       </span>
                       <div className="text-[10px] text-zinc-400 font-mono">{dateStr}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-bold text-white font-mono">{formattedIncome}</div>
+                      {showConverted && (
+                        <div className="text-[10px] text-amber-400/90 font-mono font-medium">
+                          ≈ {formatMoney(convertedFiatVal, goldCurrency)}
+                        </div>
+                      )}
                       {entry.hours && (
-                        <div className="text-[10px] text-zinc-400 font-medium flex items-center justify-end gap-1">
+                        <div className="text-[10px] text-zinc-400 font-medium flex items-center justify-end gap-1 mt-0.5">
                           <Clock className="w-2.5 h-2.5" />
                           <span>{entry.hours} hrs</span>
                         </div>
@@ -97,22 +114,11 @@ export function LedgerCards({
                     </div>
                   </div>
 
-                  {/* Title & Link */}
-                  <div className="flex items-center gap-1.5 mb-2">
+                  {/* Title */}
+                  <div className="mb-2">
                     <h4 className="text-xs font-semibold text-zinc-100 group-hover:text-white transition-colors leading-snug">
                       {entry.title}
                     </h4>
-                    {entry.deliverableUrl && (
-                      <a
-                        href={entry.deliverableUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-zinc-400 hover:text-blue-400 transition-colors p-0.5 shrink-0"
-                        title={`Open: ${entry.deliverableUrl}`}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
                   </div>
 
                   {/* Notes snippet */}
@@ -142,18 +148,9 @@ export function LedgerCards({
                       ))}
                     </div>
                   )}
-
-                  {/* Tags */}
-                  {entry.tags && entry.tags.length > 0 && (
-                    <div className="flex items-center gap-1 flex-wrap mb-3">
-                      {entry.tags.map((tag) => (
-                        <TagBadge key={tag} tag={tag} />
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                {/* Card Footer: Badges & Actions */}
+                {/* Card Footer: Status & Actions */}
                 <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/[0.06] mt-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge
@@ -161,7 +158,6 @@ export function LedgerCards({
                       interactive={true}
                       onClick={() => onFlipStatus(entry.id, entry.status)}
                     />
-                    <CategoryBadge category={entry.category} />
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -207,3 +203,5 @@ export function LedgerCards({
     </div>
   );
 }
+
+export default LedgerCards;

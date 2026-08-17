@@ -21,15 +21,18 @@ export default {
         },
         status: {
           paid: "#10b981",
+          holding: "#3b82f6",
+          working: "#8b5cf6",
+          pending: "#f59e0b",
           escrow: "#3b82f6",
           progress: "#8b5cf6",
-          invoiced: "#f59e0b",
-          pending: "#f43f5e"
+          invoiced: "#f59e0b"
         }
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['Inter', 'monospace']
+        sans: ['Inter', 'IRANYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['IoskeleyMono', 'monospace'],
+        farsi: ['IRANYekanRd', 'sans-serif']
       },
       backdropBlur: {
         '2xl': '24px',

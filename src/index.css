@@ -2,6 +2,130 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font Faces */
+/* IRANYekanRd */
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanThinRd.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanLightRd.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanRegularRd.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanMediumRd.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanBoldRd.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanExtraBoldRd.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IRANYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanBlackRd.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Also alias IranYekanRd to match exact casing */
+@font-face {
+  font-family: 'IranYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanRegularRd.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IranYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanMediumRd.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IranYekanRd';
+  src: url('../fonts/IranYekanRd/IRANYekanBoldRd.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* IoskeleyMono */
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('../fonts/Ioskeley-mono/IoskeleyMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IoskeleyMono';
+  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     --background: #000000;
@@ -17,10 +141,9 @@
   body {
     background-color: #000000;
     color: #f4f4f5;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: 'Inter', 'IRANYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
-    selection-background-color: rgba(255, 255, 255, 0.2);
   }
 
   ::selection {
@@ -63,29 +186,29 @@
 
 /* Pure Black Glass Utilities */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 32px 0 rgba(0, 0, 0, 0.8);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.045);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.75);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -96,9 +219,17 @@
 
 .glass-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.75);
   border-color: rgba(255, 255, 255, 0.25);
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.glass-dropdown {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 12px 40px 0 rgba(0, 0, 0, 0.9);
 }
 
 /* Subtle Specular Top Highlights */
