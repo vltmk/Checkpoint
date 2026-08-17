@@ -92,7 +92,6 @@ export function DateTimePicker({
     onChange?.(toLocalISOString(oneHourAgo));
   };
 
-  // Convert raw value to local ISO format for the native input
   const normalizedValue = value ? (value.length === 16 ? value : toLocalISOString(new Date(value))) : '';
 
   return (
@@ -101,15 +100,15 @@ export function DateTimePicker({
       <div
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] hover:border-white/20 focus-within:border-white/30 focus-within:bg-white/[0.07] focus-within:ring-1 focus-within:ring-white/20 transition-all duration-150 cursor-pointer select-none',
-          isOpen && 'border-white/30 bg-white/[0.07] ring-1 ring-white/20',
+          'w-full flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
+          isOpen && 'border-zinc-500 ring-1 ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className
         )}
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
           <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-          <span className={cn('truncate', !value && 'text-zinc-400')}>
+          <span className={cn('truncate text-xs', !value && 'text-zinc-500')}>
             {formatReadableDateTime(value)}
           </span>
         </div>
@@ -120,36 +119,36 @@ export function DateTimePicker({
             type="button"
             onClick={handleSetNow}
             title="Set to current local time"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25 hover:border-emerald-500/40 active:scale-95 transition-all shadow-[0_0_10px_rgba(16,185,129,0.15)]"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all border border-zinc-700/50"
           >
             <Zap className="w-2.5 h-2.5" />
             <span>Now</span>
           </button>
           <ChevronDown
             className={cn(
-              'w-3.5 h-3.5 text-zinc-400 transition-transform duration-200',
+              'w-3.5 h-3.5 text-zinc-400 transition-transform duration-150',
               isOpen && 'rotate-180 text-zinc-200'
             )}
           />
         </div>
       </div>
 
-      {/* Glass Popover with Quick Presets & Native Datetime Input */}
+      {/* Popover with Quick Presets & Native Datetime Input */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
             className={cn(
-              'absolute left-0 right-0 z-50 min-w-[260px] bg-[#09090b]/95 backdrop-blur-2xl border border-white/[0.1] shadow-2xl rounded-xl p-3 space-y-3',
+              'absolute left-0 right-0 z-50 min-w-[260px] bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-3 space-y-3',
               dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
           >
             {/* Quick Action Presets Header */}
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-zinc-400" />
                   Quick Presets
@@ -159,22 +158,22 @@ export function DateTimePicker({
                 <button
                   type="button"
                   onClick={handleSetNow}
-                  className="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-medium border border-emerald-500/25 transition-all active:scale-95 shadow-[0_0_8px_rgba(16,185,129,0.1)]"
+                  className="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95"
                 >
-                  <Zap className="w-3 h-3" />
+                  <Zap className="w-3 h-3 text-emerald-400" />
                   <span>Now</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSetToday}
-                  className="px-2 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-zinc-300 hover:text-white text-[11px] font-medium border border-white/[0.08] transition-all active:scale-95 text-center"
+                  className="px-2 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center"
                 >
                   Today
                 </button>
                 <button
                   type="button"
                   onClick={handleSetYesterday}
-                  className="px-2 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-zinc-300 hover:text-white text-[11px] font-medium border border-white/[0.08] transition-all active:scale-95 text-center"
+                  className="px-2 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center"
                 >
                   Yesterday
                 </button>
@@ -182,31 +181,31 @@ export function DateTimePicker({
             </div>
 
             {/* Custom / Native Picker */}
-            <div className="space-y-1.5 pt-1 border-t border-white/[0.06]">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            <div className="space-y-1.5 pt-1 border-t border-zinc-800/80">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                 Custom Date & Time
               </label>
               <input
                 type="datetime-local"
                 value={normalizedValue}
                 onChange={(e) => onChange?.(e.target.value)}
-                className="w-full rounded-lg bg-white/[0.06] border border-white/[0.1] px-2.5 py-1.5 text-xs text-white [color-scheme:dark] focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all cursor-pointer"
+                className="w-full rounded-md bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 text-xs text-white [color-scheme:dark] focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all cursor-pointer"
               />
             </div>
 
             {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-1 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between pt-1 border-t border-zinc-800/80">
               <button
                 type="button"
                 onClick={handleSetOneHourAgo}
-                className="text-[10px] text-zinc-400 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                className="text-[10px] text-zinc-400 hover:text-zinc-200 transition-colors"
               >
                 -1 hour ago
               </button>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-white text-black text-[11px] font-semibold hover:bg-zinc-200 transition-all active:scale-95 shadow-[0_0_12px_rgba(255,255,255,0.1)]"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-zinc-100 text-zinc-950 text-[11px] font-semibold hover:bg-white transition-all active:scale-95"
               >
                 <Check className="w-3 h-3" />
                 Done

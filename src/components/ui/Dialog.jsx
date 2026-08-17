@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2xl' }) {
+export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl' }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && open) {
@@ -29,7 +29,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -37,17 +37,17 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-2
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/75 backdrop-blur-xl"
+            className="fixed inset-0 bg-black/80"
           />
 
           {/* Dialog Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             className={cn(
-              'relative z-10 w-full bg-[#08080a]/90 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9),inset_0_1px_0_0_rgba(255,255,255,0.12)] overflow-hidden my-auto',
+              'relative z-10 w-full bg-zinc-950 border-t sm:border border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
               maxWidth,
               className
             )}
@@ -64,7 +64,7 @@ export function DialogHeader({ children, className, onClose }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-6 py-4 border-b border-white/[0.07] bg-white/[0.02]',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0 bg-zinc-950',
         className
       )}
     >
@@ -73,7 +73,7 @@ export function DialogHeader({ children, className, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -84,21 +84,21 @@ export function DialogHeader({ children, className, onClose }) {
 
 export function DialogTitle({ children, className }) {
   return (
-    <h3 className={cn('text-sm font-semibold tracking-tight text-white flex items-center gap-2', className)}>
+    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-100 flex items-center gap-2', className)}>
       {children}
     </h3>
   );
 }
 
 export function DialogContent({ children, className }) {
-  return <div className={cn('p-6 space-y-4 max-h-[80vh] overflow-y-auto', className)}>{children}</div>;
+  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1', className)}>{children}</div>;
 }
 
 export function DialogFooter({ children, className }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-2.5 px-6 py-4 border-t border-white/[0.07] bg-white/[0.02]',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 shrink-0 bg-zinc-950',
         className
       )}
     >
@@ -106,3 +106,5 @@ export function DialogFooter({ children, className }) {
     </div>
   );
 }
+
+export default Dialog;

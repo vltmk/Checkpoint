@@ -9,25 +9,27 @@ export function ShortcutsModal({ isOpen, onClose }) {
     {
       group: 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: 'New work entry (or Ctrl+N)' },
-        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof in modal' },
-        { keys: ['Esc'], desc: 'Close dialogs, lightbox or clear search' },
+        { keys: ['N'], desc: 'Log new work record' },
+        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof into modal' },
+        { keys: ['Esc'], desc: 'Close dialogs or clear search' },
       ],
     },
     {
-      group: 'Views & Navigation',
+      group: 'Navigation & Views',
       items: [
-        { keys: ['/'], desc: 'Focus search (or Ctrl+K)' },
-        { keys: ['V'], desc: 'Toggle Table vs Cards view' },
-        { keys: ['A'], desc: 'Toggle Analytics drawer' },
-        { keys: ['?'], desc: 'Open shortcuts guide' },
+        { keys: ['1'], desc: 'Jump to Overview tab' },
+        { keys: ['2'], desc: 'Jump to Ledger tab' },
+        { keys: ['3'], desc: 'Jump to Analytics tab' },
+        { keys: ['4'], desc: 'Jump to Exchange tab' },
+        { keys: ['/'], desc: 'Focus search bar' },
+        { keys: ['?'], desc: 'Open shortcuts cheat sheet' },
       ],
     },
     {
-      group: 'Data & Backup (Mistake-Proof)',
+      group: 'Data & Portability',
       items: [
-        { keys: ['Alt', 'E'], desc: 'Export ledger to CSV (or Ctrl+Shift+E)' },
-        { keys: ['Alt', 'B'], desc: 'Backup full JSON (or Ctrl+Shift+B)' },
+        { keys: ['Alt', 'E'], desc: 'Export ledger to CSV' },
+        { keys: ['Alt', 'B'], desc: 'Backup database to JSON' },
       ],
     },
   ];
@@ -44,10 +46,10 @@ export function ShortcutsModal({ isOpen, onClose }) {
       <DialogContent className="space-y-4">
         {shortcutGroups.map((grp) => (
           <div key={grp.group} className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
               {grp.group}
             </h4>
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl divide-y divide-white/[0.04] overflow-hidden">
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg divide-y divide-zinc-800/60 overflow-hidden">
               {grp.items.map((item, idx) => (
                 <div
                   key={idx}
@@ -59,7 +61,7 @@ export function ShortcutsModal({ isOpen, onClose }) {
                       <React.Fragment key={k}>
                         <Kbd>{k}</Kbd>
                         {kIdx < item.keys.length - 1 && (
-                          <span className="text-zinc-400 text-[10px]">+</span>
+                          <span className="text-zinc-500 text-[10px]">+</span>
                         )}
                       </React.Fragment>
                     ))}
@@ -72,8 +74,8 @@ export function ShortcutsModal({ isOpen, onClose }) {
       </DialogContent>
 
       <DialogFooter>
-        <Button variant="primary" size="sm" onClick={onClose} className="w-full sm:w-auto">
-          Got It
+        <Button variant="primary" size="sm" onClick={onClose}>
+          Done
         </Button>
       </DialogFooter>
     </Dialog>

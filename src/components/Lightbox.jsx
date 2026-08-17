@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X } from 'lucide-react';
-import { Button } from './ui/Button';
 
 export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof' }) {
   useEffect(() => {
@@ -17,27 +16,27 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
   return (
     <AnimatePresence>
       {isOpen && imgSrc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/90 backdrop-blur-xl"
+            className="fixed inset-0 bg-black/90"
           />
 
           {/* Lightbox Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="relative z-10 max-w-5xl w-full max-h-[92vh] flex flex-col bg-[#0a0a0c] border border-white/[0.12] rounded-2xl overflow-hidden shadow-[0_25px_70px_rgba(0,0,0,0.95)]"
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="relative z-10 max-w-4xl w-full max-h-[90vh] flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl"
           >
             {/* Top Bar */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.08] bg-white/[0.02]">
-              <div className="text-xs font-semibold text-white truncate max-w-md">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 bg-zinc-950">
+              <div className="text-xs font-semibold text-zinc-200 truncate max-w-md">
                 {caption}
               </div>
               <div className="flex items-center gap-2">
@@ -46,7 +45,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
                   download={`${(caption || 'proof').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-xs font-medium text-white border border-white/10 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download</span>
@@ -54,7 +53,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -62,11 +61,11 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
             </div>
 
             {/* Image Preview Canvas */}
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/60">
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/80">
               <img
                 src={imgSrc}
                 alt={caption}
-                className="max-h-[75vh] w-auto max-w-full object-contain rounded-lg border border-white/10 shadow-2xl"
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-md border border-zinc-800 shadow-lg"
               />
             </div>
           </motion.div>
@@ -75,3 +74,5 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
     </AnimatePresence>
   );
 }
+
+export default Lightbox;

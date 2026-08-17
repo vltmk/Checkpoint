@@ -1,17 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GAMING_PRESETS } from '../lib/currencies';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Input, Textarea } from './ui/Input';
 import { Select } from './ui/Select';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { Kbd } from './ui/Tooltip';
-import {
-  UploadCloud,
-  X,
-  Zap,
-  Check,
-} from 'lucide-react';
+import { UploadCloud, X, Check } from 'lucide-react';
 
 const GAME_OPTIONS = [
   { value: 'World of Warcraft', label: 'World of Warcraft' },
@@ -20,12 +14,9 @@ const GAME_OPTIONS = [
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: 'WOW_GOLD', label: 'WoW Gold (g)', icon: '🟡' },
   { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
   { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-  { value: 'EUR', label: 'EUR (€)', flag: '🇪🇺' },
-  { value: 'GBP', label: 'GBP (£)', flag: '🇬🇧' },
-  { value: 'USDT', label: 'USDT (₮)', flag: '🌐' },
+  { value: 'GOLD', label: 'GOLD (🪙)', icon: '🟡' },
 ];
 
 const STATUS_OPTIONS = [
@@ -50,7 +41,7 @@ export function WorkModal({
     game: 'World of Warcraft',
     isCustomGame: false,
     customGameText: '',
-    currency: 'WOW_GOLD',
+    currency: 'USD',
     income: '',
     status: 'Paid',
     hours: '',
@@ -62,7 +53,7 @@ export function WorkModal({
   const fileInputRef = useRef(null);
   const titleInputRef = useRef(null);
 
-  // Initialize form when opening or changing editingEntry
+  // Initialize form
   useEffect(() => {
     if (isOpen) {
       if (editingEntry) {
@@ -70,13 +61,17 @@ export function WorkModal({
           editingEntry.game === 'World of Warcraft' ||
           editingEntry.game === 'World of Warcraft Classic';
 
+        let entryCur = editingEntry.currency;
+        if (entryCur === 'WOW_GOLD') entryCur = 'GOLD';
+        if (!['USD', 'TOMAN', 'GOLD'].includes(entryCur)) entryCur = 'USD';
+
         setFormData({
           title: editingEntry.title || '',
           dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
           game: isStandardGame ? editingEntry.game : '__custom__',
           isCustomGame: !isStandardGame && Boolean(editingEntry.game),
           customGameText: isStandardGame ? '' : editingEntry.game || '',
-          currency: editingEntry.currency || (globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD'),
+          currency: entryCur,
           income: editingEntry.income !== undefined && editingEntry.income !== null ? editingEntry.income : '',
           status: editingEntry.status || 'Paid',
           hours: editingEntry.hours !== undefined && editingEntry.hours !== null ? editingEntry.hours : '',
@@ -90,7 +85,7 @@ export function WorkModal({
           game: 'World of Warcraft',
           isCustomGame: false,
           customGameText: '',
-          currency: globalCurrency === 'TOMAN' ? 'TOMAN' : 'WOW_GOLD',
+          currency: globalCurrency || 'USD',
           income: '',
           status: 'Paid',
           hours: '',
@@ -105,7 +100,7 @@ export function WorkModal({
     }
   }, [isOpen, editingEntry, globalCurrency]);
 
-  // Clipboard Paste Handler (Ctrl+V) while modal is active
+  // Clipboard Paste Handler (Ctrl+V)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -126,7 +121,7 @@ export function WorkModal({
 
       if (hasImage) {
         e.preventDefault();
-        onToast?.('⚡ Screenshot pasted as proof!');
+        onToast?.('⚡ Screenshot attached from clipboard!');
       }
     };
 
@@ -139,7 +134,7 @@ export function WorkModal({
     reader.onload = (e) => {
       const newProof = {
         id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        dataUrl: e.target.result,
+        data: e.target.result,
         name: name,
         timestamp: new Date().toISOString(),
       };
@@ -153,8 +148,6 @@ export function WorkModal({
       const file = fileList[i];
       if (file.type.startsWith('image/')) {
         readImageBlob(file, file.name);
-      } else {
-        onToast?.(`Attached: ${file.name}`);
       }
     }
   };
@@ -169,25 +162,6 @@ export function WorkModal({
 
   const handleRemoveProof = (idx) => {
     setProofs((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleApplyPreset = (preset) => {
-    const d = preset.data;
-    const isStandardGame =
-      d.game === 'World of Warcraft' || d.game === 'World of Warcraft Classic';
-
-    setFormData((prev) => ({
-      ...prev,
-      title: d.title,
-      game: isStandardGame ? d.game : '__custom__',
-      isCustomGame: !isStandardGame,
-      customGameText: isStandardGame ? '' : d.game,
-      currency: d.currency,
-      income: d.income,
-      hours: d.hours || '',
-      notes: d.notes || '',
-    }));
-    onToast?.(`⚡ Applied preset: ${preset.name}`);
   };
 
   const handleGameSelect = (val) => {
@@ -211,7 +185,7 @@ export function WorkModal({
     e.preventDefault();
 
     const selectedGame = formData.isCustomGame
-      ? formData.customGameText.trim() || 'Custom'
+      ? formData.customGameText.trim() || 'Custom Game'
       : formData.game;
 
     if (!formData.title.trim() || !selectedGame.trim() || !formData.dateTime) {
@@ -239,13 +213,13 @@ export function WorkModal({
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-2xl">
+    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-xl">
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
           <DialogTitle>
-            {editingEntry ? 'Edit Work' : 'Log Work'}
+            {editingEntry ? 'Edit Work Record' : 'Log New Work'}
           </DialogTitle>
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-white/[0.08] text-zinc-300 border border-white/[0.1]">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
             {editingEntry ? 'EDIT' : 'NEW'}
           </span>
         </div>
@@ -253,37 +227,11 @@ export function WorkModal({
 
       <form onSubmit={handleSubmit}>
         <DialogContent className="space-y-4">
-          {/* Quick Presets Bar */}
-          {!editingEntry && (
-            <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-2.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-amber-400" />
-                  Quick Presets
-                </span>
-                <span className="text-[10px] text-zinc-400">1-click autofill</span>
-              </div>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {GAMING_PRESETS.map((preset) => (
-                  <button
-                    key={preset.name}
-                    type="button"
-                    onClick={() => handleApplyPreset(preset)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.09] text-[11px] font-medium text-zinc-300 hover:text-white border border-white/[0.08] shrink-0 transition-all active:scale-95"
-                  >
-                    <span>{preset.icon}</span>
-                    <span>{preset.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Row 1: Game & Work Title */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Game *
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Game / Platform *
               </label>
               <Select
                 value={formData.game}
@@ -298,13 +246,13 @@ export function WorkModal({
                     onChange={(e) =>
                       setFormData({ ...formData, customGameText: e.target.value })
                     }
-                    placeholder="Enter custom game / realm..."
+                    placeholder="Custom game name..."
                   />
                 </div>
               )}
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Work Title *
               </label>
               <Input
@@ -312,15 +260,15 @@ export function WorkModal({
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Mythic+ +20 Boost, Raid Clear, Leveling"
+                placeholder="e.g. Keystone +20, GDKP Raid, UI Addon"
               />
             </div>
           </div>
 
-          {/* Row 2: Date & Time + Status */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Row 2: Date & Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Date & Time *
               </label>
               <DateTimePicker
@@ -329,7 +277,7 @@ export function WorkModal({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Status *
               </label>
               <Select
@@ -340,11 +288,11 @@ export function WorkModal({
             </div>
           </div>
 
-          {/* Row 3: Income Amount & Currency + Time Spent */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Income Amount & Currency *
+          {/* Row 3: Income Amount & Currency + Time */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Income & Currency *
               </label>
               <div className="grid grid-cols-5 gap-2">
                 <div className="col-span-2">
@@ -363,14 +311,15 @@ export function WorkModal({
                     value={formData.income}
                     onChange={(e) => setFormData({ ...formData, income: e.target.value })}
                     placeholder="0.00"
+                    className="font-mono"
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Time Spent (Hours)
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                Time (Hours)
               </label>
               <Input
                 type="number"
@@ -379,30 +328,31 @@ export function WorkModal({
                 value={formData.hours}
                 onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                 placeholder="e.g. 2.5"
+                className="font-mono"
               />
             </div>
           </div>
 
-          {/* Row 4: Work Notes */}
+          {/* Row 4: Notes */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Work Notes
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+              Notes / Client Details
             </label>
             <Textarea
               rows={2}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Add any details, client name, or notes..."
+              placeholder="Add client username, realm name, or transaction notes..."
             />
           </div>
 
-          {/* Proof of Completion: Instant Clipboard & Dropzone */}
+          {/* Proof Screenshot Attachment */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                 Proof of Completion
               </label>
-              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              <span className="text-[10px] font-mono text-zinc-400">
                 ⚡ Press Ctrl+V to paste screenshot
               </span>
             </div>
@@ -415,10 +365,10 @@ export function WorkModal({
               }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-150 ${
+              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
                 isDragOver
-                  ? 'border-emerald-500/60 bg-emerald-500/[0.05]'
-                  : 'border-white/[0.1] hover:border-white/[0.2] bg-white/[0.02] hover:bg-white/[0.04]'
+                  ? 'border-zinc-400 bg-zinc-900'
+                  : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
               }`}
             >
               <input
@@ -430,17 +380,17 @@ export function WorkModal({
                     e.target.value = '';
                   }
                 }}
-                accept="image/*,.pdf,.zip"
+                accept="image/*"
                 multiple
                 className="hidden"
               />
               <div className="flex flex-col items-center justify-center gap-1.5">
-                <UploadCloud className="w-5 h-5 text-zinc-400" />
+                <UploadCloud className="w-5 h-5 text-zinc-500" />
                 <div className="text-xs text-zinc-300">
-                  <span className="font-semibold text-white">Click to browse</span> or drag images here
+                  <span className="font-semibold text-zinc-100">Click to upload</span> or drag image here
                 </div>
-                <div className="text-[10px] text-zinc-400">
-                  Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> directly from Snipping Tool
+                <div className="text-[10px] text-zinc-500">
+                  Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool
                 </div>
               </div>
             </div>
@@ -451,13 +401,13 @@ export function WorkModal({
                 {proofs.map((proof, idx) => (
                   <div
                     key={proof.id || idx}
-                    className="group relative h-16 w-20 rounded-lg overflow-hidden border border-white/20 bg-zinc-900 shadow-md"
+                    className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900"
                   >
                     <img
-                      src={proof.dataUrl}
+                      src={proof.data}
                       alt={proof.name || 'Proof'}
                       onClick={() =>
-                        onOpenLightbox?.(proof.dataUrl, proof.name || 'Attached Proof')
+                        onOpenLightbox?.(proof.data, proof.name || 'Attached Proof')
                       }
                       className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
                     />
@@ -467,14 +417,11 @@ export function WorkModal({
                         e.stopPropagation();
                         handleRemoveProof(idx);
                       }}
-                      className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-500 text-zinc-300 hover:text-white transition-colors"
+                      className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-white transition-colors"
                       title="Remove attachment"
                     >
                       <X className="w-3 h-3" />
                     </button>
-                    <div className="absolute bottom-0 inset-x-0 bg-black/70 px-1 py-0.5 text-[8px] text-zinc-300 truncate font-mono">
-                      {proof.name || 'Screenshot'}
-                    </div>
                   </div>
                 ))}
               </div>
@@ -488,7 +435,7 @@ export function WorkModal({
           </Button>
           <Button variant="primary" size="sm" type="submit">
             <Check className="w-3.5 h-3.5" />
-            <span>Save Work</span>
+            <span>Save Record</span>
           </Button>
         </DialogFooter>
       </form>

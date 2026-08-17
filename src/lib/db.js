@@ -3,7 +3,7 @@
  * Persistent client-side database supporting screenshot attachments and zero quota limit.
  */
 
-const DB_NAME = 'FreelanceGamingTrackerDB';
+const DB_NAME = 'NodraPayDB_v2';
 const DB_VERSION = 1;
 const STORE_ENTRIES = 'work_entries';
 
@@ -54,8 +54,15 @@ export class StorageDB {
 
       request.onsuccess = () => {
         const results = request.result || [];
-        results.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
-        resolve(results);
+        // Normalize any legacy currency codes on retrieval
+        const normalized = results.map((entry) => {
+          let cur = entry.currency;
+          if (cur === 'WOW_GOLD') cur = 'GOLD';
+          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'USD';
+          return { ...entry, currency: cur };
+        });
+        normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+        resolve(normalized);
       };
       request.onerror = (e) => reject(e.target.error);
     });
@@ -70,7 +77,13 @@ export class StorageDB {
       const store = transaction.objectStore(STORE_ENTRIES);
       const request = store.get(id);
 
-      request.onsuccess = () => resolve(request.result || null);
+      request.onsuccess = () => {
+        const entry = request.result || null;
+        if (entry && entry.currency === 'WOW_GOLD') {
+          entry.currency = 'GOLD';
+        }
+        resolve(entry);
+      };
       request.onerror = (e) => reject(e.target.error);
     });
   }
@@ -79,12 +92,17 @@ export class StorageDB {
     await this.initPromise;
     if (!this.db) return entry;
 
+    // Normalize currency
+    let cleanEntry = { ...entry };
+    if (cleanEntry.currency === 'WOW_GOLD') cleanEntry.currency = 'GOLD';
+    if (!['USD', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'USD';
+
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([STORE_ENTRIES], 'readwrite');
       const store = transaction.objectStore(STORE_ENTRIES);
-      const request = store.put(entry);
+      const request = store.put(cleanEntry);
 
-      request.onsuccess = () => resolve(entry);
+      request.onsuccess = () => resolve(cleanEntry);
       request.onerror = (e) => reject(e.target.error);
     });
   }
@@ -116,7 +134,10 @@ export class StorageDB {
 
       for (const entry of entries) {
         if (entry && entry.id) {
-          store.put(entry);
+          let clean = { ...entry };
+          if (clean.currency === 'WOW_GOLD') clean.currency = 'GOLD';
+          if (!['USD', 'TOMAN', 'GOLD'].includes(clean.currency)) clean.currency = 'USD';
+          store.put(clean);
         }
       }
     });
@@ -137,17 +158,26 @@ export class StorageDB {
   }
 
   /**
+   * Reset database with fresh sample data
+   */
+  async resetWithFreshSeed() {
+    await this.clearAll();
+    localStorage.removeItem('nodrapay_v2_seeded');
+    return await this.seedInitialDataIfEmpty(true);
+  }
+
+  /**
    * Seed realistic sample data ONLY on very first app initialization
    */
-  async seedInitialDataIfEmpty() {
-    if (typeof window !== 'undefined' && localStorage.getItem('nodrapay_seeded')) {
+  async seedInitialDataIfEmpty(force = false) {
+    if (!force && typeof window !== 'undefined' && localStorage.getItem('nodrapay_v2_seeded')) {
       return [];
     }
 
     const existing = await this.getAllEntries();
-    if (existing.length === 0) {
+    if (existing.length === 0 || force) {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('nodrapay_seeded', 'true');
+        localStorage.setItem('nodrapay_v2_seeded', 'true');
       }
 
       const now = new Date();
@@ -160,43 +190,43 @@ export class StorageDB {
       const sampleEntries = [
         {
           id: 'job_' + Date.now() + '_1',
-          title: 'Mythic+ +20 Boost (Key Run)',
+          title: 'Mythic+ +20 Keystone Boost',
           game: 'World of Warcraft',
           income: 450000,
-          currency: 'WOW_GOLD',
+          currency: 'GOLD',
           status: 'Paid',
           dateTime: d1,
           hours: 2.5,
-          notes: 'Timed +20 dungeon run with specific loot funnel.',
+          notes: 'Timed +20 dungeon run with specific armor loot funnel.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_2',
-          title: 'Ulduar 25-man GDKP Raid Run',
+          title: 'Ulduar 25-man GDKP Raid Split',
           game: 'World of Warcraft Classic',
           income: 850000,
-          currency: 'WOW_GOLD',
+          currency: 'GOLD',
           status: 'Paid',
           dateTime: d2,
           hours: 4.0,
-          notes: 'Full clear GDKP raid with gold pot split.',
+          notes: 'Full clear GDKP raid with high cut payout.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_3',
-          title: 'Leveling 1-80 Service',
+          title: 'Powerleveling 1-80 Service',
           game: 'World of Warcraft Classic',
           income: 3500000,
           currency: 'TOMAN',
           status: 'Working',
           dateTime: d3,
           hours: 12.0,
-          notes: 'Fast 1-80 questing and dungeon leveling service.',
+          notes: 'Fast questing and dungeon leveling service.',
           proofs: [],
         },
         {
           id: 'job_' + Date.now() + '_4',
-          title: 'Custom WeakAuras UI Setup',
+          title: 'Custom Raid UI & WeakAuras Suite',
           game: 'World of Warcraft',
           income: 180,
           currency: 'USD',
@@ -208,24 +238,20 @@ export class StorageDB {
         },
         {
           id: 'job_' + Date.now() + '_5',
-          title: 'Gold Farming / Crafting Order',
+          title: 'Profession Crafting Order Batch',
           game: 'World of Warcraft',
           income: 600000,
-          currency: 'WOW_GOLD',
+          currency: 'GOLD',
           status: 'On Hold',
           dateTime: d5,
           hours: 6.0,
-          notes: 'Profession craft orders fulfilled; awaiting client trade.',
+          notes: 'Max-rank craft orders fulfilled; awaiting client trade.',
           proofs: [],
         },
       ];
 
       await this.bulkImport(sampleEntries);
       return sampleEntries;
-    } else {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('nodrapay_seeded', 'true');
-      }
     }
     return existing;
   }

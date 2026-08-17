@@ -6,17 +6,15 @@ Welcome to the **Nodra Pay** project! This guide is written for AI agents and hu
 
 ## 1. Project Mission & Overview
 
-**Nodra Pay** is a minimal, high-density pure-black glassmorphic freelance ledger application specifically tailored for **World of Warcraft & World of Warcraft Classic freelancers, boosters, GDKP runners, addon devs, and gaming creators**.
+**Nodra Pay** is a monochromatic, high-density Shadcn-styled freelance ledger application specifically tailored for **freelancers, gaming boosters, raid runners, addon devs, and digital creators**.
 
 ### Key Value Propositions
+- **Tablet-Width Mini-App Frame**: Centered desktop layout (`max-w-5xl`) with minimal left sidebar and mobile bottom tab navigation.
+- **Monochromatic Shadcn Aesthetic**: Dark zinc palette (`#09090b`), spacing-driven section hierarchy, zero decorative clutter or gradients, and clean logical status indicators.
+- **Mathematical Bi-Directional Currency Engine**: Full bi-directional conversion between **USD ($)**, **IRANIAN TOMAN (تومان)**, and **GOLD (🪙)** with configurable rates.
+- **Dedicated Exchange Calculator**: Live 2-way Gold to Fiat calculator, realm token presets, and portfolio gold value overview.
 - **Instant Proof Attachment**: `Ctrl+V` clipboard pasting directly from the screen capture tool (`Win+Shift+S`) or drag-and-drop into the work modal.
-- **WoW In-Game Gold & Fiat Rate Converter**: Plain-sight exchange rate bar (e.g. 1,000 WoW Gold = $0.035 USD or 2,500 Toman) that automatically converts in-game gold to real-world fiat across all metric cards, analytics charts, and table rows.
-- **Simplified Universal Language**: Removed confusing financial jargon and replaced with clear everyday terms (`Paid`, `Pending`, `Working`, `On Hold`, `Total Earned`, `Average Rate`).
-- **Shadcn-Style Glass UI Components**: Custom translucent glass dropdown menus (`Select.jsx`) and date/time picker (`DateTimePicker.jsx`) with a 1-click **⚡ Now** button.
-- **Customizable Views**: Interactive toggles for KPI cards and charts with persistent preferences and dynamic responsive grid layout.
-- **Floating Bottom-Left Dock**: Centralized Data menu (CSV, JSON Backup, JSON Restore) and Shortcuts guide (`?`) anchored at bottom-left.
-- **Custom Typography**: Embedded `IRANYekanRd` for Persian/Arabic/Toman text, `IoskeleyMono` for numeric/code styling, and `Inter` for primary UI.
-- **1-Click Inline Status Flip & Proof Receipts**: Instant status cycling and 1-click client proof-of-work receipt slips.
+- **Proof-of-Work Receipts**: Printable client receipt slips and 1-click Discord markdown export.
 - **Zero Quota Limit Storage**: Built on **IndexedDB** (`src/lib/db.js`) to allow saving large screenshot proofs without hitting `localStorage` quota restrictions.
 
 ---
@@ -24,10 +22,10 @@ Welcome to the **Nodra Pay** project! This guide is written for AI agents and hu
 ## 2. Tech Stack & Architecture
 
 - **Framework & Toolchain**: Vite + React 18
-- **Styling**: Tailwind CSS + Pure Black Glassmorphic Design System (`src/index.css`, `tailwind.config.js`)
+- **Styling**: Tailwind CSS + Shadcn Dark Zinc Design System (`src/index.css`, `tailwind.config.js`)
 - **Animation**: `motion` (`motion/react`)
 - **Icons**: Lucide React (`lucide-react`)
-- **Visuals & Charts**: Chart.js (`react-chartjs-2`)
+- **Visuals & Charts**: Chart.js (`react-chartjs-2`) with monochromatic theme
 - **Storage**: IndexedDB (`src/lib/db.js`) with JSON and CSV export/import
 - **Typography**: `Inter` (sans), `IRANYekanRd` (farsi/toman), `IoskeleyMono` (mono)
 
@@ -40,54 +38,55 @@ jolly-pasteur/
 ├── fonts/
 │   ├── Ioskeley-mono/          # Monospace font files (.woff2)
 │   └── IranYekanRd/            # Persian / Arabic font files (.ttf)
+├── nodra-pay.png               # Main geometric white logo
 ├── src/
 │   ├── components/
 │   │   ├── ui/
-│   │   │   ├── Badge.jsx       # Simplified status and tag badges
-│   │   │   ├── Button.jsx      # Glass button primitive
+│   │   │   ├── Badge.jsx       # Logical color status badges
+│   │   │   ├── Button.jsx      # Monochromatic Shadcn button
 │   │   │   ├── DateTimePicker.jsx # Shadcn date/time picker with 1-click Now
-│   │   │   ├── Dialog.jsx      # Pure black glass modal dialog
-│   │   │   ├── Input.jsx       # Glass text input & textarea
-│   │   │   ├── Select.jsx      # Shadcn-style custom glass dropdown select
+│   │   │   ├── Dialog.jsx      # Adaptive Shadcn dialog / bottom sheet
+│   │   │   ├── Input.jsx       # Shadcn input & textarea
+│   │   │   ├── Select.jsx      # Shadcn custom dropdown select
 │   │   │   └── Tooltip.jsx     # Kbd keycap and tooltip utilities
-│   │   ├── Header.jsx          # Top bar with currency switcher & Log Work CTA
-│   │   ├── GoldConversionBar.jsx # Live WoW Gold to fiat rate converter
-│   │   ├── MetricStrip.jsx     # High-density KPI strip with dynamic grid
-│   │   ├── AnalyticsDrawer.jsx # Collapsible charts with dynamic responsive grid
-│   │   ├── Toolbar.jsx         # Search bar with custom Shadcn select filters
-│   │   ├── LedgerTable.jsx     # Table view with vertically centered rows
-│   │   ├── LedgerCards.jsx     # Compact card view with converted gold values
-│   │   ├── WorkModal.jsx       # Streamlined work modal with Ctrl+V screenshot paste
-│   │   ├── ReceiptModal.jsx    # Proof-of-work receipt generator for client sharing
+│   │   ├── views/
+│   │   │   ├── OverviewView.jsx # Hero balance, monthly chart, recent jobs
+│   │   │   ├── LedgerView.jsx  # Filterable job cards with date grouping
+│   │   │   ├── AnalyticsView.jsx # Monochromatic monthly & game share charts
+│   │   │   └── ExchangeView.jsx # Live 2-way Gold calculator & realm presets
+│   │   ├── Sidebar.jsx         # Desktop minimal sidebar navigation
+│   │   ├── MobileNavigation.jsx # Mobile top bar and bottom dock
+│   │   ├── WorkModal.jsx       # Work modal with Ctrl+V screenshot paste
+│   │   ├── ReceiptModal.jsx    # Proof-of-work receipt with Discord MD copy
+│   │   ├── SettingsModal.jsx   # Data backup/restore and currency settings
 │   │   ├── ShortcutsModal.jsx  # Keyboard shortcuts cheat-sheet modal (? key)
-│   │   ├── FloatingControls.jsx # Bottom-left floating Data menu & Customize Views
 │   │   └── Lightbox.jsx        # Full-res screenshot viewer with download
 │   ├── lib/
-│   │   ├── currencies.js       # Currencies, WoW presets, and gold conversion helpers
+│   │   ├── currencies.js       # Bi-directional conversion engine & currencies
 │   │   ├── db.js               # IndexedDB zero-quota storage wrapper
 │   │   └── utils.js            # Tailwind clsx + twMerge utility
 │   ├── App.jsx                 # Central reactive state engine & keyboard shortcuts
 │   ├── main.jsx                # React root
-│   └── index.css               # Tailwind tokens, font-faces & glassmorphism
-├── index.html                  # HTML entry point (Inter font)
-├── package.json                # Dependencies: react, motion, lucide-react, tailwindcss, vite
-├── tailwind.config.js          # Pure black glassmorphism & typography config
+│   └── index.css               # Monochromatic Shadcn tokens & safe-area insets
+├── index.html                  # HTML entry point
+├── package.json                # Dependencies
+├── tailwind.config.js          # Zinc scale & typography config
 ├── vite.config.js              # Vite configuration
-├── README.md                   # Updated documentation
-└── AGENTS.md                   # Collaboration & manual git workflow guide
+├── README.md                   # Documentation
+└── AGENTS.md                   # Collaboration & git workflow guide
 ```
 
 ---
 
 ## 4. Coding Conventions & Best Practices
 
-1. **Keep UI Dense and Pure Black Glassmorphic**:
-   - Base background `#000000`, `bg-white/[0.035]` to `bg-white/[0.08]` shades, `backdrop-blur-2xl`, and `ring-1 ring-white/10` specular lines.
+1. **Monochromatic Shadcn Aesthetic**:
+   - Keep UI minimal, dark zinc (`#09090b`), spacing-driven, and devoid of unneeded decorative borders, glassmorphic glows, or rainbow gradients.
 2. **Motion Library Import**:
    - Always import Motion components from `"motion/react"` (e.g. `import { motion, AnimatePresence } from "motion/react"`).
-3. **Currency & Gold Calculations**:
-   - `formatMoney(amount, currencyCode)` handles number formatting.
-   - `convertToFiat(goldAmount, goldRate, targetCurrency)` handles WoW Gold conversion.
+3. **Currency & Gold Engine**:
+   - Use `convertCurrency(amount, from, to, rates)` in `src/lib/currencies.js` for all conversions.
+   - Use `formatMoney(amount, currencyCode)` for number and currency formatting.
 4. **IndexedDB Operations**:
    - All persistence calls go through `trackerDB` in `src/lib/db.js`.
 
@@ -95,14 +94,14 @@ jolly-pasteur/
 
 ## 5. Git Workflow & Manual Push Protocol
 
-To ensure full control over commits and pushes, all git operations are performed manually by the user. Provide the following staging & push commands after applying changes to the project.
+To ensure full control over commits and pushes, all git operations are performed manually by the user.
 
 ### Staging & Push Commands
 ```bash
 git status
 git add .
-git commit -m "feat: simplify language, add WoW gold conversion system, custom Shadcn dropdowns, 1-click Now date picker, and floating controls"
+git commit -m "feat: monochromatic shadcn mini-app rework with tablet desktop sidebar, mobile nav, bi-directional gold engine, and nodra-pay branding"
 
-# 4. Push to remote
+# Push to remote
 git push
 ```

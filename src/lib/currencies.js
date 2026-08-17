@@ -1,22 +1,40 @@
 /**
- * currencies.js - Currency definitions, formatters, and gaming presets for Nodra Pay
+ * currencies.js - Currency definitions, formatters, and conversion engine for Nodra Pay
  */
 
 export const CURRENCIES = {
-  USD: { code: 'USD', symbol: '$', name: 'USD ($)', suffix: '', isFiat: true, flag: '🇺🇸' },
-  TOMAN: { code: 'TOMAN', symbol: '', name: 'Toman (تومان)', suffix: ' تومان', isFiat: true, flag: '🇮🇷' },
-  EUR: { code: 'EUR', symbol: '€', name: 'EUR (€)', suffix: '', isFiat: true, flag: '🇪🇺' },
-  GBP: { code: 'GBP', symbol: '£', name: 'GBP (£)', suffix: '', isFiat: true, flag: '🇬🇧' },
-  USDT: { code: 'USDT', symbol: '₮', name: 'USDT (₮)', suffix: '', isFiat: true, flag: '🌐' },
-  WOW_GOLD: { code: 'WOW_GOLD', symbol: '🟡 ', name: 'WoW Gold (g)', suffix: 'g', isFiat: false, game: 'World of Warcraft' },
+  USD: {
+    code: 'USD',
+    symbol: '$',
+    name: 'USD ($)',
+    suffix: '',
+    isFiat: true,
+    flag: '🇺🇸',
+  },
+  TOMAN: {
+    code: 'TOMAN',
+    symbol: '',
+    name: 'Toman (تومان)',
+    suffix: ' تومان',
+    isFiat: true,
+    flag: '🇮🇷',
+  },
+  GOLD: {
+    code: 'GOLD',
+    symbol: '🪙 ',
+    name: 'GOLD',
+    suffix: ' GOLD',
+    isFiat: false,
+    game: 'World of Warcraft',
+  },
 };
+
+export const SUPPORTED_CURRENCY_CODES = ['USD', 'TOMAN', 'GOLD'];
 
 export const GAMES = [
   'World of Warcraft',
   'World of Warcraft Classic',
 ];
-
-export const CATEGORIES = [];
 
 export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold'];
 
@@ -24,29 +42,29 @@ export const STATUS_CONFIG = {
   Paid: {
     label: 'Paid',
     color: 'emerald',
-    badgeClass: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+    badgeClass: 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40',
     dotClass: 'bg-emerald-400',
     next: 'Pending',
   },
   Pending: {
     label: 'Pending',
     color: 'amber',
-    badgeClass: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+    badgeClass: 'bg-amber-950/40 text-amber-400 border border-amber-800/40',
     dotClass: 'bg-amber-400',
     next: 'Working',
   },
   Working: {
     label: 'Working',
-    color: 'purple',
-    badgeClass: 'bg-purple-500/10 text-purple-400 border border-purple-500/20',
-    dotClass: 'bg-purple-400',
+    color: 'blue',
+    badgeClass: 'bg-blue-950/40 text-blue-400 border border-blue-800/40',
+    dotClass: 'bg-blue-400',
     next: 'On Hold',
   },
   'On Hold': {
     label: 'On Hold',
-    color: 'blue',
-    badgeClass: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-    dotClass: 'bg-blue-400',
+    color: 'zinc',
+    badgeClass: 'bg-zinc-900 text-zinc-400 border border-zinc-800',
+    dotClass: 'bg-zinc-500',
     next: 'Paid',
   },
 };
@@ -54,13 +72,19 @@ export const STATUS_CONFIG = {
 /**
  * Format numeric currency amount for display
  */
-export function formatMoney(amount, currencyCode = null, fallbackCurrency = 'USD') {
-  const code = currencyCode && currencyCode !== 'DEFAULT' ? currencyCode : fallbackCurrency;
-  const cur = CURRENCIES[code] || { symbol: '$', suffix: '', isFiat: true };
+export function formatMoney(amount, currencyCode = 'USD', compact = false) {
+  const code = currencyCode === 'WOW_GOLD' ? 'GOLD' : (currencyCode || 'USD');
+  const cur = CURRENCIES[code] || CURRENCIES.USD;
   const num = Number(amount || 0);
 
+  if (isNaN(num)) return `0${cur.suffix}`;
+
   let formattedNum;
-  if (code === 'TOMAN' || !cur.isFiat) {
+  if (compact && Math.abs(num) >= 1000000) {
+    formattedNum = (num / 1000000).toFixed(1) + 'M';
+  } else if (compact && Math.abs(num) >= 1000) {
+    formattedNum = (num / 1000).toFixed(1) + 'k';
+  } else if (code === 'TOMAN' || code === 'GOLD') {
     formattedNum = Math.round(num).toLocaleString('en-US');
   } else {
     formattedNum = num.toLocaleString('en-US', {
@@ -80,88 +104,76 @@ export function formatMoney(amount, currencyCode = null, fallbackCurrency = 'USD
 }
 
 /**
- * Convert WoW Gold amount to target fiat currency based on rate per 1,000 Gold
+ * Robust Bi-Directional Currency Converter
+ * Converts any amount from fromCurrency to toCurrency using configurable rates.
+ * 
+ * Rates Object:
+ * {
+ *   goldRateUSD: number (rate per 1,000 GOLD in USD, e.g. 0.035)
+ *   goldRateTOMAN: number (rate per 1,000 GOLD in TOMAN, e.g. 3200)
+ * }
  */
-export function convertToFiat(goldAmount, goldRate, targetCurrency = 'USD') {
-  const rate = Number(goldRate || 0);
-  const gold = Number(goldAmount || 0);
-  if (!rate || rate <= 0 || !gold) return 0;
-  return (gold / 1000) * rate;
-}
+export function convertCurrency(amount, fromCurrency, toCurrency, rates = {}) {
+  const val = Number(amount || 0);
+  if (isNaN(val) || val === 0) return 0;
 
-/**
- * Format converted value if currency is WoW Gold and conversion rate is set
- */
-export function formatConvertedValue(amount, currencyCode, goldRate, targetCurrency = 'USD') {
-  if (currencyCode === 'WOW_GOLD' && goldRate && Number(goldRate) > 0) {
-    const converted = convertToFiat(amount, goldRate, targetCurrency);
-    return formatMoney(converted, targetCurrency);
+  const from = fromCurrency === 'WOW_GOLD' ? 'GOLD' : (fromCurrency || 'USD');
+  const to = toCurrency === 'WOW_GOLD' ? 'GOLD' : (toCurrency || 'USD');
+
+  // Same currency -> 1:1
+  if (from === to) return val;
+
+  const goldRateUSD = Number(rates.goldRateUSD) || 0.035;
+  const goldRateTOMAN = Number(rates.goldRateTOMAN) || 3200;
+
+  // 1. From GOLD to Fiat
+  if (from === 'GOLD') {
+    if (to === 'USD') {
+      return (val / 1000) * goldRateUSD;
+    }
+    if (to === 'TOMAN') {
+      return (val / 1000) * goldRateTOMAN;
+    }
   }
-  return formatMoney(amount, currencyCode);
+
+  // 2. From Fiat to GOLD
+  if (to === 'GOLD') {
+    if (from === 'USD') {
+      return goldRateUSD > 0 ? (val / goldRateUSD) * 1000 : 0;
+    }
+    if (from === 'TOMAN') {
+      return goldRateTOMAN > 0 ? (val / goldRateTOMAN) * 1000 : 0;
+    }
+  }
+
+  // 3. Between USD and TOMAN (via Gold reference or default cross-rate)
+  if (from === 'USD' && to === 'TOMAN') {
+    // If 1k gold = $X USD and 1k gold = Y Toman, then $1 USD = Y / X Toman
+    if (goldRateUSD > 0 && goldRateTOMAN > 0) {
+      return val * (goldRateTOMAN / goldRateUSD);
+    }
+    return val * 90000;
+  }
+
+  if (from === 'TOMAN' && to === 'USD') {
+    if (goldRateUSD > 0 && goldRateTOMAN > 0) {
+      return val * (goldRateUSD / goldRateTOMAN);
+    }
+    return val / 90000;
+  }
+
+  return val;
 }
 
 /**
- * Gaming Quick Presets for 1-click modal fill
+ * Format converted secondary string (e.g. "≈ $17.50" or "≈ 500,000 GOLD")
  */
-export const GAMING_PRESETS = [
-  {
-    name: 'Mythic+ +20 Boost',
-    icon: '⚔️',
-    data: {
-      title: 'Mythic+ +20 Boost',
-      game: 'World of Warcraft',
-      currency: 'WOW_GOLD',
-      income: 450000,
-      hours: 2.5,
-      notes: 'Timed +20 dungeon run boost with specific loot funnel.',
-    },
-  },
-  {
-    name: 'Raid GDKP Run',
-    icon: '👑',
-    data: {
-      title: 'Raid GDKP Run',
-      game: 'World of Warcraft Classic',
-      currency: 'WOW_GOLD',
-      income: 850000,
-      hours: 4.0,
-      notes: 'Full clear GDKP raid with gold pot split.',
-    },
-  },
-  {
-    name: 'Leveling 1-80 Service',
-    icon: '⚡',
-    data: {
-      title: 'Leveling 1-80 Service',
-      game: 'World of Warcraft Classic',
-      currency: 'TOMAN',
-      income: 3500000,
-      hours: 12.0,
-      notes: 'Fast 1-80 questing and dungeon grinding service.',
-    },
-  },
-  {
-    name: 'Custom WeakAuras UI',
-    icon: '🛡️',
-    data: {
-      title: 'Custom WeakAuras UI',
-      game: 'World of Warcraft',
-      currency: 'USD',
-      income: 180,
-      hours: 5.0,
-      notes: 'Tailored Mythic raid aura suite and action bar integration.',
-    },
-  },
-  {
-    name: 'Gold Farming / Crafting',
-    icon: '⛏️',
-    data: {
-      title: 'Gold Farming / Crafting',
-      game: 'World of Warcraft',
-      currency: 'WOW_GOLD',
-      income: 600000,
-      hours: 6.0,
-      notes: 'Ore farming and profession craft orders fulfillment.',
-    },
-  },
-];
+export function formatConvertedSecondary(amount, fromCurrency, targetCurrency, rates = {}) {
+  const from = fromCurrency === 'WOW_GOLD' ? 'GOLD' : (fromCurrency || 'USD');
+  const to = targetCurrency === 'WOW_GOLD' ? 'GOLD' : (targetCurrency || 'USD');
+
+  if (from === to) return null;
+
+  const converted = convertCurrency(amount, from, to, rates);
+  return `≈ ${formatMoney(converted, to)}`;
+}
