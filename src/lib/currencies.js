@@ -165,3 +165,14 @@ export const GAMING_PRESETS = [
     },
   },
 ];
+
+/**
+ * WoW Gold Rate Presets (per 1,000 gold)
+ */
+export const WOW_PRESETS = [
+  { label: 'Retail (USD)', rate: 0.035, currency: 'USD' },
+  { label: 'High (USD)', rate: 0.045, currency: 'USD' },
+  { label: 'Toman (2.5k)', rate: 2500, currency: 'TOMAN' },
+  { label: 'Toman (3.2k)', rate: 3200, currency: 'TOMAN' },
+  { label: 'EU (EUR)', rate: 0.032, currency: 'EUR' },
+];

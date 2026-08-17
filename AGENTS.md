@@ -95,17 +95,12 @@ jolly-pasteur/
 
 ## 5. Git Workflow & Manual Push Protocol
 
-To ensure full control over commits and pushes, all git operations are performed manually by the user.
+To ensure full control over commits and pushes, all git operations are performed manually by the user. Provide the following staging & push commands after applying changes to the project.
 
 ### Staging & Push Commands
 ```bash
-# 1. Review status & modified files
 git status
-
-# 2. Stage all files
 git add .
-
-# 3. Create descriptive commit
 git commit -m "feat: simplify language, add WoW gold conversion system, custom Shadcn dropdowns, 1-click Now date picker, and floating controls"
 
 # 4. Push to remote

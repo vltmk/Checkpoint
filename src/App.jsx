@@ -1,41 +1,29 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG } from './lib/currencies';
-import { Header } from './components/Header';
-import { GoldConversionBar } from './components/GoldConversionBar';
-import { MetricStrip } from './components/MetricStrip';
-import { AnalyticsDrawer } from './components/AnalyticsDrawer';
-import { Toolbar } from './components/Toolbar';
-import { LedgerTable } from './components/LedgerTable';
-import { LedgerCards } from './components/LedgerCards';
+import { MobileShell } from './components/MobileShell';
+import { MobileHeader } from './components/MobileHeader';
+import { MobileNavBar } from './components/MobileNavBar';
+import { SettingsSheet } from './components/SettingsSheet';
+import { HomeScreen } from './components/screens/HomeScreen';
+import { LedgerScreen } from './components/screens/LedgerScreen';
+import { StatsRatesScreen } from './components/screens/StatsRatesScreen';
 import { WorkModal } from './components/WorkModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
-import { FloatingControls } from './components/FloatingControls';
 import { toLocalISOString } from './components/ui/DateTimePicker';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle } from 'lucide-react';
 
-const DEFAULT_VISIBLE_ELEMENTS = {
-  avgRate: false,
-  topGame: false,
-  chartMonthly: true,
-  chartCategory: false,
-  chartClients: false,
-};
-
 export default function App() {
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'ledger' | 'stats'
 
   // User Preferences
   const [globalCurrency, setGlobalCurrency] = useState(() => {
     return localStorage.getItem('nodrapay_currency') || 'USD';
-  });
-
-  const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('nodrapay_view') || 'dense';
   });
 
   // Gold Conversion State
@@ -57,28 +45,8 @@ export default function App() {
     return saved !== null ? saved === 'true' : true;
   });
 
-  // Visible Elements Customization
-  const [visibleElements, setVisibleElements] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nodrapay_visible_elements');
-      if (saved) {
-        return { ...DEFAULT_VISIBLE_ELEMENTS, ...JSON.parse(saved) };
-      }
-    } catch (e) {
-      console.error('Failed to parse saved visible elements:', e);
-    }
-    return DEFAULT_VISIBLE_ELEMENTS;
-  });
-
-  // Search & Filter State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [gameFilter, setGameFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [proofFilter, setProofFilter] = useState('');
-  const [sortOption, setSortOption] = useState('date_desc');
-
-  // UI Drawer / Modals State
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  // UI Modals State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
@@ -96,7 +64,6 @@ export default function App() {
   // Toast Notification
   const [toast, setToast] = useState(null);
   const toastTimeoutRef = useRef(null);
-  const searchInputRef = useRef(null);
 
   const showToast = useCallback((msg) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -106,7 +73,7 @@ export default function App() {
     }, 2800);
   }, []);
 
-  // Initial Data Load
+  // Initial Data Load (IndexedDB)
   const loadData = useCallback(async () => {
     try {
       await trackerDB.seedInitialDataIfEmpty();
@@ -139,31 +106,11 @@ export default function App() {
     localStorage.setItem('nodrapay_gold_conversion', String(enabled));
   };
 
-  // Handlers for Visible Elements
-  const handleToggleVisibleElement = (key, val) => {
-    setVisibleElements((prev) => {
-      const updated = { ...prev, [key]: val };
-      localStorage.setItem('nodrapay_visible_elements', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleResetVisibleDefaults = () => {
-    setVisibleElements(DEFAULT_VISIBLE_ELEMENTS);
-    localStorage.setItem('nodrapay_visible_elements', JSON.stringify(DEFAULT_VISIBLE_ELEMENTS));
-    showToast('Reset views to defaults');
-  };
-
   // Handle Global Currency Preference Change
   const handleCurrencyChange = (newCurr) => {
     setGlobalCurrency(newCurr);
     localStorage.setItem('nodrapay_currency', newCurr);
-  };
-
-  // Handle View Mode Change
-  const handleViewModeChange = (mode) => {
-    setViewMode(mode);
-    localStorage.setItem('nodrapay_view', mode);
+    showToast(`Currency set to ${newCurr}`);
   };
 
   // Save Entry (Create / Update)
@@ -280,7 +227,7 @@ export default function App() {
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `nodrapay_gaming_ledger_${new Date().toISOString().slice(0, 10)}.csv`
+      `nodrapay_ledger_${new Date().toISOString().slice(0, 10)}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -298,307 +245,209 @@ export default function App() {
     const backupData = {
       app: 'Nodra Pay',
       exportDate: new Date().toISOString(),
-      version: '2.0',
-      currency: globalCurrency,
-      goldRate,
-      goldCurrency,
-      isConversionEnabled,
-      entries: entries,
+      version: '2.0-mobile',
+      settings: {
+        globalCurrency,
+        goldRate,
+        goldCurrency,
+        isConversionEnabled,
+      },
+      entries,
     };
 
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `nodrapay_ledger_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.setAttribute('href', dataStr);
+    link.setAttribute(
+      'download',
+      `nodrapay_backup_${new Date().toISOString().slice(0, 10)}.json`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast('Full JSON backup with screenshots downloaded');
+    showToast('Full JSON backup downloaded');
   };
 
   // Import JSON Backup
-  const handleImportJson = (file) => {
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        const importedEntries = Array.isArray(data) ? data : data.entries || [];
+  const handleImportJson = async (file) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          const entriesToImport = Array.isArray(imported)
+            ? imported
+            : imported.entries || [];
 
-        if (!Array.isArray(importedEntries)) {
-          throw new Error('Invalid JSON format');
-        }
+          if (!Array.isArray(entriesToImport) || entriesToImport.length === 0) {
+            showToast('Invalid backup file or no entries found');
+            return;
+          }
 
-        if (
-          window.confirm(
-            `Restore ${importedEntries.length} entries into Nodra Pay ledger?`
-          )
-        ) {
-          await trackerDB.bulkImport(importedEntries);
-          await loadData();
-          showToast(`Successfully restored ${importedEntries.length} entries`);
+          if (
+            window.confirm(
+              `Restore ${entriesToImport.length} work records from this backup?`
+            )
+          ) {
+            await trackerDB.restoreFromBackup(entriesToImport);
+            if (imported.settings) {
+              if (imported.settings.globalCurrency) handleCurrencyChange(imported.settings.globalCurrency);
+              if (imported.settings.goldRate) handleGoldRateChange(imported.settings.goldRate);
+              if (imported.settings.goldCurrency) handleGoldCurrencyChange(imported.settings.goldCurrency);
+            }
+            await loadData();
+            showToast(`⚡ Successfully restored ${entriesToImport.length} entries!`);
+          }
+        } catch (err) {
+          console.error('Failed to parse backup JSON:', err);
+          showToast('Failed to parse backup file');
         }
-      } catch (err) {
-        console.error('Import error:', err);
-        showToast('Failed to parse JSON backup file');
-      }
-    };
-    reader.readAsText(file);
+      };
+      reader.readAsText(file);
+    } catch (err) {
+      console.error('Import error:', err);
+      showToast('Error importing file');
+    }
   };
 
-  // Global Keyboard Shortcuts Listener
+  // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const isInputFocused =
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
-        document.activeElement?.isContentEditable;
-
-      // Escape closes any open modal or blurs search
-      if (e.key === 'Escape') {
-        if (lightboxData.isOpen) {
-          setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
-        } else if (isReceiptModalOpen) {
-          setIsReceiptModalOpen(false);
-        } else if (isShortcutsOpen) {
-          setIsShortcutsOpen(false);
-        } else if (isWorkModalOpen) {
-          setIsWorkModalOpen(false);
-        } else if (isInputFocused) {
-          document.activeElement?.blur();
-        }
+      // Don't trigger if typing in an input or textarea
+      const targetTag = e.target.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') {
         return;
       }
 
-      if (isInputFocused) return;
-
-      // '?' or 'Shift+/' -> Shortcuts modal
-      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-        e.preventDefault();
-        setIsShortcutsOpen((prev) => !prev);
-      }
-
-      // 'N' or 'Ctrl+N' / 'Cmd+N' -> Open Log Work Modal
-      if (
-        (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) ||
-        ((e.ctrlKey || e.metaKey || e.altKey) && e.key.toLowerCase() === 'n')
-      ) {
+      if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         handleOpenWorkModal();
-      }
-
-      // '/' or 'Ctrl+K' / 'Cmd+K' -> Focus Search Input
-      if (
-        (e.key === '/' && !e.ctrlKey && !e.metaKey) ||
-        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')
-      ) {
+      } else if (e.key === '1') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-
-      // 'V' -> Toggle View Mode
-      if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTab('home');
+      } else if (e.key === '2') {
         e.preventDefault();
-        handleViewModeChange(viewMode === 'dense' ? 'cards' : 'dense');
-        showToast(`Switched to ${viewMode === 'dense' ? 'Cards' : 'Table'} view`);
-      }
-
-      // 'A' -> Toggle Analytics
-      if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTab('ledger');
+      } else if (e.key === '3') {
         e.preventDefault();
-        setIsAnalyticsOpen((prev) => !prev);
-      }
-
-      // 'Ctrl+Shift+E' or 'Alt+E' -> Mistake-proof Export CSV
-      if (
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'e') ||
-        (e.altKey && e.key.toLowerCase() === 'e')
-      ) {
+        setActiveTab('stats');
+      } else if (e.key === '?') {
         e.preventDefault();
-        handleExportCsv();
-      }
-
-      // 'Ctrl+Shift+B' or 'Alt+B' -> Mistake-proof Full JSON Backup
-      if (
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b') ||
-        (e.altKey && e.key.toLowerCase() === 'b')
-      ) {
-        e.preventDefault();
-        handleExportJson();
+        setIsShortcutsOpen((prev) => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    isWorkModalOpen,
-    isReceiptModalOpen,
-    isShortcutsOpen,
-    lightboxData.isOpen,
-    viewMode,
-    entries,
-    globalCurrency,
-    showToast,
-  ]);
-
-  // Filter and Sort Entries
-  const filteredEntries = useMemo(() => {
-    let list = [...entries];
-    const q = searchQuery.toLowerCase().trim();
-
-    if (q) {
-      list = list.filter((item) => {
-        const titleMatch = (item.title || '').toLowerCase().includes(q);
-        const gameMatch = (item.game || '').toLowerCase().includes(q);
-        const notesMatch = (item.notes || '').toLowerCase().includes(q);
-        return titleMatch || gameMatch || notesMatch;
-      });
-    }
-
-    if (gameFilter) {
-      list = list.filter((item) => item.game === gameFilter);
-    }
-
-    if (statusFilter) {
-      list = list.filter((item) => item.status === statusFilter);
-    }
-
-    if (proofFilter === 'has_proof') {
-      list = list.filter((item) => item.proofs && item.proofs.length > 0);
-    } else if (proofFilter === 'no_proof') {
-      list = list.filter((item) => !item.proofs || item.proofs.length === 0);
-    }
-
-    // Sort
-    list.sort((a, b) => {
-      if (sortOption === 'date_desc') return new Date(b.dateTime) - new Date(a.dateTime);
-      if (sortOption === 'date_asc') return new Date(a.dateTime) - new Date(b.dateTime);
-      if (sortOption === 'income_desc') return (b.income || 0) - (a.income || 0);
-      if (sortOption === 'income_asc') return (a.income || 0) - (b.income || 0);
-      if (sortOption === 'title_asc') return (a.title || '').localeCompare(b.title || '');
-      return 0;
-    });
-
-    return list;
-  }, [entries, searchQuery, gameFilter, statusFilter, proofFilter, sortOption]);
+  }, []);
 
   return (
-    <div className="relative min-h-screen bg-[#000000] text-zinc-100 flex flex-col selection:bg-white/20">
-      {/* Translucent radial ambient background mesh */}
-      <div className="ambient-mesh" />
+    <MobileShell>
+      {/* Mobile Top Header */}
+      <MobileHeader
+        globalCurrency={globalCurrency}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenWorkModal={() => handleOpenWorkModal()}
+      />
 
-      {/* Top Header */}
-      <Header
+      {/* Main Active Screen */}
+      <main className="flex-1 flex flex-col relative z-10">
+        <AnimatePresence mode="wait">
+          {activeTab === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="flex-1 flex flex-col"
+            >
+              <HomeScreen
+                entries={entries}
+                globalCurrency={globalCurrency}
+                goldRate={goldRate}
+                goldCurrency={goldCurrency}
+                isConversionEnabled={isConversionEnabled}
+                onNavigateToLedger={() => setActiveTab('ledger')}
+                onOpenWorkModal={handleOpenWorkModal}
+                onFlipStatus={handleFlipStatus}
+                onOpenReceipt={handleOpenReceipt}
+                onOpenLightbox={handleOpenLightbox}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'ledger' && (
+            <motion.div
+              key="ledger"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="flex-1 flex flex-col"
+            >
+              <LedgerScreen
+                entries={entries}
+                globalCurrency={globalCurrency}
+                goldRate={goldRate}
+                goldCurrency={goldCurrency}
+                isConversionEnabled={isConversionEnabled}
+                onEditEntry={handleOpenWorkModal}
+                onDuplicateEntry={handleDuplicateEntry}
+                onDeleteEntry={handleDeleteEntry}
+                onFlipStatus={handleFlipStatus}
+                onOpenReceipt={handleOpenReceipt}
+                onOpenLightbox={handleOpenLightbox}
+                onOpenWorkModal={handleOpenWorkModal}
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'stats' && (
+            <motion.div
+              key="stats"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="flex-1 flex flex-col"
+            >
+              <StatsRatesScreen
+                entries={entries}
+                globalCurrency={globalCurrency}
+                goldRate={goldRate}
+                onGoldRateChange={handleGoldRateChange}
+                goldCurrency={goldCurrency}
+                onGoldCurrencyChange={handleGoldCurrencyChange}
+                isConversionEnabled={isConversionEnabled}
+                onToggleConversion={handleToggleConversion}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Floating Bottom Navigation Bar */}
+      <MobileNavBar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onOpenWorkModal={() => handleOpenWorkModal()}
+      />
+
+      {/* Settings Bottom-Sheet */}
+      <SettingsSheet
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
         globalCurrency={globalCurrency}
         onCurrencyChange={handleCurrencyChange}
-        onOpenWorkModal={handleOpenWorkModal}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
         totalEntriesCount={entries.length}
       />
 
-      {/* Live WoW Gold Conversion Bar */}
-      <GoldConversionBar
-        goldRate={goldRate}
-        onGoldRateChange={handleGoldRateChange}
-        goldCurrency={goldCurrency}
-        onGoldCurrencyChange={handleGoldCurrencyChange}
-        isConversionEnabled={isConversionEnabled}
-        onToggleConversion={handleToggleConversion}
-        entries={entries}
-      />
-
-      {/* High Density Metric Strip */}
-      <MetricStrip
-        entries={entries}
-        globalCurrency={globalCurrency}
-        goldRate={goldRate}
-        goldCurrency={goldCurrency}
-        isConversionEnabled={isConversionEnabled}
-        visibleElements={visibleElements}
-      />
-
-      {/* Analytics Drawer */}
-      <AnalyticsDrawer
-        isOpen={isAnalyticsOpen}
-        onToggle={() => setIsAnalyticsOpen((prev) => !prev)}
-        entries={entries}
-        globalCurrency={globalCurrency}
-        goldRate={goldRate}
-        goldCurrency={goldCurrency}
-        isConversionEnabled={isConversionEnabled}
-        visibleElements={visibleElements}
-      />
-
-      {/* Main Ledger Control & Listing */}
-      <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col">
-        <Toolbar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          gameFilter={gameFilter}
-          onGameFilterChange={setGameFilter}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          proofFilter={proofFilter}
-          onProofFilterChange={setProofFilter}
-          sortOption={sortOption}
-          onSortOptionChange={setSortOption}
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
-          visibleCount={filteredEntries.length}
-          totalCount={entries.length}
-          searchInputRef={searchInputRef}
-        />
-
-        {viewMode === 'dense' ? (
-          <LedgerTable
-            entries={filteredEntries}
-            globalCurrency={globalCurrency}
-            goldRate={goldRate}
-            goldCurrency={goldCurrency}
-            isConversionEnabled={isConversionEnabled}
-            onEditEntry={handleOpenWorkModal}
-            onDuplicateEntry={handleDuplicateEntry}
-            onDeleteEntry={handleDeleteEntry}
-            onFlipStatus={handleFlipStatus}
-            onOpenReceipt={handleOpenReceipt}
-            onOpenLightbox={handleOpenLightbox}
-            onOpenWorkModal={handleOpenWorkModal}
-          />
-        ) : (
-          <LedgerCards
-            entries={filteredEntries}
-            globalCurrency={globalCurrency}
-            goldRate={goldRate}
-            goldCurrency={goldCurrency}
-            isConversionEnabled={isConversionEnabled}
-            onEditEntry={handleOpenWorkModal}
-            onDuplicateEntry={handleDuplicateEntry}
-            onDeleteEntry={handleDeleteEntry}
-            onFlipStatus={handleFlipStatus}
-            onOpenReceipt={handleOpenReceipt}
-            onOpenLightbox={handleOpenLightbox}
-            onOpenWorkModal={handleOpenWorkModal}
-          />
-        )}
-      </main>
-
-      {/* Floating Controls at bottom-left */}
-      <FloatingControls
-        visibleElements={visibleElements}
-        onToggleElement={handleToggleVisibleElement}
-        onResetDefaults={handleResetVisibleDefaults}
-        onExportCsv={handleExportCsv}
-        onExportJson={handleExportJson}
-        onImportJson={handleImportJson}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
-      />
-
-      {/* Modals */}
+      {/* Work Modal (Log / Edit) */}
       <WorkModal
         isOpen={isWorkModalOpen}
         onClose={() => {
@@ -612,6 +461,7 @@ export default function App() {
         onToast={showToast}
       />
 
+      {/* Client Receipt Modal */}
       <ReceiptModal
         isOpen={isReceiptModalOpen}
         onClose={() => {
@@ -624,11 +474,13 @@ export default function App() {
         onToast={showToast}
       />
 
+      {/* Keyboard Shortcuts Modal */}
       <ShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
       />
 
+      {/* Lightbox Modal */}
       <Lightbox
         isOpen={lightboxData.isOpen}
         onClose={() => setLightboxData({ isOpen: false, imgSrc: '', caption: '' })}
@@ -644,13 +496,13 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="fixed bottom-6 right-6 z-[60] flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/95 text-white text-xs font-medium border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-2xl"
+            className="fixed top-4 inset-x-0 mx-auto w-fit z-[70] flex items-center gap-2 px-4 py-2 rounded-2xl bg-zinc-900/95 text-white text-xs font-medium border border-white/15 shadow-[0_12px_36px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.15)] backdrop-blur-2xl"
           >
             <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{toast.text}</span>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </MobileShell>
   );
 }

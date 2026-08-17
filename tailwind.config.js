@@ -30,9 +30,9 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'IRANYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['IoskeleyMono', 'monospace'],
-        farsi: ['IRANYekanRd', 'sans-serif']
+        sans: ['Inter', 'IRANYekanRd', 'IranYekanRd', 'IRANYekan', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', 'IRANYekan', 'monospace'],
+        farsi: ['IRANYekanRd', 'IranYekanRd', 'IRANYekan', 'sans-serif']
       },
       backdropBlur: {
         '2xl': '24px',
