@@ -58,7 +58,7 @@ export class StorageDB {
         const normalized = results.map((entry) => {
           let cur = entry.currency;
           if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'USD';
+          if (!['TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
           return { ...entry, currency: cur };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
@@ -79,8 +79,9 @@ export class StorageDB {
 
       request.onsuccess = () => {
         const entry = request.result || null;
-        if (entry && entry.currency === 'WOW_GOLD') {
-          entry.currency = 'GOLD';
+        if (entry) {
+          if (entry.currency === 'WOW_GOLD') entry.currency = 'GOLD';
+          if (!['TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
         }
         resolve(entry);
       };
@@ -90,19 +91,21 @@ export class StorageDB {
 
   async saveEntry(entry) {
     await this.initPromise;
-    if (!this.db) return entry;
-
-    // Normalize currency
-    let cleanEntry = { ...entry };
-    if (cleanEntry.currency === 'WOW_GOLD') cleanEntry.currency = 'GOLD';
-    if (!['USD', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'USD';
+    if (!this.db) return null;
 
     return new Promise((resolve, reject) => {
       const transaction = this.db.transaction([STORE_ENTRIES], 'readwrite');
       const store = transaction.objectStore(STORE_ENTRIES);
-      const request = store.put(cleanEntry);
 
-      request.onsuccess = () => resolve(cleanEntry);
+      const record = {
+        ...entry,
+        currency: entry.currency === 'WOW_GOLD' ? 'GOLD' : (entry.currency || 'TOMAN'),
+        exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : 3200,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const request = store.put(record);
+      request.onsuccess = () => resolve(record);
       request.onerror = (e) => reject(e.target.error);
     });
   }
@@ -121,29 +124,7 @@ export class StorageDB {
     });
   }
 
-  async bulkImport(entries) {
-    await this.initPromise;
-    if (!this.db || !Array.isArray(entries)) return false;
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction([STORE_ENTRIES], 'readwrite');
-      const store = transaction.objectStore(STORE_ENTRIES);
-
-      transaction.oncomplete = () => resolve(true);
-      transaction.onerror = (e) => reject(e.target.error);
-
-      for (const entry of entries) {
-        if (entry && entry.id) {
-          let clean = { ...entry };
-          if (clean.currency === 'WOW_GOLD') clean.currency = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(clean.currency)) clean.currency = 'USD';
-          store.put(clean);
-        }
-      }
-    });
-  }
-
-  async clearAll() {
+  async clearAllEntries() {
     await this.initPromise;
     if (!this.db) return false;
 
@@ -157,27 +138,53 @@ export class StorageDB {
     });
   }
 
+  async bulkImport(entriesList) {
+    await this.initPromise;
+    if (!this.db) return false;
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+
+      entriesList.forEach((entry) => {
+        const rec = {
+          ...entry,
+          id: entry.id || 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          currency: entry.currency === 'WOW_GOLD' ? 'GOLD' : (entry.currency || 'TOMAN'),
+          exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : 3200,
+          updatedAt: new Date().toISOString(),
+        };
+        store.put(rec);
+      });
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  }
+
   /**
-   * Reset database with fresh sample data
+   * Reset database with fresh default sample data
    */
   async resetWithFreshSeed() {
-    await this.clearAll();
-    localStorage.removeItem('nodrapay_v2_seeded');
-    return await this.seedInitialDataIfEmpty(true);
+    await this.clearAllEntries();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('nodrapay_v3_seeded');
+    }
+    return this.seedInitialDataIfEmpty(true);
   }
 
   /**
    * Seed realistic sample data ONLY on very first app initialization
    */
   async seedInitialDataIfEmpty(force = false) {
-    if (!force && typeof window !== 'undefined' && localStorage.getItem('nodrapay_v2_seeded')) {
+    if (!force && typeof window !== 'undefined' && localStorage.getItem('nodrapay_v3_seeded')) {
       return [];
     }
 
     const existing = await this.getAllEntries();
     if (existing.length === 0 || force) {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('nodrapay_v2_seeded', 'true');
+        localStorage.setItem('nodrapay_v3_seeded', 'true');
       }
 
       const now = new Date();
@@ -190,13 +197,14 @@ export class StorageDB {
       const sampleEntries = [
         {
           id: 'job_' + Date.now() + '_1',
-          title: 'Mythic+ +20 Keystone Boost',
+          title: 'Mythic+ +20 Keystone Carry',
           game: 'World of Warcraft',
+          source: 'G2G',
           income: 450000,
           currency: 'GOLD',
+          exchangeRate: 3200,
           status: 'Paid',
           dateTime: d1,
-          hours: 2.5,
           notes: 'Timed +20 dungeon run with specific armor loot funnel.',
           proofs: [],
         },
@@ -204,11 +212,12 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_2',
           title: 'Ulduar 25-man GDKP Raid Split',
           game: 'World of Warcraft Classic',
+          source: 'Guild Run',
           income: 850000,
           currency: 'GOLD',
+          exchangeRate: 2500,
           status: 'Paid',
           dateTime: d2,
-          hours: 4.0,
           notes: 'Full clear GDKP raid with high cut payout.',
           proofs: [],
         },
@@ -216,11 +225,12 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_3',
           title: 'Powerleveling 1-80 Service',
           game: 'World of Warcraft Classic',
+          source: 'FunPay',
           income: 3500000,
           currency: 'TOMAN',
-          status: 'Working',
+          exchangeRate: 7800,
+          status: 'Pending',
           dateTime: d3,
-          hours: 12.0,
           notes: 'Fast questing and dungeon leveling service.',
           proofs: [],
         },
@@ -228,11 +238,12 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_4',
           title: 'Custom Raid UI & WeakAuras Suite',
           game: 'World of Warcraft',
-          income: 180,
-          currency: 'USD',
+          source: 'Discord Direct',
+          income: 2500000,
+          currency: 'TOMAN',
+          exchangeRate: 3200,
           status: 'Pending',
           dateTime: d4,
-          hours: 5.0,
           notes: 'Custom Mythic raid aura suite and action bar integration.',
           proofs: [],
         },
@@ -240,11 +251,12 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_5',
           title: 'Profession Crafting Order Batch',
           game: 'World of Warcraft',
+          source: 'Personal Client',
           income: 600000,
           currency: 'GOLD',
-          status: 'On Hold',
+          exchangeRate: 3200,
+          status: 'Pending',
           dateTime: d5,
-          hours: 6.0,
           notes: 'Max-rank craft orders fulfilled; awaiting client trade.',
           proofs: [],
         },

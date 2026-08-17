@@ -93,6 +93,23 @@ export function Select({
     setIsOpen(false);
   };
 
+  const renderScaledText = (text) => {
+    if (typeof text !== 'string' || !text.includes('تومان')) return text;
+    const parts = text.split('تومان');
+    return (
+      <>
+        {parts.map((p, idx) => (
+          <React.Fragment key={idx}>
+            {p}
+            {idx < parts.length - 1 && (
+              <span className="text-[0.78em] font-sans opacity-90 mx-0.5">تومان</span>
+            )}
+          </React.Fragment>
+        ))}
+      </>
+    );
+  };
+
   const renderOptionItem = (option) => {
     const isSelected = String(option.value) === String(value);
 
@@ -111,9 +128,9 @@ export function Select({
         <div className="flex items-center gap-2 min-w-0 truncate">
           {option.flag && <span className="text-sm shrink-0">{option.flag}</span>}
           {option.icon && <span className="shrink-0 text-zinc-400">{option.icon}</span>}
-          <span className="truncate">{option.label}</span>
+          <span className="truncate">{renderScaledText(option.label)}</span>
           {option.subtext && (
-            <span className="text-[10px] text-zinc-500 truncate">({option.subtext})</span>
+            <span className="text-[10px] text-zinc-500 truncate">({renderScaledText(option.subtext)})</span>
           )}
         </div>
         {isSelected && <Check className="w-3.5 h-3.5 text-zinc-100 shrink-0 ml-1.5" />}
@@ -140,7 +157,7 @@ export function Select({
             <>
               {selectedOption.flag && <span className="text-sm">{selectedOption.flag}</span>}
               {selectedOption.icon && <span>{selectedOption.icon}</span>}
-              <span className="truncate text-zinc-100">{selectedOption.label}</span>
+              <span className="truncate text-zinc-100">{renderScaledText(selectedOption.label)}</span>
             </>
           ) : (
             <span className="text-zinc-400 truncate">{placeholder}</span>

@@ -2,6 +2,8 @@ import React from 'react';
 import { formatMoney } from '../lib/currencies';
 import { StatusBadge } from './ui/Badge';
 import { Button } from './ui/Button';
+import { GameIcon } from './ui/GameIcon';
+import { MoneyDisplay } from './ui/MoneyDisplay';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import {
   Printer,
@@ -13,13 +15,13 @@ import {
   Coins,
   MessageSquare,
 } from 'lucide-react';
-import nodraLogo from '../../nodra-pay.png';
+import nodraLogo from '../../nodra-vault.svg';
 
 export function ReceiptModal({
   isOpen,
   onClose,
   entry = null,
-  globalCurrency = 'USD',
+  globalCurrency = 'TOMAN',
   onOpenLightbox,
   onToast,
 }) {
@@ -52,15 +54,18 @@ export function ReceiptModal({
     window.print();
   };
 
+  const effectiveRate = Number(entry.exchangeRate) || 3200;
+
   const handleCopyText = () => {
     const text = `=== NODRA VAULT WORK RECEIPT ===
 Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${entry.game || 'World of Warcraft'}
 Work Title: ${entry.title}
+Job Source: ${entry.source || 'Direct Client'}
+Exchange Rate: ${effectiveRate.toLocaleString()} Toman / 1,000 Gold
 Status: ${entry.status || 'Paid'}
 Amount: ${formattedIncome}
-Hours: ${entry.hours ? `${entry.hours} hrs` : 'N/A'}
 Notes: ${entry.notes || 'None'}
 ==============================`;
 
@@ -75,9 +80,10 @@ ID      = ${receiptId}
 Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
 Title   = ${entry.title}
+Source  = ${entry.source || 'Direct Client'}
+Rate    = ${effectiveRate.toLocaleString()} Toman / 1k Gold
 Status  = ${entry.status || 'Paid'}
 Amount  = ${formattedIncome}
-Hours   = ${entry.hours ? `${entry.hours}h` : 'N/A'}
 Notes   = ${entry.notes || 'None'}
 \`\`\``;
 
@@ -105,7 +111,7 @@ Notes   = ${entry.notes || 'None'}
               <img
                 src={nodraLogo}
                 alt="Nodra Vault"
-                className="w-6 h-6 object-contain invert brightness-200"
+                className="w-6 h-6 object-contain"
               />
               <div>
                 <h4 className="text-sm font-bold tracking-tight text-zinc-100">
@@ -138,7 +144,19 @@ Notes   = ${entry.notes || 'None'}
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
                   Game / Platform
                 </span>
-                <span className="text-zinc-200">{entry.game}</span>
+                <span className="text-zinc-200 flex items-center gap-1.5 mt-0.5">
+                  <GameIcon game={entry.game} className="w-3.5 h-3.5" />
+                  <span>{entry.game}</span>
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
+                  Job Source / Seller
+                </span>
+                <span className="text-zinc-300 font-mono mt-0.5 block">
+                  {entry.source || 'Direct Client'}
+                </span>
               </div>
 
               <div>
@@ -152,20 +170,16 @@ Notes   = ${entry.notes || 'None'}
 
               <div>
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
-                  Time Spent
-                </span>
-                <span className="text-zinc-300 font-mono">
-                  {entry.hours ? `${entry.hours} hours` : 'Not logged'}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
                   Amount Earned
                 </span>
-                <span className="text-sm font-bold text-zinc-100 font-mono">
-                  {formattedIncome}
-                </span>
+                <div className="text-sm font-bold text-zinc-100 font-mono">
+                  <MoneyDisplay amount={entry.income} currency={entryCurrency} />
+                </div>
+              </div>
+
+              <div className="col-span-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase font-sans font-semibold">Locked Rate</span>
+                <span>{effectiveRate.toLocaleString()} Toman / 1,000 Gold</span>
               </div>
             </div>
 
@@ -228,3 +242,4 @@ Notes   = ${entry.notes || 'None'}
 }
 
 export default ReceiptModal;
+

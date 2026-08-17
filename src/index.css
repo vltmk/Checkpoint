@@ -227,3 +227,15 @@
     padding: 24px !important;
   }
 }
+
+/* Persian Currency Typography Optimization */
+.toman-unit {
+  font-size: 0.72em;
+  font-weight: 500;
+  opacity: 0.85;
+  margin-right: 0.15rem;
+  letter-spacing: normal;
+  display: inline-block;
+  vertical-align: baseline;
+}
+

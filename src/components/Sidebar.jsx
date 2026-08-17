@@ -11,18 +11,17 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
+import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
 import { CURRENCIES, formatMoney } from '../lib/currencies';
-import nodraLogo from '../../nodra-pay.png';
+import nodraLogo from '../../nodra-vault.svg';
 
 export function Sidebar({
   activeTab = 'overview',
   onTabChange,
-  globalCurrency = 'USD',
+  globalCurrency = 'TOMAN',
   onCurrencyChange,
-  goldRateUSD = 0.035,
   goldRateTOMAN = 3200,
-  onGoldRateUSDChange,
   onGoldRateTOMANChange,
   onOpenWorkModal,
   onOpenSettings,
@@ -30,13 +29,11 @@ export function Sidebar({
   entriesCount = 0,
 }) {
   const [isEditingRate, setIsEditingRate] = useState(false);
-  const [tempRateUSD, setTempRateUSD] = useState(goldRateUSD);
   const [tempRateTOMAN, setTempRateTOMAN] = useState(goldRateTOMAN);
 
   const currencyOptions = [
-    { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
     { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-    { value: 'GOLD', label: 'GOLD (🪙)', icon: '🟡' },
+    { value: 'GOLD', label: 'GOLD (G)', icon: 'G' },
   ];
 
   const navItems = [
@@ -47,7 +44,6 @@ export function Sidebar({
   ];
 
   const handleSaveRate = () => {
-    onGoldRateUSDChange?.(Number(tempRateUSD) || 0.035);
     onGoldRateTOMANChange?.(Number(tempRateTOMAN) || 3200);
     setIsEditingRate(false);
   };
@@ -60,7 +56,7 @@ export function Sidebar({
           <img
             src={nodraLogo}
             alt="Nodra Vault"
-            className="w-6 h-6 object-contain invert brightness-200"
+            className="w-6 h-6 object-contain"
           />
           <div>
             <div className="flex items-center gap-1.5">
@@ -78,7 +74,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Primary Log CTA */}
+      {/* Primary Add Work CTA */}
       <div className="mb-4">
         <Button
           variant="primary"
@@ -88,7 +84,7 @@ export function Sidebar({
         >
           <div className="flex items-center gap-1.5">
             <Plus className="w-4 h-4" />
-            <span>Log Work</span>
+            <span>Add Work</span>
           </div>
           <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700">N</Kbd>
         </Button>
@@ -151,14 +147,17 @@ export function Sidebar({
         <div className="relative">
           <button
             type="button"
-            onClick={() => setIsEditingRate((prev) => !prev)}
-            title="Click to edit live WoW Gold rates"
+            onClick={() => {
+              setTempRateTOMAN(goldRateTOMAN);
+              setIsEditingRate((prev) => !prev);
+            }}
+            title="Click to edit live WoW Gold rate"
             className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/80 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <div className="flex items-center gap-1.5 truncate">
-              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <Coins className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span className="font-mono text-[10px] truncate">
-                1k = {globalCurrency === 'TOMAN' ? `${goldRateTOMAN.toLocaleString()} T` : `$${goldRateUSD}`}
+                1k = {goldRateTOMAN.toLocaleString()} T
               </span>
             </div>
             <span className="text-[9px] font-medium text-zinc-500 uppercase">Rate</span>
@@ -168,27 +167,17 @@ export function Sidebar({
           {isEditingRate && (
             <div className="absolute bottom-full left-0 right-0 mb-1.5 p-2.5 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg space-y-2 z-50">
               <div className="text-[10px] font-semibold text-zinc-400 flex items-center justify-between">
-                <span>Set 1,000 Gold Rate</span>
+                <span>Set 1,000 Gold Rate (Toman)</span>
               </div>
               <div className="space-y-1.5">
                 <div>
-                  <span className="text-[10px] text-zinc-500">Rate in USD ($):</span>
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={tempRateUSD}
-                    onChange={(e) => setTempRateUSD(e.target.value)}
-                    className="w-full text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-zinc-100 focus:outline-none focus:border-zinc-500"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-500">Rate in Toman:</span>
-                  <input
-                    type="number"
-                    step="50"
+                  <NumberStepperInput
+                    step={50}
                     value={tempRateTOMAN}
                     onChange={(e) => setTempRateTOMAN(e.target.value)}
-                    className="w-full text-xs bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-zinc-100 focus:outline-none focus:border-zinc-500"
+                    placeholder="3200"
+                    currency="TOMAN"
+                    className="text-xs font-mono"
                   />
                 </div>
               </div>
@@ -199,7 +188,7 @@ export function Sidebar({
                 className="w-full justify-center"
               >
                 <Check className="w-3 h-3" />
-                Save Rates
+                Save Rate
               </Button>
             </div>
           )}
@@ -232,3 +221,4 @@ export function Sidebar({
 }
 
 export default Sidebar;
+

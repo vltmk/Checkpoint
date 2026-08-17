@@ -7,10 +7,10 @@ import {
   Plus,
   Settings,
 } from 'lucide-react';
-import nodraLogo from '../../nodra-pay.png';
+import nodraLogo from '../../nodra-vault.svg';
 
 export function MobileHeader({
-  globalCurrency = 'USD',
+  globalCurrency = 'TOMAN',
   onOpenSettings,
   onOpenWorkModal,
 }) {
@@ -20,7 +20,7 @@ export function MobileHeader({
         <img
           src={nodraLogo}
           alt="Nodra Vault"
-          className="w-5 h-5 object-contain invert brightness-200"
+          className="w-5 h-5 object-contain"
         />
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-bold tracking-tight text-zinc-100">
@@ -51,13 +51,6 @@ export function MobileBottomNav({
   onTabChange,
   onOpenWorkModal,
 }) {
-  const tabs = [
-    { id: 'overview', label: 'Home', icon: LayoutDashboard },
-    { id: 'ledger', label: 'Ledger', icon: Receipt },
-    { id: 'analytics', label: 'Stats', icon: BarChart3 },
-    { id: 'exchange', label: 'Exchange', icon: Coins },
-  ];
-
   return (
     <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 border-t border-zinc-800/80 px-2 py-1.5 safe-bottom">
       <div className="flex items-center justify-around max-w-md mx-auto">
@@ -85,11 +78,11 @@ export function MobileBottomNav({
           <span>Ledger</span>
         </button>
 
-        {/* Center CTA: + Log */}
+        {/* Center CTA: + Add Work */}
         <button
           type="button"
           onClick={onOpenWorkModal}
-          title="Log new work"
+          title="Add Work"
           className="flex items-center justify-center w-10 h-10 -mt-3 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-95 transition-all border border-zinc-300"
         >
           <Plus className="w-5 h-5" />
@@ -122,3 +115,5 @@ export function MobileBottomNav({
     </nav>
   );
 }
+
+export default MobileBottomNav;

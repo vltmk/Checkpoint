@@ -12,15 +12,22 @@ import {
   Trash2,
   ExternalLink,
   ChevronDown,
+  UploadCloud,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { StatusBadge } from '../ui/Badge';
+import { GameIcon } from '../ui/GameIcon';
+import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Kbd } from '../ui/Tooltip';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   formatMoney,
   convertCurrency,
+  convertEntryCurrency,
   formatConvertedSecondary,
   STATUSES,
   GAMES,
@@ -28,8 +35,7 @@ import {
 
 export function LedgerView({
   entries = [],
-  globalCurrency = 'USD',
-  goldRateUSD = 0.035,
+  globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
   onOpenWorkModal,
   onOpenReceipt,
@@ -45,10 +51,11 @@ export function LedgerView({
   const [hasProofFilter, setHasProofFilter] = useState(false);
   const [sortOption, setSortOption] = useState('date_desc');
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
+  const [promptProofEntryId, setPromptProofEntryId] = useState(null);
 
   const rates = useMemo(
-    () => ({ goldRateUSD, goldRateTOMAN }),
-    [goldRateUSD, goldRateTOMAN]
+    () => ({ goldRateTOMAN }),
+    [goldRateTOMAN]
   );
 
   // Filter and sort entries
@@ -61,6 +68,7 @@ export function LedgerView({
         (e) =>
           (e.title && e.title.toLowerCase().includes(q)) ||
           (e.game && e.game.toLowerCase().includes(q)) ||
+          (e.source && e.source.toLowerCase().includes(q)) ||
           (e.notes && e.notes.toLowerCase().includes(q)) ||
           (e.status && e.status.toLowerCase().includes(q))
       );
@@ -82,13 +90,13 @@ export function LedgerView({
       if (sortOption === 'date_desc') return new Date(b.dateTime || 0) - new Date(a.dateTime || 0);
       if (sortOption === 'date_asc') return new Date(a.dateTime || 0) - new Date(b.dateTime || 0);
       if (sortOption === 'income_desc') {
-        const valA = convertCurrency(a.income, a.currency, globalCurrency, rates);
-        const valB = convertCurrency(b.income, b.currency, globalCurrency, rates);
+        const valA = convertEntryCurrency(a, globalCurrency, rates);
+        const valB = convertEntryCurrency(b, globalCurrency, rates);
         return valB - valA;
       }
       if (sortOption === 'income_asc') {
-        const valA = convertCurrency(a.income, a.currency, globalCurrency, rates);
-        const valB = convertCurrency(b.income, b.currency, globalCurrency, rates);
+        const valA = convertEntryCurrency(a, globalCurrency, rates);
+        const valB = convertEntryCurrency(b, globalCurrency, rates);
         return valA - valB;
       }
       return 0;
@@ -146,6 +154,15 @@ export function LedgerView({
     { value: 'income_asc', label: 'Lowest Income' },
   ];
 
+  const handleStatusSelect = (entry, nextStatus) => {
+    onFlipStatus?.(entry.id, entry.status, nextStatus);
+    if (nextStatus === 'Paid' && (!entry.proofs || entry.proofs.length === 0)) {
+      setPromptProofEntryId(entry.id);
+    } else if (promptProofEntryId === entry.id) {
+      setPromptProofEntryId(null);
+    }
+  };
+
   return (
     <div className="space-y-5 pb-20 md:pb-6">
       {/* 1. Search & Filter Bar */}
@@ -156,7 +173,7 @@ export function LedgerView({
             <Input
               ref={searchInputRef}
               type="text"
-              placeholder="Search jobs, games, notes... (Press / to search)"
+              placeholder="Search jobs, games, seller source, notes... (Press / to search)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-8 h-9 text-xs"
@@ -245,7 +262,7 @@ export function LedgerView({
           </p>
           <Button variant="primary" size="sm" onClick={() => onOpenWorkModal?.()}>
             <Plus className="w-3.5 h-3.5" />
-            <span>Log Work</span>
+            <span>Add Work</span>
           </Button>
         </div>
       ) : (
@@ -274,145 +291,198 @@ export function LedgerView({
                     );
 
                     const isActionOpen = activeActionMenuId === entry.id;
+                    const isProofPrompting = promptProofEntryId === entry.id;
 
                     return (
-                      <div
-                        key={entry.id}
-                        className="relative flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
-                      >
-                        {/* Left: Thumbnail & Details */}
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          {entry.proofs && entry.proofs.length > 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
-                              title="View screenshot proof"
-                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0"
-                            >
-                              <FileImage className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
-                              <Receipt className="w-4 h-4" />
-                            </div>
-                          )}
+                      <div key={entry.id} className="space-y-1">
+                        <div
+                          className="relative flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
+                        >
+                          {/* Left: Thumbnail / WoW Emblem & Details */}
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {entry.proofs && entry.proofs.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
+                                title="View screenshot proof"
+                                className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden"
+                              >
+                                <img
+                                  src={entry.proofs[0].data}
+                                  alt="Proof"
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                />
+                              </button>
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5">
+                                <GameIcon game={entry.game} className="w-full h-full" />
+                              </div>
+                            )}
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-zinc-200 truncate">
-                                {entry.title}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-zinc-500 mt-0.5 truncate">
-                              <span>{entry.game}</span>
-                              {entry.hours && (
-                                <>
-                                  <span>•</span>
-                                  <span>{entry.hours}h</span>
-                                </>
-                              )}
-                              {entry.notes && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate max-w-[150px] text-zinc-500 italic">
-                                    "{entry.notes}"
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-zinc-200 truncate">
+                                  {entry.title}
+                                </span>
+                                {entry.source && (
+                                  <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800/80">
+                                    {entry.source}
                                   </span>
-                                </>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5 truncate">
+                                <span>{entry.game}</span>
+                                {entry.notes && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate max-w-[150px] text-zinc-500 italic">
+                                      "{entry.notes}"
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Right: Income, Status, Menu */}
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="text-right">
+                              <div className="text-xs font-semibold text-zinc-100 font-mono">
+                                <MoneyDisplay amount={entry.income} currency={entry.currency} />
+                              </div>
+                              {entry.currency !== globalCurrency && (
+                                <ConvertedSecondaryDisplay
+                                  amount={entry.income}
+                                  fromCurrency={entry.currency}
+                                  targetCurrency={globalCurrency}
+                                  rates={rates}
+                                  customRate={entry.exchangeRate}
+                                  showRateLabel={true}
+                                />
+                              )}
+                            </div>
+
+                            <StatusBadge
+                              status={entry.status}
+                              interactive={true}
+                              onSelectStatus={(st) => handleStatusSelect(entry, st)}
+                            />
+
+                            {/* 3-Dot Action Menu */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveActionMenuId(isActionOpen ? null : entry.id);
+                                }}
+                                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                              >
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+
+                              {isActionOpen && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-36 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onOpenReceipt?.(entry);
+                                      setActiveActionMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                  >
+                                    <Receipt className="w-3.5 h-3.5 text-zinc-400" />
+                                    <span>Client Receipt</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onOpenWorkModal?.(entry);
+                                      setActiveActionMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                                    <span>Edit Record</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onDuplicateEntry?.(entry.id);
+                                      setActiveActionMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                  >
+                                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                                    <span>Duplicate</span>
+                                  </button>
+
+                                  <div className="border-t border-zinc-800 my-0.5" />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onDeleteEntry?.(entry.id);
+                                      setActiveActionMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        {/* Right: Income, Status, Menu */}
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="text-right">
-                            <div className="text-xs font-semibold text-zinc-100 font-mono">
-                              {formatMoney(entry.income, entry.currency)}
-                            </div>
-                            {secondary && (
-                              <div className="text-[10px] text-zinc-500 font-mono">
-                                {secondary}
-                              </div>
-                            )}
-                          </div>
-
-                          <StatusBadge
-                            status={entry.status}
-                            interactive={true}
-                            onClick={() => onFlipStatus?.(entry.id, entry.status)}
-                          />
-
-                          {/* 3-Dot Action Menu */}
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveActionMenuId(isActionOpen ? null : entry.id);
-                              }}
-                              className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                        {/* In-Row Animated Proof Prompt Overlay */}
+                        <AnimatePresence>
+                          {isProofPrompting && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                              transition={{ duration: 0.15 }}
+                              className="p-2.5 rounded-xl bg-zinc-900 border border-emerald-900/60 shadow-lg flex items-center justify-between gap-3 text-xs"
                             >
-                              <MoreVertical className="w-3.5 h-3.5" />
-                            </button>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <span className="text-zinc-200 font-medium truncate">
+                                  Marked as Paid! Would you like to attach screenshot proof?
+                                </span>
+                              </div>
 
-                            {isActionOpen && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-0 top-full mt-1 w-36 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onOpenReceipt?.(entry);
-                                    setActiveActionMenuId(null);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
-                                >
-                                  <Receipt className="w-3.5 h-3.5 text-zinc-400" />
-                                  <span>Client Receipt</span>
-                                </button>
-
-                                <button
-                                  type="button"
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  variant="primary"
+                                  size="xs"
                                   onClick={() => {
                                     onOpenWorkModal?.(entry);
-                                    setActiveActionMenuId(null);
+                                    setPromptProofEntryId(null);
                                   }}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                  className="h-7 text-xs gap-1"
                                 >
-                                  <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-                                  <span>Edit Record</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onDuplicateEntry?.(entry.id);
-                                    setActiveActionMenuId(null);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                  <UploadCloud className="w-3 h-3" />
+                                  <span>Attach Proof</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => setPromptProofEntryId(null)}
+                                  className="h-7 text-xs text-zinc-400 hover:text-zinc-200"
                                 >
-                                  <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                                  <span>Duplicate</span>
-                                </button>
-
-                                <div className="border-t border-zinc-800 my-0.5" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onDeleteEntry?.(entry.id);
-                                    setActiveActionMenuId(null);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
-                                </button>
+                                  <span>Dismiss</span>
+                                </Button>
                               </div>
-                            )}
-                          </div>
-                        </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
@@ -427,3 +497,4 @@ export function LedgerView({
 }
 
 export default LedgerView;
+

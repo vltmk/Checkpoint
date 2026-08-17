@@ -20,7 +20,7 @@ import {
 export function SettingsModal({
   isOpen,
   onClose,
-  globalCurrency = 'USD',
+  globalCurrency = 'TOMAN',
   onCurrencyChange,
   onExportCsv,
   onExportJson,
@@ -32,9 +32,8 @@ export function SettingsModal({
   const fileInputRef = useRef(null);
 
   const currencyOptions = [
-    { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
     { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-    { value: 'GOLD', label: 'GOLD (🪙)', icon: '🟡' },
+    { value: 'GOLD', label: 'GOLD (G)', icon: 'G' },
   ];
 
   const handleFileChange = (e) => {

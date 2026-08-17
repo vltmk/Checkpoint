@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
+import { ChevronDown, Check } from 'lucide-react';
+import { STATUSES } from '../../lib/currencies';
 
 export const STATUS_STYLES = {
   Paid: {
@@ -54,27 +56,87 @@ export function Badge({ children, className, variant = 'default', size = 'sm' })
   );
 }
 
-export function StatusBadge({ status, onClick, className, interactive = false }) {
+export function StatusBadge({
+  status,
+  onClick,
+  onSelectStatus,
+  className,
+  interactive = false,
+}) {
   const style = STATUS_STYLES[status] || STATUS_STYLES['Paid'];
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [isOpen]);
 
   if (interactive) {
     return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.();
-        }}
-        title={`Status: ${style.label}. Click to flip.`}
-        className={cn(
-          'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-95',
-          style.badgeClass,
-          className
+      <div className="relative inline-block" ref={menuRef}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onSelectStatus) {
+              setIsOpen((prev) => !prev);
+            } else {
+              onClick?.();
+            }
+          }}
+          title={`Status: ${style.label}. Click to change status.`}
+          className={cn(
+            'group inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-95 hover:ring-1 hover:ring-zinc-600/60 cursor-pointer',
+            style.badgeClass,
+            className
+          )}
+        >
+          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
+          <span>{style.label}</span>
+          <ChevronDown className="w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+        </button>
+
+        {isOpen && onSelectStatus && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-0 top-full mt-1 w-28 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
+          >
+            {STATUSES.map((st) => {
+              const stStyle = STATUS_STYLES[st];
+              const isCurrent = st === status;
+              return (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => {
+                    onSelectStatus(st);
+                    setIsOpen(false);
+                  }}
+                  className={cn(
+                    'w-full flex items-center justify-between px-2 py-1 rounded text-[11px] transition-colors',
+                    isCurrent
+                      ? 'bg-zinc-900 text-zinc-100 font-semibold'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stStyle.dotClass)} />
+                    <span>{st}</span>
+                  </div>
+                  {isCurrent && <Check className="w-3 h-3 text-zinc-200" />}
+                </button>
+              );
+            })}
+          </div>
         )}
-      >
-        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
-        <span>{style.label}</span>
-      </button>
+      </div>
     );
   }
 
@@ -93,3 +155,4 @@ export function StatusBadge({ status, onClick, className, interactive = false })
 }
 
 export default Badge;
+

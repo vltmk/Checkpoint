@@ -13,8 +13,10 @@ import { ReceiptModal } from './components/ReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
+import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Download, FileSpreadsheet } from 'lucide-react';
 
 export default function App() {
   const [entries, setEntries] = useState([]);
@@ -25,23 +27,15 @@ export default function App() {
     return localStorage.getItem('nodrapay_tab') || 'overview';
   });
 
-  // User Currency Preferences (USD | TOMAN | GOLD)
+  // User Currency Preferences (TOMAN | GOLD)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
     const saved = localStorage.getItem('nodrapay_currency');
     if (saved === 'WOW_GOLD') return 'GOLD';
-    return ['USD', 'TOMAN', 'GOLD'].includes(saved) ? saved : 'USD';
+    if (saved === 'GOLD') return 'GOLD';
+    return 'TOMAN';
   });
 
-  // Gold Exchange Rates
-  const [goldRateUSD, setGoldRateUSD] = useState(() => {
-    const saved = localStorage.getItem('nodrapay_gold_rate_usd');
-    if (saved !== null) {
-      const parsed = parseFloat(saved);
-      return !isNaN(parsed) && parsed > 0 ? parsed : 0.035;
-    }
-    return 0.035;
-  });
-
+  // Gold Exchange Rate in Toman (default 3,200 Toman per 1,000 Gold)
   const [goldRateTOMAN, setGoldRateTOMAN] = useState(() => {
     const saved = localStorage.getItem('nodrapay_gold_rate_toman');
     if (saved !== null) {
@@ -60,6 +54,7 @@ export default function App() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [exportConfirm, setExportConfirm] = useState(null); // null | 'csv' | 'json'
 
   const [lightboxData, setLightboxData] = useState({
     isOpen: false,
@@ -105,15 +100,9 @@ export default function App() {
 
   // Currency Handlers
   const handleCurrencyChange = (newCurr) => {
-    const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : newCurr;
+    const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (newCurr === 'USD' ? 'TOMAN' : newCurr);
     setGlobalCurrency(cur);
     localStorage.setItem('nodrapay_currency', cur);
-  };
-
-  const handleGoldRateUSDChange = (newRate) => {
-    const r = Number(newRate) || 0.035;
-    setGoldRateUSD(r);
-    localStorage.setItem('nodrapay_gold_rate_usd', String(r));
   };
 
   const handleGoldRateTOMANChange = (newRate) => {
@@ -150,7 +139,7 @@ export default function App() {
       id: 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       title: `${original.title} (Copy)`,
       dateTime: new Date().toISOString().slice(0, 16),
-      status: original.status || 'Paid',
+      status: original.status || 'Pending',
       updatedAt: new Date().toISOString(),
     };
 
@@ -159,9 +148,9 @@ export default function App() {
     showToast('⚡ Record duplicated');
   };
 
-  // 1-Click Status Flip
-  const handleFlipStatus = async (id, currentStatus) => {
-    const nextStatus = STATUS_CONFIG[currentStatus]?.next || 'Paid';
+  // Status Change / Flip
+  const handleFlipStatus = async (id, currentStatus, targetStatus = null) => {
+    const nextStatus = targetStatus || STATUS_CONFIG[currentStatus]?.next || 'Paid';
     const entry = await trackerDB.getEntry(id);
     if (!entry) return;
 
@@ -196,7 +185,7 @@ export default function App() {
   };
 
   // Export CSV
-  const handleExportCsv = () => {
+  const handleExportCsv = useCallback(() => {
     if (entries.length === 0) {
       showToast('No records to export');
       return;
@@ -207,10 +196,11 @@ export default function App() {
       'Date & Time',
       'Game',
       'Work Title',
+      'Seller / Source',
       'Currency',
       'Income Amount',
+      'Applied Rate (Toman/1k G)',
       'Status',
-      'Hours',
       'Notes',
       'Has Proof Attached',
     ];
@@ -220,10 +210,11 @@ export default function App() {
       e.dateTime,
       `"${(e.game || '').replace(/"/g, '""')}"`,
       `"${(e.title || '').replace(/"/g, '""')}"`,
+      `"${(e.source || 'Direct Client').replace(/"/g, '""')}"`,
       `"${e.currency || globalCurrency}"`,
       e.income,
+      e.exchangeRate || goldRateTOMAN || 3200,
       e.status,
-      e.hours || '',
       `"${(e.notes || '').replace(/"/g, '""')}"`,
       e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
     ]);
@@ -242,10 +233,10 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     showToast('CSV export downloaded');
-  };
+  }, [entries, globalCurrency, showToast]);
 
   // Export JSON Backup
-  const handleExportJson = () => {
+  const handleExportJson = useCallback(() => {
     if (entries.length === 0) {
       showToast('No records to export');
       return;
@@ -256,7 +247,6 @@ export default function App() {
       version: '3.0.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
-      goldRateUSD,
       goldRateTOMAN,
       entriesCount: entries.length,
       entries,
@@ -274,7 +264,7 @@ export default function App() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     showToast('Full JSON backup downloaded');
-  };
+  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
 
   // Import JSON Restore
   const handleImportJson = (file) => {
@@ -288,7 +278,6 @@ export default function App() {
           importedList = json;
         } else if (json.entries && Array.isArray(json.entries)) {
           importedList = json.entries;
-          if (json.goldRateUSD) handleGoldRateUSDChange(json.goldRateUSD);
           if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
         } else {
           showToast('Invalid backup JSON format');
@@ -322,6 +311,20 @@ export default function App() {
         return;
       }
 
+      // Alt + E (Export CSV)
+      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        setExportConfirm('csv');
+        return;
+      }
+
+      // Alt + B (Backup JSON)
+      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setExportConfirm('json');
+        return;
+      }
+
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         handleOpenWorkModal();
@@ -351,7 +354,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [handleExportCsv, handleExportJson]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center selection:bg-zinc-800">
@@ -363,9 +366,7 @@ export default function App() {
           onTabChange={handleTabChange}
           globalCurrency={globalCurrency}
           onCurrencyChange={handleCurrencyChange}
-          goldRateUSD={goldRateUSD}
           goldRateTOMAN={goldRateTOMAN}
-          onGoldRateUSDChange={handleGoldRateUSDChange}
           onGoldRateTOMANChange={handleGoldRateTOMANChange}
           onOpenWorkModal={handleOpenWorkModal}
           onOpenSettings={() => setIsSettingsOpen(true)}
@@ -381,7 +382,25 @@ export default function App() {
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 max-w-full overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 max-w-full overflow-y-auto relative">
+          {/* Top-Center Toast Notification inside Main Screen */}
+          <div className="sticky top-0 z-50 flex justify-center pointer-events-none mb-0 h-0">
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -16, scale: 0.94 }}
+                  animate={{ opacity: 1, y: 8, scale: 1 }}
+                  exit={{ opacity: 0, y: -16, scale: 0.94 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  className="pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/95 text-zinc-100 text-xs font-medium border border-zinc-700/80 shadow-2xl backdrop-blur-md max-w-[90%] sm:max-w-md select-none"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="truncate">{toast.text}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {isLoading ? (
             <div className="flex items-center justify-center h-64 text-zinc-500 text-xs">
               Loading ledger...
@@ -399,7 +418,6 @@ export default function App() {
                   <OverviewView
                     entries={entries}
                     globalCurrency={globalCurrency}
-                    goldRateUSD={goldRateUSD}
                     goldRateTOMAN={goldRateTOMAN}
                     onOpenWorkModal={handleOpenWorkModal}
                     onOpenReceipt={handleOpenReceipt}
@@ -414,7 +432,6 @@ export default function App() {
                   <LedgerView
                     entries={entries}
                     globalCurrency={globalCurrency}
-                    goldRateUSD={goldRateUSD}
                     goldRateTOMAN={goldRateTOMAN}
                     onOpenWorkModal={handleOpenWorkModal}
                     onOpenReceipt={handleOpenReceipt}
@@ -430,7 +447,6 @@ export default function App() {
                   <AnalyticsView
                     entries={entries}
                     globalCurrency={globalCurrency}
-                    goldRateUSD={goldRateUSD}
                     goldRateTOMAN={goldRateTOMAN}
                   />
                 )}
@@ -439,9 +455,7 @@ export default function App() {
                   <ExchangeView
                     entries={entries}
                     globalCurrency={globalCurrency}
-                    goldRateUSD={goldRateUSD}
                     goldRateTOMAN={goldRateTOMAN}
-                    onGoldRateUSDChange={handleGoldRateUSDChange}
                     onGoldRateTOMANChange={handleGoldRateTOMANChange}
                     onToast={showToast}
                   />
@@ -469,6 +483,7 @@ export default function App() {
         onSave={handleSaveEntry}
         editingEntry={editingEntry}
         globalCurrency={globalCurrency}
+        goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
         onToast={showToast}
       />
@@ -510,21 +525,71 @@ export default function App() {
         caption={lightboxData.caption}
       />
 
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.96 }}
-            transition={{ duration: 0.15 }}
-            className="fixed bottom-16 sm:bottom-6 right-6 z-50 flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 text-zinc-100 text-xs font-medium border border-zinc-800 shadow-xl"
+      {/* Compact Export Confirmation Dialog (Alt + E / Alt + B) */}
+      <Dialog
+        open={Boolean(exportConfirm)}
+        onClose={() => setExportConfirm(null)}
+        maxWidth="max-w-sm"
+      >
+        <DialogHeader onClose={() => setExportConfirm(null)}>
+          <div className="flex items-center gap-2">
+            <DialogTitle>
+              {exportConfirm === 'csv' ? 'Export CSV Spreadsheet' : 'Download JSON Backup'}
+            </DialogTitle>
+            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+              {exportConfirm === 'csv' ? 'Alt + E' : 'Alt + B'}
+            </span>
+          </div>
+        </DialogHeader>
+
+        <DialogContent className="space-y-3 py-2">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 shrink-0">
+              {exportConfirm === 'csv' ? (
+                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Download className="w-4 h-4 text-cyan-400" />
+              )}
+            </div>
+            <div className="space-y-1 text-xs text-zinc-400">
+              <p className="text-zinc-200 font-medium">
+                {exportConfirm === 'csv'
+                  ? `Export ${entries.length} records to a formatted .csv spreadsheet?`
+                  : `Download a complete backup with ${entries.length} records and proofs?`}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                {exportConfirm === 'csv'
+                  ? 'Compatible with Excel, Google Sheets, and financial apps.'
+                  : 'Can be restored anytime in Settings to restore all data.'}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExportConfirm(null)}
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>{toast.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              if (exportConfirm === 'csv') handleExportCsv();
+              if (exportConfirm === 'json') handleExportJson();
+              setExportConfirm(null);
+            }}
+            className="gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Confirm & Download</span>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
+

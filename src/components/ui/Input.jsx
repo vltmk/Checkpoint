@@ -22,7 +22,7 @@ export const Textarea = React.forwardRef(({ className, rows = 3, ...props }, ref
       ref={ref}
       rows={rows}
       className={cn(
-        'w-full rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150 resize-y',
+        'w-full min-h-[84px] max-h-48 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150 resize-y selection:bg-zinc-800',
         className
       )}
       {...props}
@@ -32,3 +32,4 @@ export const Textarea = React.forwardRef(({ className, rows = 3, ...props }, ref
 Textarea.displayName = 'Textarea';
 
 export default Input;
+

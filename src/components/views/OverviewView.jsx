@@ -3,10 +3,13 @@ import { motion } from 'motion/react';
 import {
   formatMoney,
   convertCurrency,
+  convertEntryCurrency,
   formatConvertedSecondary,
 } from '../../lib/currencies';
 import { StatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { GameIcon } from '../ui/GameIcon';
+import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import {
   TrendingUp,
   Clock,
@@ -40,8 +43,7 @@ ChartJS.register(
 
 export function OverviewView({
   entries = [],
-  globalCurrency = 'USD',
-  goldRateUSD = 0.035,
+  globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
   onOpenWorkModal,
   onOpenReceipt,
@@ -51,25 +53,22 @@ export function OverviewView({
   onNavigateToExchange,
 }) {
   const rates = useMemo(
-    () => ({ goldRateUSD, goldRateTOMAN }),
-    [goldRateUSD, goldRateTOMAN]
+    () => ({ goldRateTOMAN }),
+    [goldRateTOMAN]
   );
 
-  // Aggregate metrics with accurate bi-directional conversion
+  // Aggregate metrics with accurate entry-level historical conversion
   const metrics = useMemo(() => {
     let totalPaid = 0;
     let paidCount = 0;
     let totalPending = 0;
     let pendingCount = 0;
     let totalValue = 0;
-    let totalHours = 0;
 
     entries.forEach((e) => {
-      const inc = parseFloat(e.income) || 0;
-      const convertedInc = convertCurrency(inc, e.currency, globalCurrency, rates);
+      const convertedInc = convertEntryCurrency(e, globalCurrency, rates);
 
       totalValue += convertedInc;
-      if (e.hours) totalHours += parseFloat(e.hours);
 
       if (e.status === 'Paid') {
         totalPaid += convertedInc;
@@ -90,7 +89,6 @@ export function OverviewView({
       totalPending,
       pendingCount,
       totalValue,
-      totalHours,
       completionRate,
       avgRate,
     };
@@ -107,8 +105,7 @@ export function OverviewView({
     }
 
     entries.forEach((e) => {
-      const inc = parseFloat(e.income) || 0;
-      const convertedInc = convertCurrency(inc, e.currency, globalCurrency, rates);
+      const convertedInc = convertEntryCurrency(e, globalCurrency, rates);
       const dt = new Date(e.dateTime);
       if (!isNaN(dt)) {
         const key = dt.toLocaleString('en-US', { month: 'short' });
@@ -189,12 +186,15 @@ export function OverviewView({
 
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
           <div className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-100 font-mono">
-            {formatMoney(metrics.totalPaid, globalCurrency)}
+            <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
           </div>
           {globalCurrency !== 'GOLD' && (
-            <div className="text-xs font-mono text-zinc-500">
-              {formatConvertedSecondary(metrics.totalPaid, globalCurrency, 'GOLD', rates)}
-            </div>
+            <ConvertedSecondaryDisplay
+              amount={metrics.totalPaid}
+              fromCurrency={globalCurrency}
+              targetCurrency="GOLD"
+              rates={rates}
+            />
           )}
         </div>
 
@@ -216,11 +216,15 @@ export function OverviewView({
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono">
-            <span>
-              Paid: <strong className="text-zinc-200">{formatMoney(metrics.totalPaid, globalCurrency)}</strong> ({metrics.paidCount})
+            <span className="flex items-center gap-1">
+              <span>Paid:</span>
+              <strong className="text-zinc-200"><MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} /></strong>
+              <span>({metrics.paidCount})</span>
             </span>
-            <span>
-              Pending: <strong className="text-zinc-300">{formatMoney(metrics.totalPending, globalCurrency)}</strong> ({metrics.pendingCount})
+            <span className="flex items-center gap-1">
+              <span>Pending:</span>
+              <strong className="text-zinc-300"><MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} /></strong>
+              <span>({metrics.pendingCount})</span>
             </span>
           </div>
         </div>
@@ -244,7 +248,7 @@ export function OverviewView({
             <span>Pending Payout</span>
           </div>
           <div className="text-xl font-bold text-zinc-100 font-mono truncate">
-            {formatMoney(metrics.totalPending, globalCurrency, true)}
+            <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
@@ -254,7 +258,7 @@ export function OverviewView({
             <span>Average Rate</span>
           </div>
           <div className="text-xl font-bold text-zinc-100 font-mono truncate">
-            {formatMoney(metrics.avgRate, globalCurrency, true)}
+            <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
           </div>
         </div>
       </div>
@@ -290,10 +294,10 @@ export function OverviewView({
 
         {recentEntries.length === 0 ? (
           <div className="rounded-xl border border-dashed border-zinc-800 p-8 text-center space-y-3">
-            <p className="text-xs text-zinc-500">No work entries logged yet.</p>
+            <p className="text-xs text-zinc-500">No work records logged yet.</p>
             <Button variant="primary" size="sm" onClick={() => onOpenWorkModal?.()}>
               <Plus className="w-3.5 h-3.5" />
-              <span>Log First Job</span>
+              <span>Add Work</span>
             </Button>
           </div>
         ) : (
@@ -312,19 +316,23 @@ export function OverviewView({
                   className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {/* Proof Icon */}
+                    {/* Proof Icon or Game Emblem */}
                     {entry.proofs && entry.proofs.length > 0 ? (
                       <button
                         type="button"
                         onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
                         title="View attached screenshot proof"
-                        className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white shrink-0"
+                        className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white shrink-0 overflow-hidden"
                       >
-                        <FileImage className="w-4 h-4 text-emerald-400" />
+                        <img
+                          src={entry.proofs[0].data}
+                          alt="Proof"
+                          className="w-full h-full object-cover"
+                        />
                       </button>
                     ) : (
-                      <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 shrink-0">
-                        <Receipt className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5">
+                        <GameIcon game={entry.game} className="w-full h-full" />
                       </div>
                     )}
 
@@ -333,8 +341,13 @@ export function OverviewView({
                         <span className="text-xs font-semibold text-zinc-200 truncate">
                           {entry.title}
                         </span>
+                        {entry.source && (
+                          <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800/80">
+                            {entry.source}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-500 mt-0.5">
+                      <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5">
                         <span>{entry.game}</span>
                         <span>•</span>
                         <span>{new Date(entry.dateTime).toLocaleDateString()}</span>
@@ -345,20 +358,21 @@ export function OverviewView({
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
                       <div className="text-xs font-semibold text-zinc-100 font-mono">
-                        {formatMoney(entry.income, entry.currency)}
+                        <MoneyDisplay amount={entry.income} currency={entry.currency} />
                       </div>
-                      {secondary && (
-                        <div className="text-[10px] text-zinc-500 font-mono">
-                          {secondary}
-                        </div>
+                      {entry.currency !== globalCurrency && (
+                        <ConvertedSecondaryDisplay
+                          amount={entry.income}
+                          fromCurrency={entry.currency}
+                          targetCurrency={globalCurrency}
+                          rates={rates}
+                          customRate={entry.exchangeRate}
+                          showRateLabel={true}
+                        />
                       )}
                     </div>
 
-                    <StatusBadge
-                      status={entry.status}
-                      interactive={true}
-                      onClick={() => onFlipStatus?.(entry.id, entry.status)}
-                    />
+                    <StatusBadge status={entry.status} interactive={false} />
                   </div>
                 </div>
               );
@@ -371,3 +385,4 @@ export function OverviewView({
 }
 
 export default OverviewView;
+

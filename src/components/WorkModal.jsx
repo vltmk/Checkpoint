@@ -3,7 +3,9 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '
 import { Button } from './ui/Button';
 import { Input, Textarea } from './ui/Input';
 import { Select } from './ui/Select';
+import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
+import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
 import { UploadCloud, X, Check } from 'lucide-react';
 
@@ -14,24 +16,26 @@ const GAME_OPTIONS = [
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
   { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-  { value: 'GOLD', label: 'GOLD (🪙)', icon: '🟡' },
+  { value: 'GOLD', label: 'GOLD (G)', icon: 'G' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'Paid', label: 'Paid' },
   { value: 'Pending', label: 'Pending' },
+  { value: 'Paid', label: 'Paid' },
   { value: 'Working', label: 'Working' },
   { value: 'On Hold', label: 'On Hold' },
 ];
+
+const DRAFT_KEY = 'vault_work_draft';
 
 export function WorkModal({
   isOpen,
   onClose,
   onSave,
   editingEntry = null,
-  globalCurrency = 'USD',
+  globalCurrency = 'TOMAN',
+  goldRateTOMAN = 3200,
   onOpenLightbox,
   onToast,
 }) {
@@ -41,87 +45,144 @@ export function WorkModal({
     game: 'World of Warcraft',
     isCustomGame: false,
     customGameText: '',
-    currency: 'USD',
+    source: '',
+    currency: 'TOMAN',
     income: '',
-    status: 'Paid',
-    hours: '',
+    exchangeRate: '3200',
+    status: 'Pending',
     notes: '',
   });
 
   const [proofs, setProofs] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
   const fileInputRef = useRef(null);
   const titleInputRef = useRef(null);
 
-  // Initialize form
   useEffect(() => {
-    if (isOpen) {
-      if (editingEntry) {
-        const isStandardGame =
-          editingEntry.game === 'World of Warcraft' ||
-          editingEntry.game === 'World of Warcraft Classic';
+    if (!isOpen) return;
 
-        let entryCur = editingEntry.currency;
-        if (entryCur === 'WOW_GOLD') entryCur = 'GOLD';
-        if (!['USD', 'TOMAN', 'GOLD'].includes(entryCur)) entryCur = 'USD';
+    if (editingEntry) {
+      setIsDraftRestored(false);
+      const isStandardGame =
+        editingEntry.game === 'World of Warcraft' ||
+        editingEntry.game === 'World of Warcraft Classic';
 
-        setFormData({
-          title: editingEntry.title || '',
-          dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
-          game: isStandardGame ? editingEntry.game : '__custom__',
-          isCustomGame: !isStandardGame && Boolean(editingEntry.game),
-          customGameText: isStandardGame ? '' : editingEntry.game || '',
-          currency: entryCur,
-          income: editingEntry.income !== undefined && editingEntry.income !== null ? editingEntry.income : '',
-          status: editingEntry.status || 'Paid',
-          hours: editingEntry.hours !== undefined && editingEntry.hours !== null ? editingEntry.hours : '',
-          notes: editingEntry.notes || '',
-        });
-        setProofs(editingEntry.proofs ? [...editingEntry.proofs] : []);
-      } else {
-        setFormData({
-          title: '',
-          dateTime: toLocalISOString(new Date()),
-          game: 'World of Warcraft',
-          isCustomGame: false,
-          customGameText: '',
-          currency: globalCurrency || 'USD',
-          income: '',
-          status: 'Paid',
-          hours: '',
-          notes: '',
-        });
-        setProofs([]);
+      let entryCur = editingEntry.currency;
+      if (entryCur === 'WOW_GOLD') entryCur = 'GOLD';
+      if (!['TOMAN', 'GOLD'].includes(entryCur)) entryCur = 'TOMAN';
+
+      setFormData({
+        title: editingEntry.title || '',
+        dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
+        game: isStandardGame ? editingEntry.game : '__custom__',
+        isCustomGame: !isStandardGame && Boolean(editingEntry.game),
+        customGameText: isStandardGame ? '' : editingEntry.game || '',
+        source: editingEntry.source || '',
+        currency: entryCur,
+        income: editingEntry.income !== undefined && editingEntry.income !== null ? String(editingEntry.income) : '',
+        exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
+        status: editingEntry.status || 'Pending',
+        notes: editingEntry.notes || '',
+      });
+      setProofs(editingEntry.proofs ? [...editingEntry.proofs] : []);
+    } else {
+      try {
+        const savedDraft = localStorage.getItem(DRAFT_KEY);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          setFormData({
+            title: parsed.title || '',
+            dateTime: parsed.dateTime || toLocalISOString(new Date()),
+            game: parsed.game || 'World of Warcraft',
+            isCustomGame: Boolean(parsed.isCustomGame),
+            customGameText: parsed.customGameText || '',
+            source: parsed.source || '',
+            currency: parsed.currency || globalCurrency || 'TOMAN',
+            income: parsed.income || '',
+            exchangeRate: String(parsed.exchangeRate || goldRateTOMAN || 3200),
+            status: parsed.status || 'Pending',
+            notes: parsed.notes || '',
+          });
+          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.notes || parsed.source));
+        } else {
+          setIsDraftRestored(false);
+          setFormData({
+            title: '',
+            dateTime: toLocalISOString(new Date()),
+            game: 'World of Warcraft',
+            isCustomGame: false,
+            customGameText: '',
+            source: '',
+            currency: globalCurrency || 'TOMAN',
+            income: '',
+            exchangeRate: String(goldRateTOMAN || 3200),
+            status: 'Pending',
+            notes: '',
+          });
+          setProofs([]);
+        }
+      } catch (err) {
+        setIsDraftRestored(false);
       }
-
-      setTimeout(() => {
-        titleInputRef.current?.focus();
-      }, 100);
     }
-  }, [isOpen, editingEntry, globalCurrency]);
+  }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN]);
 
-  // Clipboard Paste Handler (Ctrl+V)
+  const updateFormData = (patch) => {
+    setFormData((prev) => {
+      const next = { ...prev, ...patch };
+      if (!editingEntry) {
+        try {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
+  };
+
+  const handleClearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    setIsDraftRestored(false);
+    setFormData({
+      title: '',
+      dateTime: toLocalISOString(new Date()),
+      game: 'World of Warcraft',
+      isCustomGame: false,
+      customGameText: '',
+      source: '',
+      currency: globalCurrency || 'TOMAN',
+      income: '',
+      exchangeRate: String(goldRateTOMAN || 3200),
+      status: 'Pending',
+      notes: '',
+    });
+    setProofs([]);
+    onToast?.('Draft cleared');
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePaste = (e) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
+      const clipboardData = e.clipboardData;
+      if (!clipboardData || !clipboardData.items) return;
 
+      const items = clipboardData.items;
       let hasImage = false;
+
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
+          hasImage = true;
           const blob = items[i].getAsFile();
           if (blob) {
-            hasImage = true;
-            readImageBlob(blob, `Screenshot (${new Date().toLocaleTimeString()})`);
+            readImageBlob(blob, `screenshot_paste_${Date.now()}.png`);
           }
         }
       }
 
       if (hasImage) {
         e.preventDefault();
-        onToast?.('⚡ Screenshot attached from clipboard!');
+        onToast?.('📸 Screenshot proof attached!');
       }
     };
 
@@ -129,25 +190,28 @@ export function WorkModal({
     return () => window.removeEventListener('paste', handlePaste);
   }, [isOpen, onToast]);
 
-  const readImageBlob = (blob, name = 'Proof Image') => {
+  const readImageBlob = (blob, fileName) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      const newProof = {
-        id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        data: e.target.result,
-        name: name,
-        timestamp: new Date().toISOString(),
-      };
-      setProofs((prev) => [...prev, newProof]);
+      const dataUrl = e.target.result;
+      setProofs((prev) => [
+        ...prev,
+        {
+          id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          name: fileName || 'Proof Screenshot',
+          data: dataUrl,
+          size: blob.size,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     };
     reader.readAsDataURL(blob);
   };
 
   const handleFiles = (fileList) => {
     for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      if (file.type.startsWith('image/')) {
-        readImageBlob(file, file.name);
+      if (fileList[i].type.startsWith('image/')) {
+        readImageBlob(fileList[i], fileList[i].name);
       }
     }
   };
@@ -166,18 +230,9 @@ export function WorkModal({
 
   const handleGameSelect = (val) => {
     if (val === '__custom__') {
-      setFormData((prev) => ({
-        ...prev,
-        game: '__custom__',
-        isCustomGame: true,
-      }));
+      updateFormData({ game: '__custom__', isCustomGame: true });
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        game: val,
-        isCustomGame: false,
-        customGameText: '',
-      }));
+      updateFormData({ game: val, isCustomGame: false, customGameText: '' });
     }
   };
 
@@ -193,6 +248,8 @@ export function WorkModal({
       return;
     }
 
+    const rateNum = parseFloat(formData.exchangeRate) || goldRateTOMAN || 3200;
+
     const entryToSave = {
       id:
         editingEntry?.id ||
@@ -200,15 +257,17 @@ export function WorkModal({
       title: formData.title.trim(),
       dateTime: formData.dateTime,
       game: selectedGame,
+      source: formData.source.trim() || 'Direct Client',
       currency: formData.currency,
       income: parseFloat(formData.income) || 0,
+      exchangeRate: rateNum,
       status: formData.status,
-      hours: formData.hours ? parseFloat(formData.hours) : null,
       notes: formData.notes.trim(),
       proofs,
       updatedAt: new Date().toISOString(),
     };
 
+    localStorage.removeItem(DRAFT_KEY);
     onSave(entryToSave);
   };
 
@@ -217,21 +276,37 @@ export function WorkModal({
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
           <DialogTitle>
-            {editingEntry ? 'Edit Work Record' : 'Log New Work'}
+            {editingEntry ? 'Edit Work Record' : 'Add Work'}
           </DialogTitle>
           <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
             {editingEntry ? 'EDIT' : 'NEW'}
           </span>
         </div>
+
+        {!editingEntry && isDraftRestored && (
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/40">
+              Draft Restored
+            </span>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-[10px] text-zinc-500 hover:text-zinc-300 underline"
+              title="Discard saved draft"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </DialogHeader>
 
       <form onSubmit={handleSubmit}>
-        <DialogContent className="space-y-4">
-          {/* Row 1: Game & Work Title */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <DialogContent className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Game / Platform *
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1.5">
+                <GameIcon game={formData.game} className="w-3.5 h-3.5" />
+                <span>Game / Platform *</span>
               </label>
               <Select
                 value={formData.game}
@@ -243,29 +318,38 @@ export function WorkModal({
                   <Input
                     required
                     value={formData.customGameText}
-                    onChange={(e) =>
-                      setFormData({ ...formData, customGameText: e.target.value })
-                    }
-                    placeholder="Custom game name..."
+                    onChange={(e) => updateFormData({ customGameText: e.target.value })}
+                    placeholder="Custom game / realm name..."
                   />
                 </div>
               )}
             </div>
-            <div className="sm:col-span-2">
+
+            <div>
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Work Title *
+                Seller / Job Source
               </label>
               <Input
-                ref={titleInputRef}
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g. Keystone +20, GDKP Raid, UI Addon"
+                value={formData.source}
+                onChange={(e) => updateFormData({ source: e.target.value })}
+                placeholder="e.g. G2G, FunPay, Discord, Guild, Client..."
               />
             </div>
           </div>
 
-          {/* Row 2: Date & Status */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+              Work Title *
+            </label>
+            <Input
+              ref={titleInputRef}
+              required
+              value={formData.title}
+              onChange={(e) => updateFormData({ title: e.target.value })}
+              placeholder="e.g. Keystone +20, GDKP Raid Pot, UI Addon Dev"
+            />
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
@@ -273,7 +357,7 @@ export function WorkModal({
               </label>
               <DateTimePicker
                 value={formData.dateTime}
-                onChange={(val) => setFormData({ ...formData, dateTime: val })}
+                onChange={(val) => updateFormData({ dateTime: val })}
               />
             </div>
             <div>
@@ -282,15 +366,14 @@ export function WorkModal({
               </label>
               <Select
                 value={formData.status}
-                onChange={(val) => setFormData({ ...formData, status: val })}
+                onChange={(val) => updateFormData({ status: val })}
                 options={STATUS_OPTIONS}
               />
             </div>
           </div>
 
-          {/* Row 3: Income Amount & Currency + Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Income & Currency *
               </label>
@@ -298,55 +381,48 @@ export function WorkModal({
                 <div className="col-span-2">
                   <Select
                     value={formData.currency}
-                    onChange={(val) => setFormData({ ...formData, currency: val })}
+                    onChange={(val) => updateFormData({ currency: val })}
                     options={CURRENCY_OPTIONS}
                   />
                 </div>
                 <div className="col-span-3">
-                  <Input
-                    type="number"
-                    step="any"
-                    min="0"
-                    required
+                  <NumberStepperInput
                     value={formData.income}
-                    onChange={(e) => setFormData({ ...formData, income: e.target.value })}
-                    placeholder="0.00"
-                    className="font-mono"
+                    onChange={(e) => updateFormData({ income: e.target.value })}
+                    currency={formData.currency}
+                    placeholder={formData.currency === 'GOLD' ? '1,000' : '100,000'}
+                    required
                   />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Time (Hours)
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+                <span>Rate (Toman / 1k Gold)</span>
+                <span className="text-[9px] font-mono text-zinc-500">Historical Lock</span>
               </label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                value={formData.hours}
-                onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                placeholder="e.g. 2.5"
-                className="font-mono"
+              <NumberStepperInput
+                value={formData.exchangeRate}
+                onChange={(e) => updateFormData({ exchangeRate: e.target.value })}
+                step={50}
+                placeholder={String(goldRateTOMAN || 3200)}
               />
             </div>
           </div>
 
-          {/* Row 4: Notes */}
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
               Notes / Client Details
             </label>
             <Textarea
-              rows={2}
+              rows={3}
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Add client username, realm name, or transaction notes..."
+              onChange={(e) => updateFormData({ notes: e.target.value })}
+              placeholder="Add client username, realm name, transaction ID, or completion notes..."
             />
           </div>
 
-          {/* Proof Screenshot Attachment */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
@@ -365,7 +441,7 @@ export function WorkModal({
               }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-3.5 text-center cursor-pointer transition-colors ${
                 isDragOver
                   ? 'border-zinc-400 bg-zinc-900'
                   : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
@@ -384,10 +460,10 @@ export function WorkModal({
                 multiple
                 className="hidden"
               />
-              <div className="flex flex-col items-center justify-center gap-1.5">
-                <UploadCloud className="w-5 h-5 text-zinc-500" />
+              <div className="flex flex-col items-center justify-center gap-1">
+                <UploadCloud className="w-4 h-4 text-zinc-500" />
                 <div className="text-xs text-zinc-300">
-                  <span className="font-semibold text-zinc-100">Click to upload</span> or drag image here
+                  <span className="font-semibold text-zinc-100">Click to upload</span> or drag screenshot
                 </div>
                 <div className="text-[10px] text-zinc-500">
                   Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool
@@ -395,9 +471,8 @@ export function WorkModal({
               </div>
             </div>
 
-            {/* Proof Thumbnails Grid */}
             {proofs.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap mt-3">
+              <div className="flex items-center gap-2 flex-wrap mt-2.5">
                 {proofs.map((proof, idx) => (
                   <div
                     key={proof.id || idx}
