@@ -9,25 +9,25 @@ export function ShortcutsModal({ isOpen, onClose }) {
     {
       group: 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: 'New work entry' },
-        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot as proof in modal' },
-        { keys: ['Esc'], desc: 'Close open dialogs or clear search' },
+        { keys: ['N'], desc: 'New work entry (or Ctrl+N)' },
+        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof in modal' },
+        { keys: ['Esc'], desc: 'Close dialogs, lightbox or clear search' },
       ],
     },
     {
-      group: 'Views & Search',
+      group: 'Views & Navigation',
       items: [
-        { keys: ['/'], desc: 'Focus search bar' },
+        { keys: ['/'], desc: 'Focus search (or Ctrl+K)' },
         { keys: ['V'], desc: 'Toggle Table vs Cards view' },
         { keys: ['A'], desc: 'Toggle Analytics drawer' },
-        { keys: ['?'], desc: 'Open keyboard shortcuts' },
+        { keys: ['?'], desc: 'Open shortcuts guide' },
       ],
     },
     {
-      group: 'Export & Backup',
+      group: 'Data & Backup (Mistake-Proof)',
       items: [
-        { keys: ['E'], desc: 'Export ledger to CSV' },
-        { keys: ['B'], desc: 'Backup full ledger with screenshots as JSON' },
+        { keys: ['Alt', 'E'], desc: 'Export ledger to CSV (or Ctrl+Shift+E)' },
+        { keys: ['Alt', 'B'], desc: 'Backup full JSON (or Ctrl+Shift+B)' },
       ],
     },
   ];

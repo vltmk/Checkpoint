@@ -137,11 +137,19 @@ export class StorageDB {
   }
 
   /**
-   * Seed realistic sample data if DB is currently empty
+   * Seed realistic sample data ONLY on very first app initialization
    */
   async seedInitialDataIfEmpty() {
+    if (typeof window !== 'undefined' && localStorage.getItem('nodrapay_seeded')) {
+      return [];
+    }
+
     const existing = await this.getAllEntries();
     if (existing.length === 0) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nodrapay_seeded', 'true');
+      }
+
       const now = new Date();
       const d1 = new Date(now.getTime() - 1 * 86400000).toISOString().slice(0, 16);
       const d2 = new Date(now.getTime() - 3 * 86400000).toISOString().slice(0, 16);
@@ -214,6 +222,10 @@ export class StorageDB {
 
       await this.bulkImport(sampleEntries);
       return sampleEntries;
+    } else {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nodrapay_seeded', 'true');
+      }
     }
     return existing;
   }

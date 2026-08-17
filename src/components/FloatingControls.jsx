@@ -136,7 +136,10 @@ export function FloatingControls({
                   <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Export CSV</span>
                 </div>
-                <Kbd>E</Kbd>
+                <div className="flex items-center gap-0.5">
+                  <Kbd>Alt</Kbd>
+                  <Kbd>E</Kbd>
+                </div>
               </button>
 
               {/* Backup JSON */}
@@ -152,7 +155,10 @@ export function FloatingControls({
                   <Download className="w-3.5 h-3.5 text-blue-400" />
                   <span>Backup JSON</span>
                 </div>
-                <Kbd>B</Kbd>
+                <div className="flex items-center gap-0.5">
+                  <Kbd>Alt</Kbd>
+                  <Kbd>B</Kbd>
+                </div>
               </button>
 
               {/* Restore JSON */}

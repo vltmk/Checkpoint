@@ -32,8 +32,8 @@ A minimal, high-density pure-black glassmorphic freelance ledger crafted for **W
 | <kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd> | Focus Search Bar |
 | <kbd>V</kbd> | Toggle View (Table ⇄ Cards) |
 | <kbd>A</kbd> | Toggle Analytics Drawer |
-| <kbd>E</kbd> | Export Ledger to CSV |
-| <kbd>B</kbd> | Full JSON Backup with Screenshots |
+| <kbd>Alt</kbd>+<kbd>E</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd> | Export Ledger to CSV (Mistake-Proof) |
+| <kbd>Alt</kbd>+<kbd>B</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> | Full JSON Backup with Screenshots |
 | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste Screenshot Proof (in modal) |
 | <kbd>Esc</kbd> | Close any open modal or clear search |
 

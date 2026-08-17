@@ -380,42 +380,51 @@ export default function App() {
         setIsShortcutsOpen((prev) => !prev);
       }
 
-      // 'N' or 'Ctrl+N' -> Open Log Work Modal
+      // 'N' or 'Ctrl+N' / 'Cmd+N' -> Open Log Work Modal
       if (
-        (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey) ||
-        ((e.ctrlKey || e.altKey) && e.key.toLowerCase() === 'n')
+        (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) ||
+        ((e.ctrlKey || e.metaKey || e.altKey) && e.key.toLowerCase() === 'n')
       ) {
         e.preventDefault();
         handleOpenWorkModal();
       }
 
-      // '/' -> Focus Search Input
-      if (e.key === '/') {
+      // '/' or 'Ctrl+K' / 'Cmd+K' -> Focus Search Input
+      if (
+        (e.key === '/' && !e.ctrlKey && !e.metaKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')
+      ) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
 
       // 'V' -> Toggle View Mode
-      if (e.key.toLowerCase() === 'v') {
+      if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleViewModeChange(viewMode === 'dense' ? 'cards' : 'dense');
         showToast(`Switched to ${viewMode === 'dense' ? 'Cards' : 'Table'} view`);
       }
 
       // 'A' -> Toggle Analytics
-      if (e.key.toLowerCase() === 'a') {
+      if (e.key.toLowerCase() === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setIsAnalyticsOpen((prev) => !prev);
       }
 
-      // 'E' -> Export CSV
-      if (e.key.toLowerCase() === 'e') {
+      // 'Ctrl+Shift+E' or 'Alt+E' -> Mistake-proof Export CSV
+      if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'e') ||
+        (e.altKey && e.key.toLowerCase() === 'e')
+      ) {
         e.preventDefault();
         handleExportCsv();
       }
 
-      // 'B' -> Backup JSON
-      if (e.key.toLowerCase() === 'b') {
+      // 'Ctrl+Shift+B' or 'Alt+B' -> Mistake-proof Full JSON Backup
+      if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b') ||
+        (e.altKey && e.key.toLowerCase() === 'b')
+      ) {
         e.preventDefault();
         handleExportJson();
       }
@@ -635,7 +644,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/90 text-white text-xs font-medium border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-xl"
+            className="fixed bottom-6 right-6 z-[60] flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/95 text-white text-xs font-medium border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-2xl"
           >
             <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{toast.text}</span>
