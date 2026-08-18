@@ -1,0 +1,22 @@
+[package]
+name = "nodra-vault"
+version = "2.0.0"
+description = "High-density offline freelance ledger for gaming boosters, devs, and creators"
+authors = ["Nodra"]
+edition = "2021"
+
+[lib]
+name = "nodra_vault_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-clipboard-manager = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -3,11 +3,13 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '
 import { Button } from './ui/Button';
 import { Input, Textarea } from './ui/Input';
 import { Select } from './ui/Select';
+import { SourceCombobox } from './ui/SourceCombobox';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
 import { UploadCloud, X, Check } from 'lucide-react';
+import { trackerDB } from '../lib/db';
 
 const GAME_OPTIONS = [
   { value: 'World of Warcraft', label: 'World of Warcraft' },
@@ -48,7 +50,7 @@ export function WorkModal({
     source: '',
     currency: 'TOMAN',
     income: '',
-    exchangeRate: '3200',
+    exchangeRate: String(goldRateTOMAN || 3200),
     status: 'Pending',
     notes: '',
   });
@@ -85,7 +87,15 @@ export function WorkModal({
         status: editingEntry.status || 'Pending',
         notes: editingEntry.notes || '',
       });
-      setProofs(editingEntry.proofs ? [...editingEntry.proofs] : []);
+      setProofs(editingEntry.proofs && editingEntry.proofs.length > 0 && editingEntry.proofs[0]?.data ? [...editingEntry.proofs] : []);
+      // If proofs need hydration from SQLite / DB:
+      if (editingEntry.id) {
+        trackerDB.getEntry(editingEntry.id).then((full) => {
+          if (full && Array.isArray(full.proofs) && full.proofs.length > 0) {
+            setProofs(full.proofs);
+          }
+        }).catch(() => {});
+      }
     } else {
       try {
         const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -100,7 +110,7 @@ export function WorkModal({
             source: parsed.source || '',
             currency: parsed.currency || globalCurrency || 'TOMAN',
             income: parsed.income || '',
-            exchangeRate: String(parsed.exchangeRate || goldRateTOMAN || 3200),
+            exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
             notes: parsed.notes || '',
           });
@@ -186,9 +196,20 @@ export function WorkModal({
       }
     };
 
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSubmit(e);
+      }
+    };
+
     window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [isOpen, onToast]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onToast, formData, proofs, editingEntry]);
 
   const readImageBlob = (blob, fileName) => {
     const reader = new FileReader();
@@ -228,11 +249,22 @@ export function WorkModal({
     setProofs((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const isClassic =
+    formData.game === 'World of Warcraft Classic' ||
+    (!formData.isCustomGame && formData.game?.toLowerCase().includes('classic'));
+
   const handleGameSelect = (val) => {
     if (val === '__custom__') {
       updateFormData({ game: '__custom__', isCustomGame: true });
     } else {
-      updateFormData({ game: val, isCustomGame: false, customGameText: '' });
+      const isClassicVal = val === 'World of Warcraft Classic';
+      const defaultRate = isClassicVal ? '7000' : String(goldRateTOMAN || 3200);
+      updateFormData({
+        game: val,
+        isCustomGame: false,
+        customGameText: '',
+        exchangeRate: defaultRate,
+      });
     }
   };
 
@@ -248,7 +280,7 @@ export function WorkModal({
       return;
     }
 
-    const rateNum = parseFloat(formData.exchangeRate) || goldRateTOMAN || 3200;
+    const rateNum = parseFloat(formData.exchangeRate) || (isClassic ? 7000 : goldRateTOMAN || 3200);
 
     const entryToSave = {
       id:
@@ -261,6 +293,7 @@ export function WorkModal({
       currency: formData.currency,
       income: parseFloat(formData.income) || 0,
       exchangeRate: rateNum,
+      rateUnit: isClassic ? '1' : '1k',
       status: formData.status,
       notes: formData.notes.trim(),
       proofs,
@@ -326,13 +359,15 @@ export function WorkModal({
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Seller / Job Source
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+                <span>Seller / Job Source</span>
+                <span className="text-[9px] font-mono text-zinc-500">Saved Sources</span>
               </label>
-              <Input
+              <SourceCombobox
                 value={formData.source}
-                onChange={(e) => updateFormData({ source: e.target.value })}
-                placeholder="e.g. G2G, FunPay, Discord, Guild, Client..."
+                onChange={(val) => updateFormData({ source: val })}
+                onToast={onToast}
+                placeholder="e.g. Enter seller, broker, or client..."
               />
             </div>
           </div>
@@ -372,20 +407,21 @@ export function WorkModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+          {/* Row 4: Income & Currency (expanded) and Rate (compact) */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+            <div className="sm:col-span-7">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Income & Currency *
               </label>
-              <div className="grid grid-cols-5 gap-2">
-                <div className="col-span-2">
+              <div className="flex gap-2">
+                <div className="w-[145px] shrink-0">
                   <Select
                     value={formData.currency}
                     onChange={(val) => updateFormData({ currency: val })}
                     options={CURRENCY_OPTIONS}
                   />
                 </div>
-                <div className="col-span-3">
+                <div className="flex-1 min-w-0">
                   <NumberStepperInput
                     value={formData.income}
                     onChange={(e) => updateFormData({ income: e.target.value })}
@@ -397,16 +433,44 @@ export function WorkModal({
               </div>
             </div>
 
-            <div>
+            <div className="sm:col-span-5">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
-                <span>Rate (Toman / 1k Gold)</span>
-                <span className="text-[9px] font-mono text-zinc-500">Historical Lock</span>
+                <span className="truncate">
+                  {isClassic ? 'Rate (T / 1 Gold)' : 'Rate (T / 1k Gold)'}
+                </span>
+                {isClassic ? (
+                  Number(formData.exchangeRate) !== 7000 ? (
+                    <button
+                      type="button"
+                      onClick={() => updateFormData({ exchangeRate: '7000' })}
+                      className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                      title="Reset to classic default (7,000 T)"
+                    >
+                      Reset (7k T)
+                    </button>
+                  ) : (
+                    <span className="text-[9px] font-mono text-zinc-500 shrink-0">Classic (1 G)</span>
+                  )
+                ) : Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
+                  <button
+                    type="button"
+                    onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
+                    className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                    title="Reset to current navbar rate"
+                  >
+                    Reset ({goldRateTOMAN?.toLocaleString()} T)
+                  </button>
+                ) : (
+                  <span className="text-[9px] font-mono text-zinc-500 shrink-0">
+                    Active ({goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)
+                  </span>
+                )}
               </label>
               <NumberStepperInput
                 value={formData.exchangeRate}
                 onChange={(e) => updateFormData({ exchangeRate: e.target.value })}
-                step={50}
-                placeholder={String(goldRateTOMAN || 3200)}
+                step={isClassic ? 100 : 50}
+                placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
               />
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogHeader,
@@ -15,7 +15,12 @@ import {
   FileSpreadsheet,
   Trash2,
   Check,
+  History,
+  RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
+import { isTauri } from '../lib/desktop';
+import { trackerDB } from '../lib/db';
 
 export function SettingsModal({
   isOpen,
@@ -30,6 +35,20 @@ export function SettingsModal({
   entriesCount = 0,
 }) {
   const fileInputRef = useRef(null);
+  const [snapshots, setSnapshots] = useState([]);
+  const [selectedSnapshot, setSelectedSnapshot] = useState('');
+  const isDesktop = isTauri();
+
+  useEffect(() => {
+    if (isOpen) {
+      trackerDB.listSnapshots().then((list) => {
+        setSnapshots(list || []);
+        if (list && list.length > 0) {
+          setSelectedSnapshot(list[0].id);
+        }
+      });
+    }
+  }, [isOpen]);
 
   const currencyOptions = [
     { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
@@ -45,14 +64,33 @@ export function SettingsModal({
     }
   };
 
+  const handleRestoreSnapshot = async () => {
+    if (!selectedSnapshot) return;
+    if (window.confirm('Restore database from this snapshot? Current unsaved modifications will be replaced.')) {
+      const ok = await trackerDB.restoreSnapshot(selectedSnapshot);
+      if (ok) {
+        onToast?.('Database restored from snapshot successfully');
+        window.location.reload();
+      } else {
+        onToast?.('Failed to restore snapshot');
+      }
+    }
+  };
+
   return (
     <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-md">
       <DialogHeader onClose={onClose}>
-        <DialogTitle>Settings & Data</DialogTitle>
+        <div className="flex items-center gap-2">
+          <DialogTitle>Settings & Data</DialogTitle>
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 flex items-center gap-1">
+            <Database className="w-3 h-3 text-emerald-400" />
+            {isDesktop ? 'SQLite Engine' : 'IndexedDB'}
+          </span>
+        </div>
       </DialogHeader>
 
       <DialogContent className="space-y-5">
-        {/* Hidden file input for restore */}
+        {/* Hidden file input for web restore */}
         <input
           type="file"
           ref={fileInputRef}
@@ -67,7 +105,7 @@ export function SettingsModal({
             Default Display Currency
           </label>
           <p className="text-[11px] text-zinc-500">
-            Choose the default primary currency used to calculate dashboard metrics and charts.
+            Choose the default primary currency used across dashboard metrics and financial charts.
           </p>
           <div className="pt-1">
             <Select
@@ -82,13 +120,20 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 2. Data Backup & Export */}
+        {/* 2. Data Backup & Portability */}
         <div className="space-y-2 pt-2 border-t border-zinc-800">
-          <label className="block text-xs font-semibold text-zinc-300">
-            Data Backup & Portability
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-zinc-300">
+              Data Backup & Portability
+            </label>
+            <span className="text-[10px] font-mono text-zinc-500">
+              {entriesCount} {entriesCount === 1 ? 'Record' : 'Records'}
+            </span>
+          </div>
           <p className="text-[11px] text-zinc-500">
-            Nodra Vault stores all work records and screenshot proofs securely in local IndexedDB.
+            {isDesktop
+              ? 'Stored securely on this PC in standalone SQLite format (%APPDATA%/com.nodra.vault/vault.db).'
+              : 'Stored securely in local client IndexedDB.'}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -108,7 +153,14 @@ export function SettingsModal({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (isDesktop) {
+                  onImportJson?.();
+                  onClose();
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
               className="justify-start gap-2 text-xs"
             >
               <Upload className="w-4 h-4 text-zinc-400" />
@@ -130,7 +182,49 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 3. Reset Data */}
+        {/* 3. Automatic Daily Rolling Snapshots (Desktop/SQLite) */}
+        {snapshots.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Automatic Snapshots</span>
+              </label>
+              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                Protected
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Rolling daily recovery points saved automatically to prevent data loss.
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1">
+                <Select
+                  value={selectedSnapshot}
+                  onChange={setSelectedSnapshot}
+                  options={snapshots.map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.entries_count} records)`,
+                  }))}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRestoreSnapshot}
+                className="gap-1.5 text-xs shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Restore</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Reset Data */}
         <div className="space-y-2 pt-2 border-t border-zinc-800">
           <label className="block text-xs font-semibold text-rose-400">
             Database Reset
@@ -142,7 +236,7 @@ export function SettingsModal({
             variant="danger"
             size="sm"
             onClick={() => {
-              if (window.confirm('Reset database with fresh sample data?')) {
+              if (window.confirm('Reset database with fresh sample data? All existing custom records will be replaced.')) {
                 onResetData?.();
                 onClose();
               }

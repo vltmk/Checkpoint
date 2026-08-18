@@ -146,7 +146,7 @@ export function Select({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150',
           isOpen && 'border-zinc-500 ring-1 ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className

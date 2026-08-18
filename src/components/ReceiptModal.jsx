@@ -54,7 +54,10 @@ export function ReceiptModal({
     window.print();
   };
 
-  const effectiveRate = Number(entry.exchangeRate) || 3200;
+  const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+  const effectiveRate = Number(entry.exchangeRate) || (isClassic ? 7000 : 3200);
+  const rateUnitText = isClassic ? '1 Gold' : '1,000 Gold';
+  const rateDiscordText = isClassic ? '1 Gold' : '1k Gold';
 
   const handleCopyText = () => {
     const text = `=== NODRA VAULT WORK RECEIPT ===
@@ -63,7 +66,7 @@ Date: ${dateStr} ${timeStr}
 Game: ${entry.game || 'World of Warcraft'}
 Work Title: ${entry.title}
 Job Source: ${entry.source || 'Direct Client'}
-Exchange Rate: ${effectiveRate.toLocaleString()} Toman / 1,000 Gold
+Exchange Rate: ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
 Status: ${entry.status || 'Paid'}
 Amount: ${formattedIncome}
 Notes: ${entry.notes || 'None'}
@@ -81,7 +84,7 @@ Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
 Title   = ${entry.title}
 Source  = ${entry.source || 'Direct Client'}
-Rate    = ${effectiveRate.toLocaleString()} Toman / 1k Gold
+Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
 Status  = ${entry.status || 'Paid'}
 Amount  = ${formattedIncome}
 Notes   = ${entry.notes || 'None'}
@@ -179,7 +182,7 @@ Notes   = ${entry.notes || 'None'}
 
               <div className="col-span-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between text-[10px] font-mono text-zinc-400">
                 <span className="text-zinc-500 uppercase font-sans font-semibold">Locked Rate</span>
-                <span>{effectiveRate.toLocaleString()} Toman / 1,000 Gold</span>
+                <span>{effectiveRate.toLocaleString()} Toman / {rateUnitText}</span>
               </div>
             </div>
 

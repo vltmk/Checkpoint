@@ -357,6 +357,7 @@ export function LedgerView({
                                   targetCurrency={globalCurrency}
                                   rates={rates}
                                   customRate={entry.exchangeRate}
+                                  isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
                                   showRateLabel={true}
                                 />
                               )}

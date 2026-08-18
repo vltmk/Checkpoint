@@ -108,10 +108,10 @@ export function formatMoney(amount, currencyCode = 'TOMAN', compact = false) {
 
 /**
  * Robust Bi-Directional Currency Converter
- * Converts between TOMAN and GOLD directly using goldRateTOMAN (rate per 1,000 Gold in Toman).
- * Supports entry-specific historical locked rates.
+ * Converts between TOMAN and GOLD directly.
+ * Standard rate is per 1,000 Gold (WoW Retail), but supports per 1 Gold (WoW Classic).
  */
-export function convertCurrency(amount, fromCurrency, toCurrency, rates = {}, customRate = null) {
+export function convertCurrency(amount, fromCurrency, toCurrency, rates = {}, customRate = null, isPerOneGold = false) {
   const val = Number(amount || 0);
   if (isNaN(val) || val === 0) return 0;
 
@@ -133,32 +133,34 @@ export function convertCurrency(amount, fromCurrency, toCurrency, rates = {}, cu
 
   // 1. From GOLD to TOMAN
   if (from === 'GOLD' && to === 'TOMAN') {
-    return (val / 1000) * rate;
+    return isPerOneGold ? val * rate : (val / 1000) * rate;
   }
 
   // 2. From TOMAN to GOLD
   if (from === 'TOMAN' && to === 'GOLD') {
-    return rate > 0 ? (val / rate) * 1000 : 0;
+    if (rate <= 0) return 0;
+    return isPerOneGold ? val / rate : (val / rate) * 1000;
   }
 
   return val;
 }
 
 /**
- * Convert a full entry object using its locked historical exchangeRate
+ * Convert a full entry object using its locked historical exchangeRate and rateUnit
  */
 export function convertEntryCurrency(entry, targetCurrency, defaultRates = {}) {
   if (!entry) return 0;
   const inc = parseFloat(entry.income) || 0;
   const cur = entry.currency || 'TOMAN';
   const entryRate = entry.exchangeRate || defaultRates?.goldRateTOMAN;
-  return convertCurrency(inc, cur, targetCurrency, defaultRates, entryRate);
+  const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+  return convertCurrency(inc, cur, targetCurrency, defaultRates, entryRate, isClassic);
 }
 
 /**
  * Format converted secondary string (e.g. "≈ 320,000 تومان" or "≈ 100,000 G")
  */
-export function formatConvertedSecondary(amount, fromCurrency, targetCurrency, rates = {}, customRate = null) {
+export function formatConvertedSecondary(amount, fromCurrency, targetCurrency, rates = {}, customRate = null, isPerOneGold = false) {
   const normalize = (c) => {
     if (c === 'WOW_GOLD') return 'GOLD';
     if (c === 'USD') return 'TOMAN';
@@ -170,7 +172,8 @@ export function formatConvertedSecondary(amount, fromCurrency, targetCurrency, r
 
   if (from === to) return null;
 
-  const converted = convertCurrency(amount, from, to, rates, customRate);
+  const converted = convertCurrency(amount, from, to, rates, customRate, isPerOneGold);
   return `≈ ${formatMoney(converted, to)}`;
 }
+
 

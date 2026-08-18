@@ -239,3 +239,15 @@
   vertical-align: baseline;
 }
 
+/* Desktop Window Dragging */
+[data-tauri-drag-region] {
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+button, a, input, textarea, select, .no-drag {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+

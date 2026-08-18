@@ -100,7 +100,7 @@ export function DateTimePicker({
       <div
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
           isOpen && 'border-zinc-500 ring-1 ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className

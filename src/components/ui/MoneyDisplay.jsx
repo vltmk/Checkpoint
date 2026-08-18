@@ -38,6 +38,7 @@ export function ConvertedSecondaryDisplay({
   targetCurrency,
   rates = {},
   customRate = null,
+  isPerOneGold = false,
   showRateLabel = false,
   className = '',
 }) {
@@ -47,7 +48,7 @@ export function ConvertedSecondaryDisplay({
   if (from === to) return null;
 
   const effectiveRate = Number(customRate) > 0 ? Number(customRate) : (Number(rates?.goldRateTOMAN) || 3200);
-  const converted = convertCurrency(amount, from, to, rates, effectiveRate);
+  const converted = convertCurrency(amount, from, to, rates, effectiveRate, isPerOneGold);
 
   return (
     <div className={cn('text-[10px] text-zinc-500 font-mono flex items-center justify-end gap-1', className)}>
@@ -60,9 +61,14 @@ export function ConvertedSecondaryDisplay({
       {showRateLabel && (
         <span
           className="text-[9px] text-zinc-600 font-mono tracking-tight"
-          title={`Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1,000 Gold`}
+          title={
+            isPerOneGold
+              ? `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1 Gold`
+              : `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1,000 Gold`
+          }
         >
-          @{effectiveRate >= 1000 ? `${(effectiveRate / 1000).toFixed(1)}k` : effectiveRate}T
+          @{effectiveRate >= 1000 ? `${(effectiveRate / 1000).toFixed(1)}k` : effectiveRate}
+          {isPerOneGold ? 'T/G' : 'T'}
         </span>
       )}
     </div>

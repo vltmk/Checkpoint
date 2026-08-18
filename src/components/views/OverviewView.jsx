@@ -320,15 +320,19 @@ export function OverviewView({
                     {entry.proofs && entry.proofs.length > 0 ? (
                       <button
                         type="button"
-                        onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
+                        onClick={() => onOpenLightbox?.(entry.proofs[0]?.data || entry.id, entry.title)}
                         title="View attached screenshot proof"
                         className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white shrink-0 overflow-hidden"
                       >
-                        <img
-                          src={entry.proofs[0].data}
-                          alt="Proof"
-                          className="w-full h-full object-cover"
-                        />
+                        {entry.proofs[0]?.data ? (
+                          <img
+                            src={entry.proofs[0].data}
+                            alt="Proof"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <FileImage className="w-4 h-4 text-cyan-400" />
+                        )}
                       </button>
                     ) : (
                       <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5">
@@ -367,6 +371,7 @@ export function OverviewView({
                           targetCurrency={globalCurrency}
                           rates={rates}
                           customRate={entry.exchangeRate}
+                          isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
                           showRateLabel={true}
                         />
                       )}

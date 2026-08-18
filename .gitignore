@@ -41,3 +41,8 @@ scratch/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Tauri Build Outputs
+src-tauri/target/
+src-tauri/gen/
+

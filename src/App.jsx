@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG } from './lib/currencies';
 import { toLocalISOString } from './components/ui/DateTimePicker';
+import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
 import { OverviewView } from './components/views/OverviewView';
@@ -15,8 +16,10 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
+import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Download, FileSpreadsheet } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
+import { isTauri, saveFileNative, openFileNative } from './lib/desktop';
 
 export default function App() {
   const [entries, setEntries] = useState([]);
@@ -67,12 +70,39 @@ export default function App() {
   const toastTimeoutRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, options = {}) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToast({ text: msg, time: Date.now() });
+
+    let toastObj = {};
+    if (typeof msg === 'string') {
+      let variant = options.variant || 'success';
+      if (
+        msg.toLowerCase().includes('failed') ||
+        msg.toLowerCase().includes('error') ||
+        msg.toLowerCase().includes('required')
+      ) {
+        variant = 'destructive';
+      }
+
+      toastObj = {
+        id: Date.now(),
+        title: options.title || msg,
+        description: options.description || null,
+        variant,
+      };
+    } else if (typeof msg === 'object' && msg !== null) {
+      toastObj = {
+        id: Date.now(),
+        title: msg.title || 'Notification',
+        description: msg.description || msg.text || null,
+        variant: msg.variant || 'success',
+      };
+    }
+
+    setToast(toastObj);
     toastTimeoutRef.current = setTimeout(() => {
       setToast(null);
-    }, 2600);
+    }, 3600);
   }, []);
 
   // Data Loading
@@ -81,8 +111,18 @@ export default function App() {
       await trackerDB.seedInitialDataIfEmpty();
       const all = await trackerDB.getAllEntries();
       setEntries(all);
+
+      // Also hydrate persistent settings from SQLite / DB
+      const savedCur = await trackerDB.getSetting('nodrapay_currency', null);
+      if (savedCur && ['TOMAN', 'GOLD'].includes(savedCur)) {
+        setGlobalCurrency(savedCur);
+      }
+      const savedRate = await trackerDB.getSetting('nodrapay_gold_rate_toman', null);
+      if (savedRate && Number(savedRate) > 0) {
+        setGoldRateTOMAN(Number(savedRate));
+      }
     } catch (err) {
-      console.error('Failed to load data from IndexedDB:', err);
+      console.error('Failed to load data from storage engine:', err);
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +136,7 @@ export default function App() {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     localStorage.setItem('nodrapay_tab', tab);
+    trackerDB.setSetting('nodrapay_tab', tab);
   };
 
   // Currency Handlers
@@ -103,12 +144,14 @@ export default function App() {
     const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (newCurr === 'USD' ? 'TOMAN' : newCurr);
     setGlobalCurrency(cur);
     localStorage.setItem('nodrapay_currency', cur);
+    trackerDB.setSetting('nodrapay_currency', cur);
   };
 
   const handleGoldRateTOMANChange = (newRate) => {
     const r = Number(newRate) || 3200;
     setGoldRateTOMAN(r);
     localStorage.setItem('nodrapay_gold_rate_toman', String(r));
+    trackerDB.setSetting('nodrapay_gold_rate_toman', String(r));
   };
 
   // Save Entry (Create / Edit)
@@ -162,30 +205,51 @@ export default function App() {
 
     await trackerDB.saveEntry(updated);
     await loadData();
-    showToast(`Status updated to "${nextStatus}"`);
   };
 
   // Modal Openers
-  const handleOpenWorkModal = (entry = null) => {
-    setEditingEntry(entry);
+  const handleOpenWorkModal = async (entry = null) => {
+    if (entry && entry.id) {
+      const full = await trackerDB.getEntry(entry.id);
+      setEditingEntry(full || entry);
+    } else {
+      setEditingEntry(null);
+    }
     setIsWorkModalOpen(true);
   };
 
-  const handleOpenReceipt = (entry) => {
-    setReceiptEntry(entry);
+  const handleOpenReceipt = async (entry) => {
+    if (!entry) return;
+    const full = await trackerDB.getEntry(entry.id);
+    setReceiptEntry(full || entry);
     setIsReceiptModalOpen(true);
   };
 
-  const handleOpenLightbox = (imgSrc, caption) => {
-    setLightboxData({
-      isOpen: true,
-      imgSrc,
-      caption,
-    });
+  const handleOpenLightbox = async (imgSrcOrEntry, caption) => {
+    if (typeof imgSrcOrEntry === 'string' && (imgSrcOrEntry.startsWith('data:') || imgSrcOrEntry.startsWith('http') || imgSrcOrEntry.startsWith('blob:'))) {
+      setLightboxData({
+        isOpen: true,
+        imgSrc: imgSrcOrEntry,
+        caption: caption || 'Screenshot Proof',
+      });
+      return;
+    }
+
+    if (typeof imgSrcOrEntry === 'string') {
+      const full = await trackerDB.getEntry(imgSrcOrEntry);
+      if (full && full.proofs && full.proofs.length > 0 && full.proofs[0]?.data) {
+        setLightboxData({
+          isOpen: true,
+          imgSrc: full.proofs[0].data,
+          caption: caption || full.title || 'Screenshot Proof',
+        });
+        return;
+      }
+    }
   };
 
   // Export CSV
-  const handleExportCsv = useCallback(() => {
+  const handleExportCsv = useCallback(async () => {
     if (entries.length === 0) {
       showToast('No records to export');
       return;
@@ -220,45 +284,75 @@ export default function App() {
     ]);
 
     const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    const fileName = `nodravault_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    if (isTauri()) {
+      const res = await saveFileNative({
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
+        content: csvContent,
+      });
+      if (res && res.success) {
+        showToast('CSV export saved successfully');
+      }
+      return;
+    }
+
+    // Web Fallback
+    const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `nodravault_ledger_${new Date().toISOString().slice(0, 10)}.csv`
-    );
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     showToast('CSV export downloaded');
-  }, [entries, globalCurrency, showToast]);
+  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
 
   // Export JSON Backup
-  const handleExportJson = useCallback(() => {
+  const handleExportJson = useCallback(async () => {
     if (entries.length === 0) {
       showToast('No records to export');
       return;
     }
 
+    // Retrieve all records with complete full-res screenshot proofs
+    const fullEntries = await trackerDB.getAllEntriesFull();
+
     const backupData = {
       app: 'Nodra Vault',
-      version: '3.0.0',
+      version: '2.0.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
       goldRateTOMAN,
-      entriesCount: entries.length,
-      entries,
+      entriesCount: fullEntries.length,
+      entries: fullEntries,
     };
 
+    const fileName = `nodravault_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+    if (isTauri()) {
+      const res = await saveFileNative({
+        defaultPath: fileName,
+        filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+        content: backupData,
+      });
+      if (res && res.success) {
+        showToast('Full JSON backup saved successfully');
+      }
+      return;
+    }
+
+    // Web Fallback
     const blob = new Blob([JSON.stringify(backupData, null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `nodravault_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -267,32 +361,45 @@ export default function App() {
   }, [entries, globalCurrency, goldRateTOMAN, showToast]);
 
   // Import JSON Restore
-  const handleImportJson = (file) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const json = JSON.parse(e.target.result);
-        let importedList = [];
+  const handleImportJson = async (fileOrRaw) => {
+    try {
+      let json = null;
 
-        if (Array.isArray(json)) {
-          importedList = json;
-        } else if (json.entries && Array.isArray(json.entries)) {
-          importedList = json.entries;
-          if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
-        } else {
-          showToast('Invalid backup JSON format');
-          return;
-        }
-
-        await trackerDB.bulkImport(importedList);
-        await loadData();
-        showToast(`Successfully restored ${importedList.length} records`);
-      } catch (err) {
-        console.error('Failed to import JSON backup:', err);
-        showToast('Error restoring backup file');
+      if (isTauri() && !fileOrRaw) {
+        const res = await openFileNative({
+          filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+        });
+        if (!res || !res.success || !res.content) return;
+        json = JSON.parse(res.content);
+      } else if (fileOrRaw instanceof File) {
+        const text = await fileOrRaw.text();
+        json = JSON.parse(text);
+      } else if (typeof fileOrRaw === 'string') {
+        json = JSON.parse(fileOrRaw);
+      } else if (typeof fileOrRaw === 'object' && fileOrRaw !== null) {
+        json = fileOrRaw;
       }
-    };
-    reader.readAsText(file);
+
+      if (!json) return;
+
+      let importedList = [];
+      if (Array.isArray(json)) {
+        importedList = json;
+      } else if (json.entries && Array.isArray(json.entries)) {
+        importedList = json.entries;
+        if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
+      } else {
+        showToast('Invalid backup JSON format');
+        return;
+      }
+
+      await trackerDB.bulkImport(importedList);
+      await loadData();
+      showToast(`Successfully restored ${importedList.length} records`);
+    } catch (err) {
+      console.error('Failed to import JSON backup:', err);
+      showToast('Error restoring backup file');
+    }
   };
 
   // Reset Data with Fresh Seed
@@ -305,7 +412,47 @@ export default function App() {
   // Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't trigger if typing in inputs/textareas
+      // Escape closes open modals / lightbox
+      if (e.key === 'Escape') {
+        if (lightboxData.isOpen) {
+          setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
+          return;
+        }
+        if (exportConfirm) {
+          setExportConfirm(null);
+          return;
+        }
+        if (isWorkModalOpen) {
+          setIsWorkModalOpen(false);
+          setEditingEntry(null);
+          return;
+        }
+        if (isReceiptModalOpen) {
+          setIsReceiptModalOpen(false);
+          setReceiptEntry(null);
+          return;
+        }
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+          return;
+        }
+        if (isShortcutsOpen) {
+          setIsShortcutsOpen(false);
+          return;
+        }
+      }
+
+      // Ctrl + F (Focus Search in Ledger)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        handleTabChange('ledger');
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
+        return;
+      }
+
+      // Don't trigger standard navigation hotkeys if typing in inputs/textareas
       const tag = e.target.tagName.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
         return;
@@ -354,12 +501,15 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExportCsv, handleExportJson]);
+  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, lightboxData, exportConfirm]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center selection:bg-zinc-800">
-      {/* Tablet-Width Desktop Shell Container */}
-      <div className="w-full max-w-5xl min-h-screen flex flex-col md:flex-row md:border-x border-zinc-800/80 bg-zinc-950 shadow-2xl relative">
+    <div className="w-full h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-800/80 shadow-2xl">
+      {/* 1. Frameless Title Bar */}
+      <TitleBar />
+
+      {/* 2. Main Desktop Shell Body */}
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden bg-zinc-950 relative">
         {/* Desktop Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -381,22 +531,17 @@ export default function App() {
           onOpenWorkModal={handleOpenWorkModal}
         />
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 max-w-full overflow-y-auto relative">
-          {/* Top-Center Toast Notification inside Main Screen */}
-          <div className="sticky top-0 z-50 flex justify-center pointer-events-none mb-0 h-0">
+        {/* Main Content Workspace */}
+        <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950">
+          {/* Top-Center Toast Notification */}
+          <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
             <AnimatePresence>
               {toast && (
-                <motion.div
-                  initial={{ opacity: 0, y: -16, scale: 0.94 }}
-                  animate={{ opacity: 1, y: 8, scale: 1 }}
-                  exit={{ opacity: 0, y: -16, scale: 0.94 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                  className="pointer-events-auto flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/95 text-zinc-100 text-xs font-medium border border-zinc-700/80 shadow-2xl backdrop-blur-md max-w-[90%] sm:max-w-md select-none"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="truncate">{toast.text}</span>
-                </motion.div>
+                <Toast
+                  key={toast.id || 'toast'}
+                  toast={toast}
+                  onClose={() => setToast(null)}
+                />
               )}
             </AnimatePresence>
           </div>
@@ -555,7 +700,7 @@ export default function App() {
               <p className="text-zinc-200 font-medium">
                 {exportConfirm === 'csv'
                   ? `Export ${entries.length} records to a formatted .csv spreadsheet?`
-                  : `Download a complete backup with ${entries.length} records and proofs?`}
+                  : `Save a complete backup with ${entries.length} records and proofs?`}
               </p>
               <p className="text-[11px] text-zinc-500">
                 {exportConfirm === 'csv'
@@ -585,11 +730,10 @@ export default function App() {
             className="gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Confirm & Download</span>
+            <span>Confirm & Save</span>
           </Button>
         </DialogFooter>
       </Dialog>
     </div>
   );
 }
-

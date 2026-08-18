@@ -73,7 +73,7 @@ export function NumberStepperInput({
   return (
     <div
       className={cn(
-        'relative flex items-center w-full rounded-lg bg-zinc-900/60 border border-zinc-800 transition-all duration-150 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500',
+        'relative flex items-center w-full h-9 rounded-lg bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
@@ -89,7 +89,7 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full bg-transparent px-3 py-2 pr-8 text-xs font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
           inputClassName
         )}
         {...props}
