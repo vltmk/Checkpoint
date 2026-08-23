@@ -24,6 +24,7 @@ import {
   toggleMaximizeWindow,
   isWindowMaximized,
   closeWindow,
+  startDraggingWindow,
   isTauri,
 } from '../lib/desktop';
 
@@ -106,16 +107,25 @@ export function Navbar({
     closeWindow();
   };
 
+  const handleHeaderMouseDown = (e) => {
+    // Only initiate window drag if left button and not clicking an interactive control
+    if (e.button === 0 && !e.target.closest('button, input, select, textarea, [data-no-drag]')) {
+      startDraggingWindow();
+    }
+  };
+
   return (
     <header
       data-tauri-drag-region
+      onMouseDown={handleHeaderMouseDown}
       onDoubleClick={handleToggleMaximize}
       className="hidden md:flex h-12 w-full bg-black/95 border-b border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
     >
       {/* 1. Left: Brand Identity (Draggable) & Add Work Button */}
-      <div className="flex items-center gap-2.5 shrink-0 z-10">
+      <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-2.5 shrink-0 z-10">
         <div
           data-tauri-drag-region
+          onMouseDown={handleHeaderMouseDown}
           className="flex items-center gap-2 cursor-default select-none"
         >
           <img
@@ -133,7 +143,7 @@ export function Navbar({
 
         <div className="h-4 w-px bg-zinc-800/80 pointer-events-none" />
 
-        <div className="no-drag">
+        <div data-no-drag>
           <Button
             variant="primary"
             size="sm"
@@ -149,9 +159,13 @@ export function Navbar({
         </div>
       </div>
 
-      {/* 2. Center: Segmented Sliding Tab Switcher (Elevated Dark Zinc Pill + Bright Font) */}
-      <div className="flex-1 flex items-center justify-center min-w-0 px-1 no-drag z-10">
-        <div className="bg-zinc-900/90 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
+      {/* 2. Center: Segmented Sliding Tab Switcher with Draggable Empty Gaps */}
+      <div
+        data-tauri-drag-region
+        onMouseDown={handleHeaderMouseDown}
+        className="flex-1 flex items-center justify-center min-w-0 px-1 h-full cursor-default z-10"
+      >
+        <div data-no-drag className="bg-zinc-900/90 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
           {/* Tab 1: Ledger */}
           <button
             type="button"
@@ -208,9 +222,9 @@ export function Navbar({
       </div>
 
       {/* 3. Right: Consolidated Currency & Rates Dropdown, Settings, Window Controls */}
-      <div className="flex items-center gap-1.5 shrink-0 no-drag z-10">
+      <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-1.5 shrink-0 z-10">
         {/* Consolidated Currency & Gold Ratio Dropdown */}
-        <div className="relative" ref={ratesDropdownRef}>
+        <div className="relative" ref={ratesDropdownRef} data-no-drag>
           <button
             type="button"
             onClick={() => {
@@ -310,7 +324,7 @@ export function Navbar({
         </div>
 
         {/* Settings & Shortcuts Buttons */}
-        <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80">
+        <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
           <button
             type="button"
             onClick={onOpenSettings}
@@ -332,7 +346,7 @@ export function Navbar({
 
         {/* Desktop Window Controls */}
         {isDesktop && (
-          <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80">
+          <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
             <button
               type="button"
               onClick={handleMinimize}
@@ -352,7 +366,7 @@ export function Navbar({
               {isMaximized ? (
                 <Copy className="w-3 h-3 rotate-180" />
               ) : (
-                <Square className="w-3 h-3" />
+                <Square className="w-3.5 h-3.5" />
               )}
             </button>
             <button

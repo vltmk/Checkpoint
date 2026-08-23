@@ -432,9 +432,10 @@ export function LedgerView({
 
       {/* 3. Compact / Collapsible Search & Filter Bar (Higher Stacking Context) */}
       <div className="relative z-30 space-y-2.5">
-        {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Search Drawer Toggle) */}
-        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
-          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+        {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Expanding Search Drawer Toggle) */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          {/* Filter Chips group */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar shrink-0">
             {/* Status Chips */}
             <div className="flex items-center gap-1">
               <button
@@ -523,31 +524,33 @@ export function LedgerView({
             )}
           </div>
 
-          {/* Toggle Search & Advanced Filters Drawer */}
-          <div className="shrink-0 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSearchExpanded((prev) => !prev);
-                if (!isSearchExpanded) {
-                  setTimeout(() => searchInputRef?.current?.focus(), 80);
-                }
-              }}
-              title="Toggle Search, Games & Sort (Press / to search)"
-              className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-colors ${
-                isSearchExpanded || hasAdvancedFilters
-                  ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold'
-                  : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Search & Filters</span>
+          {/* Toggle Search & Advanced Filters Drawer (Fills empty space on desktop, full row on mobile) */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchExpanded((prev) => !prev);
+              if (!isSearchExpanded) {
+                setTimeout(() => searchInputRef?.current?.focus(), 80);
+              }
+            }}
+            title="Toggle Search, Games & Sort (Press / to search)"
+            className={`w-full sm:flex-1 h-8 sm:h-7 px-3 rounded-md text-xs font-medium flex items-center justify-between sm:justify-center gap-2 border transition-colors ${
+              isSearchExpanded || hasAdvancedFilters
+                ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold'
+                : 'bg-transparent hover:bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <span className="truncate">Search & Filters</span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
               <Kbd className="text-[9px] bg-zinc-900/80 border-zinc-700 text-zinc-400 px-1 py-0">/</Kbd>
               {hasAdvancedFilters && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5" />
               )}
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
 
         {/* Collapsible Search, Game & Sort Drawer */}
@@ -977,50 +980,54 @@ export function LedgerView({
       <AnimatePresence>
         {selectedDaysSummary && selectedDaysSummary.daysCount > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            initial={{ opacity: 0, y: 28, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.96 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/90 backdrop-blur-md border border-zinc-700 shadow-2xl rounded-2xl px-3.5 sm:px-4 py-2.5 flex items-center gap-3 max-w-[95vw] sm:max-w-lg"
+            exit={{ opacity: 0, y: 28, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-[90] bg-zinc-950/95 backdrop-blur-xl border border-zinc-700/80 shadow-2xl ring-1 ring-zinc-800 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-3.5 sm:gap-5 max-w-[95vw] sm:max-w-xl"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0">
                 {selectedDaysSummary.daysCount} {selectedDaysSummary.daysCount === 1 ? 'Day' : 'Days'}
               </span>
 
-              <div className="flex items-center gap-1.5 min-w-0 truncate text-xs">
-                <span className="text-zinc-400 text-[11px] hidden sm:inline font-sans">Sum:</span>
-                <strong className="text-zinc-100 font-mono font-bold text-sm">
+              <div className="flex items-baseline gap-2 min-w-0 truncate">
+                <span className="text-zinc-400 text-xs font-sans hidden sm:inline">Sum:</span>
+                <strong className="text-zinc-100 font-mono font-bold text-base sm:text-lg tracking-tight">
                   <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
                 </strong>
-                <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+                <span className="text-[11px] text-zinc-500 font-mono shrink-0">
                   ({selectedDaysSummary.totalJobs} {selectedDaysSummary.totalJobs === 1 ? 'job' : 'jobs'})
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2 border-l border-zinc-800">
-              <button
-                type="button"
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-3 border-l border-zinc-800">
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => {
                   const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
                   navigator.clipboard.writeText(formatted);
                   onToast?.(`📋 Copied selected days sum (${formatted}) to clipboard!`);
                 }}
                 title="Copy sum to clipboard"
-                className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+                className="h-8 px-2.5 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/80 gap-1.5 border border-transparent hover:border-zinc-700 transition-colors"
               >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
+                <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="hidden sm:inline">Copy</span>
+              </Button>
 
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => setSelectedDayKeys(new Set())}
                 title="Clear day selection"
-                className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 transition-colors"
+                className="h-8 px-2 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-700 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+                <span className="hidden sm:inline">Clear</span>
+              </Button>
             </div>
           </motion.div>
         )}

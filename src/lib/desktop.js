@@ -50,6 +50,16 @@ export async function closeWindow() {
   }
 }
 
+export async function startDraggingWindow() {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().startDragging();
+  } catch (err) {
+    // Ignore drag start error
+  }
+}
+
 /**
  * Native File Dialogs (Save & Open)
  */
