@@ -181,6 +181,19 @@
   background: #3f3f46;
 }
 
+/* GPU-Accelerated Hardware Scrolling & Containment */
+.gpu-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  transform: translateZ(0);
+}
+
+.job-row-item {
+  contain: content;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 68px;
+}
+
 /* Mobile Safe Area Insets */
 .safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));

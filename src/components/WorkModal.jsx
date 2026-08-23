@@ -639,6 +639,7 @@ export function WorkModal({
             </span>
             <div className="w-28 sm:w-32">
               <Select
+                dropUp={true}
                 value={formData.status}
                 onChange={(val) => updateFormData({ status: val })}
                 options={STATUS_OPTIONS}

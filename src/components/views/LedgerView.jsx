@@ -51,6 +51,9 @@ export function LedgerView({
   onDuplicateEntry,
   onDeleteEntry,
   searchInputRef,
+  externalTeammateFilter = '',
+  onClearExternalTeammateFilter,
+  onToast,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -63,15 +66,25 @@ export function LedgerView({
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
   const [promptProofEntryId, setPromptProofEntryId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedDayKeys, setSelectedDayKeys] = useState(new Set());
 
   const rates = useMemo(
     () => ({ goldRateTOMAN }),
     [goldRateTOMAN]
   );
 
-  // Reset page when any filter criteria changes
+  // Sync external teammate filter from receipt or other views
+  useEffect(() => {
+    if (externalTeammateFilter) {
+      setTeammateFilter(externalTeammateFilter);
+      onClearExternalTeammateFilter?.();
+    }
+  }, [externalTeammateFilter, onClearExternalTeammateFilter]);
+
+  // Reset page & day selection when filter criteria changes
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedDayKeys(new Set());
   }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sortOption]);
 
   // Filter and sort entries
@@ -219,6 +232,50 @@ export function LedgerView({
     });
   }, [paginatedEntries, globalCurrency, rates]);
 
+  // Multi-day calculation summary
+  const selectedDaysSummary = useMemo(() => {
+    if (selectedDayKeys.size === 0) return null;
+
+    let totalIncome = 0;
+    let totalJobs = 0;
+
+    dateGroups.forEach(({ groupTitle, groupItems, dayTotal }) => {
+      if (selectedDayKeys.has(groupTitle)) {
+        totalIncome += dayTotal;
+        totalJobs += groupItems.length;
+      }
+    });
+
+    return {
+      daysCount: selectedDayKeys.size,
+      totalIncome,
+      totalJobs,
+    };
+  }, [selectedDayKeys, dateGroups]);
+
+  const handleToggleDaySelection = (dayKey) => {
+    setSelectedDayKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(dayKey)) {
+        next.delete(dayKey);
+      } else {
+        next.add(dayKey);
+      }
+      return next;
+    });
+  };
+
+  const handlePageChange = (pageNum) => {
+    setCurrentPage(pageNum);
+    setSelectedDayKeys(new Set());
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const gameOptions = [
     { value: '', label: 'All Games' },
     ...GAMES.map((g) => ({ value: g, label: g })),
@@ -239,6 +296,7 @@ export function LedgerView({
     setTeammateFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
+    setSelectedDayKeys(new Set());
   };
 
   const hasAdvancedFilters = Boolean(searchQuery.trim() || gameFilter || sortOption !== 'date_desc');
@@ -253,7 +311,7 @@ export function LedgerView({
   };
 
   return (
-    <div className="space-y-5 pb-20 md:pb-6">
+    <div className="space-y-5 pb-20 md:pb-6 relative">
       {/* 1. Compact Total Earned Summary Card */}
       <div className="rounded-xl bg-zinc-900/40 border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
         <div className="flex items-center justify-between">
@@ -365,7 +423,7 @@ export function LedgerView({
 
       {/* 3. Compact / Collapsible Search & Filter Bar */}
       <div className="space-y-2.5">
-        {/* Quick Filter Bar (Status Chips + Currency Chips + Teammate Chip + Search Drawer Toggle) */}
+        {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Search Drawer Toggle) */}
         <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
             {/* Status Chips */}
@@ -442,7 +500,7 @@ export function LedgerView({
               </button>
             </div>
 
-            {/* Active Teammate Filter Chip */}
+            {/* Active Team Filter Chip */}
             {teammateFilter && (
               <button
                 type="button"
@@ -450,7 +508,7 @@ export function LedgerView({
                 className="px-2 py-1 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
               >
                 <Users className="w-3 h-3 text-zinc-400" />
-                <span>Crew: {teammateFilter}</span>
+                <span>Team: {teammateFilter}</span>
                 <X className="w-3 h-3 text-zinc-400 hover:text-zinc-100" />
               </button>
             )}
@@ -557,10 +615,11 @@ export function LedgerView({
         <div className="space-y-6">
           {dateGroups.map(({ groupTitle, groupItems, dayTotal }) => {
             if (groupItems.length === 0) return null;
+            const isDaySelected = selectedDayKeys.has(groupTitle);
 
             return (
               <div key={groupTitle} className="space-y-2">
-                {/* Daily Group Header with Day Total Income Badge */}
+                {/* Daily Group Header with Dark Low-Contrast & Selectable Day Total Income Badge */}
                 <div className="flex items-center justify-between px-1 py-1 border-b border-zinc-800/80">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
@@ -571,12 +630,27 @@ export function LedgerView({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900/90 border border-zinc-800/90 text-[11px] font-mono text-zinc-300 shadow-sm">
-                    <span className="text-zinc-500 text-[9px] uppercase font-sans font-semibold">Day Total:</span>
-                    <strong className="text-zinc-100 font-semibold">
+                  {/* Selectable Day Total Income Badge */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleDaySelection(groupTitle)}
+                    title={`Click to ${isDaySelected ? 'deselect' : 'select and sum'} ${groupTitle}'s earnings`}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono transition-all select-none border ${
+                      isDaySelected
+                        ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-200 shadow-md ring-1 ring-zinc-300'
+                        : 'bg-zinc-950/80 border-zinc-800/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 shadow-sm'
+                    }`}
+                  >
+                    <span className={`text-[9px] uppercase font-sans font-semibold ${isDaySelected ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                      Day Total:
+                    </span>
+                    <strong className={isDaySelected ? 'text-zinc-950' : 'text-zinc-300'}>
                       <MoneyDisplay amount={dayTotal} currency={globalCurrency} />
                     </strong>
-                  </div>
+                    {isDaySelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 ml-0.5 shrink-0" />
+                    )}
+                  </button>
                 </div>
 
                 <div className="space-y-1.5">
@@ -585,7 +659,7 @@ export function LedgerView({
                     const isProofPrompting = promptProofEntryId === entry.id;
 
                     return (
-                      <div key={entry.id} className="space-y-1">
+                      <div key={entry.id} className="space-y-1 job-row-item">
                         <div
                           className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
                         >
@@ -641,7 +715,7 @@ export function LedgerView({
                                 <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
                                   <span className="text-zinc-500 flex items-center gap-1">
                                     <Users className="w-3 h-3 text-zinc-500" />
-                                    <span>Crew:</span>
+                                    <span>Team:</span>
                                   </span>
                                   {entry.teammates.map((tm) => {
                                     const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
@@ -830,10 +904,7 @@ export function LedgerView({
                 <button
                   type="button"
                   disabled={currentPage <= 1}
-                  onClick={() => {
-                    setCurrentPage((p) => Math.max(1, p - 1));
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
                 >
                   Previous
@@ -860,10 +931,7 @@ export function LedgerView({
                     <button
                       key={pageNum}
                       type="button"
-                      onClick={() => {
-                        setCurrentPage(pageNum);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
+                      onClick={() => handlePageChange(pageNum)}
                       className={`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
                         currentPage === pageNum
                           ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
@@ -878,10 +946,7 @@ export function LedgerView({
                 <button
                   type="button"
                   disabled={currentPage >= totalPages}
-                  onClick={() => {
-                    setCurrentPage((p) => Math.min(totalPages, p + 1));
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
                 >
                   Next
@@ -891,6 +956,59 @@ export function LedgerView({
           )}
         </div>
       )}
+
+      {/* 6. Interactive Multi-Day Income Calculator Floating Bottom Bar */}
+      <AnimatePresence>
+        {selectedDaysSummary && selectedDaysSummary.daysCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.96 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/95 border border-zinc-700 shadow-2xl rounded-2xl px-3.5 sm:px-4 py-2.5 flex items-center gap-3 backdrop-blur-md max-w-[95vw] sm:max-w-lg"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 shrink-0">
+                {selectedDaysSummary.daysCount} {selectedDaysSummary.daysCount === 1 ? 'Day' : 'Days'}
+              </span>
+
+              <div className="flex items-center gap-1.5 min-w-0 truncate text-xs">
+                <span className="text-zinc-400 text-[11px] hidden sm:inline font-sans">Sum:</span>
+                <strong className="text-zinc-100 font-mono font-bold text-sm">
+                  <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
+                </strong>
+                <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+                  ({selectedDaysSummary.totalJobs} {selectedDaysSummary.totalJobs === 1 ? 'job' : 'jobs'})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2 border-l border-zinc-800">
+              <button
+                type="button"
+                onClick={() => {
+                  const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
+                  navigator.clipboard.writeText(formatted);
+                  onToast?.(`📋 Copied selected days sum (${formatted}) to clipboard!`);
+                }}
+                title="Copy sum to clipboard"
+                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedDayKeys(new Set())}
+                title="Clear day selection"
+                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

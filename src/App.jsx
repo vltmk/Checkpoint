@@ -54,6 +54,7 @@ export default function App() {
 
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptEntry, setReceiptEntry] = useState(null);
+  const [externalTeammateFilter, setExternalTeammateFilter] = useState('');
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
@@ -535,7 +536,7 @@ export default function App() {
       />
 
       {/* 3. Main Centered Mini-App Workspace */}
-      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950">
+      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950 gpu-scroll">
         {/* Top-Center Toast Notification */}
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
           <AnimatePresence>
@@ -576,6 +577,9 @@ export default function App() {
                     onDuplicateEntry={handleDuplicateEntry}
                     onDeleteEntry={handleDeleteEntry}
                     searchInputRef={searchInputRef}
+                    externalTeammateFilter={externalTeammateFilter}
+                    onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
+                    onToast={showToast}
                   />
                 )}
 
@@ -624,6 +628,13 @@ export default function App() {
         globalCurrency={globalCurrency}
         onOpenLightbox={handleOpenLightbox}
         onToast={showToast}
+        onFilterTeammate={(name) => {
+          setIsReceiptModalOpen(false);
+          setReceiptEntry(null);
+          setActiveTab('ledger');
+          setExternalTeammateFilter(name);
+          showToast(`Filtered for teammate: ${name}`);
+        }}
       />
 
       <SettingsModal

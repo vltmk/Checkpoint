@@ -186,7 +186,7 @@ export function TeammatesCombobox({
           )}
 
           <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-            <span>Saved Crew Members ({savedTeammates.length})</span>
+            <span>Saved Team Members ({savedTeammates.length})</span>
           </div>
 
           {savedTeammates.length === 0 ? (
@@ -218,7 +218,7 @@ export function TeammatesCombobox({
                       type="button"
                       onClick={(e) => handleDeleteSaved(e, member)}
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-all"
-                      title={`Remove "${member}" from saved crew`}
+                      title={`Remove "${member}" from saved teammates`}
                     >
                       <X className="w-3 h-3" />
                     </button>
