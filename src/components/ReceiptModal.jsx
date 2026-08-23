@@ -60,7 +60,7 @@ export function ReceiptModal({
   const rateDiscordText = isClassic ? '1 Gold' : '1k Gold';
 
   const handleCopyText = () => {
-    const text = `=== NODRA VAULT WORK RECEIPT ===
+    const text = `=== CHECKPOINT WORK RECEIPT ===
 Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${entry.game || 'World of Warcraft'}
@@ -78,7 +78,7 @@ Notes: ${entry.notes || 'None'}
 
   const handleCopyDiscordMarkdown = () => {
     const md = `\`\`\`ini
-[ NODRA VAULT - PROOF OF WORK RECEIPT ]
+[ CHECKPOINT - PROOF OF WORK RECEIPT ]
 ID      = ${receiptId}
 Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
@@ -113,15 +113,15 @@ Notes   = ${entry.notes || 'None'}
             <div className="flex items-center gap-2.5">
               <img
                 src={nodraLogo}
-                alt="Nodra Vault"
+                alt="Checkpoint"
                 className="w-6 h-6 object-contain"
               />
               <div>
                 <h4 className="text-sm font-bold tracking-tight text-zinc-100">
-                  Vault
+                  Checkpoint
                 </h4>
                 <p className="text-[10px] text-zinc-500 font-mono">
-                  Nodra Freelance Ledger
+                  Freelance & Gaming Ledger
                 </p>
               </div>
             </div>

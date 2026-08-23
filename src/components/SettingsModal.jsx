@@ -142,7 +142,7 @@ export function SettingsModal({
           </div>
           <p className="text-[11px] text-zinc-500">
             {isDesktop
-              ? 'Stored securely on this PC in standalone SQLite format (%APPDATA%/com.nodra.vault/vault.db).'
+              ? 'Stored securely on this PC in standalone SQLite format.'
               : 'Stored securely in local client IndexedDB.'}
           </p>
 
@@ -240,13 +240,13 @@ export function SettingsModal({
             Database Reset
           </label>
           <p className="text-[11px] text-zinc-500">
-            Reset database with fresh default sample jobs.
+            Reset database and populate with 25 realistic sample work logs for testing.
           </p>
           <Button
             variant="danger"
             size="sm"
             onClick={() => {
-              if (window.confirm('Reset database with fresh sample data? All existing custom records will be replaced.')) {
+              if (window.confirm('Reset database with 25 fresh sample records? All existing custom records will be replaced.')) {
                 onResetData?.();
                 onClose();
               }
@@ -254,7 +254,7 @@ export function SettingsModal({
             className="gap-2 text-xs"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Reset with Fresh Seed Data</span>
+            <span>Reset with 25 Sample Jobs</span>
           </Button>
         </div>
       </DialogContent>

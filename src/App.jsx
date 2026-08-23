@@ -4,6 +4,7 @@ import { STATUS_CONFIG } from './lib/currencies';
 import { toLocalISOString } from './components/ui/DateTimePicker';
 import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
+import { SplashScreen } from './components/ui/SplashScreen';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
 import { WorkModal } from './components/WorkModal';
@@ -106,6 +107,7 @@ export default function App() {
 
   // Data Loading
   const loadData = useCallback(async () => {
+    const startTime = Date.now();
     try {
       await trackerDB.seedInitialDataIfEmpty();
       const all = await trackerDB.getAllEntries();
@@ -123,7 +125,11 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
     } finally {
-      setIsLoading(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 450 - elapsed);
+      setTimeout(() => {
+        setIsLoading(false);
+      }, remaining);
     }
   }, []);
 
@@ -325,7 +331,7 @@ export default function App() {
     const fullEntries = await trackerDB.getAllEntriesFull();
 
     const backupData = {
-      app: 'Nodra Vault',
+      app: 'Checkpoint',
       version: '2.1.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
@@ -334,7 +340,7 @@ export default function App() {
       entries: fullEntries,
     };
 
-    const fileName = `nodravault_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    const fileName = `checkpoint_backup_${new Date().toISOString().slice(0, 10)}.json`;
 
     if (isTauri()) {
       const res = await saveFileNative({
@@ -502,6 +508,11 @@ export default function App() {
 
   return (
     <div className="w-full h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-800/80 shadow-2xl">
+      {/* 0. App Launch Splash Screen */}
+      <AnimatePresence>
+        {isLoading && <SplashScreen key="app-splash" />}
+      </AnimatePresence>
+
       {/* 1. Desktop Unified Top Navigation Bar */}
       <Navbar
         activeTab={activeTab}

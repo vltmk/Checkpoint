@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Receipt,
+  Layers,
   BarChart3,
   Plus,
   Settings,
@@ -17,12 +17,12 @@ export function MobileHeader({
       <div className="flex items-center gap-2">
         <img
           src={nodraLogo}
-          alt="Nodra Vault"
+          alt="Checkpoint"
           className="w-5 h-5 object-contain"
         />
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-bold tracking-tight text-zinc-100">
-            Vault
+            Checkpoint
           </span>
           <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
             v2.1.0
@@ -60,7 +60,7 @@ export function MobileBottomNav({
             activeTab === 'ledger' ? 'text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          <Receipt className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
+          <Layers className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
           <span>Ledger</span>
         </button>
 

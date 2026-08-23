@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   TrendingUp,
   Clock,
+  Coins,
+  Banknote,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -49,9 +51,11 @@ export function LedgerView({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [currencyFilter, setCurrencyFilter] = useState('');
   const [gameFilter, setGameFilter] = useState('');
   const [hasProofFilter, setHasProofFilter] = useState(false);
   const [sortOption, setSortOption] = useState('date_desc');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
   const [promptProofEntryId, setPromptProofEntryId] = useState(null);
 
@@ -80,6 +84,10 @@ export function LedgerView({
       list = list.filter((e) => e.status === statusFilter);
     }
 
+    if (currencyFilter) {
+      list = list.filter((e) => e.currency === currencyFilter);
+    }
+
     if (gameFilter) {
       list = list.filter((e) => e.game === gameFilter);
     }
@@ -105,7 +113,7 @@ export function LedgerView({
     });
 
     return list;
-  }, [entries, searchQuery, statusFilter, gameFilter, hasProofFilter, sortOption, globalCurrency, rates]);
+  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, sortOption, globalCurrency, rates]);
 
   // Aggregate metrics for compact balance summary
   const metrics = useMemo(() => {
@@ -196,10 +204,13 @@ export function LedgerView({
   const handleClearFilters = () => {
     setSearchQuery('');
     setStatusFilter('');
+    setCurrencyFilter('');
     setGameFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
   };
+
+  const hasAdvancedFilters = Boolean(searchQuery.trim() || gameFilter || sortOption !== 'date_desc');
 
   const handleStatusSelect = (entry, nextStatus) => {
     onFlipStatus?.(entry.id, entry.status, nextStatus);
@@ -321,91 +332,168 @@ export function LedgerView({
         </div>
       </div>
 
-      {/* 3. Search & Filter Bar */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search jobs, games, seller source, notes... (Press / to search)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-8 h-9 text-xs"
-            />
-            {searchQuery && (
+      {/* 3. Compact / Collapsible Search & Filter Bar */}
+      <div className="space-y-2.5">
+        {/* Quick Filter Bar (Status Chips + Currency Chips + Search Drawer Toggle) */}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+            {/* Status Chips */}
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300"
+                onClick={() => setStatusFilter('')}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
+                  statusFilter === ''
+                    ? 'bg-zinc-100 text-zinc-950 font-semibold'
+                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                }`}
               >
-                ✕
+                All ({entries.length})
               </button>
-            )}
+
+              {STATUSES.map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(statusFilter === st ? '' : st)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
+                    statusFilter === st
+                      ? 'bg-zinc-100 text-zinc-950 font-semibold'
+                      : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setHasProofFilter((prev) => !prev)}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                  hasProofFilter
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold'
+                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                }`}
+              >
+                <FileImage className="w-3 h-3" />
+                <span>Proof</span>
+              </button>
+            </div>
+
+            <div className="h-4 w-px bg-zinc-800 shrink-0 hidden sm:block" />
+
+            {/* Currency Payment Type Chips */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrencyFilter(currencyFilter === 'GOLD' ? '' : 'GOLD')}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                  currencyFilter === 'GOLD'
+                    ? 'bg-amber-950/80 text-amber-300 border border-amber-800 font-semibold shadow-sm'
+                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                }`}
+              >
+                <Coins className="w-3 h-3 text-amber-400" />
+                <span>Gold</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCurrencyFilter(currencyFilter === 'TOMAN' ? '' : 'TOMAN')}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                  currencyFilter === 'TOMAN'
+                    ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
+                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                }`}
+              >
+                <Banknote className="w-3 h-3" />
+                <span className="font-sans">تومان</span>
+              </button>
+            </div>
           </div>
 
-          <div className="w-36 hidden sm:block">
-            <Select
-              value={gameFilter}
-              onChange={setGameFilter}
-              options={gameOptions}
-              className="h-9 text-xs"
-            />
-          </div>
-
-          <div className="w-36 hidden sm:block">
-            <Select
-              value={sortOption}
-              onChange={setSortOption}
-              options={sortOptions}
-              className="h-9 text-xs"
-            />
-          </div>
-        </div>
-
-        {/* Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <button
-            type="button"
-            onClick={() => setStatusFilter('')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
-              statusFilter === ''
-                ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-            }`}
-          >
-            All ({entries.length})
-          </button>
-
-          {STATUSES.map((st) => (
+          {/* Toggle Search & Advanced Filters Drawer */}
+          <div className="shrink-0 flex items-center gap-1">
             <button
-              key={st}
               type="button"
-              onClick={() => setStatusFilter(statusFilter === st ? '' : st)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
-                statusFilter === st
-                  ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+              onClick={() => {
+                setIsSearchExpanded((prev) => !prev);
+                if (!isSearchExpanded) {
+                  setTimeout(() => searchInputRef?.current?.focus(), 80);
+                }
+              }}
+              title="Toggle Search, Games & Sort (Press / to search)"
+              className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-colors ${
+                isSearchExpanded || hasAdvancedFilters
+                  ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold'
+                  : 'bg-zinc-900/80 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
               }`}
             >
-              {st}
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Search & Filters</span>
+              <Kbd className="text-[9px] bg-zinc-900/80 border-zinc-700 text-zinc-400 px-1 py-0">/</Kbd>
+              {hasAdvancedFilters && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5" />
+              )}
             </button>
-          ))}
-
-          <button
-            type="button"
-            onClick={() => setHasProofFilter((prev) => !prev)}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
-              hasProofFilter
-                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold'
-                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-            }`}
-          >
-            <FileImage className="w-3 h-3" />
-            <span>With Proof</span>
-          </button>
+          </div>
         </div>
+
+        {/* Collapsible Search, Game & Sort Drawer */}
+        <AnimatePresence>
+          {(isSearchExpanded || hasAdvancedFilters) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                    <Input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search jobs, games, seller source, notes... (Press / to focus)"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 pr-7 h-8 text-xs bg-zinc-900 border-zinc-800"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="w-full sm:w-36">
+                    <Select
+                      value={gameFilter}
+                      onChange={setGameFilter}
+                      options={gameOptions}
+                      className="h-8 text-xs bg-zinc-900 border-zinc-800"
+                    />
+                  </div>
+
+                  <div className="w-full sm:w-36">
+                    <Select
+                      value={sortOption}
+                      onChange={setSortOption}
+                      options={sortOptions}
+                      className="h-8 text-xs bg-zinc-900 border-zinc-800"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* 4. Grouped Job Feed */}
