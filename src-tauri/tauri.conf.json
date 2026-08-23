@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nodra Vault",
-  "version": "2.0.0",
-  "identifier": "com.nodra.vault",
+  "productName": "Checkpoint",
+  "version": "2.1.0",
+  "identifier": "com.checkpoint.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:3000",
@@ -13,11 +13,11 @@
     "windows": [
       {
         "label": "main",
-        "title": "Nodra Vault",
+        "title": "Checkpoint",
         "width": 1080,
         "height": 840,
-        "minWidth": 800,
-        "minHeight": 600,
+        "minWidth": 720,
+        "minHeight": 480,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,

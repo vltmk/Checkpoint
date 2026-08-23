@@ -58,6 +58,8 @@ export class StorageDB {
         title TEXT NOT NULL,
         game TEXT NOT NULL,
         source TEXT DEFAULT 'Direct Client',
+        teamMode INTEGER DEFAULT 0,
+        teammates TEXT DEFAULT '[]',
         income REAL NOT NULL,
         currency TEXT NOT NULL DEFAULT 'TOMAN',
         exchangeRate REAL DEFAULT 3200,
@@ -74,6 +76,12 @@ export class StorageDB {
     // Run safe migrations for existing tables
     try {
       await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';`);
+    } catch (e) {}
+    try {
+      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN teamMode INTEGER DEFAULT 0;`);
+    } catch (e) {}
+    try {
+      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN teammates TEXT DEFAULT '[]';`);
     } catch (e) {}
     try {
       await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;`);
@@ -174,7 +182,7 @@ export class StorageDB {
         // Fast lightweight query with proof metadata
         const rows = await this.sqliteDb.select(`
           SELECT 
-            w.id, w.title, w.game, w.source, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes,
+            w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -188,9 +196,18 @@ export class StorageDB {
           if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
           const isClassic = r.rateUnit === '1' || r.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
+
+          let parsedTeammates = [];
+          try {
+            if (typeof r.teammates === 'string') parsedTeammates = JSON.parse(r.teammates);
+            else if (Array.isArray(r.teammates)) parsedTeammates = r.teammates;
+          } catch (e) {}
+
           return {
             ...r,
             source: r.source || 'Direct Client',
+            teamMode: Boolean(r.teamMode),
+            teammates: parsedTeammates,
             currency: cur,
             exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
             rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
@@ -221,6 +238,8 @@ export class StorageDB {
           return {
             ...entry,
             source: entry.source || 'Direct Client',
+            teamMode: Boolean(entry.teamMode),
+            teammates: Array.isArray(entry.teammates) ? entry.teammates : [],
             currency: cur,
             exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate,
             rateUnit: entry.rateUnit || (isClassic ? '1' : '1k'),
@@ -252,6 +271,14 @@ export class StorageDB {
         entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
         entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
 
+        try {
+          if (typeof entry.teammates === 'string') entry.teammates = JSON.parse(entry.teammates);
+          else if (!Array.isArray(entry.teammates)) entry.teammates = [];
+        } catch (e) {
+          entry.teammates = [];
+        }
+        entry.teamMode = Boolean(entry.teamMode);
+
         // Fetch full proofs attachments
         const proofRows = await this.sqliteDb.select(
           'SELECT id, name, data_blob as data, size, created_at as createdAt FROM proof_attachments WHERE entry_id = ? ORDER BY created_at ASC',
@@ -280,6 +307,8 @@ export class StorageDB {
           const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
           entry.source = entry.source || 'Direct Client';
+          entry.teamMode = Boolean(entry.teamMode);
+          entry.teammates = Array.isArray(entry.teammates) ? entry.teammates : [];
           entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
           entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
         }
@@ -302,6 +331,8 @@ export class StorageDB {
     const finalRate = Number(cleanEntry.exchangeRate) > 0 ? Number(cleanEntry.exchangeRate) : defaultRate;
     const finalUnit = cleanEntry.rateUnit || (isClassic ? '1' : '1k');
     const finalSource = cleanEntry.source || 'Direct Client';
+    const teammatesJson = JSON.stringify(cleanEntry.teammates || []);
+    const teamModeInt = cleanEntry.teamMode ? 1 : 0;
 
     cleanEntry.exchangeRate = finalRate;
     cleanEntry.rateUnit = finalUnit;
@@ -310,13 +341,15 @@ export class StorageDB {
     if (this.isDesktop && this.sqliteDb) {
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
             cleanEntry.game || 'World of Warcraft',
             finalSource,
+            teamModeInt,
+            teammatesJson,
             Number(cleanEntry.income) || 0,
             cleanEntry.currency,
             finalRate,
@@ -623,6 +656,8 @@ export class StorageDB {
           title: 'Mythic+ +20 Keystone Carry (Armor Funnel)',
           game: 'World of Warcraft',
           source: 'Discord Direct',
+          teamMode: true,
+          teammates: ['ShadowPriest', 'TankGod'],
           income: 450000,
           currency: 'GOLD',
           exchangeRate: 3200,
@@ -638,6 +673,8 @@ export class StorageDB {
           title: 'Ulduar 25 GDKP Guild Run Cut Split',
           game: 'World of Warcraft Classic',
           source: 'Guild Run',
+          teamMode: true,
+          teammates: ['Valkyrie', 'HealBot'],
           income: 850000,
           currency: 'GOLD',
           exchangeRate: 7000,
@@ -653,6 +690,8 @@ export class StorageDB {
           title: 'Powerleveling 1-80 Speed Service',
           game: 'World of Warcraft Classic',
           source: 'G2G',
+          teamMode: false,
+          teammates: [],
           income: 3500000,
           currency: 'TOMAN',
           exchangeRate: 7000,
@@ -668,6 +707,8 @@ export class StorageDB {
           title: 'Custom Mythic Raid WeakAuras Suite',
           game: 'World of Warcraft',
           source: 'Personal Client',
+          teamMode: false,
+          teammates: [],
           income: 1800000,
           currency: 'TOMAN',
           exchangeRate: 3200,
@@ -683,6 +724,8 @@ export class StorageDB {
           title: 'Profession Crafting Max-Rank Batch',
           game: 'World of Warcraft',
           source: 'FunPay',
+          teamMode: false,
+          teammates: [],
           income: 600000,
           currency: 'GOLD',
           exchangeRate: 3200,
@@ -698,6 +741,8 @@ export class StorageDB {
           title: 'Diablo IV Pit Tier 100+ Carry',
           game: 'Diablo IV',
           source: 'Discord Direct',
+          teamMode: true,
+          teammates: ['BarbKing', 'SorcererX'],
           income: 2200000,
           currency: 'TOMAN',
           exchangeRate: 3200,
@@ -713,6 +758,8 @@ export class StorageDB {
           title: 'Heroic Raid Full Clear (Personal Loot)',
           game: 'World of Warcraft',
           source: 'Eldorado',
+          teamMode: true,
+          teammates: ['RaidLead', 'DPSGod'],
           income: 550000,
           currency: 'GOLD',
           exchangeRate: 3200,
@@ -728,6 +775,8 @@ export class StorageDB {
           title: 'PoE T17 Abomination Map Boss Carry',
           game: 'Path of Exile',
           source: 'Discord Direct',
+          teamMode: false,
+          teammates: [],
           income: 1650000,
           currency: 'TOMAN',
           exchangeRate: 3200,
@@ -743,6 +792,8 @@ export class StorageDB {
           title: 'LoL Diamond Duo Queue Placement Boost',
           game: 'League of Legends',
           source: 'G2G',
+          teamMode: true,
+          teammates: ['DuoPartner'],
           income: 2800000,
           currency: 'TOMAN',
           exchangeRate: 3200,
@@ -758,6 +809,8 @@ export class StorageDB {
           title: 'Gladiator Arena 3v3 Coaching Session',
           game: 'World of Warcraft',
           source: 'Personal Client',
+          teamMode: true,
+          teammates: ['GladCoach', 'R1Rogue'],
           income: 4200000,
           currency: 'TOMAN',
           exchangeRate: 3200,
@@ -773,6 +826,8 @@ export class StorageDB {
           title: 'Icecrown Citadel 25H Shadowmourne Shards',
           game: 'World of Warcraft Classic',
           source: 'Guild Run',
+          teamMode: true,
+          teammates: ['GuildMaster', 'MainTank'],
           income: 1200000,
           currency: 'GOLD',
           exchangeRate: 7000,

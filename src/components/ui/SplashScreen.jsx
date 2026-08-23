@@ -7,38 +7,39 @@ export function SplashScreen() {
     <motion.div
       key="checkpoint-splash"
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.02, filter: 'blur(4px)' }}
-      transition={{ duration: 0.35, ease: 'easeInOut' }}
+      exit={{ opacity: 0, scale: 1.03, filter: 'blur(6px)' }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
       className="fixed inset-0 z-[999] bg-[#09090b] flex flex-col items-center justify-center select-none overflow-hidden"
     >
-      {/* Background Soft Glow */}
-      <div className="absolute w-72 h-72 rounded-full bg-zinc-800/20 blur-3xl pointer-events-none -z-10" />
+      {/* High-End Multi-Layer Ambient Radial Glow */}
+      <div className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-b from-zinc-700/10 via-zinc-800/5 to-transparent blur-3xl pointer-events-none -z-10" />
+      <div className="absolute w-72 h-72 rounded-full bg-zinc-800/20 blur-2xl pointer-events-none -z-10 animate-pulse" />
 
-      <div className="flex flex-col items-center space-y-5">
-        {/* Pulsing Geometric Logo */}
+      <div className="flex flex-col items-center space-y-6">
+        {/* Pulsing Geometric Logo Container */}
         <motion.div
           animate={{
-            scale: [0.96, 1.04, 0.96],
-            opacity: [0.85, 1, 0.85],
+            scale: [0.97, 1.03, 0.97],
+            opacity: [0.9, 1, 0.9],
           }}
           transition={{
             repeat: Infinity,
-            duration: 2.4,
+            duration: 2.2,
             ease: 'easeInOut',
           }}
           className="relative flex items-center justify-center"
         >
-          <div className="w-16 h-16 rounded-2xl bg-zinc-900/90 border border-zinc-800/90 flex items-center justify-center p-3 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-zinc-900/95 border border-zinc-800/90 flex items-center justify-center p-3.5 shadow-2xl backdrop-blur-sm">
             <img
               src={nodraLogo}
               alt="Checkpoint"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain filter drop-shadow-[0_2px_8px_rgba(255,255,255,0.08)]"
             />
           </div>
         </motion.div>
 
         {/* Brand Title & Version */}
-        <div className="flex flex-col items-center space-y-1">
+        <div className="flex flex-col items-center space-y-1.5">
           <div className="flex items-center gap-2">
             <span className="text-base font-bold tracking-tight text-zinc-100">
               Checkpoint
@@ -52,18 +53,18 @@ export function SplashScreen() {
           </p>
         </div>
 
-        {/* Shimmering Progress Bar */}
-        <div className="w-36 h-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800/60">
+        {/* High-Precision Shimmering Progress Beam */}
+        <div className="w-40 h-1 bg-zinc-900/80 rounded-full overflow-hidden relative border border-zinc-800/70">
           <motion.div
             animate={{
               x: ['-100%', '100%'],
             }}
             transition={{
               repeat: Infinity,
-              duration: 1.2,
+              duration: 1.3,
               ease: 'easeInOut',
             }}
-            className="w-1/2 h-full bg-gradient-to-r from-transparent via-zinc-200 to-transparent rounded-full"
+            className="w-1/2 h-full bg-gradient-to-r from-transparent via-zinc-200 to-transparent rounded-full shadow-[0_0_8px_rgba(255,255,255,0.4)]"
           />
         </div>
       </div>

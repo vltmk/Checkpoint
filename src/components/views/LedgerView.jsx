@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -19,6 +19,7 @@ import {
   Clock,
   Coins,
   Banknote,
+  Users,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -37,6 +38,8 @@ import {
   GAMES,
 } from '../../lib/currencies';
 
+const ITEMS_PER_PAGE = 15;
+
 export function LedgerView({
   entries = [],
   globalCurrency = 'TOMAN',
@@ -54,15 +57,22 @@ export function LedgerView({
   const [currencyFilter, setCurrencyFilter] = useState('');
   const [gameFilter, setGameFilter] = useState('');
   const [hasProofFilter, setHasProofFilter] = useState(false);
+  const [teammateFilter, setTeammateFilter] = useState('');
   const [sortOption, setSortOption] = useState('date_desc');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
   const [promptProofEntryId, setPromptProofEntryId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const rates = useMemo(
     () => ({ goldRateTOMAN }),
     [goldRateTOMAN]
   );
+
+  // Reset page when any filter criteria changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sortOption]);
 
   // Filter and sort entries
   const filteredEntries = useMemo(() => {
@@ -76,7 +86,8 @@ export function LedgerView({
           (e.game && e.game.toLowerCase().includes(q)) ||
           (e.source && e.source.toLowerCase().includes(q)) ||
           (e.notes && e.notes.toLowerCase().includes(q)) ||
-          (e.status && e.status.toLowerCase().includes(q))
+          (e.status && e.status.toLowerCase().includes(q)) ||
+          (e.teammates && Array.isArray(e.teammates) && e.teammates.some((t) => t.toLowerCase().includes(q)))
       );
     }
 
@@ -96,6 +107,13 @@ export function LedgerView({
       list = list.filter((e) => e.proofs && e.proofs.length > 0);
     }
 
+    if (teammateFilter) {
+      const tf = teammateFilter.toLowerCase();
+      list = list.filter(
+        (e) => e.teammates && Array.isArray(e.teammates) && e.teammates.some((t) => t.toLowerCase() === tf)
+      );
+    }
+
     list.sort((a, b) => {
       if (sortOption === 'date_desc') return new Date(b.dateTime || 0) - new Date(a.dateTime || 0);
       if (sortOption === 'date_asc') return new Date(a.dateTime || 0) - new Date(b.dateTime || 0);
@@ -113,7 +131,7 @@ export function LedgerView({
     });
 
     return list;
-  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, sortOption, globalCurrency, rates]);
+  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sortOption, globalCurrency, rates]);
 
   // Aggregate metrics for compact balance summary
   const metrics = useMemo(() => {
@@ -152,42 +170,54 @@ export function LedgerView({
     };
   }, [filteredEntries, globalCurrency, rates]);
 
-  // Date grouping
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE));
+  const paginatedEntries = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredEntries.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredEntries, currentPage]);
+
+  // Daily Date Grouping with Day Subtotals
   const dateGroups = useMemo(() => {
     const now = new Date();
     const todayStr = now.toDateString();
     const yesterday = new Date(now.getTime() - 86400000);
     const yesterdayStr = yesterday.toDateString();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000);
 
-    const groups = {
-      Today: [],
-      Yesterday: [],
-      'This Week': [],
-      Earlier: [],
-    };
+    const groupsMap = new Map();
 
-    filteredEntries.forEach((entry) => {
+    paginatedEntries.forEach((entry) => {
       const d = new Date(entry.dateTime);
-      if (isNaN(d.getTime())) {
-        groups.Earlier.push(entry);
-        return;
+      let groupTitle = 'Earlier';
+      if (!isNaN(d.getTime())) {
+        const dStr = d.toDateString();
+        if (dStr === todayStr) {
+          groupTitle = 'Today';
+        } else if (dStr === yesterdayStr) {
+          groupTitle = 'Yesterday';
+        } else {
+          groupTitle = d.toLocaleDateString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+          });
+        }
       }
 
-      const dStr = d.toDateString();
-      if (dStr === todayStr) {
-        groups.Today.push(entry);
-      } else if (dStr === yesterdayStr) {
-        groups.Yesterday.push(entry);
-      } else if (d > sevenDaysAgo) {
-        groups['This Week'].push(entry);
-      } else {
-        groups.Earlier.push(entry);
+      if (!groupsMap.has(groupTitle)) {
+        groupsMap.set(groupTitle, []);
       }
+      groupsMap.get(groupTitle).push(entry);
     });
 
-    return groups;
-  }, [filteredEntries]);
+    return Array.from(groupsMap.entries()).map(([groupTitle, groupItems]) => {
+      const dayTotal = groupItems.reduce(
+        (sum, item) => sum + convertEntryCurrency(item, globalCurrency, rates),
+        0
+      );
+      return { groupTitle, groupItems, dayTotal };
+    });
+  }, [paginatedEntries, globalCurrency, rates]);
 
   const gameOptions = [
     { value: '', label: 'All Games' },
@@ -206,6 +236,7 @@ export function LedgerView({
     setStatusFilter('');
     setCurrencyFilter('');
     setGameFilter('');
+    setTeammateFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
   };
@@ -226,7 +257,7 @@ export function LedgerView({
       {/* 1. Compact Total Earned Summary Card */}
       <div className="rounded-xl bg-zinc-900/40 border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
               Total Earned
             </span>
@@ -334,7 +365,7 @@ export function LedgerView({
 
       {/* 3. Compact / Collapsible Search & Filter Bar */}
       <div className="space-y-2.5">
-        {/* Quick Filter Bar (Status Chips + Currency Chips + Search Drawer Toggle) */}
+        {/* Quick Filter Bar (Status Chips + Currency Chips + Teammate Chip + Search Drawer Toggle) */}
         <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
             {/* Status Chips */}
@@ -410,6 +441,19 @@ export function LedgerView({
                 <span className="font-sans">تومان</span>
               </button>
             </div>
+
+            {/* Active Teammate Filter Chip */}
+            {teammateFilter && (
+              <button
+                type="button"
+                onClick={() => setTeammateFilter('')}
+                className="px-2 py-1 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
+              >
+                <Users className="w-3 h-3 text-zinc-400" />
+                <span>Crew: {teammateFilter}</span>
+                <X className="w-3 h-3 text-zinc-400 hover:text-zinc-100" />
+              </button>
+            )}
           </div>
 
           {/* Toggle Search & Advanced Filters Drawer */}
@@ -456,7 +500,7 @@ export function LedgerView({
                     <Input
                       ref={searchInputRef}
                       type="text"
-                      placeholder="Search jobs, games, seller source, notes... (Press / to focus)"
+                      placeholder="Search jobs, games, seller source, teammates, notes... (Press / to focus)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-8 pr-7 h-8 text-xs bg-zinc-900 border-zinc-800"
@@ -500,7 +544,7 @@ export function LedgerView({
       {filteredEntries.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-800 p-12 text-center space-y-3">
           <p className="text-xs text-zinc-500">
-            {searchQuery || statusFilter || gameFilter || hasProofFilter
+            {searchQuery || statusFilter || gameFilter || hasProofFilter || teammateFilter
               ? 'No jobs match the selected filters.'
               : 'No work records logged yet.'}
           </p>
@@ -511,18 +555,28 @@ export function LedgerView({
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(dateGroups).map(([groupTitle, groupItems]) => {
+          {dateGroups.map(({ groupTitle, groupItems, dayTotal }) => {
             if (groupItems.length === 0) return null;
 
             return (
               <div key={groupTitle} className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                    {groupTitle}
-                  </span>
-                  <span className="text-[10px] font-mono text-zinc-600">
-                    {groupItems.length} {groupItems.length === 1 ? 'entry' : 'entries'}
-                  </span>
+                {/* Daily Group Header with Day Total Income Badge */}
+                <div className="flex items-center justify-between px-1 py-1 border-b border-zinc-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                      {groupTitle}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      ({groupItems.length} {groupItems.length === 1 ? 'job' : 'jobs'})
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900/90 border border-zinc-800/90 text-[11px] font-mono text-zinc-300 shadow-sm">
+                    <span className="text-zinc-500 text-[9px] uppercase font-sans font-semibold">Day Total:</span>
+                    <strong className="text-zinc-100 font-semibold">
+                      <MoneyDisplay amount={dayTotal} currency={globalCurrency} />
+                    </strong>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -533,16 +587,16 @@ export function LedgerView({
                     return (
                       <div key={entry.id} className="space-y-1">
                         <div
-                          className="relative flex items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
+                          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
                         >
-                          {/* Left: Thumbnail / WoW Emblem & Details */}
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                          {/* Left: Thumbnail / Emblem & Details */}
+                          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                             {entry.proofs && entry.proofs.length > 0 ? (
                               <button
                                 type="button"
                                 onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
                                 title="View screenshot proof"
-                                className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden"
+                                className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
                               >
                                 <img
                                   src={entry.proofs[0].data}
@@ -551,12 +605,13 @@ export function LedgerView({
                                 />
                               </button>
                             ) : (
-                              <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5">
+                              <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5 mt-0.5 sm:mt-0">
                                 <GameIcon game={entry.game} className="w-full h-full" />
                               </div>
                             )}
 
-                            <div className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1 space-y-0.5">
+                              {/* Line 1: Title & Seller Badge */}
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-semibold text-zinc-200 truncate">
                                   {entry.title}
@@ -567,23 +622,56 @@ export function LedgerView({
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5 truncate">
+
+                              {/* Line 2: Game & Notes */}
+                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate">
                                 <span>{entry.game}</span>
                                 {entry.notes && (
                                   <>
                                     <span>•</span>
-                                    <span className="truncate max-w-[150px] text-zinc-500 italic">
+                                    <span className="truncate max-w-[180px] text-zinc-500 italic">
                                       "{entry.notes}"
                                     </span>
                                   </>
                                 )}
                               </div>
+
+                              {/* Line 3: Interactive Teammate Badges */}
+                              {entry.teammates && entry.teammates.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
+                                  <span className="text-zinc-500 flex items-center gap-1">
+                                    <Users className="w-3 h-3 text-zinc-500" />
+                                    <span>Crew:</span>
+                                  </span>
+                                  {entry.teammates.map((tm) => {
+                                    const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                                    return (
+                                      <button
+                                        key={tm}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTeammateFilter(isMatch ? '' : tm);
+                                        }}
+                                        title={`Click to filter jobs with ${tm}`}
+                                        className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border ${
+                                          isMatch
+                                            ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
+                                            : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800/80'
+                                        }`}
+                                      >
+                                        {tm}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           {/* Right: Income, Status, Menu */}
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <div className="text-right">
+                          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-zinc-800/60">
+                            <div className="text-left sm:text-right">
                               <div className="text-xs font-semibold text-zinc-100 font-mono">
                                 <MoneyDisplay amount={entry.income} currency={entry.currency} />
                               </div>
@@ -600,81 +688,83 @@ export function LedgerView({
                               )}
                             </div>
 
-                            <StatusBadge
-                              status={entry.status}
-                              interactive={true}
-                              onSelectStatus={(st) => handleStatusSelect(entry, st)}
-                            />
+                            <div className="flex items-center gap-2">
+                              <StatusBadge
+                                status={entry.status}
+                                interactive={true}
+                                onSelectStatus={(st) => handleStatusSelect(entry, st)}
+                              />
 
-                            {/* 3-Dot Action Menu */}
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveActionMenuId(isActionOpen ? null : entry.id);
-                                }}
-                                className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                              >
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </button>
-
-                              {isActionOpen && (
-                                <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-36 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
+                              {/* 3-Dot Action Menu */}
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveActionMenuId(isActionOpen ? null : entry.id);
+                                  }}
+                                  className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onOpenReceipt?.(entry);
-                                      setActiveActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
-                                  >
-                                    <Receipt className="w-3.5 h-3.5 text-zinc-400" />
-                                    <span>Client Receipt</span>
-                                  </button>
+                                  <MoreVertical className="w-3.5 h-3.5" />
+                                </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onOpenWorkModal?.(entry);
-                                      setActiveActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                {isActionOpen && (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-0 top-full mt-1 w-36 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
                                   >
-                                    <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-                                    <span>Edit Record</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onOpenReceipt?.(entry);
+                                        setActiveActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                    >
+                                      <Receipt className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span>Client Receipt</span>
+                                    </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onDuplicateEntry?.(entry.id);
-                                      setActiveActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
-                                  >
-                                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                                    <span>Duplicate</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onOpenWorkModal?.(entry);
+                                        setActiveActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span>Edit Record</span>
+                                    </button>
 
-                                  <div className="border-t border-zinc-800 my-0.5" />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onDuplicateEntry?.(entry.id);
+                                        setActiveActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                    >
+                                      <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                                      <span>Duplicate</span>
+                                    </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onDeleteEntry?.(entry.id);
-                                      setActiveActionMenuId(null);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              )}
+                                    <div className="border-t border-zinc-800 my-0.5" />
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onDeleteEntry?.(entry.id);
+                                        setActiveActionMenuId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Delete</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -728,6 +818,77 @@ export function LedgerView({
               </div>
             );
           })}
+
+          {/* 5. Numbered Pagination Toolbar */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-800/80 text-xs text-zinc-400">
+              <span className="text-zinc-500 font-mono text-[11px]">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)} of {filteredEntries.length} jobs
+              </span>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.max(1, p - 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                >
+                  Previous
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                  if (
+                    totalPages > 7 &&
+                    pageNum !== 1 &&
+                    pageNum !== totalPages &&
+                    Math.abs(pageNum - currentPage) > 1
+                  ) {
+                    if (pageNum === 2 || pageNum === totalPages - 1) {
+                      return (
+                        <span key={pageNum} className="px-1 text-zinc-600 font-mono">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className={`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
+                        currentPage === pageNum
+                          ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
+                          : 'bg-zinc-900/80 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -735,4 +896,3 @@ export function LedgerView({
 }
 
 export default LedgerView;
-

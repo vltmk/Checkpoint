@@ -4,28 +4,32 @@ import { Button } from './ui/Button';
 import { Input, Textarea } from './ui/Input';
 import { Select } from './ui/Select';
 import { SourceCombobox } from './ui/SourceCombobox';
+import { TeammatesCombobox } from './ui/TeammatesCombobox';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { UploadCloud, X, Check, Banknote, Coins } from 'lucide-react';
+import { UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
 import { trackerDB } from '../lib/db';
 
 const GAME_OPTIONS = [
   { value: 'World of Warcraft', label: 'World of Warcraft' },
   { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
+  { value: 'Diablo IV', label: 'Diablo IV' },
+  { value: 'Path of Exile', label: 'Path of Exile' },
+  { value: 'League of Legends', label: 'League of Legends' },
   { value: '__custom__', label: '+ Custom Game / Realm' },
 ];
 
 const CURRENCY_OPTIONS = [
   {
     value: 'TOMAN',
-    label: 'Toman (تومان)',
+    label: 'تومان',
     icon: <Banknote className="w-3.5 h-3.5" />,
   },
   {
     value: 'GOLD',
-    label: 'GOLD (G)',
+    label: 'Gold',
     icon: <Coins className="w-3.5 h-3.5" />,
   },
 ];
@@ -56,6 +60,8 @@ export function WorkModal({
     isCustomGame: false,
     customGameText: '',
     source: '',
+    teamMode: false,
+    teammates: [],
     currency: 'TOMAN',
     income: '',
     exchangeRate: String(goldRateTOMAN || 3200),
@@ -74,13 +80,15 @@ export function WorkModal({
 
     if (editingEntry) {
       setIsDraftRestored(false);
-      const isStandardGame =
-        editingEntry.game === 'World of Warcraft' ||
-        editingEntry.game === 'World of Warcraft Classic';
+      const isStandardGame = GAME_OPTIONS.some(
+        (g) => g.value !== '__custom__' && g.value === editingEntry.game
+      );
 
       let entryCur = editingEntry.currency;
       if (entryCur === 'WOW_GOLD') entryCur = 'GOLD';
       if (!['TOMAN', 'GOLD'].includes(entryCur)) entryCur = 'TOMAN';
+
+      const entryTeammates = Array.isArray(editingEntry.teammates) ? editingEntry.teammates : [];
 
       setFormData({
         title: editingEntry.title || '',
@@ -89,6 +97,8 @@ export function WorkModal({
         isCustomGame: !isStandardGame && Boolean(editingEntry.game),
         customGameText: isStandardGame ? '' : editingEntry.game || '',
         source: editingEntry.source || '',
+        teamMode: Boolean(editingEntry.teamMode || entryTeammates.length > 0),
+        teammates: entryTeammates,
         currency: entryCur,
         income: editingEntry.income !== undefined && editingEntry.income !== null ? String(editingEntry.income) : '',
         exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
@@ -96,7 +106,7 @@ export function WorkModal({
         notes: editingEntry.notes || '',
       });
       setProofs(editingEntry.proofs && editingEntry.proofs.length > 0 && editingEntry.proofs[0]?.data ? [...editingEntry.proofs] : []);
-      // If proofs need hydration from SQLite / DB:
+      
       if (editingEntry.id) {
         trackerDB.getEntry(editingEntry.id).then((full) => {
           if (full && Array.isArray(full.proofs) && full.proofs.length > 0) {
@@ -109,6 +119,7 @@ export function WorkModal({
         const savedDraft = localStorage.getItem(DRAFT_KEY);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
+          const draftTeammates = Array.isArray(parsed.teammates) ? parsed.teammates : [];
           setFormData({
             title: parsed.title || '',
             dateTime: parsed.dateTime || toLocalISOString(new Date()),
@@ -116,13 +127,15 @@ export function WorkModal({
             isCustomGame: Boolean(parsed.isCustomGame),
             customGameText: parsed.customGameText || '',
             source: parsed.source || '',
+            teamMode: Boolean(parsed.teamMode || draftTeammates.length > 0),
+            teammates: draftTeammates,
             currency: parsed.currency || globalCurrency || 'TOMAN',
             income: parsed.income || '',
             exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
             notes: parsed.notes || '',
           });
-          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.notes || parsed.source));
+          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.notes || parsed.source || draftTeammates.length > 0));
         } else {
           setIsDraftRestored(false);
           setFormData({
@@ -132,6 +145,8 @@ export function WorkModal({
             isCustomGame: false,
             customGameText: '',
             source: '',
+            teamMode: false,
+            teammates: [],
             currency: globalCurrency || 'TOMAN',
             income: '',
             exchangeRate: String(goldRateTOMAN || 3200),
@@ -168,6 +183,8 @@ export function WorkModal({
       isCustomGame: false,
       customGameText: '',
       source: '',
+      teamMode: false,
+      teammates: [],
       currency: globalCurrency || 'TOMAN',
       income: '',
       exchangeRate: String(goldRateTOMAN || 3200),
@@ -298,6 +315,8 @@ export function WorkModal({
       dateTime: formData.dateTime,
       game: selectedGame,
       source: formData.source.trim() || 'Direct Client',
+      teamMode: Boolean(formData.teamMode),
+      teammates: formData.teamMode ? formData.teammates : [],
       currency: formData.currency,
       income: parseFloat(formData.income) || 0,
       exchangeRate: rateNum,
@@ -343,6 +362,7 @@ export function WorkModal({
 
       <form onSubmit={handleSubmit}>
         <DialogContent className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Row 1: Game & Seller Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1.5">
@@ -380,6 +400,7 @@ export function WorkModal({
             </div>
           </div>
 
+          {/* Row 2: Work Title */}
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
               Work Title *
@@ -393,36 +414,67 @@ export function WorkModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Date & Time *
-              </label>
-              <DateTimePicker
-                value={formData.dateTime}
-                onChange={(val) => updateFormData({ dateTime: val })}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Status *
-              </label>
-              <Select
-                value={formData.status}
-                onChange={(val) => updateFormData({ status: val })}
-                options={STATUS_OPTIONS}
-              />
-            </div>
+          {/* Row 3: Date & Time */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+              Date & Time *
+            </label>
+            <DateTimePicker
+              value={formData.dateTime}
+              onChange={(val) => updateFormData({ dateTime: val })}
+            />
           </div>
 
-          {/* Row 4: Income & Currency (expanded) and Rate (compact) */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+          {/* Row 4: Team Mode Toggle & Teammates Input */}
+          <div className="space-y-2 pt-1 border-t border-zinc-800/60">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => updateFormData({ teamMode: !formData.teamMode })}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                  formData.teamMode
+                    ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
+                    : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Team Mode</span>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ml-1 ${
+                    formData.teamMode ? 'bg-emerald-400' : 'bg-zinc-600'
+                  }`}
+                />
+              </button>
+              {formData.teamMode && (
+                <span className="text-[10px] font-mono text-zinc-500">
+                  {formData.teammates.length} {formData.teammates.length === 1 ? 'member' : 'members'}
+                </span>
+              )}
+            </div>
+
+            {formData.teamMode && (
+              <div className="space-y-1">
+                <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                  Teammates / Crew Members
+                </label>
+                <TeammatesCombobox
+                  value={formData.teammates}
+                  onChange={(val) => updateFormData({ teammates: val })}
+                  onToast={onToast}
+                  placeholder="Type teammate username and press Enter..."
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Row 5: Income & Currency and Rate */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start pt-1 border-t border-zinc-800/60">
             <div className="sm:col-span-7">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
                 Income & Currency *
               </label>
               <div className="flex gap-2">
-                <div className="w-[145px] shrink-0">
+                <div className="w-[125px] shrink-0">
                   <Select
                     value={formData.currency}
                     onChange={(val) => updateFormData({ currency: val })}
@@ -483,18 +535,20 @@ export function WorkModal({
             </div>
           </div>
 
+          {/* Row 6: Notes */}
           <div>
             <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
               Notes / Client Details
             </label>
             <Textarea
-              rows={3}
+              rows={2}
               value={formData.notes}
               onChange={(e) => updateFormData({ notes: e.target.value })}
               placeholder="Add client username, realm name, transaction ID, or completion notes..."
             />
           </div>
 
+          {/* Row 7: Proof Upload & Screenshot Paste */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
@@ -513,7 +567,7 @@ export function WorkModal({
               }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-3.5 text-center cursor-pointer transition-colors ${
+              className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
                 isDragOver
                   ? 'border-zinc-400 bg-zinc-900'
                   : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
@@ -576,14 +630,33 @@ export function WorkModal({
           </div>
         </DialogContent>
 
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="sm" type="submit">
-            <Check className="w-3.5 h-3.5" />
-            <span>Save Record</span>
-          </Button>
+        {/* Footer with Anchored Status Selector on Left */}
+        <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
+          {/* Left: Desaturated Muted Status Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Status:
+            </span>
+            <div className="w-28 sm:w-32">
+              <Select
+                value={formData.status}
+                onChange={(val) => updateFormData({ status: val })}
+                options={STATUS_OPTIONS}
+                className="h-7 text-xs bg-zinc-900/60 border-zinc-800/80 text-zinc-400 focus:text-zinc-200 opacity-80 hover:opacity-100"
+              />
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onClose} type="button">
+              Cancel
+            </Button>
+            <Button variant="primary" size="sm" type="submit">
+              <Check className="w-3.5 h-3.5" />
+              <span>{editingEntry ? 'Update Record' : 'Save Record'}</span>
+            </Button>
+          </div>
         </DialogFooter>
       </form>
     </Dialog>

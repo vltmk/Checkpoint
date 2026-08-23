@@ -126,7 +126,7 @@ export default function App() {
       console.error('Failed to load data from storage engine:', err);
     } finally {
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 450 - elapsed);
+      const remaining = Math.max(0, 2200 - elapsed);
       setTimeout(() => {
         setIsLoading(false);
       }, remaining);

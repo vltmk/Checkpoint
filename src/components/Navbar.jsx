@@ -110,10 +110,10 @@ export function Navbar({
     <header
       data-tauri-drag-region
       onDoubleClick={handleToggleMaximize}
-      className="hidden md:flex h-12 w-full bg-zinc-950/95 border-b border-zinc-800/80 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default"
+      className="hidden md:flex h-12 w-full bg-zinc-950/95 border-b border-zinc-800/80 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
     >
       {/* 1. Left: Brand Identity (Draggable) & Add Work Button */}
-      <div className="flex items-center gap-3 z-10 shrink-0">
+      <div className="flex items-center gap-2.5 shrink-0 z-10">
         <div
           data-tauri-drag-region
           className="flex items-center gap-2 cursor-default select-none"
@@ -126,7 +126,7 @@ export function Navbar({
           <span className="text-xs font-bold tracking-tight text-zinc-100 pointer-events-none">
             Checkpoint
           </span>
-          <span className="text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
+          <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
             v2.1.0
           </span>
         </div>
@@ -138,10 +138,10 @@ export function Navbar({
             variant="primary"
             size="sm"
             onClick={() => onOpenWorkModal?.()}
-            className="h-7 px-2.5 text-xs font-semibold gap-1.5 shadow-sm"
+            className="h-7 px-2 lg:px-2.5 text-xs font-semibold gap-1.5 shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Add Work</span>
+            <span className="hidden lg:inline">Add Work</span>
             <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0 ml-0.5">
               N
             </Kbd>
@@ -149,80 +149,66 @@ export function Navbar({
         </div>
       </div>
 
-      {/* 2. Center: Segmented Sliding Tab Switcher (High-Contrast Active Pill) */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center no-drag z-10">
+      {/* 2. Center: Segmented Sliding Tab Switcher (Elevated Dark Zinc Pill + Bright Font) */}
+      <div className="flex-1 flex items-center justify-center min-w-0 px-1 no-drag z-10">
         <div className="bg-zinc-900/90 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
           {/* Tab 1: Ledger */}
           <button
             type="button"
             onClick={() => onTabChange?.('ledger')}
-            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
               activeTab === 'ledger'
-                ? 'text-zinc-950 font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'text-zinc-100 font-semibold'
+                : 'text-zinc-400 hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'ledger' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-100 rounded-md -z-10 shadow-sm"
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-950' : 'text-zinc-500'}`} />
+            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
             <span>Ledger</span>
             {entriesCount > 0 && (
               <span
                 className={`text-[10px] font-mono px-1 py-0.2 rounded border ${
                   activeTab === 'ledger'
-                    ? 'bg-zinc-200 text-zinc-900 border-zinc-300 font-semibold'
+                    ? 'bg-zinc-900 text-zinc-200 border-zinc-700 font-semibold'
                     : 'bg-zinc-900/80 text-zinc-400 border-zinc-800/80'
                 }`}
               >
                 {entriesCount}
               </span>
             )}
-            <Kbd
-              className={`text-[9px] bg-transparent border-transparent px-0 ${
-                activeTab === 'ledger' ? 'text-zinc-700 font-semibold' : 'text-zinc-500'
-              }`}
-            >
-              1
-            </Kbd>
           </button>
 
           {/* Tab 2: Analytics */}
           <button
             type="button"
             onClick={() => onTabChange?.('analytics')}
-            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
               activeTab === 'analytics'
-                ? 'text-zinc-950 font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'text-zinc-100 font-semibold'
+                : 'text-zinc-400 hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'analytics' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-100 rounded-md -z-10 shadow-sm"
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-950' : 'text-zinc-500'}`} />
+            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-100' : 'text-zinc-500'}`} />
             <span>Analytics</span>
-            <Kbd
-              className={`text-[9px] bg-transparent border-transparent px-0 ${
-                activeTab === 'analytics' ? 'text-zinc-700 font-semibold' : 'text-zinc-500'
-              }`}
-            >
-              2
-            </Kbd>
           </button>
         </div>
       </div>
 
       {/* 3. Right: Consolidated Currency & Rates Dropdown, Settings, Window Controls */}
-      <div className="flex items-center gap-2 no-drag z-10 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0 no-drag z-10">
         {/* Consolidated Currency & Gold Ratio Dropdown */}
         <div className="relative" ref={ratesDropdownRef}>
           <button
@@ -232,7 +218,7 @@ export function Navbar({
               setIsRatesOpen((prev) => !prev);
             }}
             title="Configure Display Currency and Gold Rate"
-            className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md border text-xs transition-colors ${
+            className={`h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-md border text-xs transition-colors ${
               isRatesOpen
                 ? 'bg-zinc-800 text-zinc-100 border-zinc-700 shadow-sm'
                 : 'bg-zinc-900/60 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
@@ -243,9 +229,11 @@ export function Navbar({
             ) : (
               <Banknote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             )}
-            <span className="font-mono font-medium text-[11px]">{globalCurrency}</span>
-            <span className="text-zinc-600 text-[10px]">•</span>
-            <span className="font-mono text-[11px] text-zinc-400">
+            <span className="font-mono font-medium text-[11px]">
+              {globalCurrency === 'TOMAN' ? 'تومان' : 'Gold'}
+            </span>
+            <span className="hidden xl:inline text-zinc-600 text-[10px]">•</span>
+            <span className="hidden xl:inline font-mono text-[11px] text-zinc-400">
               1k={goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN}T
             </span>
             <ChevronDown
@@ -269,24 +257,24 @@ export function Navbar({
                     onClick={() => onCurrencyChange('TOMAN')}
                     className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
                       globalCurrency === 'TOMAN'
-                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
+                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <Banknote className="w-3.5 h-3.5" />
-                    <span>TOMAN</span>
+                    <span>تومان</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onCurrencyChange('GOLD')}
                     className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
                       globalCurrency === 'GOLD'
-                        ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
+                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <Coins className="w-3.5 h-3.5" />
-                    <span>GOLD</span>
+                    <span>Gold</span>
                   </button>
                 </div>
               </div>

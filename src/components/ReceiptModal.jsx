@@ -57,7 +57,8 @@ export function ReceiptModal({
   const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
   const effectiveRate = Number(entry.exchangeRate) || (isClassic ? 7000 : 3200);
   const rateUnitText = isClassic ? '1 Gold' : '1,000 Gold';
-  const rateDiscordText = isClassic ? '1 Gold' : '1k Gold';
+  const hasTeammates = Array.isArray(entry.teammates) && entry.teammates.length > 0;
+  const teammatesStr = hasTeammates ? entry.teammates.join(', ') : '';
 
   const handleCopyText = () => {
     const text = `=== CHECKPOINT WORK RECEIPT ===
@@ -65,7 +66,7 @@ Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${entry.game || 'World of Warcraft'}
 Work Title: ${entry.title}
-Job Source: ${entry.source || 'Direct Client'}
+Job Source: ${entry.source || 'Direct Client'}${hasTeammates ? `\nTeammates: ${teammatesStr}` : ''}
 Exchange Rate: ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
 Status: ${entry.status || 'Paid'}
 Amount: ${formattedIncome}
@@ -83,7 +84,7 @@ ID      = ${receiptId}
 Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
 Title   = ${entry.title}
-Source  = ${entry.source || 'Direct Client'}
+Source  = ${entry.source || 'Direct Client'}${hasTeammates ? `\nTeam    = ${teammatesStr}` : ''}
 Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
 Status  = ${entry.status || 'Paid'}
 Amount  = ${formattedIncome}
@@ -184,6 +185,17 @@ Notes   = ${entry.notes || 'None'}
                 <span className="text-zinc-500 uppercase font-sans font-semibold">Locked Rate</span>
                 <span>{effectiveRate.toLocaleString()} Toman / {rateUnitText}</span>
               </div>
+
+              {hasTeammates && (
+                <div className="col-span-2 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                    Teammates / Crew
+                  </span>
+                  <span className="text-zinc-200 font-medium font-mono text-[11px]">
+                    {teammatesStr}
+                  </span>
+                </div>
+              )}
             </div>
 
             {entry.notes && (
