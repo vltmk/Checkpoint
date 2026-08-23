@@ -636,6 +636,23 @@ export class StorageDB {
   async seedInitialDataIfEmpty(force = false) {
     const isSeeded = await this.getSetting('nodrapay_v2_seeded', false);
     if (!force && isSeeded) {
+      // Auto-sanitize legacy over-inflated classic seed values if present in existing IndexedDB
+      const existing = await this.getAllEntries();
+      let hasOverinflated = false;
+      const sanitized = existing.map((entry) => {
+        if (
+          (entry.game === 'World of Warcraft Classic' || entry.rateUnit === '1') &&
+          entry.currency === 'GOLD' &&
+          Number(entry.income) >= 50000
+        ) {
+          hasOverinflated = true;
+          return { ...entry, income: Math.round(Number(entry.income) / 1000) };
+        }
+        return entry;
+      });
+      if (hasOverinflated) {
+        await this.bulkImport(sanitized);
+      }
       return [];
     }
 
@@ -675,7 +692,7 @@ export class StorageDB {
           source: 'Guild Run',
           teamMode: true,
           teammates: ['Valkyrie', 'HealBot'],
-          income: 850000,
+          income: 850,
           currency: 'GOLD',
           exchangeRate: 7000,
           rateUnit: '1',
@@ -828,7 +845,7 @@ export class StorageDB {
           source: 'Guild Run',
           teamMode: true,
           teammates: ['GuildMaster', 'MainTank'],
-          income: 1200000,
+          income: 1200,
           currency: 'GOLD',
           exchangeRate: 7000,
           rateUnit: '1',
@@ -963,7 +980,7 @@ export class StorageDB {
           title: 'GDKP Naxxramas 25 Immortal Title Run',
           game: 'World of Warcraft Classic',
           source: 'Guild Run',
-          income: 1500000,
+          income: 1500,
           currency: 'GOLD',
           exchangeRate: 7000,
           rateUnit: '1',
@@ -1008,7 +1025,7 @@ export class StorageDB {
           title: 'WoW Classic Gold Delivery 50,000g Batch',
           game: 'World of Warcraft Classic',
           source: 'FunPay',
-          income: 750000,
+          income: 750,
           currency: 'GOLD',
           exchangeRate: 7000,
           rateUnit: '1',

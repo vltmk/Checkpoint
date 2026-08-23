@@ -8,6 +8,7 @@ import { SplashScreen } from './components/ui/SplashScreen';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
 import { WorkModal } from './components/WorkModal';
+import { QuickAddModal } from './components/QuickAddModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
@@ -51,6 +52,7 @@ export default function App() {
 
   // Modals State
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -173,6 +175,15 @@ export default function App() {
       handleTabChange('ledger');
     }
     showToast(isNew ? 'Work record saved' : 'Work record updated');
+  };
+
+  // Quick Add Save Entry
+  const handleSaveQuickEntry = async (entryData) => {
+    await trackerDB.saveEntry(entryData);
+    setIsQuickAddOpen(false);
+    await loadData();
+    handleTabChange('ledger');
+    showToast('⚡ Quick record added');
   };
 
   // Delete Entry
@@ -439,6 +450,10 @@ export default function App() {
           setEditingEntry(null);
           return;
         }
+        if (isQuickAddOpen) {
+          setIsQuickAddOpen(false);
+          return;
+        }
         if (isReceiptModalOpen) {
           setIsReceiptModalOpen(false);
           setReceiptEntry(null);
@@ -484,7 +499,10 @@ export default function App() {
         return;
       }
 
-      if (e.key === 'n' || e.key === 'N') {
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        setIsQuickAddOpen(true);
+      } else if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         handleOpenWorkModal();
       } else if (e.key === '1') {
@@ -507,7 +525,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, lightboxData, exportConfirm]);
+  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isQuickAddOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, lightboxData, exportConfirm]);
 
   return (
     <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
@@ -525,6 +543,7 @@ export default function App() {
         goldRateTOMAN={goldRateTOMAN}
         onGoldRateTOMANChange={handleGoldRateTOMANChange}
         onOpenWorkModal={handleOpenWorkModal}
+        onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         entriesCount={entries.length}
@@ -536,6 +555,7 @@ export default function App() {
           globalCurrency={globalCurrency}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenWorkModal={handleOpenWorkModal}
+          onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         />
       )}
 
@@ -606,6 +626,7 @@ export default function App() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onOpenWorkModal={() => handleOpenWorkModal()}
+          onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         />
       )}
 
@@ -621,6 +642,15 @@ export default function App() {
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
+        onToast={showToast}
+      />
+
+      <QuickAddModal
+        isOpen={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        onSave={handleSaveQuickEntry}
+        globalCurrency={globalCurrency}
+        goldRateTOMAN={goldRateTOMAN}
         onToast={showToast}
       />
 

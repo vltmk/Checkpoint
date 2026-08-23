@@ -4,6 +4,7 @@ import {
   Layers,
   BarChart3,
   Plus,
+  Zap,
   Settings,
   Keyboard,
   Banknote,
@@ -36,6 +37,7 @@ export function Navbar({
   goldRateTOMAN = 3200,
   onGoldRateTOMANChange,
   onOpenWorkModal,
+  onOpenQuickAdd,
   onOpenSettings,
   onOpenShortcuts,
   entriesCount = 0,
@@ -131,9 +133,9 @@ export function Navbar({
           <img
             src={nodraLogo}
             alt="CHECKPOINT"
-            className="w-4 h-4 object-contain pointer-events-none"
+            className="w-5 h-5 object-contain pointer-events-none"
           />
-          <span className="text-xs font-bold tracking-wider text-zinc-100 pointer-events-none uppercase">
+          <span className="text-xs font-black tracking-wider text-white pointer-events-none uppercase">
             CHECKPOINT
           </span>
           <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
@@ -143,19 +145,38 @@ export function Navbar({
 
         <div className="h-4 w-px bg-zinc-800/80 pointer-events-none" />
 
-        <div data-no-drag>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onOpenWorkModal?.()}
-            className="h-7 px-2 lg:px-2.5 text-xs font-semibold gap-1.5 shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Add Work</span>
-            <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0 ml-0.5">
-              N
-            </Kbd>
-          </Button>
+        <div data-no-drag className="flex items-center">
+          <div className="inline-flex items-center rounded-lg bg-zinc-100 p-0.5 shadow-sm border border-zinc-200/20">
+            {/* Primary Add Work (Left Side) */}
+            <button
+              type="button"
+              onClick={() => onOpenWorkModal?.()}
+              title="Add Work Record (N)"
+              className="flex items-center gap-1.5 h-6 px-2 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Add Work</span>
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0 ml-0.5">
+                N
+              </Kbd>
+            </button>
+
+            {/* Subtle vertical hairline divider */}
+            <div className="h-3.5 w-px bg-zinc-300/80 my-auto mx-0.5" />
+
+            {/* Quick Add Lightning (Right Side) */}
+            <button
+              type="button"
+              onClick={() => onOpenQuickAdd?.()}
+              title="Quick Add Record (Q)"
+              className="flex items-center justify-center h-6 px-1.5 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
+            >
+              <Zap className="w-3.5 h-3.5 text-zinc-950" strokeWidth={1.5} />
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0">
+                Q
+              </Kbd>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -165,31 +186,31 @@ export function Navbar({
         onMouseDown={handleHeaderMouseDown}
         className="flex-1 flex items-center justify-center min-w-0 px-1 h-full cursor-default z-10"
       >
-        <div data-no-drag className="bg-zinc-900/90 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
+        <div data-no-drag className="bg-zinc-950 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
           {/* Tab 1: Ledger */}
           <button
             type="button"
             onClick={() => onTabChange?.('ledger')}
-            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
+            className={`relative isolate flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors select-none ${
               activeTab === 'ledger'
-                ? 'text-zinc-100 font-semibold'
+                ? 'text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'ledger' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700"
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
+            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-white' : 'text-zinc-500'}`} />
             <span>Ledger</span>
             {entriesCount > 0 && (
               <span
                 className={`text-[10px] font-mono px-1 py-0.2 rounded border ${
                   activeTab === 'ledger'
-                    ? 'bg-zinc-900 text-zinc-200 border-zinc-700 font-semibold'
+                    ? 'bg-zinc-900 text-zinc-100 border-zinc-700 font-semibold'
                     : 'bg-zinc-900/80 text-zinc-400 border-zinc-800/80'
                 }`}
               >
@@ -202,20 +223,20 @@ export function Navbar({
           <button
             type="button"
             onClick={() => onTabChange?.('analytics')}
-            className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors ${
+            className={`relative isolate flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors select-none ${
               activeTab === 'analytics'
-                ? 'text-zinc-100 font-semibold'
+                ? 'text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'analytics' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700"
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-100' : 'text-zinc-500'}`} />
+            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-white' : 'text-zinc-500'}`} />
             <span>Analytics</span>
           </button>
         </div>

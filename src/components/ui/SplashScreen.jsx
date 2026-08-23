@@ -23,7 +23,7 @@ export function SplashScreen() {
 
         {/* Brand Title, Subtitle, and Emerald Accent Free Forever Badge */}
         <div className="flex flex-col items-center space-y-2 text-center">
-          <span className="text-base font-bold tracking-wider text-zinc-100 uppercase">
+          <span className="text-base font-black tracking-wider text-white uppercase">
             CHECKPOINT
           </span>
 

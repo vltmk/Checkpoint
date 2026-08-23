@@ -9,7 +9,8 @@ export function ShortcutsModal({ isOpen, onClose }) {
     {
       group: 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: 'Add work record' },
+        { keys: ['N'], desc: 'Add work record (Full)' },
+        { keys: ['Q'], desc: 'Quick add work record' },
         { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof into modal' },
         { keys: ['Esc'], desc: 'Close dialogs or clear search' },
       ],
