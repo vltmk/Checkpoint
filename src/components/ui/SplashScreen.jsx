@@ -16,15 +16,15 @@ export function SplashScreen() {
         <div className="w-14 h-14 flex items-center justify-center">
           <img
             src={nodraLogo}
-            alt="Checkpoint"
+            alt="CHECKPOINT"
             className="w-full h-full object-contain"
           />
         </div>
 
         {/* Brand Title, Subtitle, and Emerald Accent Free Forever Badge */}
         <div className="flex flex-col items-center space-y-2 text-center">
-          <span className="text-base font-bold tracking-tight text-zinc-100">
-            Checkpoint
+          <span className="text-base font-bold tracking-wider text-zinc-100 uppercase">
+            CHECKPOINT
           </span>
 
           <p className="text-xs text-zinc-400 font-sans tracking-normal">

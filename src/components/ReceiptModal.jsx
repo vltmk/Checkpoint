@@ -117,12 +117,12 @@ Notes   = ${entry.notes || 'None'}
             <div className="flex items-center gap-3">
               <img
                 src={nodraLogo}
-                alt="Checkpoint"
+                alt="CHECKPOINT"
                 className="w-7 h-7 object-contain"
               />
               <div>
-                <h4 className="text-sm font-bold tracking-tight text-zinc-100">
-                  Checkpoint
+                <h4 className="text-sm font-bold tracking-wider text-zinc-100 uppercase">
+                  CHECKPOINT
                 </h4>
                 <p className="text-[10px] text-zinc-500 font-mono">
                   Freelance & Gaming Ledger

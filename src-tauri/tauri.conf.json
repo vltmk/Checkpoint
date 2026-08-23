@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Checkpoint",
+  "productName": "CHECKPOINT",
   "version": "2.1.0",
   "identifier": "com.checkpoint.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Checkpoint",
+        "title": "CHECKPOINT",
         "width": 1080,
         "height": 840,
         "minWidth": 720,
@@ -24,7 +24,7 @@
         "transparent": true,
         "shadow": true,
         "center": true,
-        "backgroundColor": "#09090b"
+        "backgroundColor": "#000000"
       }
     ],
     "security": {

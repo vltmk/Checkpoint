@@ -332,7 +332,7 @@ export default function App() {
     const fullEntries = await trackerDB.getAllEntriesFull();
 
     const backupData = {
-      app: 'Checkpoint',
+      app: 'CHECKPOINT',
       version: '2.1.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,

@@ -120,11 +120,11 @@ export function Navbar({
         >
           <img
             src={nodraLogo}
-            alt="Checkpoint"
+            alt="CHECKPOINT"
             className="w-4 h-4 object-contain pointer-events-none"
           />
-          <span className="text-xs font-bold tracking-tight text-zinc-100 pointer-events-none">
-            Checkpoint
+          <span className="text-xs font-bold tracking-wider text-zinc-100 pointer-events-none uppercase">
+            CHECKPOINT
           </span>
           <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
             v2.1.0
