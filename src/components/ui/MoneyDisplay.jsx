@@ -47,7 +47,8 @@ export function ConvertedSecondaryDisplay({
 
   if (from === to) return null;
 
-  const effectiveRate = Number(customRate) > 0 ? Number(customRate) : (Number(rates?.goldRateTOMAN) || 3200);
+  const defaultRate = isPerOneGold ? 7000 : (Number(rates?.goldRateTOMAN) || 3200);
+  const effectiveRate = Number(customRate) > 0 ? Number(customRate) : defaultRate;
   const converted = convertCurrency(amount, from, to, rates, effectiveRate, isPerOneGold);
 
   return (

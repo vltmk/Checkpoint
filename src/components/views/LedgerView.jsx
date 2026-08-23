@@ -283,13 +283,6 @@ export function LedgerView({
 
                 <div className="space-y-1.5">
                   {groupItems.map((entry) => {
-                    const secondary = formatConvertedSecondary(
-                      entry.income,
-                      entry.currency,
-                      globalCurrency,
-                      rates
-                    );
-
                     const isActionOpen = activeActionMenuId === entry.id;
                     const isProofPrompting = promptProofEntryId === entry.id;
 

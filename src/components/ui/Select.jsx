@@ -127,7 +127,7 @@ export function Select({
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
           {option.flag && <span className="text-sm shrink-0">{option.flag}</span>}
-          {option.icon && <span className="shrink-0 text-zinc-400">{option.icon}</span>}
+          {option.icon && <span className="shrink-0 text-zinc-400 flex items-center justify-center">{option.icon}</span>}
           <span className="truncate">{renderScaledText(option.label)}</span>
           {option.subtext && (
             <span className="text-[10px] text-zinc-500 truncate">({renderScaledText(option.subtext)})</span>
@@ -156,7 +156,7 @@ export function Select({
           {selectedOption ? (
             <>
               {selectedOption.flag && <span className="text-sm">{selectedOption.flag}</span>}
-              {selectedOption.icon && <span>{selectedOption.icon}</span>}
+              {selectedOption.icon && <span className="shrink-0 text-zinc-400 flex items-center justify-center">{selectedOption.icon}</span>}
               <span className="truncate text-zinc-100">{renderScaledText(selectedOption.label)}</span>
             </>
           ) : (

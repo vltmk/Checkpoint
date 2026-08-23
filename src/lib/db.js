@@ -57,8 +57,11 @@ export class StorageDB {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         game TEXT NOT NULL,
+        source TEXT DEFAULT 'Direct Client',
         income REAL NOT NULL,
-        currency TEXT NOT NULL DEFAULT 'USD',
+        currency TEXT NOT NULL DEFAULT 'TOMAN',
+        exchangeRate REAL DEFAULT 3200,
+        rateUnit TEXT DEFAULT '1k',
         status TEXT NOT NULL DEFAULT 'Working',
         dateTime TEXT NOT NULL,
         hours REAL DEFAULT 0,
@@ -67,6 +70,17 @@ export class StorageDB {
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
     `);
+
+    // Run safe migrations for existing tables
+    try {
+      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';`);
+    } catch (e) {}
+    try {
+      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;`);
+    } catch (e) {}
+    try {
+      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN rateUnit TEXT DEFAULT '1k';`);
+    } catch (e) {}
 
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_datetime ON work_entries(dateTime DESC);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_status ON work_entries(status);`);
@@ -160,7 +174,7 @@ export class StorageDB {
         // Fast lightweight query with proof metadata
         const rows = await this.sqliteDb.select(`
           SELECT 
-            w.id, w.title, w.game, w.income, w.currency, w.status, w.dateTime, w.hours, w.notes,
+            w.id, w.title, w.game, w.source, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -171,10 +185,15 @@ export class StorageDB {
         return rows.map((r) => {
           let cur = r.currency;
           if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'USD';
+          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
+          const isClassic = r.rateUnit === '1' || r.game === 'World of Warcraft Classic';
+          const defaultRate = isClassic ? 7000 : 3200;
           return {
             ...r,
+            source: r.source || 'Direct Client',
             currency: cur,
+            exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
+            rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
             proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
           };
         });
@@ -196,8 +215,16 @@ export class StorageDB {
         const normalized = results.map((entry) => {
           let cur = entry.currency;
           if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'USD';
-          return { ...entry, currency: cur };
+          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
+          const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+          const defaultRate = isClassic ? 7000 : 3200;
+          return {
+            ...entry,
+            source: entry.source || 'Direct Client',
+            currency: cur,
+            exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate,
+            rateUnit: entry.rateUnit || (isClassic ? '1' : '1k'),
+          };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
         resolve(normalized);
@@ -217,6 +244,13 @@ export class StorageDB {
 
         const entry = { ...rows[0] };
         if (entry.currency === 'WOW_GOLD') entry.currency = 'GOLD';
+        if (!['USD', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
+
+        const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+        const defaultRate = isClassic ? 7000 : 3200;
+        entry.source = entry.source || 'Direct Client';
+        entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
+        entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
 
         // Fetch full proofs attachments
         const proofRows = await this.sqliteDb.select(
@@ -240,8 +274,14 @@ export class StorageDB {
 
       request.onsuccess = () => {
         const entry = request.result || null;
-        if (entry && entry.currency === 'WOW_GOLD') {
-          entry.currency = 'GOLD';
+        if (entry) {
+          if (entry.currency === 'WOW_GOLD') entry.currency = 'GOLD';
+          if (!['USD', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
+          const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+          const defaultRate = isClassic ? 7000 : 3200;
+          entry.source = entry.source || 'Direct Client';
+          entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
+          entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
         }
         resolve(entry);
       };
@@ -255,19 +295,32 @@ export class StorageDB {
 
     let cleanEntry = { ...entry };
     if (cleanEntry.currency === 'WOW_GOLD') cleanEntry.currency = 'GOLD';
-    if (!['USD', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'USD';
+    if (!['USD', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'TOMAN';
+
+    const isClassic = cleanEntry.rateUnit === '1' || cleanEntry.game === 'World of Warcraft Classic';
+    const defaultRate = isClassic ? 7000 : 3200;
+    const finalRate = Number(cleanEntry.exchangeRate) > 0 ? Number(cleanEntry.exchangeRate) : defaultRate;
+    const finalUnit = cleanEntry.rateUnit || (isClassic ? '1' : '1k');
+    const finalSource = cleanEntry.source || 'Direct Client';
+
+    cleanEntry.exchangeRate = finalRate;
+    cleanEntry.rateUnit = finalUnit;
+    cleanEntry.source = finalSource;
 
     if (this.isDesktop && this.sqliteDb) {
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, income, currency, status, dateTime, hours, notes, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
             cleanEntry.game || 'World of Warcraft',
+            finalSource,
             Number(cleanEntry.income) || 0,
             cleanEntry.currency,
+            finalRate,
+            finalUnit,
             cleanEntry.status || 'Working',
             cleanEntry.dateTime || new Date().toISOString(),
             Number(cleanEntry.hours) || 0,
@@ -569,8 +622,11 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_1',
           title: 'Mythic+ +20 Keystone Boost',
           game: 'World of Warcraft',
+          source: 'Discord Direct',
           income: 450000,
           currency: 'GOLD',
+          exchangeRate: 3200,
+          rateUnit: '1k',
           status: 'Paid',
           dateTime: d1,
           hours: 2.5,
@@ -581,8 +637,11 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_2',
           title: 'Ulduar 25-man GDKP Raid Split',
           game: 'World of Warcraft Classic',
+          source: 'Guild Run',
           income: 850000,
           currency: 'GOLD',
+          exchangeRate: 7000,
+          rateUnit: '1',
           status: 'Paid',
           dateTime: d2,
           hours: 4.0,
@@ -593,8 +652,11 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_3',
           title: 'Powerleveling 1-80 Service',
           game: 'World of Warcraft Classic',
+          source: 'G2G',
           income: 3500000,
           currency: 'TOMAN',
+          exchangeRate: 7000,
+          rateUnit: '1',
           status: 'Working',
           dateTime: d3,
           hours: 12.0,
@@ -605,8 +667,11 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_4',
           title: 'Custom Raid UI & WeakAuras Suite',
           game: 'World of Warcraft',
-          income: 180,
-          currency: 'USD',
+          source: 'Personal Client',
+          income: 1800000,
+          currency: 'TOMAN',
+          exchangeRate: 3200,
+          rateUnit: '1k',
           status: 'Pending',
           dateTime: d4,
           hours: 5.0,
@@ -617,8 +682,11 @@ export class StorageDB {
           id: 'job_' + Date.now() + '_5',
           title: 'Profession Crafting Order Batch',
           game: 'World of Warcraft',
+          source: 'FunPay',
           income: 600000,
           currency: 'GOLD',
+          exchangeRate: 3200,
+          rateUnit: '1k',
           status: 'On Hold',
           dateTime: d5,
           hours: 6.0,

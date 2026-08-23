@@ -303,13 +303,6 @@ export function OverviewView({
         ) : (
           <div className="space-y-2">
             {recentEntries.map((entry) => {
-              const secondary = formatConvertedSecondary(
-                entry.income,
-                entry.currency,
-                globalCurrency,
-                rates
-              );
-
               return (
                 <div
                   key={entry.id}

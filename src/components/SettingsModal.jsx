@@ -18,6 +18,8 @@ import {
   History,
   RotateCcw,
   ShieldCheck,
+  Banknote,
+  Coins,
 } from 'lucide-react';
 import { isTauri } from '../lib/desktop';
 import { trackerDB } from '../lib/db';
@@ -51,8 +53,16 @@ export function SettingsModal({
   }, [isOpen]);
 
   const currencyOptions = [
-    { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-    { value: 'GOLD', label: 'GOLD (G)', icon: 'G' },
+    {
+      value: 'TOMAN',
+      label: 'Toman (تومان)',
+      icon: <Banknote className="w-3.5 h-3.5" />,
+    },
+    {
+      value: 'GOLD',
+      label: 'GOLD (G)',
+      icon: <Coins className="w-3.5 h-3.5" />,
+    },
   ];
 
   const handleFileChange = (e) => {

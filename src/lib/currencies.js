@@ -10,7 +10,6 @@ export const CURRENCIES = {
     name: 'Toman (تومان)',
     suffix: ' تومان',
     isFiat: true,
-    flag: '🇮🇷',
   },
   GOLD: {
     code: 'GOLD',
@@ -19,7 +18,6 @@ export const CURRENCIES = {
     suffix: ' G',
     isFiat: false,
     game: 'World of Warcraft',
-    badge: 'G',
   },
 };
 
@@ -152,8 +150,9 @@ export function convertEntryCurrency(entry, targetCurrency, defaultRates = {}) {
   if (!entry) return 0;
   const inc = parseFloat(entry.income) || 0;
   const cur = entry.currency || 'TOMAN';
-  const entryRate = entry.exchangeRate || defaultRates?.goldRateTOMAN;
   const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+  const defaultRate = isClassic ? 7000 : (Number(defaultRates?.goldRateTOMAN) || 3200);
+  const entryRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
   return convertCurrency(inc, cur, targetCurrency, defaultRates, entryRate, isClassic);
 }
 

@@ -8,7 +8,7 @@ import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { UploadCloud, X, Check } from 'lucide-react';
+import { UploadCloud, X, Check, Banknote, Coins } from 'lucide-react';
 import { trackerDB } from '../lib/db';
 
 const GAME_OPTIONS = [
@@ -18,8 +18,16 @@ const GAME_OPTIONS = [
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: 'TOMAN', label: 'Toman (تومان)', flag: '🇮🇷' },
-  { value: 'GOLD', label: 'GOLD (G)', icon: 'G' },
+  {
+    value: 'TOMAN',
+    label: 'Toman (تومان)',
+    icon: <Banknote className="w-3.5 h-3.5" />,
+  },
+  {
+    value: 'GOLD',
+    label: 'GOLD (G)',
+    icon: <Coins className="w-3.5 h-3.5" />,
+  },
 ];
 
 const STATUS_OPTIONS = [
@@ -263,7 +271,7 @@ export function WorkModal({
         game: val,
         isCustomGame: false,
         customGameText: '',
-        exchangeRate: defaultRate,
+        exchangeRate: !editingEntry ? defaultRate : (formData.exchangeRate || defaultRate),
       });
     }
   };
