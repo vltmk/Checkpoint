@@ -20,9 +20,11 @@ import {
   ShieldCheck,
   Banknote,
   Coins,
+  AlertTriangle,
 } from 'lucide-react';
 import { isTauri } from '../lib/desktop';
 import { trackerDB } from '../lib/db';
+import { Input } from './ui/Input';
 
 export function SettingsModal({
   isOpen,
@@ -33,12 +35,16 @@ export function SettingsModal({
   onExportJson,
   onImportJson,
   onResetData,
+  onClearAllData,
   onToast,
   entriesCount = 0,
 }) {
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState('');
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState('');
+  const [purgeSnapshots, setPurgeSnapshots] = useState(false);
   const isDesktop = isTauri();
 
   useEffect(() => {
@@ -234,28 +240,45 @@ export function SettingsModal({
           </div>
         )}
 
-        {/* 4. Reset Data */}
-        <div className="space-y-2 pt-2 border-t border-zinc-800">
+        {/* 4. Danger Zone: Reset & Clear All Data */}
+        <div className="space-y-3 pt-2 border-t border-zinc-800">
           <label className="block text-xs font-semibold text-rose-400">
-            Database Reset
+            Danger Zone
           </label>
           <p className="text-[11px] text-zinc-500">
-            Reset database and populate with 25 realistic sample work logs for testing.
+            Re-populate with default mock data or completely wipe the database.
           </p>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => {
-              if (window.confirm('Reset database with 25 fresh sample records? All existing custom records will be replaced.')) {
-                onResetData?.();
-                onClose();
-              }
-            }}
-            className="gap-2 text-xs"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Reset with 25 Sample Jobs</span>
-          </Button>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-0.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                if (window.confirm('Reset database with 25 fresh sample records? All existing custom records will be replaced.')) {
+                  onResetData?.();
+                  onClose();
+                }
+              }}
+              className="gap-2 text-xs flex-1 justify-center"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Reset Sample Data</span>
+            </Button>
+
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                setClearConfirmText('');
+                setPurgeSnapshots(false);
+                setIsClearConfirmOpen(true);
+              }}
+              className="gap-2 text-xs flex-1 justify-center bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-900/80"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Clear All Data...</span>
+            </Button>
+          </div>
         </div>
       </DialogContent>
 
@@ -265,6 +288,82 @@ export function SettingsModal({
           <span>Done</span>
         </Button>
       </DialogFooter>
+
+      {/* Dedicated Text-Confirmation Security Modal for Wiping Database */}
+      <Dialog
+        open={isClearConfirmOpen}
+        onClose={() => setIsClearConfirmOpen(false)}
+        maxWidth="max-w-sm"
+      >
+        <DialogHeader onClose={() => setIsClearConfirmOpen(false)}>
+          <div className="flex items-center gap-2 text-rose-400">
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <DialogTitle>Erase All Ledger Data</DialogTitle>
+          </div>
+        </DialogHeader>
+
+        <DialogContent className="space-y-3.5 py-2">
+          <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/60 space-y-1.5 text-xs text-rose-200">
+            <p className="font-semibold text-rose-300">
+              Warning: This action is permanent!
+            </p>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              All <strong className="text-zinc-200 font-mono">{entriesCount}</strong> work entries, earnings records, and screenshot proof attachments will be permanently purged.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-medium text-zinc-300">
+              Type <span className="font-mono font-bold text-rose-400">DELETE ALL</span> or <span className="font-mono font-bold text-rose-400">CLEAR</span> to confirm:
+            </label>
+            <Input
+              type="text"
+              placeholder="DELETE ALL"
+              value={clearConfirmText}
+              onChange={(e) => setClearConfirmText(e.target.value)}
+              className="h-8 text-xs font-mono bg-zinc-950/80 border-rose-900/60 focus:border-rose-500 text-zinc-100"
+              autoFocus
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-[11px] text-zinc-400 select-none cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={purgeSnapshots}
+              onChange={(e) => setPurgeSnapshots(e.target.checked)}
+              className="rounded border-zinc-700 bg-zinc-900 text-rose-500 focus:ring-0 w-3.5 h-3.5"
+            />
+            <span>Also delete automatic recovery snapshots</span>
+          </label>
+        </DialogContent>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsClearConfirmOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={
+              clearConfirmText.trim().toUpperCase() !== 'DELETE ALL' &&
+              clearConfirmText.trim().toUpperCase() !== 'CLEAR'
+            }
+            onClick={() => {
+              onClearAllData?.(purgeSnapshots);
+              setIsClearConfirmOpen(false);
+              onClose();
+            }}
+            className="gap-1.5 font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Erase Everything</span>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </Dialog>
   );
 }

@@ -77,7 +77,7 @@ export async function enforceMinWindowSize(minWidth = 800, minHeight = 560) {
  * Native File Dialogs (Save & Open)
  */
 export async function saveFileNative({ defaultPath, filters, content }) {
-  if (!isTauri()) return false;
+  if (!isTauri()) return { success: false, error: 'Not running in desktop mode' };
   try {
     const { save } = await import('@tauri-apps/plugin-dialog');
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
@@ -88,7 +88,8 @@ export async function saveFileNative({ defaultPath, filters, content }) {
     });
 
     if (filePath) {
-      await writeTextFile(filePath, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+      const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+      await writeTextFile(filePath, text);
       return { success: true, filePath };
     }
     return { success: false, cancelled: true };
@@ -121,6 +122,35 @@ export async function openFileNative({ filters }) {
   }
 }
 
+export async function saveImageNative({ defaultPath, dataUrl, filename }) {
+  if (!isTauri() || !dataUrl) return false;
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeFile } = await import('@tauri-apps/plugin-fs');
+
+    const suggested = defaultPath || filename || 'screenshot_proof.png';
+    const filePath = await save({
+      defaultPath: suggested,
+      filters: [{ name: 'PNG Image', extensions: ['png', 'jpg', 'jpeg'] }],
+    });
+
+    if (filePath) {
+      const base64 = dataUrl.split(',')[1] || dataUrl;
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      await writeFile(filePath, bytes);
+      return { success: true, filePath };
+    }
+    return { success: false, cancelled: true };
+  } catch (err) {
+    console.error('Native save image error:', err);
+    return { success: false, error: err };
+  }
+}
+
 /**
  * Native Clipboard helper
  */
@@ -131,13 +161,17 @@ export async function copyTextNative(text) {
       await writeText(text);
       return true;
     } catch (e) {
-      // Fallback
+      console.warn('Native clipboard write failed, using browser fallback:', e);
     }
   }
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    await navigator.clipboard.writeText(text);
-    return true;
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      console.error('Clipboard write error:', e);
+    }
   }
   return false;
 }

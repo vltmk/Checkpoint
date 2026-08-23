@@ -156,7 +156,7 @@ export function Navbar({
             >
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden lg:inline">Add Work</span>
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0 ml-0.5">
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 ml-0.5">
                 N
               </Kbd>
             </button>
@@ -172,7 +172,7 @@ export function Navbar({
               className="flex items-center justify-center h-6 px-1.5 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
             >
               <Zap className="w-3.5 h-3.5 text-zinc-950" strokeWidth={1.5} />
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 py-0">
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1">
                 Q
               </Kbd>
             </button>

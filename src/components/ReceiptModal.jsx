@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import nodraLogo from '../../nodra-vault.svg';
+import { copyTextNative } from '../lib/desktop';
 
 export function ReceiptModal({
   isOpen,
@@ -63,7 +64,7 @@ export function ReceiptModal({
   const hasTeammates = Array.isArray(entry.teammates) && entry.teammates.length > 0;
   const teammatesStr = hasTeammates ? entry.teammates.join(', ') : '';
 
-  const handleCopyText = () => {
+  const handleCopyText = async () => {
     const text = `=== CHECKPOINT WORK RECEIPT ===
 Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
@@ -76,11 +77,11 @@ Amount: ${formattedIncome}
 Notes: ${entry.notes || 'None'}
 ==============================`;
 
-    navigator.clipboard.writeText(text);
+    await copyTextNative(text);
     onToast?.('📋 Plain receipt copied to clipboard!');
   };
 
-  const handleCopyDiscordMarkdown = () => {
+  const handleCopyDiscordMarkdown = async () => {
     const md = `\`\`\`ini
 [ CHECKPOINT - PROOF OF WORK RECEIPT ]
 ID      = ${receiptId}
@@ -88,13 +89,13 @@ Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
 Title   = ${entry.title}
 Source  = ${entry.source || 'Direct Client'}${hasTeammates ? `\nTeam    = ${teammatesStr}` : ''}
-Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
+Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
 Status  = ${entry.status || 'Paid'}
 Amount  = ${formattedIncome}
 Notes   = ${entry.notes || 'None'}
 \`\`\``;
 
-    navigator.clipboard.writeText(md);
+    await copyTextNative(md);
     onToast?.('🎮 Discord markdown copied to clipboard!');
   };
 

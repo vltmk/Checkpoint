@@ -186,13 +186,102 @@ export default function App() {
     showToast('⚡ Quick record added');
   };
 
-  // Delete Entry
+  // Delete Single Entry (Called after in-line confirmation)
   const handleDeleteEntry = async (id) => {
-    if (window.confirm('Delete this work record and attached proofs?')) {
-      await trackerDB.deleteEntry(id);
-      await loadData();
-      showToast('Work record deleted');
+    await trackerDB.deleteEntry(id);
+    await loadData();
+    showToast('🗑️ Work record deleted');
+  };
+
+  // Bulk Delete Entries
+  const handleBulkDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    await trackerDB.bulkDeleteEntries(ids);
+    await loadData();
+    showToast(`🗑️ Deleted ${ids.length} ${ids.length === 1 ? 'record' : 'records'}`);
+  };
+
+  // Bulk Update Status
+  const handleBulkUpdateStatus = async (ids, nextStatus) => {
+    if (!ids || ids.length === 0 || !nextStatus) return;
+    await trackerDB.bulkUpdateStatus(ids, nextStatus);
+    await loadData();
+    showToast(`⚡ Updated ${ids.length} ${ids.length === 1 ? 'record' : 'records'} to ${nextStatus}`);
+  };
+
+  // Bulk Export CSV
+  const handleBulkExportCsv = useCallback(async (selectedIds) => {
+    const listToExport = entries.filter((e) => selectedIds.includes(e.id));
+    if (listToExport.length === 0) {
+      showToast('No records to export');
+      return;
     }
+
+    const headers = [
+      'ID',
+      'Date & Time',
+      'Game',
+      'Work Title',
+      'Seller / Source',
+      'Currency',
+      'Income Amount',
+      'Applied Rate (Toman/1k G)',
+      'Status',
+      'Notes',
+      'Has Proof Attached',
+    ];
+
+    const rows = listToExport.map((e) => [
+      e.id,
+      e.dateTime,
+      `"${(e.game || '').replace(/"/g, '""')}"`,
+      `"${(e.title || '').replace(/"/g, '""')}"`,
+      `"${(e.source || 'Direct Client').replace(/"/g, '""')}"`,
+      `"${e.currency || globalCurrency}"`,
+      e.income,
+      e.exchangeRate || goldRateTOMAN || 3200,
+      e.status,
+      `"${(e.notes || '').replace(/"/g, '""')}"`,
+      e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
+    ]);
+
+    const csvContent =
+      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    const fileName = `nodravault_selected_${listToExport.length}_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    if (isTauri()) {
+      const res = await saveFileNative({
+        defaultPath: fileName,
+        filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
+        content: csvContent,
+      });
+      if (res && res.success) {
+        showToast(`📄 Exported ${listToExport.length} records to CSV`);
+        return;
+      }
+      if (res && res.cancelled) {
+        return;
+      }
+      console.warn('Native bulk CSV save failed, falling back to browser download:', res?.error);
+    }
+
+    // Web Fallback
+    const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`📄 Exported ${listToExport.length} records to CSV`);
+  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
+
+  // Purge / Clear All Data
+  const handleClearAllData = async (purgeSnapshots = false) => {
+    await trackerDB.clearAll(purgeSnapshots);
+    await loadData();
+    showToast('Database wiped successfully');
   };
 
   // Duplicate Entry
@@ -319,8 +408,12 @@ export default function App() {
       });
       if (res && res.success) {
         showToast('CSV export saved successfully');
+        return;
       }
-      return;
+      if (res && res.cancelled) {
+        return;
+      }
+      console.warn('Native CSV save failed, falling back to browser download:', res?.error);
     }
 
     // Web Fallback
@@ -364,8 +457,12 @@ export default function App() {
       });
       if (res && res.success) {
         showToast('Full JSON backup saved successfully');
+        return;
       }
-      return;
+      if (res && res.cancelled) {
+        return;
+      }
+      console.warn('Native JSON backup save failed, falling back to browser download:', res?.error);
     }
 
     // Web Fallback
@@ -392,8 +489,17 @@ export default function App() {
         const res = await openFileNative({
           filters: [{ name: 'JSON Backup', extensions: ['json'] }],
         });
-        if (!res || !res.success || !res.content) return;
-        json = JSON.parse(res.content);
+        if (!res || res.cancelled) return;
+        if (!res.success || !res.content) {
+          showToast('Failed to open backup file', { variant: 'destructive' });
+          return;
+        }
+        try {
+          json = JSON.parse(res.content);
+        } catch (e) {
+          showToast('Selected file is not valid JSON', { variant: 'destructive' });
+          return;
+        }
       } else if (fileOrRaw instanceof File) {
         const text = await fileOrRaw.text();
         json = JSON.parse(text);
@@ -412,7 +518,7 @@ export default function App() {
         importedList = json.entries;
         if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
       } else {
-        showToast('Invalid backup JSON format');
+        showToast('Invalid backup JSON format', { variant: 'destructive' });
         return;
       }
 
@@ -421,7 +527,7 @@ export default function App() {
       showToast(`Successfully restored ${importedList.length} records`);
     } catch (err) {
       console.error('Failed to import JSON backup:', err);
-      showToast('Error restoring backup file');
+      showToast('Error restoring backup file', { variant: 'destructive' });
     }
   };
 
@@ -600,6 +706,9 @@ export default function App() {
                     onFlipStatus={handleFlipStatus}
                     onDuplicateEntry={handleDuplicateEntry}
                     onDeleteEntry={handleDeleteEntry}
+                    onBulkDelete={handleBulkDelete}
+                    onBulkUpdateStatus={handleBulkUpdateStatus}
+                    onBulkExportCsv={handleBulkExportCsv}
                     searchInputRef={searchInputRef}
                     externalTeammateFilter={externalTeammateFilter}
                     onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
@@ -682,6 +791,7 @@ export default function App() {
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onResetData={handleResetData}
+        onClearAllData={handleClearAllData}
         onToast={showToast}
         entriesCount={entries.length}
       />

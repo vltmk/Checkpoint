@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X } from 'lucide-react';
+import { isTauri, saveImageNative } from '../lib/desktop';
 
 export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof' }) {
   useEffect(() => {
@@ -12,6 +13,17 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  const handleDownload = async (e) => {
+    if (isTauri()) {
+      e.preventDefault();
+      const filename = `${(caption || 'proof').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      await saveImageNative({
+        defaultPath: filename,
+        dataUrl: imgSrc,
+      });
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -43,6 +55,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
                 <a
                   href={imgSrc}
                   download={`${(caption || 'proof').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`}
+                  onClick={handleDownload}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 transition-colors"

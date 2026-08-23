@@ -427,6 +427,75 @@ export class StorageDB {
     });
   }
 
+  async bulkDeleteEntries(ids) {
+    await this.initPromise;
+    if (!Array.isArray(ids) || ids.length === 0) return false;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const placeholders = ids.map(() => '?').join(',');
+        await this.sqliteDb.execute(`DELETE FROM proof_attachments WHERE entry_id IN (${placeholders})`, ids);
+        await this.sqliteDb.execute(`DELETE FROM work_entries WHERE id IN (${placeholders})`, ids);
+        return true;
+      } catch (err) {
+        console.error('SQLite bulkDeleteEntries error:', err);
+        return false;
+      }
+    }
+
+    // Browser IndexedDB Fallback
+    if (!this.idb) return false;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      ids.forEach((id) => store.delete(id));
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async bulkUpdateStatus(ids, nextStatus) {
+    await this.initPromise;
+    if (!Array.isArray(ids) || ids.length === 0 || !nextStatus) return false;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const placeholders = ids.map(() => '?').join(',');
+        const nowSec = Math.floor(Date.now() / 1000);
+        await this.sqliteDb.execute(
+          `UPDATE work_entries SET status = ?, updated_at = ? WHERE id IN (${placeholders})`,
+          [nextStatus, nowSec, ...ids]
+        );
+        return true;
+      } catch (err) {
+        console.error('SQLite bulkUpdateStatus error:', err);
+        return false;
+      }
+    }
+
+    // Browser IndexedDB Fallback
+    if (!this.idb) return false;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      ids.forEach((id) => {
+        const getReq = store.get(id);
+        getReq.onsuccess = () => {
+          const entry = getReq.result;
+          if (entry) {
+            entry.status = nextStatus;
+            entry.updatedAt = new Date().toISOString();
+            store.put(entry);
+          }
+        };
+      });
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  }
+
   async bulkImport(entries) {
     await this.initPromise;
     if (!Array.isArray(entries)) return false;
@@ -439,13 +508,18 @@ export class StorageDB {
     return true;
   }
 
-  async clearAll() {
+  async clearAll(purgeSnapshots = false) {
     await this.initPromise;
 
     if (this.isDesktop && this.sqliteDb) {
       try {
         await this.sqliteDb.execute('DELETE FROM proof_attachments');
         await this.sqliteDb.execute('DELETE FROM work_entries');
+        if (purgeSnapshots) {
+          try {
+            await this.sqliteDb.execute('DELETE FROM db_snapshots');
+          } catch (e) {}
+        }
         return true;
       } catch (err) {
         console.error('SQLite clearAll error:', err);
@@ -455,12 +529,14 @@ export class StorageDB {
 
     if (!this.idb) return false;
     return new Promise((resolve, reject) => {
-      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
-      const store = transaction.objectStore(STORE_ENTRIES);
-      const request = store.clear();
+      const stores = purgeSnapshots && this.idb.objectStoreNames.contains(STORE_SNAPSHOTS)
+        ? [STORE_ENTRIES, STORE_SNAPSHOTS]
+        : [STORE_ENTRIES];
+      const transaction = this.idb.transaction(stores, 'readwrite');
+      stores.forEach((s) => transaction.objectStore(s).clear());
 
-      request.onsuccess = () => resolve(true);
-      request.onerror = (e) => reject(e.target.error);
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
     });
   }
 

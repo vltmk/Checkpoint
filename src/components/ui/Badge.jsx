@@ -80,7 +80,7 @@ export function StatusBadge({
 
   if (interactive) {
     return (
-      <div className={cn('relative inline-block', isOpen && 'z-[70]')} ref={menuRef}>
+      <div className={cn('relative inline-flex items-center', isOpen && 'z-[70]')} ref={menuRef}>
         <button
           type="button"
           onClick={(e) => {
@@ -93,14 +93,14 @@ export function StatusBadge({
           }}
           title={`Status: ${style.label}. Click to change status.`}
           className={cn(
-            'group inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-95 hover:ring-1 hover:ring-zinc-600/60 cursor-pointer',
+            'group inline-flex items-center gap-1.5 px-2 h-[26px] leading-none rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-95 hover:ring-1 hover:ring-zinc-600/60 cursor-pointer',
             style.badgeClass,
             className
           )}
         >
           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
-          <span>{style.label}</span>
-          <ChevronDown className="w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+          <span className="leading-none">{style.label}</span>
+          <ChevronDown className="w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
         </button>
 
         {isOpen && onSelectStatus && (
@@ -143,13 +143,13 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide select-none',
+        'inline-flex items-center gap-1.5 px-2 h-[26px] leading-none rounded-md text-[11px] font-medium tracking-wide select-none',
         style.badgeClass,
         className
       )}
     >
       <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
-      <span>{style.label}</span>
+      <span className="leading-none">{style.label}</span>
     </span>
   );
 }

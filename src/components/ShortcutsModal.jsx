@@ -12,7 +12,15 @@ export function ShortcutsModal({ isOpen, onClose }) {
         { keys: ['N'], desc: 'Add work record (Full)' },
         { keys: ['Q'], desc: 'Quick add work record' },
         { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof into modal' },
-        { keys: ['Esc'], desc: 'Close dialogs or clear search' },
+        { keys: ['Esc'], desc: 'Close dialogs, cancel confirmation, or clear selection' },
+      ],
+    },
+    {
+      group: 'Multi-Select & Bulk Actions',
+      items: [
+        { keys: ['S'], desc: 'Toggle multi-selection mode' },
+        { keys: ['Shift', 'Click'], desc: 'Select range between jobs' },
+        { keys: ['Ctrl', 'A'], desc: 'Select all jobs on current page (in select mode)' },
       ],
     },
     {
