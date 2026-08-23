@@ -15,6 +15,7 @@ import {
   UploadCloud,
   X,
   CheckCircle2,
+  Check,
   TrendingUp,
   Clock,
   Coins,
@@ -68,6 +69,7 @@ export function LedgerView({
   const [promptProofEntryId, setPromptProofEntryId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDayKeys, setSelectedDayKeys] = useState(new Set());
+  const [isSumCopied, setIsSumCopied] = useState(false);
 
   const rates = useMemo(
     () => ({ goldRateTOMAN }),
@@ -325,7 +327,7 @@ export function LedgerView({
       <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
               Total Earned
             </span>
             {filteredEntries.length !== entries.length && (
@@ -333,7 +335,7 @@ export function LedgerView({
                 type="button"
                 onClick={handleClearFilters}
                 title="Click to clear all active filters"
-                className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors"
+                className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80 transition-colors"
               >
                 <span>Filtered ({filteredEntries.length}/{entries.length})</span>
                 <X className="w-2.5 h-2.5 text-zinc-500" />
@@ -341,14 +343,14 @@ export function LedgerView({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 font-mono">
+            <span className="text-xs text-zinc-500">
               {metrics.completionRate}% Paid
             </span>
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100 font-mono">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-200">
             <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
           </div>
           {globalCurrency !== 'GOLD' && (
@@ -365,30 +367,30 @@ export function LedgerView({
         <div className="space-y-1.5">
           <div className="h-1.5 w-full bg-zinc-800/80 rounded-full overflow-hidden flex">
             <div
-              className="bg-zinc-100 h-full transition-all duration-300"
+              className="bg-zinc-300 h-full transition-all duration-300"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : 0}%`,
               }}
             />
             <div
-              className="bg-zinc-600 h-full transition-all duration-300"
+              className="bg-zinc-700 h-full transition-all duration-300"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
               }}
             />
           </div>
 
-          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 font-mono">
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-500">
             <span className="flex items-center gap-1">
               <span>Paid:</span>
-              <strong className="text-zinc-200">
+              <strong className="text-zinc-300 font-medium">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
               <span>({metrics.paidCount})</span>
             </span>
             <span className="flex items-center gap-1">
               <span>Pending:</span>
-              <strong className="text-zinc-300">
+              <strong className="text-zinc-400 font-medium">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
               <span>({metrics.pendingCount})</span>
@@ -397,40 +399,43 @@ export function LedgerView({
         </div>
       </div>
 
-      {/* 2. Quick Stat Tiles (Transparent Borders) */}
+      {/* 2. Quick Stat Tiles (Transparent Borders & Dimmed Numbers) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
             <span>Jobs Done</span>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-100 font-mono">
-            {metrics.paidCount} <span className="text-xs text-zinc-500 font-normal">/ {filteredEntries.length}</span>
+          <div className="text-lg sm:text-xl font-bold text-zinc-300">
+            {metrics.paidCount} <span className="text-xs text-zinc-600 font-normal">/ {filteredEntries.length}</span>
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <Clock className="w-3.5 h-3.5 text-amber-500/80" />
             <span>Pending Payout</span>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-100 font-mono truncate">
+          <div className="text-lg sm:text-xl font-bold text-zinc-300 truncate">
             <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1 col-span-2 sm:col-span-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-zinc-300" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
             <span>Average Rate</span>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-100 font-mono truncate">
+          <div className="text-lg sm:text-xl font-bold text-zinc-300 truncate">
             <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
           </div>
         </div>
       </div>
 
-      {/* 3. Compact / Collapsible Search & Filter Bar (Higher Stacking Context) */}
+      {/* Subtle Gradient Fade Separator Line */}
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700/60 to-transparent" />
+
+      {/* 3. Compact / Collapsible Search & Filter Bar (Dimmed & Low-Contrast) */}
       <div className="relative z-30 space-y-2.5">
         {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Expanding Search Drawer Toggle) */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -443,8 +448,8 @@ export function LedgerView({
                 onClick={() => setStatusFilter('')}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
                   statusFilter === ''
-                    ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
+                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                 }`}
               >
                 All ({entries.length})
@@ -457,8 +462,8 @@ export function LedgerView({
                   onClick={() => setStatusFilter(statusFilter === st ? '' : st)}
                   className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
                     statusFilter === st
-                      ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                      : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                      ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
+                      : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                   }`}
                 >
                   {st}
@@ -470,16 +475,16 @@ export function LedgerView({
                 onClick={() => setHasProofFilter((prev) => !prev)}
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   hasProofFilter
-                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800 font-semibold'
-                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-emerald-950/25 text-emerald-400/90 border border-emerald-800/60 font-medium'
+                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                 }`}
               >
-                <FileImage className="w-3 h-3" />
+                <FileImage className="w-3 h-3 text-zinc-500" />
                 <span>Proof</span>
               </button>
             </div>
 
-            <div className="h-4 w-px bg-zinc-800 shrink-0 hidden sm:block" />
+            <div className="h-4 w-px bg-zinc-800/80 shrink-0 hidden sm:block" />
 
             {/* Currency Payment Type Chips */}
             <div className="flex items-center gap-1">
@@ -488,11 +493,11 @@ export function LedgerView({
                 onClick={() => setCurrencyFilter(currencyFilter === 'GOLD' ? '' : 'GOLD')}
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   currencyFilter === 'GOLD'
-                    ? 'bg-amber-950/40 text-amber-300 border border-amber-800 font-semibold shadow-sm'
-                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-amber-950/25 text-amber-400/90 border border-amber-800/60 font-medium shadow-sm'
+                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                 }`}
               >
-                <Coins className="w-3 h-3 text-amber-400" />
+                <Coins className="w-3 h-3 text-amber-400/80" />
                 <span>Gold</span>
               </button>
 
@@ -501,12 +506,12 @@ export function LedgerView({
                 onClick={() => setCurrencyFilter(currencyFilter === 'TOMAN' ? '' : 'TOMAN')}
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   currencyFilter === 'TOMAN'
-                    ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
-                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
+                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                 }`}
               >
-                <Banknote className="w-3 h-3" />
-                <span className="font-sans">تومان</span>
+                <Banknote className="w-3 h-3 text-zinc-500" />
+                <span className="font-farsi font-medium">تومان</span>
               </button>
             </div>
 
@@ -515,16 +520,16 @@ export function LedgerView({
               <button
                 type="button"
                 onClick={() => setTeammateFilter('')}
-                className="px-2 py-1 rounded-md text-[11px] font-medium bg-transparent text-zinc-100 border border-zinc-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
+                className="px-2 py-1 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-300 border border-zinc-700/80 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
               >
-                <Users className="w-3 h-3 text-zinc-400" />
+                <Users className="w-3 h-3 text-zinc-500" />
                 <span>Team: {teammateFilter}</span>
-                <X className="w-3 h-3 text-zinc-400 hover:text-zinc-100" />
+                <X className="w-3 h-3 text-zinc-500 hover:text-zinc-200" />
               </button>
             )}
           </div>
 
-          {/* Toggle Search & Advanced Filters Drawer (Fills empty space on desktop, full row on mobile) */}
+          {/* Toggle Search & Advanced Filters Drawer (Dimmed & Low-Contrast) */}
           <button
             type="button"
             onClick={() => {
@@ -536,18 +541,18 @@ export function LedgerView({
             title="Toggle Search, Games & Sort (Press / to search)"
             className={`w-full sm:flex-1 h-8 sm:h-7 px-3 rounded-md text-xs font-medium flex items-center justify-between sm:justify-center gap-2 border transition-colors ${
               isSearchExpanded || hasAdvancedFilters
-                ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold'
-                : 'bg-transparent hover:bg-zinc-900/70 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                ? 'bg-zinc-900 text-zinc-200 border-zinc-700/80 font-medium shadow-sm'
+                : 'bg-transparent hover:bg-zinc-900/50 text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
             }`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
               <span className="truncate">Search & Filters</span>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <Kbd className="text-[9px] bg-zinc-900/80 border-zinc-700 text-zinc-400 px-1 py-0">/</Kbd>
+              <Kbd className="text-[9px] bg-zinc-950/80 border-zinc-800 text-zinc-500 px-1 py-0">/</Kbd>
               {hasAdvancedFilters && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 ml-0.5" />
               )}
             </div>
           </button>
@@ -563,17 +568,17 @@ export function LedgerView({
               transition={{ duration: 0.18, ease: 'easeInOut' }}
               className="space-y-2"
             >
-              <div className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl space-y-2">
+              <div className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800/80 shadow-2xl space-y-2">
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
                     <Input
                       ref={searchInputRef}
                       type="text"
                       placeholder="Search jobs, games, seller source, teammates, notes... (Press / to focus)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-7 h-8 text-xs bg-zinc-900/80 border-zinc-800"
+                      className="pl-8 pr-7 h-8 text-xs bg-zinc-950/60 border-zinc-800/80 text-zinc-300 placeholder:text-zinc-600"
                     />
                     {searchQuery && (
                       <button
@@ -591,7 +596,7 @@ export function LedgerView({
                       value={gameFilter}
                       onChange={setGameFilter}
                       options={gameOptions}
-                      className="h-8 text-xs bg-zinc-900/80 border-zinc-800"
+                      className="h-8 text-xs bg-zinc-950/60 border-zinc-800/80 text-zinc-400"
                     />
                   </div>
 
@@ -600,7 +605,7 @@ export function LedgerView({
                       value={sortOption}
                       onChange={setSortOption}
                       options={sortOptions}
-                      className="h-8 text-xs bg-zinc-900/80 border-zinc-800"
+                      className="h-8 text-xs bg-zinc-950/60 border-zinc-800/80 text-zinc-400"
                     />
                   </div>
                 </div>
@@ -612,7 +617,7 @@ export function LedgerView({
 
       {/* 4. Grouped Job Feed */}
       {filteredEntries.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-zinc-800 p-12 text-center space-y-3">
+        <div className="rounded-2xl border border-dashed border-zinc-800/80 p-12 text-center space-y-3">
           <p className="text-xs text-zinc-500">
             {searchQuery || statusFilter || gameFilter || hasProofFilter || teammateFilter
               ? 'No jobs match the selected filters.'
@@ -631,36 +636,36 @@ export function LedgerView({
 
             return (
               <div key={groupTitle} className="space-y-2">
-                {/* Daily Group Header (Without Extra Border Line) */}
+                {/* Daily Group Header */}
                 <div className="flex items-center justify-between px-1 py-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                       {groupTitle}
                     </span>
-                    <span className="text-[10px] font-mono text-zinc-500">
+                    <span className="text-[10px] text-zinc-600">
                       ({groupItems.length} {groupItems.length === 1 ? 'job' : 'jobs'})
                     </span>
                   </div>
 
-                  {/* Selectable Day Total Income Badge with Extra Padding */}
+                  {/* Dimmed Low-Contrast Day Total Income Badge */}
                   <button
                     type="button"
                     onClick={() => handleToggleDaySelection(groupTitle)}
                     title={`Click to ${isDaySelected ? 'deselect' : 'select and sum'} ${groupTitle}'s earnings`}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono transition-all select-none border ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] transition-all select-none border ${
                       isDaySelected
-                        ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-200 shadow-md ring-1 ring-zinc-300'
-                        : 'bg-transparent border-zinc-800/80 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 shadow-sm'
+                        ? 'bg-zinc-900 text-zinc-200 font-medium border-zinc-700/80 shadow-sm'
+                        : 'bg-transparent border-zinc-800/60 text-zinc-500 hover:border-zinc-700/70 hover:text-zinc-400'
                     }`}
                   >
-                    <span className={`text-[9px] uppercase font-sans font-semibold ${isDaySelected ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                    <span className={`text-[9px] uppercase font-medium ${isDaySelected ? 'text-zinc-400' : 'text-zinc-600'}`}>
                       Day Total:
                     </span>
-                    <strong className={isDaySelected ? 'text-zinc-950' : 'text-zinc-300'}>
+                    <strong className={isDaySelected ? 'text-zinc-200 font-medium' : 'text-zinc-400 font-normal'}>
                       <MoneyDisplay amount={dayTotal} currency={globalCurrency} />
                     </strong>
                     {isDaySelected && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-950 ml-0.5 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 ml-0.5 shrink-0" />
                     )}
                   </button>
                 </div>
@@ -677,7 +682,12 @@ export function LedgerView({
                         className={cn('space-y-1 relative job-row-item', isActionOpen && 'z-40')}
                       >
                         <div
-                          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-transparent hover:bg-zinc-900/40 border border-zinc-800/60 transition-colors"
+                          onClick={(e) => {
+                            if (!e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
+                              onOpenReceipt?.(entry);
+                            }
+                          }}
+                          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-transparent hover:bg-zinc-900/40 border border-zinc-800/60 transition-colors cursor-pointer"
                         >
                           {/* Left: Thumbnail / Emblem & Details */}
                           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
@@ -686,7 +696,7 @@ export function LedgerView({
                                 type="button"
                                 onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
                                 title="View screenshot proof"
-                                className="w-9 h-9 rounded-lg bg-transparent border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
+                                className="w-9 h-9 rounded-lg bg-transparent border border-zinc-800/80 flex items-center justify-center text-emerald-400/80 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
                               >
                                 <img
                                   src={entry.proofs[0].data}
@@ -695,19 +705,19 @@ export function LedgerView({
                                 />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 rounded-lg bg-transparent border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5 mt-0.5 sm:mt-0">
-                                <GameIcon game={entry.game} className="w-full h-full" />
+                              <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                                <GameIcon game={entry.game} className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity" />
                               </div>
                             )}
 
                             <div className="min-w-0 flex-1 space-y-0.5">
                               {/* Line 1: Title & Transparent Seller Badge */}
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold text-zinc-200 truncate">
+                                <span className="text-xs font-medium text-zinc-300 truncate">
                                   {entry.title}
                                 </span>
                                 {entry.source && (
-                                  <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-transparent text-zinc-400 border border-zinc-800">
+                                  <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-transparent text-zinc-500 border border-zinc-800/80">
                                     {entry.source}
                                   </span>
                                 )}
@@ -746,8 +756,8 @@ export function LedgerView({
                                         title={`Click to filter jobs with ${tm}`}
                                         className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border ${
                                           isMatch
-                                            ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
-                                            : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                                            ? 'bg-zinc-900 text-zinc-300 border-zinc-700/80 shadow-sm'
+                                            : 'bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80'
                                         }`}
                                       >
                                         {tm}
@@ -759,10 +769,10 @@ export function LedgerView({
                             </div>
                           </div>
 
-                          {/* Right: Income, Status, Menu */}
+                          {/* Right: Income, Status, Menu (Dimmed Income Display) */}
                           <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
                             <div className="text-left sm:text-right">
-                              <div className="text-xs font-semibold text-zinc-100 font-mono">
+                              <div className="text-xs font-medium text-zinc-300">
                                 <MoneyDisplay amount={entry.income} currency={entry.currency} />
                               </div>
                               {entry.currency !== globalCurrency && (
@@ -773,7 +783,6 @@ export function LedgerView({
                                   rates={rates}
                                   customRate={entry.exchangeRate}
                                   isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
-                                  showRateLabel={true}
                                 />
                               )}
                             </div>
@@ -976,52 +985,70 @@ export function LedgerView({
         </div>
       )}
 
-      {/* 6. Interactive Multi-Day Income Calculator Floating Bottom Bar */}
+      {/* 6. Interactive Multi-Day Income Calculator Floating Bottom Bar (Viewport Centered & Frosty Glass) */}
       <AnimatePresence>
         {selectedDaysSummary && selectedDaysSummary.daysCount > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 28, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 28, scale: 0.96 }}
+            initial={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
+            exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-[90] bg-zinc-950/95 backdrop-blur-xl border border-zinc-700/80 shadow-2xl ring-1 ring-zinc-800 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-3.5 sm:gap-5 max-w-[95vw] sm:max-w-xl"
+            className="fixed bottom-20 md:bottom-8 left-1/2 z-[90] bg-zinc-950/75 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-3.5 sm:gap-5 max-w-[95vw] sm:max-w-xl"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0">
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900/90 text-zinc-200 border border-zinc-700/80 shrink-0">
                 {selectedDaysSummary.daysCount} {selectedDaysSummary.daysCount === 1 ? 'Day' : 'Days'}
               </span>
 
               <div className="flex items-baseline gap-2 min-w-0 truncate">
-                <span className="text-zinc-400 text-xs font-sans hidden sm:inline">Sum:</span>
-                <strong className="text-zinc-100 font-mono font-bold text-base sm:text-lg tracking-tight">
+                <span className="text-zinc-400 text-xs hidden sm:inline">Sum:</span>
+                <strong className="text-zinc-100 font-bold text-base sm:text-lg tracking-tight">
                   <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
                 </strong>
-                <span className="text-[11px] text-zinc-500 font-mono shrink-0">
+                <span className="text-[11px] text-zinc-500 shrink-0">
                   ({selectedDaysSummary.totalJobs} {selectedDaysSummary.totalJobs === 1 ? 'job' : 'jobs'})
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-3 border-l border-zinc-800">
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-3 border-l border-zinc-800/80">
               <Button
                 variant="ghost"
                 size="xs"
                 onClick={() => {
                   const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
                   navigator.clipboard.writeText(formatted);
+                  setIsSumCopied(true);
+                  setTimeout(() => setIsSumCopied(false), 2000);
                   onToast?.(`📋 Copied selected days sum (${formatted}) to clipboard!`);
                 }}
                 title="Copy sum to clipboard"
-                className="h-8 px-2.5 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/80 gap-1.5 border border-transparent hover:border-zinc-700 transition-colors"
+                className={`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
+                  isSumCopied
+                    ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80'
+                    : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80 border-transparent hover:border-zinc-700'
+                }`}
               >
-                <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="hidden sm:inline">Copy</span>
+                {isSumCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in-50 duration-150" />
+                    <span className="hidden sm:inline font-medium text-emerald-300">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="hidden sm:inline">Copy</span>
+                  </>
+                )}
               </Button>
 
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => setSelectedDayKeys(new Set())}
+                onClick={() => {
+                  setSelectedDayKeys(new Set());
+                  setIsSumCopied(false);
+                }}
                 title="Clear day selection"
                 className="h-8 px-2 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-700 transition-colors"
               >

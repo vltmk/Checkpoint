@@ -243,11 +243,11 @@ export function Navbar({
             ) : (
               <Banknote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             )}
-            <span className="font-mono font-medium text-[11px]">
+            <span className={globalCurrency === 'TOMAN' ? 'font-farsi font-medium text-[11px]' : 'font-sans font-medium text-[11px]'}>
               {globalCurrency === 'TOMAN' ? 'تومان' : 'Gold'}
             </span>
             <span className="hidden xl:inline text-zinc-600 text-[10px]">•</span>
-            <span className="hidden xl:inline font-mono text-[11px] text-zinc-400">
+            <span className="hidden xl:inline font-sans text-[11px] text-zinc-400">
               1k={goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN}T
             </span>
             <ChevronDown
@@ -276,7 +276,7 @@ export function Navbar({
                     }`}
                   >
                     <Banknote className="w-3.5 h-3.5" />
-                    <span>تومان</span>
+                    <span className="font-farsi font-medium">تومان</span>
                   </button>
                   <button
                     type="button"

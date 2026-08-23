@@ -378,41 +378,41 @@ export function AnalyticsView({
       {/* 1. KPIs Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <Coins className="w-3.5 h-3.5 text-zinc-300" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <Coins className="w-3.5 h-3.5 text-zinc-400" />
             <span>Total Earned</span>
           </div>
-          <div className="text-xl font-bold text-zinc-100 font-mono truncate">
+          <div className="text-xl font-bold text-zinc-200 truncate">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <Trophy className="w-3.5 h-3.5 text-zinc-300" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <Trophy className="w-3.5 h-3.5 text-zinc-400" />
             <span>Average Job</span>
           </div>
-          <div className="text-xl font-bold text-zinc-100 font-mono truncate">
+          <div className="text-xl font-bold text-zinc-200 truncate">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
             <span>Paid Jobs</span>
           </div>
-          <div className="text-xl font-bold text-zinc-100 font-mono">
-            {stats.paidCount} <span className="text-xs text-zinc-500 font-normal">/ {filteredEntries.length}</span>
+          <div className="text-xl font-bold text-zinc-200">
+            {stats.paidCount} <span className="text-xs text-zinc-600 font-normal">/ {filteredEntries.length}</span>
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
             <span>Completion Rate</span>
           </div>
-          <div className="text-xl font-bold text-zinc-100 font-mono">
+          <div className="text-xl font-bold text-zinc-200">
             {stats.completionRate}%
           </div>
         </div>
@@ -421,11 +421,11 @@ export function AnalyticsView({
       {/* 2. Velocity Bar Chart */}
       <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-zinc-300" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-zinc-400" />
             <span>{velocityChartData.title}</span>
           </h3>
-          <span className="text-[11px] font-mono text-zinc-500">
+          <span className="text-[11px] text-zinc-500">
             {currentTfObj.windowText}
           </span>
         </div>
@@ -439,11 +439,11 @@ export function AnalyticsView({
         {/* Donut Chart */}
         <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-zinc-300" />
+            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-zinc-400" />
               <span>Revenue by Game</span>
             </h3>
-            <span className="text-[10px] font-mono text-zinc-500">
+            <span className="text-[10px] text-zinc-500">
               {stats.sortedGames.length} {stats.sortedGames.length === 1 ? 'game' : 'games'}
             </span>
           </div>
@@ -460,10 +460,10 @@ export function AnalyticsView({
         {/* Breakdown Ranking List */}
         <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">
               Top Games Breakdown
             </h3>
-            <span className="text-[10px] font-mono text-zinc-500">Period Share</span>
+            <span className="text-[10px] text-zinc-500">Period Share</span>
           </div>
 
           <div className="space-y-3">
@@ -471,11 +471,11 @@ export function AnalyticsView({
               stats.sortedGames.map((item) => (
                 <div key={item.game} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-200 font-medium truncate flex items-center gap-1.5">
+                    <span className="text-zinc-300 font-medium truncate flex items-center gap-1.5">
                       <GameIcon game={item.game} className="w-3.5 h-3.5" />
                       <span>{item.game}</span>
                     </span>
-                    <span className="text-zinc-100 font-mono font-semibold">
+                    <span className="text-zinc-300 font-medium">
                       <MoneyDisplay amount={item.revenue} currency={globalCurrency} />
                     </span>
                   </div>

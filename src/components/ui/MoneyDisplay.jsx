@@ -13,15 +13,15 @@ export function MoneyDisplay({
   const { amount: formattedNum, unit } = formatMoneyParts(amount, currency, compact);
 
   return (
-    <span className={cn('inline-flex items-baseline gap-1 font-mono tracking-tight', className)}>
+    <span className={cn('inline-flex items-baseline gap-1 tracking-tight', className)}>
       {prefix && <span className="text-zinc-500 font-normal mr-0.5">{prefix}</span>}
       <span>{formattedNum}</span>
       {unit && (
         <span
           className={cn(
             unit === 'تومان'
-              ? 'text-[0.72em] font-sans font-medium text-zinc-400 opacity-85 select-none'
-              : 'text-[0.8em] font-mono font-medium text-zinc-400 select-none',
+              ? 'text-[0.72em] font-farsi font-medium text-zinc-400 opacity-85 select-none'
+              : 'text-[0.8em] font-medium text-zinc-400 select-none',
             unitClassName
           )}
         >
@@ -52,7 +52,7 @@ export function ConvertedSecondaryDisplay({
   const converted = convertCurrency(amount, from, to, rates, effectiveRate, isPerOneGold);
 
   return (
-    <div className={cn('text-[10px] text-zinc-500 font-mono flex items-center justify-end gap-1', className)}>
+    <div className={cn('text-[10px] text-zinc-500 flex items-center justify-end gap-1', className)}>
       <MoneyDisplay
         amount={converted}
         currency={to}
@@ -61,7 +61,7 @@ export function ConvertedSecondaryDisplay({
       />
       {showRateLabel && (
         <span
-          className="text-[9px] text-zinc-600 font-mono tracking-tight"
+          className="text-[9px] text-zinc-600 tracking-tight"
           title={
             isPerOneGold
               ? `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1 Gold`

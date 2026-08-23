@@ -88,7 +88,7 @@ Date    = ${dateStr}
 Game    = ${entry.game || 'World of Warcraft'}
 Title   = ${entry.title}
 Source  = ${entry.source || 'Direct Client'}${hasTeammates ? `\nTeam    = ${teammatesStr}` : ''}
-Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
+Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
 Status  = ${entry.status || 'Paid'}
 Amount  = ${formattedIncome}
 Notes   = ${entry.notes || 'None'}
@@ -184,9 +184,13 @@ Notes   = ${entry.notes || 'None'}
                 </div>
               </div>
 
-              <div className="col-span-2 pt-2 border-t border-zinc-800/70 flex items-center justify-between text-[10px] font-mono text-zinc-400">
-                <span className="text-zinc-500 uppercase font-sans font-semibold">Locked Rate</span>
-                <span>{effectiveRate.toLocaleString()} Toman / {rateUnitText}</span>
+              <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+                <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                  Conversion Rate
+                </span>
+                <span className="text-zinc-300 font-medium">
+                  {effectiveRate.toLocaleString()} Toman / {rateUnitText}
+                </span>
               </div>
 
               {/* Interactive Teammate Badges with Click-to-Filter */}

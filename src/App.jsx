@@ -17,9 +17,10 @@ import { Button } from './components/ui/Button';
 import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, FileSpreadsheet } from 'lucide-react';
-import { isTauri, saveFileNative, openFileNative } from './lib/desktop';
+import { isTauri, saveFileNative, openFileNative, enforceMinWindowSize } from './lib/desktop';
 
 export default function App() {
+  const isDesktop = isTauri();
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -136,6 +137,7 @@ export default function App() {
 
   useEffect(() => {
     loadData();
+    enforceMinWindowSize(800, 560);
   }, [loadData]);
 
   // Tab Switcher
@@ -528,12 +530,14 @@ export default function App() {
         entriesCount={entries.length}
       />
 
-      {/* 2. Mobile Top Header */}
-      <MobileHeader
-        globalCurrency={globalCurrency}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenWorkModal={handleOpenWorkModal}
-      />
+      {/* 2. Mobile Top Header (Only on Web viewports) */}
+      {!isDesktop && (
+        <MobileHeader
+          globalCurrency={globalCurrency}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenWorkModal={handleOpenWorkModal}
+        />
+      )}
 
       {/* 3. Main Centered Mini-App Workspace */}
       <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
@@ -596,12 +600,14 @@ export default function App() {
         </div>
       </main>
 
-      {/* 4. Mobile Bottom Navigation Bar */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onOpenWorkModal={() => handleOpenWorkModal()}
-      />
+      {/* 4. Mobile Bottom Navigation Bar (Only on Web viewports) */}
+      {!isDesktop && (
+        <MobileBottomNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          onOpenWorkModal={() => handleOpenWorkModal()}
+        />
+      )}
 
       {/* Modals & Dialogs */}
       <WorkModal

@@ -102,7 +102,7 @@ export function Select({
           <React.Fragment key={idx}>
             {p}
             {idx < parts.length - 1 && (
-              <span className="text-[0.78em] font-sans opacity-90 mx-0.5">تومان</span>
+              <span className="text-[0.78em] font-farsi opacity-90 mx-0.5">تومان</span>
             )}
           </React.Fragment>
         ))}
