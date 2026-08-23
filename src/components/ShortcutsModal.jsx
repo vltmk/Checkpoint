@@ -17,10 +17,8 @@ export function ShortcutsModal({ isOpen, onClose }) {
     {
       group: 'Navigation & Views',
       items: [
-        { keys: ['1'], desc: 'Jump to Overview tab' },
-        { keys: ['2'], desc: 'Jump to Ledger tab' },
-        { keys: ['3'], desc: 'Jump to Analytics tab' },
-        { keys: ['4'], desc: 'Jump to Exchange tab' },
+        { keys: ['1'], desc: 'Jump to Ledger tab' },
+        { keys: ['2'], desc: 'Jump to Analytics tab' },
         { keys: ['/'], desc: 'Focus search bar' },
         { keys: ['?'], desc: 'Open shortcuts cheat sheet' },
       ],

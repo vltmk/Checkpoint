@@ -5,10 +5,8 @@ import { toLocalISOString } from './components/ui/DateTimePicker';
 import { TitleBar } from './components/TitleBar';
 import { Sidebar } from './components/Sidebar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
-import { OverviewView } from './components/views/OverviewView';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
-import { ExchangeView } from './components/views/ExchangeView';
 import { WorkModal } from './components/WorkModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
@@ -25,9 +23,11 @@ export default function App() {
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Active View Tab ('overview' | 'ledger' | 'analytics' | 'exchange')
+  // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('nodrapay_tab') || 'overview';
+    const saved = localStorage.getItem('nodrapay_tab');
+    if (saved === 'analytics') return 'analytics';
+    return 'ledger';
   });
 
   // User Currency Preferences (TOMAN | GOLD)
@@ -156,11 +156,15 @@ export default function App() {
 
   // Save Entry (Create / Edit)
   const handleSaveEntry = async (entryData) => {
+    const isNew = !editingEntry;
     await trackerDB.saveEntry(entryData);
     setIsWorkModalOpen(false);
     setEditingEntry(null);
     await loadData();
-    showToast(editingEntry ? 'Work record updated' : 'Work record saved');
+    if (isNew) {
+      handleTabChange('ledger');
+    }
+    showToast(isNew ? 'Work record saved' : 'Work record updated');
   };
 
   // Delete Entry
@@ -477,16 +481,10 @@ export default function App() {
         handleOpenWorkModal();
       } else if (e.key === '1') {
         e.preventDefault();
-        handleTabChange('overview');
+        handleTabChange('ledger');
       } else if (e.key === '2') {
         e.preventDefault();
-        handleTabChange('ledger');
-      } else if (e.key === '3') {
-        e.preventDefault();
         handleTabChange('analytics');
-      } else if (e.key === '4') {
-        e.preventDefault();
-        handleTabChange('exchange');
       } else if (e.key === '/') {
         e.preventDefault();
         handleTabChange('ledger');
@@ -559,20 +557,6 @@ export default function App() {
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.12 }}
               >
-                {activeTab === 'overview' && (
-                  <OverviewView
-                    entries={entries}
-                    globalCurrency={globalCurrency}
-                    goldRateTOMAN={goldRateTOMAN}
-                    onOpenWorkModal={handleOpenWorkModal}
-                    onOpenReceipt={handleOpenReceipt}
-                    onOpenLightbox={handleOpenLightbox}
-                    onFlipStatus={handleFlipStatus}
-                    onNavigateToLedger={() => handleTabChange('ledger')}
-                    onNavigateToExchange={() => handleTabChange('exchange')}
-                  />
-                )}
-
                 {activeTab === 'ledger' && (
                   <LedgerView
                     entries={entries}
@@ -593,16 +577,6 @@ export default function App() {
                     entries={entries}
                     globalCurrency={globalCurrency}
                     goldRateTOMAN={goldRateTOMAN}
-                  />
-                )}
-
-                {activeTab === 'exchange' && (
-                  <ExchangeView
-                    entries={entries}
-                    globalCurrency={globalCurrency}
-                    goldRateTOMAN={goldRateTOMAN}
-                    onGoldRateTOMANChange={handleGoldRateTOMANChange}
-                    onToast={showToast}
                   />
                 )}
               </motion.div>

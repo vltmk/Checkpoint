@@ -1,9 +1,7 @@
 import React from 'react';
 import {
-  LayoutDashboard,
   Receipt,
   BarChart3,
-  Coins,
   Plus,
   Settings,
 } from 'lucide-react';
@@ -47,31 +45,19 @@ export function MobileHeader({
 }
 
 export function MobileBottomNav({
-  activeTab = 'overview',
+  activeTab = 'ledger',
   onTabChange,
   onOpenWorkModal,
 }) {
   return (
-    <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 border-t border-zinc-800/80 px-2 py-1.5 safe-bottom">
-      <div className="flex items-center justify-around max-w-md mx-auto">
-        {/* Tab 1: Overview */}
-        <button
-          type="button"
-          onClick={() => onTabChange?.('overview')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-            activeTab === 'overview' ? 'text-zinc-100 font-semibold' : 'text-zinc-500'
-          }`}
-        >
-          <LayoutDashboard className={`w-4 h-4 ${activeTab === 'overview' ? 'text-zinc-100' : 'text-zinc-500'}`} />
-          <span>Home</span>
-        </button>
-
-        {/* Tab 2: Ledger */}
+    <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 border-t border-zinc-800/80 px-4 py-1.5 safe-bottom">
+      <div className="flex items-center justify-around max-w-sm mx-auto">
+        {/* Tab 1: Ledger */}
         <button
           type="button"
           onClick={() => onTabChange?.('ledger')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-            activeTab === 'ledger' ? 'text-zinc-100 font-semibold' : 'text-zinc-500'
+          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors ${
+            activeTab === 'ledger' ? 'text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
           <Receipt className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
@@ -83,33 +69,21 @@ export function MobileBottomNav({
           type="button"
           onClick={onOpenWorkModal}
           title="Add Work"
-          className="flex items-center justify-center w-10 h-10 -mt-3 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-95 transition-all border border-zinc-300"
+          className="flex items-center justify-center w-10 h-10 -mt-3 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-95 transition-all border border-zinc-300 hover:bg-white"
         >
           <Plus className="w-5 h-5" />
         </button>
 
-        {/* Tab 3: Analytics */}
+        {/* Tab 2: Analytics */}
         <button
           type="button"
           onClick={() => onTabChange?.('analytics')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-            activeTab === 'analytics' ? 'text-zinc-100 font-semibold' : 'text-zinc-500'
+          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors ${
+            activeTab === 'analytics' ? 'text-zinc-100 font-semibold' : 'text-zinc-500 hover:text-zinc-300'
           }`}
         >
           <BarChart3 className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-zinc-100' : 'text-zinc-500'}`} />
-          <span>Stats</span>
-        </button>
-
-        {/* Tab 4: Exchange */}
-        <button
-          type="button"
-          onClick={() => onTabChange?.('exchange')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-            activeTab === 'exchange' ? 'text-zinc-100 font-semibold' : 'text-zinc-500'
-          }`}
-        >
-          <Coins className={`w-4 h-4 ${activeTab === 'exchange' ? 'text-zinc-100' : 'text-zinc-500'}`} />
-          <span>Rates</span>
+          <span>Analytics</span>
         </button>
       </div>
     </nav>

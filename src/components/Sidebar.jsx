@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard,
   Receipt,
   BarChart3,
   Coins,
@@ -17,7 +16,7 @@ import { Kbd } from './ui/Tooltip';
 import { CURRENCIES, formatMoney } from '../lib/currencies';
 
 export function Sidebar({
-  activeTab = 'overview',
+  activeTab = 'ledger',
   onTabChange,
   globalCurrency = 'TOMAN',
   onCurrencyChange,
@@ -45,10 +44,8 @@ export function Sidebar({
   ];
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, hotkey: '1' },
-    { id: 'ledger', label: 'Ledger', icon: Receipt, hotkey: '2', count: entriesCount },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, hotkey: '3' },
-    { id: 'exchange', label: 'Exchange', icon: Coins, hotkey: '4' },
+    { id: 'ledger', label: 'Ledger', icon: Receipt, hotkey: '1', count: entriesCount },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, hotkey: '2' },
   ];
 
   const handleSaveRate = () => {
@@ -129,6 +126,9 @@ export function Sidebar({
 
         {/* Quick Gold Rate Pill */}
         <div className="relative">
+          <label className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 px-1">
+            Gold Ratio
+          </label>
           <button
             type="button"
             onClick={() => {

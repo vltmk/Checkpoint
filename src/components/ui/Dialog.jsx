@@ -68,7 +68,7 @@ export function DialogHeader({ children, className, onClose }) {
         className
       )}
     >
-      <div className="flex items-center gap-3">{children}</div>
+      <div className="flex items-center gap-3 flex-1 min-w-0">{children}</div>
       {onClose && (
         <button
           type="button"

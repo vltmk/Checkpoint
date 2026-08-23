@@ -325,14 +325,14 @@ export function WorkModal({
         </div>
 
         {!editingEntry && isDraftRestored && (
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-auto mr-1">
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/40">
               Draft Restored
             </span>
             <button
               type="button"
               onClick={handleClearDraft}
-              className="text-[10px] text-zinc-500 hover:text-zinc-300 underline"
+              className="text-[10px] text-zinc-500 hover:text-zinc-300 underline cursor-pointer"
               title="Discard saved draft"
             >
               Clear
