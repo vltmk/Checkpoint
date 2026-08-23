@@ -37,7 +37,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
           />
 
           {/* Dialog Container */}
@@ -47,7 +47,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
             className={cn(
-              'relative z-10 w-full bg-zinc-950 border-t sm:border border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
+              'relative z-10 w-full bg-zinc-950/95 backdrop-blur-xl border-t sm:border border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
               maxWidth,
               className
             )}
@@ -64,7 +64,7 @@ export function DialogHeader({ children, className, onClose }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0 bg-zinc-950',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
         className
       )}
     >
@@ -98,7 +98,7 @@ export function DialogFooter({ children, className }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 shrink-0 bg-zinc-950',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
         className
       )}
     >

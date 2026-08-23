@@ -38,6 +38,7 @@ export function DateTimePicker({
   dropUp = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isPulsingNow, setIsPulsingNow] = useState(false);
   const containerRef = useRef(null);
 
   // Close on outside click or Escape
@@ -72,6 +73,8 @@ export function DateTimePicker({
     e?.stopPropagation?.();
     const nowIso = toLocalISOString(new Date());
     onChange?.(nowIso);
+    setIsPulsingNow(true);
+    setTimeout(() => setIsPulsingNow(false), 600);
   };
 
   const handleSetToday = (e) => {
@@ -95,7 +98,7 @@ export function DateTimePicker({
   const normalizedValue = value ? (value.length === 16 ? value : toLocalISOString(new Date(value))) : '';
 
   return (
-    <div ref={containerRef} className="relative inline-block w-full">
+    <div ref={containerRef} className={cn('relative inline-block w-full', isOpen && 'z-50')}>
       {/* Trigger Bar */}
       <div
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
@@ -113,15 +116,24 @@ export function DateTimePicker({
           </span>
         </div>
 
-        {/* 1-Click "Now" quick badge on trigger */}
+        {/* 1-Click "Now" quick badge on trigger with green pulse feedback */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handleSetNow}
             title="Set to current local time"
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white active:scale-95 transition-all border border-zinc-700/50"
+            className={cn(
+              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all active:scale-95 border',
+              isPulsingNow
+                ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/50 scale-105'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border-zinc-700/50'
+            )}
           >
-            <Zap className="w-2.5 h-2.5" />
+            {isPulsingNow ? (
+              <Check className="w-2.5 h-2.5 text-emerald-400" />
+            ) : (
+              <Zap className="w-2.5 h-2.5" />
+            )}
             <span>Now</span>
           </button>
           <ChevronDown
@@ -142,7 +154,7 @@ export function DateTimePicker({
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
             className={cn(
-              'absolute left-0 right-0 z-50 min-w-[260px] bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-3 space-y-3',
+              'absolute left-0 right-0 z-50 min-w-[260px] bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-3 space-y-3',
               dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
           >
@@ -158,9 +170,18 @@ export function DateTimePicker({
                 <button
                   type="button"
                   onClick={handleSetNow}
-                  className="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95"
+                  className={cn(
+                    'inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-all active:scale-95 border',
+                    isPulsingNow
+                      ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/50 scale-105'
+                      : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800'
+                  )}
                 >
-                  <Zap className="w-3 h-3 text-emerald-400" />
+                  {isPulsingNow ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Zap className="w-3 h-3 text-emerald-400" />
+                  )}
                   <span>Now</span>
                 </button>
                 <button

@@ -28,6 +28,7 @@ import { StatusBadge } from '../ui/Badge';
 import { GameIcon } from '../ui/GameIcon';
 import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Kbd } from '../ui/Tooltip';
+import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   formatMoney,
@@ -86,6 +87,14 @@ export function LedgerView({
     setCurrentPage(1);
     setSelectedDayKeys(new Set());
   }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sortOption]);
+
+  // Close action menu on outside click
+  useEffect(() => {
+    if (!activeActionMenuId) return;
+    const handleOutsideClick = () => setActiveActionMenuId(null);
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, [activeActionMenuId]);
 
   // Filter and sort entries
   const filteredEntries = useMemo(() => {
@@ -312,8 +321,8 @@ export function LedgerView({
 
   return (
     <div className="space-y-5 pb-20 md:pb-6 relative">
-      {/* 1. Compact Total Earned Summary Card */}
-      <div className="rounded-xl bg-zinc-900/40 border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
+      {/* 1. Compact Total Earned Summary Card (Transparent & Dark Palette) */}
+      <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
@@ -324,7 +333,7 @@ export function LedgerView({
                 type="button"
                 onClick={handleClearFilters}
                 title="Click to clear all active filters"
-                className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors"
+                className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800 transition-colors"
               >
                 <span>Filtered ({filteredEntries.length}/{entries.length})</span>
                 <X className="w-2.5 h-2.5 text-zinc-500" />
@@ -388,9 +397,9 @@ export function LedgerView({
         </div>
       </div>
 
-      {/* 2. Quick Stat Tiles */}
+      {/* 2. Quick Stat Tiles (Transparent Borders) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>Jobs Done</span>
@@ -400,7 +409,7 @@ export function LedgerView({
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <Clock className="w-3.5 h-3.5 text-amber-400" />
             <span>Pending Payout</span>
@@ -410,7 +419,7 @@ export function LedgerView({
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3 space-y-1 col-span-2 sm:col-span-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1 col-span-2 sm:col-span-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-zinc-300" />
             <span>Average Rate</span>
@@ -421,8 +430,8 @@ export function LedgerView({
         </div>
       </div>
 
-      {/* 3. Compact / Collapsible Search & Filter Bar */}
-      <div className="space-y-2.5">
+      {/* 3. Compact / Collapsible Search & Filter Bar (Higher Stacking Context) */}
+      <div className="relative z-30 space-y-2.5">
         {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Search Drawer Toggle) */}
         <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
@@ -434,7 +443,7 @@ export function LedgerView({
                 className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
                   statusFilter === ''
                     ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                 }`}
               >
                 All ({entries.length})
@@ -448,7 +457,7 @@ export function LedgerView({
                   className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap ${
                     statusFilter === st
                       ? 'bg-zinc-100 text-zinc-950 font-semibold'
-                      : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                      : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                   }`}
                 >
                   {st}
@@ -460,8 +469,8 @@ export function LedgerView({
                 onClick={() => setHasProofFilter((prev) => !prev)}
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   hasProofFilter
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-semibold'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800 font-semibold'
+                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                 }`}
               >
                 <FileImage className="w-3 h-3" />
@@ -478,8 +487,8 @@ export function LedgerView({
                 onClick={() => setCurrencyFilter(currencyFilter === 'GOLD' ? '' : 'GOLD')}
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   currencyFilter === 'GOLD'
-                    ? 'bg-amber-950/80 text-amber-300 border border-amber-800 font-semibold shadow-sm'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    ? 'bg-amber-950/40 text-amber-300 border border-amber-800 font-semibold shadow-sm'
+                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                 }`}
               >
                 <Coins className="w-3 h-3 text-amber-400" />
@@ -492,7 +501,7 @@ export function LedgerView({
                 className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
                   currencyFilter === 'TOMAN'
                     ? 'bg-zinc-100 text-zinc-950 font-semibold shadow-sm'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    : 'bg-transparent text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                 }`}
               >
                 <Banknote className="w-3 h-3" />
@@ -505,7 +514,7 @@ export function LedgerView({
               <button
                 type="button"
                 onClick={() => setTeammateFilter('')}
-                className="px-2 py-1 rounded-md text-[11px] font-medium bg-zinc-800 text-zinc-100 border border-zinc-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
+                className="px-2 py-1 rounded-md text-[11px] font-medium bg-transparent text-zinc-100 border border-zinc-700 flex items-center gap-1.5 whitespace-nowrap shadow-sm"
               >
                 <Users className="w-3 h-3 text-zinc-400" />
                 <span>Team: {teammateFilter}</span>
@@ -528,7 +537,7 @@ export function LedgerView({
               className={`h-7 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 border transition-colors ${
                 isSearchExpanded || hasAdvancedFilters
                   ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold'
-                  : 'bg-zinc-900/80 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                  : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
               }`}
             >
               <Search className="w-3.5 h-3.5" />
@@ -549,9 +558,9 @@ export function LedgerView({
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.18, ease: 'easeInOut' }}
-              className="overflow-hidden"
+              className="space-y-2"
             >
-              <div className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 space-y-2">
+              <div className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl space-y-2">
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
@@ -561,7 +570,7 @@ export function LedgerView({
                       placeholder="Search jobs, games, seller source, teammates, notes... (Press / to focus)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-7 h-8 text-xs bg-zinc-900 border-zinc-800"
+                      className="pl-8 pr-7 h-8 text-xs bg-zinc-900/80 border-zinc-800"
                     />
                     {searchQuery && (
                       <button
@@ -579,7 +588,7 @@ export function LedgerView({
                       value={gameFilter}
                       onChange={setGameFilter}
                       options={gameOptions}
-                      className="h-8 text-xs bg-zinc-900 border-zinc-800"
+                      className="h-8 text-xs bg-zinc-900/80 border-zinc-800"
                     />
                   </div>
 
@@ -588,7 +597,7 @@ export function LedgerView({
                       value={sortOption}
                       onChange={setSortOption}
                       options={sortOptions}
-                      className="h-8 text-xs bg-zinc-900 border-zinc-800"
+                      className="h-8 text-xs bg-zinc-900/80 border-zinc-800"
                     />
                   </div>
                 </div>
@@ -612,15 +621,15 @@ export function LedgerView({
           </Button>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-6 relative z-10">
           {dateGroups.map(({ groupTitle, groupItems, dayTotal }) => {
             if (groupItems.length === 0) return null;
             const isDaySelected = selectedDayKeys.has(groupTitle);
 
             return (
               <div key={groupTitle} className="space-y-2">
-                {/* Daily Group Header with Dark Low-Contrast & Selectable Day Total Income Badge */}
-                <div className="flex items-center justify-between px-1 py-1 border-b border-zinc-800/80">
+                {/* Daily Group Header (Without Extra Border Line) */}
+                <div className="flex items-center justify-between px-1 py-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                       {groupTitle}
@@ -630,15 +639,15 @@ export function LedgerView({
                     </span>
                   </div>
 
-                  {/* Selectable Day Total Income Badge */}
+                  {/* Selectable Day Total Income Badge with Extra Padding */}
                   <button
                     type="button"
                     onClick={() => handleToggleDaySelection(groupTitle)}
                     title={`Click to ${isDaySelected ? 'deselect' : 'select and sum'} ${groupTitle}'s earnings`}
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono transition-all select-none border ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono transition-all select-none border ${
                       isDaySelected
                         ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-200 shadow-md ring-1 ring-zinc-300'
-                        : 'bg-zinc-950/80 border-zinc-800/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 shadow-sm'
+                        : 'bg-transparent border-zinc-800/80 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200 shadow-sm'
                     }`}
                   >
                     <span className={`text-[9px] uppercase font-sans font-semibold ${isDaySelected ? 'text-zinc-600' : 'text-zinc-500'}`}>
@@ -654,14 +663,18 @@ export function LedgerView({
                 </div>
 
                 <div className="space-y-1.5">
-                  {groupItems.map((entry) => {
+                  {groupItems.map((entry, idx) => {
                     const isActionOpen = activeActionMenuId === entry.id;
                     const isProofPrompting = promptProofEntryId === entry.id;
+                    const isNearBottom = idx >= groupItems.length - 2 && groupItems.length > 3;
 
                     return (
-                      <div key={entry.id} className="space-y-1 job-row-item">
+                      <div
+                        key={entry.id}
+                        className={cn('space-y-1 relative job-row-item', isActionOpen && 'z-40')}
+                      >
                         <div
-                          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-900/60 border border-zinc-800/60 transition-colors"
+                          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl bg-transparent hover:bg-zinc-900/40 border border-zinc-800/60 transition-colors"
                         >
                           {/* Left: Thumbnail / Emblem & Details */}
                           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
@@ -670,7 +683,7 @@ export function LedgerView({
                                 type="button"
                                 onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
                                 title="View screenshot proof"
-                                className="w-9 h-9 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
+                                className="w-9 h-9 rounded-lg bg-transparent border border-zinc-700 flex items-center justify-center text-emerald-400 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
                               >
                                 <img
                                   src={entry.proofs[0].data}
@@ -679,19 +692,19 @@ export function LedgerView({
                                 />
                               </button>
                             ) : (
-                              <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5 mt-0.5 sm:mt-0">
+                              <div className="w-9 h-9 rounded-lg bg-transparent border border-zinc-800 flex items-center justify-center text-zinc-400 shrink-0 p-1.5 mt-0.5 sm:mt-0">
                                 <GameIcon game={entry.game} className="w-full h-full" />
                               </div>
                             )}
 
                             <div className="min-w-0 flex-1 space-y-0.5">
-                              {/* Line 1: Title & Seller Badge */}
+                              {/* Line 1: Title & Transparent Seller Badge */}
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-semibold text-zinc-200 truncate">
                                   {entry.title}
                                 </span>
                                 {entry.source && (
-                                  <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800/80">
+                                  <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-transparent text-zinc-400 border border-zinc-800">
                                     {entry.source}
                                   </span>
                                 )}
@@ -731,7 +744,7 @@ export function LedgerView({
                                         className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border ${
                                           isMatch
                                             ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
-                                            : 'bg-zinc-900/90 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800/80'
+                                            : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
                                         }`}
                                       >
                                         {tm}
@@ -744,7 +757,7 @@ export function LedgerView({
                           </div>
 
                           {/* Right: Income, Status, Menu */}
-                          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0 border-t sm:border-0 border-zinc-800/60">
+                          <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
                             <div className="text-left sm:text-right">
                               <div className="text-xs font-semibold text-zinc-100 font-mono">
                                 <MoneyDisplay amount={entry.income} currency={entry.currency} />
@@ -769,7 +782,7 @@ export function LedgerView({
                                 onSelectStatus={(st) => handleStatusSelect(entry, st)}
                               />
 
-                              {/* 3-Dot Action Menu */}
+                              {/* 3-Dot Action Menu with elevated z-index and smart flip */}
                               <div className="relative">
                                 <button
                                   type="button"
@@ -785,7 +798,10 @@ export function LedgerView({
                                 {isActionOpen && (
                                   <div
                                     onClick={(e) => e.stopPropagation()}
-                                    className="absolute right-0 top-full mt-1 w-36 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
+                                    className={cn(
+                                      'absolute right-0 w-36 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs',
+                                      isNearBottom ? 'bottom-full mb-1' : 'top-full mt-1'
+                                    )}
                                   >
                                     <button
                                       type="button"
@@ -793,7 +809,7 @@ export function LedgerView({
                                         onOpenReceipt?.(entry);
                                         setActiveActionMenuId(null);
                                       }}
-                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                     >
                                       <Receipt className="w-3.5 h-3.5 text-zinc-400" />
                                       <span>Client Receipt</span>
@@ -805,7 +821,7 @@ export function LedgerView({
                                         onOpenWorkModal?.(entry);
                                         setActiveActionMenuId(null);
                                       }}
-                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                     >
                                       <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
                                       <span>Edit Record</span>
@@ -817,7 +833,7 @@ export function LedgerView({
                                         onDuplicateEntry?.(entry.id);
                                         setActiveActionMenuId(null);
                                       }}
-                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white"
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                     >
                                       <Copy className="w-3.5 h-3.5 text-zinc-400" />
                                       <span>Duplicate</span>
@@ -851,7 +867,7 @@ export function LedgerView({
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: -4, scale: 0.98 }}
                               transition={{ duration: 0.15 }}
-                              className="p-2.5 rounded-xl bg-zinc-900 border border-emerald-900/60 shadow-lg flex items-center justify-between gap-3 text-xs"
+                              className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-emerald-900/60 shadow-xl flex items-center justify-between gap-3 text-xs"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -905,7 +921,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                  className="h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
                 >
                   Previous
                 </button>
@@ -935,7 +951,7 @@ export function LedgerView({
                       className={`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
                         currentPage === pageNum
                           ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
-                          : 'bg-zinc-900/80 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                          : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
                       }`}
                     >
                       {pageNum}
@@ -947,7 +963,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  className="h-8 px-2.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                  className="h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
                 >
                   Next
                 </button>
@@ -965,7 +981,7 @@ export function LedgerView({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/95 border border-zinc-700 shadow-2xl rounded-2xl px-3.5 sm:px-4 py-2.5 flex items-center gap-3 backdrop-blur-md max-w-[95vw] sm:max-w-lg"
+            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-zinc-950/90 backdrop-blur-md border border-zinc-700 shadow-2xl rounded-2xl px-3.5 sm:px-4 py-2.5 flex items-center gap-3 max-w-[95vw] sm:max-w-lg"
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700 shrink-0">
@@ -992,7 +1008,7 @@ export function LedgerView({
                   onToast?.(`📋 Copied selected days sum (${formatted}) to clipboard!`);
                 }}
                 title="Copy sum to clipboard"
-                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
+                className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors"
               >
                 <Copy className="w-3.5 h-3.5" />
               </button>
@@ -1001,7 +1017,7 @@ export function LedgerView({
                 type="button"
                 onClick={() => setSelectedDayKeys(new Set())}
                 title="Clear day selection"
-                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 transition-colors"
+                className="p-1.5 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 border border-zinc-800 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Input, Textarea } from './ui/Input';
@@ -425,8 +426,8 @@ export function WorkModal({
             />
           </div>
 
-          {/* Row 4: Team Mode Toggle & Teammates Input */}
-          <div className="space-y-2 pt-1 border-t border-zinc-800/60">
+          {/* Row 4: Team Mode Toggle & Animated Teammates Input */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -452,19 +453,27 @@ export function WorkModal({
               )}
             </div>
 
-            {formData.teamMode && (
-              <div className="space-y-1">
-                <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Teammates / Crew Members
-                </label>
-                <TeammatesCombobox
-                  value={formData.teammates}
-                  onChange={(val) => updateFormData({ teammates: val })}
-                  onToast={onToast}
-                  placeholder="Type teammate username and press Enter..."
-                />
-              </div>
-            )}
+            <AnimatePresence>
+              {formData.teamMode && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className="overflow-hidden space-y-1"
+                >
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                    Teammates / Crew Members
+                  </label>
+                  <TeammatesCombobox
+                    value={formData.teammates}
+                    onChange={(val) => updateFormData({ teammates: val })}
+                    onToast={onToast}
+                    placeholder="Type teammate username and press Enter..."
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Row 5: Income & Currency and Rate */}

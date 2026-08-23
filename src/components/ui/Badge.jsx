@@ -6,22 +6,22 @@ import { STATUSES } from '../../lib/currencies';
 export const STATUS_STYLES = {
   Paid: {
     label: 'Paid',
-    badgeClass: 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 hover:bg-emerald-900/40',
+    badgeClass: 'bg-transparent text-emerald-400 border border-emerald-800/60 hover:bg-emerald-950/20',
     dotClass: 'bg-emerald-400',
   },
   Pending: {
     label: 'Pending',
-    badgeClass: 'bg-amber-950/40 text-amber-400 border border-amber-800/40 hover:bg-amber-900/40',
+    badgeClass: 'bg-transparent text-amber-400 border border-amber-800/60 hover:bg-amber-950/20',
     dotClass: 'bg-amber-400',
   },
   Working: {
     label: 'Working',
-    badgeClass: 'bg-blue-950/40 text-blue-400 border border-blue-800/40 hover:bg-blue-900/40',
-    dotClass: 'bg-blue-400',
+    badgeClass: 'bg-transparent text-sky-400 border border-sky-800/60 hover:bg-sky-950/20',
+    dotClass: 'bg-sky-400',
   },
   'On Hold': {
     label: 'On Hold',
-    badgeClass: 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800',
+    badgeClass: 'bg-transparent text-zinc-400 border border-zinc-800 hover:bg-zinc-900/40',
     dotClass: 'bg-zinc-500',
   },
 };
@@ -80,7 +80,7 @@ export function StatusBadge({
 
   if (interactive) {
     return (
-      <div className="relative inline-block" ref={menuRef}>
+      <div className={cn('relative inline-block', isOpen && 'z-[70]')} ref={menuRef}>
         <button
           type="button"
           onClick={(e) => {
@@ -106,7 +106,7 @@ export function StatusBadge({
         {isOpen && onSelectStatus && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 top-full mt-1 w-28 bg-zinc-950 border border-zinc-800 shadow-xl rounded-lg p-1 space-y-0.5 z-50 text-xs"
+            className="absolute right-0 top-full mt-1 w-28 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[70] text-xs"
           >
             {STATUSES.map((st) => {
               const stStyle = STATUS_STYLES[st];

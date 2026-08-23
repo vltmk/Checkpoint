@@ -88,7 +88,7 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
   );
 
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div ref={containerRef} className={cn('relative w-full', isOpen && 'z-50')}>
       {/* Input Field with Dropdown Toggle & Save Bookmark Button */}
       <div className="relative flex items-center w-full">
         <input
@@ -132,7 +132,7 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl p-1.5 space-y-1">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1">
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
             <button

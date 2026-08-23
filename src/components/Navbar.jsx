@@ -110,7 +110,7 @@ export function Navbar({
     <header
       data-tauri-drag-region
       onDoubleClick={handleToggleMaximize}
-      className="hidden md:flex h-12 w-full bg-zinc-950/95 border-b border-zinc-800/80 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
+      className="hidden md:flex h-12 w-full bg-black/95 border-b border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
     >
       {/* 1. Left: Brand Identity (Draggable) & Add Work Button */}
       <div className="flex items-center gap-2.5 shrink-0 z-10">
@@ -245,7 +245,7 @@ export function Navbar({
 
           {/* Unified Downward Popover Menu */}
           {isRatesOpen && (
-            <div className="absolute top-full right-0 mt-1.5 w-60 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50">
+            <div className="absolute top-full right-0 mt-1.5 w-60 p-3 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50">
               {/* Section 1: Display Currency Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">

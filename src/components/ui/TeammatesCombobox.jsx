@@ -102,7 +102,7 @@ export function TeammatesCombobox({
   );
 
   return (
-    <div ref={containerRef} className="relative w-full space-y-1.5">
+    <div ref={containerRef} className={cn('relative w-full space-y-1.5', isOpen && 'z-50')}>
       {/* Input container with chips */}
       <div
         onClick={() => inputRef.current?.focus()}
@@ -170,7 +170,7 @@ export function TeammatesCombobox({
 
       {/* Dropdown List */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl p-1.5 space-y-1">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1">
           {inputValue.trim() && !savedTeammates.some((s) => s.toLowerCase() === inputValue.trim().toLowerCase()) && (
             <button
               type="button"

@@ -12,7 +12,7 @@ export function SplashScreen() {
       className="fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center select-none overflow-hidden"
     >
       <div className="flex flex-col items-center space-y-6">
-        {/* Crisp Unboxed Geometric Logo (No container background, no borders) */}
+        {/* Crisp Unboxed Geometric Logo */}
         <div className="w-14 h-14 flex items-center justify-center">
           <img
             src={nodraLogo}
@@ -21,7 +21,7 @@ export function SplashScreen() {
           />
         </div>
 
-        {/* Brand Title, Subtitle, and Free & Open Source Badge */}
+        {/* Brand Title, Subtitle, and Emerald Accent Free Forever Badge */}
         <div className="flex flex-col items-center space-y-2 text-center">
           <span className="text-base font-bold tracking-tight text-zinc-100">
             Checkpoint
@@ -31,8 +31,8 @@ export function SplashScreen() {
             Nodra's freelancing ledger
           </p>
 
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 mt-0.5">
-            Free & Open Source
+          <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded bg-emerald-950/20 border border-emerald-800/60 text-emerald-400 mt-0.5">
+            Open Source with ❤️
           </span>
         </div>
 

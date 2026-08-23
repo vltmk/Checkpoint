@@ -508,7 +508,7 @@ export default function App() {
   }, [handleExportCsv, handleExportJson, isWorkModalOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, lightboxData, exportConfirm]);
 
   return (
-    <div className="w-full h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-800/80 shadow-2xl">
+    <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
       {/* 0. App Launch Splash Screen */}
       <AnimatePresence>
         {isLoading && <SplashScreen key="app-splash" />}
@@ -536,7 +536,7 @@ export default function App() {
       />
 
       {/* 3. Main Centered Mini-App Workspace */}
-      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950 gpu-scroll">
+      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
         {/* Top-Center Toast Notification */}
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
           <AnimatePresence>

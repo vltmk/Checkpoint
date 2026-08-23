@@ -139,7 +139,7 @@ export function Select({
   };
 
   return (
-    <div ref={containerRef} className="relative inline-block w-full">
+    <div ref={containerRef} className={cn('relative inline-block w-full', isOpen && 'z-50')}>
       {/* Trigger Button */}
       <button
         type="button"
@@ -180,7 +180,7 @@ export function Select({
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
             className={cn(
-              'absolute left-0 z-[100] min-w-[180px] max-h-64 overflow-y-auto bg-zinc-950 border border-zinc-850 shadow-2xl rounded-lg p-1',
+              'absolute left-0 z-[100] min-w-[180px] max-h-64 overflow-y-auto bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1',
               dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5 right-0 sm:right-auto'
             )}
           >

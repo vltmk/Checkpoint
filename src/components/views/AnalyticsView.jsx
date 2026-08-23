@@ -82,168 +82,138 @@ export function AnalyticsView({
     }
 
     if (timeframe === 'weekly') {
-      const dayOfWeek = now.getDay();
-      const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
-      startOfThisWeek.setHours(0, 0, 0, 0);
-      const cutoff = new Date(startOfThisWeek.getTime() - 7 * 7 * 86400000);
+      const cutoff = new Date(now.getTime() - 8 * 7 * 86400000);
       return entries.filter((e) => new Date(e.dateTime) >= cutoff);
     }
 
     if (timeframe === 'monthly') {
       const cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-      cutoff.setHours(0, 0, 0, 0);
       return entries.filter((e) => new Date(e.dateTime) >= cutoff);
     }
 
     return entries;
   }, [entries, timeframe]);
 
-  // Aggregate stats strictly for the filtered timeframe
+  // Aggregate Key Statistics
   const stats = useMemo(() => {
     let totalIncome = 0;
     let paidCount = 0;
-    let pendingCount = 0;
     const gameMap = {};
-    const sourceMap = {};
 
     filteredEntries.forEach((e) => {
-      const convertedInc = convertEntryCurrency(e, globalCurrency, rates);
+      const inc = convertEntryCurrency(e, globalCurrency, rates);
+      totalIncome += inc;
 
-      totalIncome += convertedInc;
-      if (e.status === 'Paid') paidCount++;
-      else pendingCount++;
+      if (e.status === 'Paid') {
+        paidCount++;
+      }
 
-      const g = e.game || 'Uncategorized';
-      gameMap[g] = (gameMap[g] || 0) + convertedInc;
-
-      const s = e.source || 'Direct Client';
-      sourceMap[s] = (sourceMap[s] || 0) + convertedInc;
+      const g = e.game || 'Other';
+      gameMap[g] = (gameMap[g] || 0) + inc;
     });
 
+    const completionRate =
+      filteredEntries.length > 0 ? Math.round((paidCount / filteredEntries.length) * 100) : 0;
     const avgPerJob = filteredEntries.length > 0 ? totalIncome / filteredEntries.length : 0;
-    const completionRate = filteredEntries.length > 0 ? Math.round((paidCount / filteredEntries.length) * 100) : 0;
 
     const sortedGames = Object.entries(gameMap)
-      .map(([game, rev]) => ({
+      .map(([game, revenue]) => ({
         game,
-        revenue: rev,
-        percentage: totalIncome > 0 ? Math.round((rev / totalIncome) * 100) : 0,
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-
-    const sortedSources = Object.entries(sourceMap)
-      .map(([source, rev]) => ({
-        source,
-        revenue: rev,
-        percentage: totalIncome > 0 ? Math.round((rev / totalIncome) * 100) : 0,
+        revenue,
+        percentage: totalIncome > 0 ? Math.round((revenue / totalIncome) * 100) : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
     return {
       totalIncome,
       paidCount,
-      pendingCount,
-      avgPerJob,
       completionRate,
+      avgPerJob,
       sortedGames,
-      sortedSources,
     };
   }, [filteredEntries, globalCurrency, rates]);
 
-  // Dynamic Velocity Bar Chart Data (Daily / Weekly / Monthly / All-Time)
+  // Velocity dynamic chart data
   const velocityChartData = useMemo(() => {
     const now = new Date();
 
-    // 1. Daily (Last 14 Days)
     if (timeframe === 'daily') {
       const days = [];
+      const data = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-        const key = d.toISOString().slice(0, 10);
-        const label = i === 0 ? 'Today' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        days.push({ key, label, total: 0 });
-      }
+        const dayStr = d.toISOString().slice(0, 10);
+        const label = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+        days.push(label);
 
-      filteredEntries.forEach((e) => {
-        const dt = new Date(e.dateTime);
-        if (!isNaN(dt)) {
-          const key = dt.toISOString().slice(0, 10);
-          const found = days.find((d) => d.key === key);
-          if (found) {
-            found.total += convertEntryCurrency(e, globalCurrency, rates);
+        const sum = filteredEntries.reduce((acc, e) => {
+          if (e.dateTime && e.dateTime.startsWith(dayStr)) {
+            return acc + convertEntryCurrency(e, globalCurrency, rates);
           }
-        }
-      });
-
+          return acc;
+        }, 0);
+        data.push(sum);
+      }
       return {
-        title: 'Daily Velocity (Last 14 Days)',
-        labels: days.map((d) => d.label),
-        data: days.map((d) => d.total),
+        title: 'Daily Earnings Velocity (14-Day)',
+        labels: days,
+        data,
       };
     }
 
-    // 2. Weekly (Last 8 Weeks)
     if (timeframe === 'weekly') {
       const weeks = [];
-      const dayOfWeek = now.getDay();
-      const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
-      startOfThisWeek.setHours(0, 0, 0, 0);
-
+      const data = [];
       for (let i = 7; i >= 0; i--) {
-        const start = new Date(startOfThisWeek.getTime() - i * 7 * 86400000);
-        const end = new Date(start.getTime() + 7 * 86400000);
-        const label = i === 0 ? 'This Wk' : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        weeks.push({ start, end, label, total: 0 });
-      }
+        const start = new Date(now.getTime() - (i + 1) * 7 * 86400000);
+        const end = new Date(now.getTime() - i * 7 * 86400000);
+        const label = `Wk ${8 - i}`;
+        weeks.push(label);
 
-      filteredEntries.forEach((e) => {
-        const dt = new Date(e.dateTime);
-        if (!isNaN(dt)) {
-          const found = weeks.find((w) => dt >= w.start && dt < w.end);
-          if (found) {
-            found.total += convertEntryCurrency(e, globalCurrency, rates);
+        const sum = filteredEntries.reduce((acc, e) => {
+          const dt = new Date(e.dateTime);
+          if (dt >= start && dt < end) {
+            return acc + convertEntryCurrency(e, globalCurrency, rates);
           }
-        }
-      });
-
+          return acc;
+        }, 0);
+        data.push(sum);
+      }
       return {
-        title: 'Weekly Velocity (Last 8 Weeks)',
-        labels: weeks.map((w) => w.label),
-        data: weeks.map((w) => w.total),
+        title: 'Weekly Earnings Velocity (8-Week)',
+        labels: weeks,
+        data,
       };
     }
 
-    // 3. Monthly (Last 6 Months)
     if (timeframe === 'monthly') {
       const months = [];
+      const data = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const year = d.getFullYear();
-        const month = d.getMonth();
-        const label = d.toLocaleString('en-US', { month: 'short' });
-        months.push({ year, month, label, total: 0 });
-      }
+        const monthKey = d.toLocaleString('en-US', { month: 'short' });
+        months.push(monthKey);
 
-      filteredEntries.forEach((e) => {
-        const dt = new Date(e.dateTime);
-        if (!isNaN(dt)) {
-          const year = dt.getFullYear();
-          const month = dt.getMonth();
-          const found = months.find((m) => m.year === year && m.month === month);
-          if (found) {
-            found.total += convertEntryCurrency(e, globalCurrency, rates);
+        const sum = filteredEntries.reduce((acc, e) => {
+          const dt = new Date(e.dateTime);
+          if (
+            dt.getFullYear() === d.getFullYear() &&
+            dt.getMonth() === d.getMonth()
+          ) {
+            return acc + convertEntryCurrency(e, globalCurrency, rates);
           }
-        }
-      });
-
+          return acc;
+        }, 0);
+        data.push(sum);
+      }
       return {
-        title: 'Monthly Velocity (Last 6 Months)',
-        labels: months.map((m) => m.label),
-        data: months.map((m) => m.total),
+        title: 'Monthly Earnings Velocity (6-Month)',
+        labels: months,
+        data,
       };
     }
 
-    // 4. All-Time (All Months Active)
+    // All-time monthly buckets
     const monthMap = {};
     entries.forEach((e) => {
       const dt = new Date(e.dateTime);
@@ -303,7 +273,7 @@ export function AnalyticsView({
         {
           data,
           backgroundColor: monochromaticPalette.slice(0, Math.max(labels.length, 1)),
-          borderColor: '#18181b',
+          borderColor: '#000000',
           borderWidth: 2,
         },
       ],
@@ -316,7 +286,7 @@ export function AnalyticsView({
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#18181b',
+        backgroundColor: '#09090b',
         titleColor: '#fafafa',
         bodyColor: '#a1a1aa',
         borderColor: '#27272a',
@@ -349,11 +319,10 @@ export function AnalyticsView({
   const donutOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: '70%',
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#18181b',
+        backgroundColor: '#09090b',
         titleColor: '#fafafa',
         bodyColor: '#a1a1aa',
         borderColor: '#27272a',
@@ -384,7 +353,7 @@ export function AnalyticsView({
         </div>
 
         {/* Monochromatic Segmented Pill Control */}
-        <div className="inline-flex items-center p-1 rounded-xl bg-zinc-900/80 border border-zinc-800/80 text-xs self-start sm:self-auto">
+        <div className="inline-flex items-center p-1 rounded-xl bg-transparent border border-zinc-800/80 text-xs self-start sm:self-auto">
           {TIMEFRAMES.map((tf) => {
             const isSelected = timeframe === tf.id;
             return (
@@ -408,7 +377,7 @@ export function AnalyticsView({
 
       {/* 1. KPIs Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3.5 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <Coins className="w-3.5 h-3.5 text-zinc-300" />
             <span>Total Earned</span>
@@ -418,7 +387,7 @@ export function AnalyticsView({
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3.5 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <Trophy className="w-3.5 h-3.5 text-zinc-300" />
             <span>Average Job</span>
@@ -428,7 +397,7 @@ export function AnalyticsView({
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3.5 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>Paid Jobs</span>
@@ -438,7 +407,7 @@ export function AnalyticsView({
           </div>
         </div>
 
-        <div className="rounded-xl bg-zinc-900/30 border border-zinc-800/60 p-3.5 space-y-1">
+        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             <span>Completion Rate</span>
@@ -450,7 +419,7 @@ export function AnalyticsView({
       </div>
 
       {/* 2. Velocity Bar Chart */}
-      <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/80 p-5 space-y-3">
+      <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-zinc-300" />
@@ -468,7 +437,7 @@ export function AnalyticsView({
       {/* 3. Game Distribution & Ranking */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Donut Chart */}
-        <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/80 p-5 space-y-4">
+        <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <PieChart className="w-4 h-4 text-zinc-300" />
@@ -489,7 +458,7 @@ export function AnalyticsView({
         </div>
 
         {/* Breakdown Ranking List */}
-        <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/80 p-5 space-y-3">
+        <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Top Games Breakdown
@@ -529,5 +498,3 @@ export function AnalyticsView({
 }
 
 export default AnalyticsView;
-
-
