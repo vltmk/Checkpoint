@@ -24,8 +24,8 @@ export function MobileHeader({
           <span className="text-sm font-bold tracking-tight text-zinc-100">
             Vault
           </span>
-          <span className="text-[9px] font-mono font-semibold px-1 py-0.2 rounded bg-zinc-800 text-zinc-400">
-            NODRA
+          <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+            v2.1.0
           </span>
         </div>
       </div>

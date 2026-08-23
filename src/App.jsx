@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG } from './lib/currencies';
 import { toLocalISOString } from './components/ui/DateTimePicker';
-import { TitleBar } from './components/TitleBar';
-import { Sidebar } from './components/Sidebar';
+import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
@@ -327,7 +326,7 @@ export default function App() {
 
     const backupData = {
       app: 'Nodra Vault',
-      version: '2.0.0',
+      version: '2.1.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
       goldRateTOMAN,
@@ -503,47 +502,44 @@ export default function App() {
 
   return (
     <div className="w-full h-screen bg-zinc-950 text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-800/80 shadow-2xl">
-      {/* 1. Frameless Title Bar */}
-      <TitleBar />
+      {/* 1. Desktop Unified Top Navigation Bar */}
+      <Navbar
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        globalCurrency={globalCurrency}
+        onCurrencyChange={handleCurrencyChange}
+        goldRateTOMAN={goldRateTOMAN}
+        onGoldRateTOMANChange={handleGoldRateTOMANChange}
+        onOpenWorkModal={handleOpenWorkModal}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        entriesCount={entries.length}
+      />
 
-      {/* 2. Main Desktop Shell Body */}
-      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden bg-zinc-950 relative">
-        {/* Desktop Left Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          globalCurrency={globalCurrency}
-          onCurrencyChange={handleCurrencyChange}
-          goldRateTOMAN={goldRateTOMAN}
-          onGoldRateTOMANChange={handleGoldRateTOMANChange}
-          onOpenWorkModal={handleOpenWorkModal}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenShortcuts={() => setIsShortcutsOpen(true)}
-          entriesCount={entries.length}
-        />
+      {/* 2. Mobile Top Header */}
+      <MobileHeader
+        globalCurrency={globalCurrency}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenWorkModal={handleOpenWorkModal}
+      />
 
-        {/* Mobile Top Header */}
-        <MobileHeader
-          globalCurrency={globalCurrency}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenWorkModal={handleOpenWorkModal}
-        />
+      {/* 3. Main Centered Mini-App Workspace */}
+      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950">
+        {/* Top-Center Toast Notification */}
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
+          <AnimatePresence>
+            {toast && (
+              <Toast
+                key={toast.id || 'toast'}
+                toast={toast}
+                onClose={() => setToast(null)}
+              />
+            )}
+          </AnimatePresence>
+        </div>
 
-        {/* Main Content Workspace */}
-        <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-950">
-          {/* Top-Center Toast Notification */}
-          <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
-            <AnimatePresence>
-              {toast && (
-                <Toast
-                  key={toast.id || 'toast'}
-                  toast={toast}
-                  onClose={() => setToast(null)}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-
+        {/* Centered Tablet-Width Mini-App Frame */}
+        <div className="max-w-4xl mx-auto w-full">
           {isLoading ? (
             <div className="flex items-center justify-center h-64 text-zinc-500 text-xs">
               Loading ledger...
@@ -582,15 +578,15 @@ export default function App() {
               </motion.div>
             </AnimatePresence>
           )}
-        </main>
+        </div>
+      </main>
 
-        {/* Mobile Bottom Navigation Bar */}
-        <MobileBottomNav
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          onOpenWorkModal={() => handleOpenWorkModal()}
-        />
-      </div>
+      {/* 4. Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onOpenWorkModal={() => handleOpenWorkModal()}
+      />
 
       {/* Modals & Dialogs */}
       <WorkModal

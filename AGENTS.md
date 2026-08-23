@@ -9,10 +9,9 @@ Welcome to the **Nodra Vault** project! This guide is written for AI agents and 
 **Vault** (by Nodra) is a monochromatic, high-density Shadcn-styled freelance ledger application specifically tailored for **freelancers, gaming boosters, raid runners, addon devs, and digital creators**.
 
 ### Key Value Propositions
-- **Tablet-Width Mini-App Frame**: Centered desktop layout (`max-w-5xl`) with minimal left sidebar and mobile bottom tab navigation.
+- **Tablet-Width Mini-App Frame**: Centered desktop layout (`max-w-4xl`) with unified top segmented navigation and mobile bottom tab dock.
 - **Monochromatic Shadcn Aesthetic**: Dark zinc palette (`#09090b`), spacing-driven section hierarchy, zero decorative clutter or gradients, and clean logical status indicators.
 - **Mathematical Bi-Directional Currency Engine**: Full bi-directional conversion between **USD ($)**, **IRANIAN TOMAN (تومان)**, and **GOLD (🪙)** with configurable rates.
-- **Dedicated Exchange Calculator**: Live 2-way Gold to Fiat calculator, realm token presets, and portfolio gold value overview.
 - **Instant Proof Attachment**: `Ctrl+V` clipboard pasting directly from the screen capture tool (`Win+Shift+S`) or drag-and-drop into the work modal.
 - **Proof-of-Work Receipts**: Printable client receipt slips and 1-click Discord markdown export.
 - **Zero Quota Limit Storage**: Built on **IndexedDB** (`src/lib/db.js`) to allow saving large screenshot proofs without hitting `localStorage` quota restrictions.
@@ -38,7 +37,7 @@ jolly-pasteur/
 ├── fonts/
 │   ├── Ioskeley-mono/          # Monospace font files (.woff2)
 │   └── IranYekanRd/            # Persian / Arabic font files (.ttf)
-├── nodra-pay.png               # Main geometric white logo
+├── nodra-vault.svg             # Main geometric white logo
 ├── src/
 │   ├── components/
 │   │   ├── ui/
@@ -50,12 +49,10 @@ jolly-pasteur/
 │   │   │   ├── Select.jsx      # Shadcn custom dropdown select
 │   │   │   └── Tooltip.jsx     # Kbd keycap and tooltip utilities
 │   │   ├── views/
-│   │   │   ├── OverviewView.jsx # Hero balance, monthly chart, recent jobs
-│   │   │   ├── LedgerView.jsx  # Filterable job cards with date grouping
-│   │   │   ├── AnalyticsView.jsx # Monochromatic monthly & game share charts
-│   │   │   └── ExchangeView.jsx # Live 2-way Gold calculator & realm presets
-│   │   ├── Sidebar.jsx         # Desktop minimal sidebar navigation
-│   │   ├── MobileNavigation.jsx # Mobile top bar and bottom dock
+│   │   │   ├── LedgerView.jsx  # Unified high-density ledger with hero stats
+│   │   │   └── AnalyticsView.jsx # Monochromatic monthly & game share charts
+│   │   ├── Navbar.jsx          # Unified top segmented navigation & window controls
+│   │   ├── MobileNavigation.jsx # Mobile top header and bottom dock
 │   │   ├── WorkModal.jsx       # Work modal with Ctrl+V screenshot paste
 │   │   ├── ReceiptModal.jsx    # Proof-of-work receipt with Discord MD copy
 │   │   ├── SettingsModal.jsx   # Data backup/restore and currency settings
