@@ -13,17 +13,60 @@ import { ReceiptModal } from './components/ReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
+import { NotificationCenter } from './components/NotificationCenter';
+import { UpdateModal } from './components/UpdateModal';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
-import { Download, FileSpreadsheet } from 'lucide-react';
-import { isTauri, saveFileNative, openFileNative, enforceMinWindowSize } from './lib/desktop';
+import { checkForUpdate, CURRENT_APP_VERSION } from './lib/updater';
+import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
+import {
+  getStoredNotifications,
+  mergeNotificationsIntoHistory,
+  countUnreadNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  dismissNotificationItem,
+  clearAllNotificationHistory,
+} from './lib/notifications';
+import {
+  isTauri,
+  saveFileNative,
+  openFileNative,
+  enforceMinWindowSize,
+  hideWindow,
+  sendTrayNotification,
+  resetTrayNotificationFlag,
+  listenToTrayEvents,
+} from './lib/desktop';
 
 export default function App() {
   const isDesktop = isTauri();
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Desktop Tray & Window Preferences
+  const [closeToTray, setCloseToTray] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_close_to_tray');
+    if (saved !== null) return saved === 'true';
+    return true; // Default ON
+  });
+  const [minimizeToTray, setMinimizeToTray] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_minimize_to_tray');
+    if (saved !== null) return saved === 'true';
+    return false; // Default OFF
+  });
+
+  const closeToTrayRef = useRef(closeToTray);
+  useEffect(() => {
+    closeToTrayRef.current = closeToTray;
+  }, [closeToTray]);
+
+  const minimizeToTrayRef = useRef(minimizeToTray);
+  useEffect(() => {
+    minimizeToTrayRef.current = minimizeToTray;
+  }, [minimizeToTray]);
 
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
@@ -68,6 +111,13 @@ export default function App() {
     imgSrc: '',
     caption: '',
   });
+
+  // Software Updates & Announcements State
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
 
   // Toast Notification
   const [toast, setToast] = useState(null);
@@ -126,6 +176,16 @@ export default function App() {
       if (savedRate && Number(savedRate) > 0) {
         setGoldRateTOMAN(Number(savedRate));
       }
+      const savedCloseToTray = await trackerDB.getSetting('checkpoint_close_to_tray', null);
+      if (savedCloseToTray !== null) {
+        setCloseToTray(savedCloseToTray === 'true');
+        localStorage.setItem('checkpoint_close_to_tray', savedCloseToTray);
+      }
+      const savedMinToTray = await trackerDB.getSetting('checkpoint_minimize_to_tray', null);
+      if (savedMinToTray !== null) {
+        setMinimizeToTray(savedMinToTray === 'true');
+        localStorage.setItem('checkpoint_minimize_to_tray', savedMinToTray);
+      }
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
     } finally {
@@ -137,10 +197,181 @@ export default function App() {
     }
   }, []);
 
+  // Calculate unread notification count
+  const unreadNotificationsCount = useMemo(() => {
+    return countUnreadNotifications(notifications);
+  }, [notifications]);
+
+  // Load stored notifications & sync remote feeds (non-blocking)
+  const syncFeeds = useCallback(async (opts = { silent: true }) => {
+    try {
+      const stored = await getStoredNotifications();
+      let currentMerged = stored;
+      setNotifications(stored);
+
+      // 1. Fetch remote announcements (async, non-blocking)
+      try {
+        const activeAnnouncements = await fetchAnnouncements(4000);
+        currentMerged = mergeNotificationsIntoHistory(currentMerged, {
+          updateInfo,
+          announcements: activeAnnouncements,
+        });
+        setNotifications(currentMerged);
+        await saveStoredNotifications(currentMerged);
+      } catch (e) {}
+
+      // 2. Check for software updates (if desktop)
+      if (isDesktop) {
+        if (!opts.silent) setIsCheckingUpdates(true);
+        const res = await checkForUpdate({ timeoutMs: 6000 });
+        if (res && res.available) {
+          setUpdateInfo(res);
+          currentMerged = mergeNotificationsIntoHistory(currentMerged, {
+            updateInfo: res,
+            announcements: [],
+          });
+          setNotifications(currentMerged);
+          await saveStoredNotifications(currentMerged);
+          if (!opts.silent) {
+            showToast(`Update available: v${res.version}`);
+          }
+        } else if (!opts.silent) {
+          if (res?.error) {
+            showToast('Unable to connect to update server', { variant: 'destructive' });
+          } else {
+            showToast(`Checkpoint is up to date (v${CURRENT_APP_VERSION})`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Feeds] Sync error:', err);
+    } finally {
+      if (!opts.silent) setIsCheckingUpdates(false);
+    }
+  }, [isDesktop, updateInfo, showToast]);
+
   useEffect(() => {
     loadData();
     enforceMinWindowSize(800, 560);
-  }, [loadData]);
+    // Asynchronous non-blocking background feed sync after UI render
+    const timer = setTimeout(() => {
+      syncFeeds({ silent: true });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [loadData, syncFeeds]);
+
+  // Desktop Window & System Tray Event Listeners
+  useEffect(() => {
+    if (!isDesktop) return;
+
+    let unlistenTray = null;
+    let unlistenClose = null;
+
+    const setupDesktopListeners = async () => {
+      try {
+        unlistenTray = await listenToTrayEvents({
+          onQuickAdd: () => setIsQuickAddOpen(true),
+          onSettings: () => setIsSettingsOpen(true),
+        });
+
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+        unlistenClose = await win.onCloseRequested(async (event) => {
+          if (closeToTrayRef.current) {
+            event.preventDefault();
+            await hideWindow();
+            sendTrayNotification(false);
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to setup desktop listeners:', e);
+      }
+    };
+
+    setupDesktopListeners();
+
+    return () => {
+      if (unlistenTray) unlistenTray();
+      if (unlistenClose) unlistenClose();
+    };
+  }, [isDesktop]);
+
+  // Tray Setting Handlers
+  const handleCloseToTrayChange = (val) => {
+    setCloseToTray(val);
+    localStorage.setItem('checkpoint_close_to_tray', String(val));
+    trackerDB.setSetting('checkpoint_close_to_tray', String(val));
+    showToast(val ? 'Close button will minimize to System Tray' : 'Close button will quit the application');
+  };
+
+  const handleMinimizeToTrayChange = (val) => {
+    setMinimizeToTray(val);
+    localStorage.setItem('checkpoint_minimize_to_tray', String(val));
+    trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
+    showToast(val ? 'Minimize button will hide to System Tray' : 'Minimize button will minimize to Taskbar');
+  };
+
+  const handleTestNotification = async () => {
+    const sent = await sendTrayNotification(true);
+    if (sent) {
+      showToast('🔔 Sent test notification to Windows system tray');
+    } else {
+      showToast('⚠️ Unable to dispatch notification (check permissions)', { variant: 'destructive' });
+    }
+  };
+
+  const handleResetNotification = async () => {
+    await resetTrayNotificationFlag();
+    showToast('🔄 One-time background notification alert reset');
+  };
+
+  // Manual Check for Updates
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdates(true);
+    const res = await checkForUpdate({ timeoutMs: 7000 });
+    setIsCheckingUpdates(false);
+    if (res && res.available) {
+      setUpdateInfo(res);
+      const stored = await getStoredNotifications();
+      const updated = mergeNotificationsIntoHistory(stored, { updateInfo: res, announcements: [] });
+      setNotifications(updated);
+      await saveStoredNotifications(updated);
+      showToast(`Update available: v${res.version}`);
+      setIsUpdateModalOpen(true);
+    } else if (res?.error) {
+      showToast('Unable to connect to update server', { variant: 'destructive' });
+    } else {
+      showToast(`Checkpoint is up to date (v${CURRENT_APP_VERSION})`);
+    }
+  };
+
+  // Notification Actions
+  const handleMarkNotificationAsRead = async (id) => {
+    const updated = await markNotificationAsRead(id, notifications);
+    setNotifications(updated);
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+    const updated = await markAllNotificationsAsRead(notifications);
+    setNotifications(updated);
+    showToast('All notifications marked as read');
+  };
+
+  const handleDismissNotification = async (id) => {
+    const updated = await dismissNotificationItem(id, notifications);
+    setNotifications(updated);
+  };
+
+  const handleClearAllNotifications = async () => {
+    const updated = await clearAllNotificationHistory(notifications);
+    setNotifications(updated);
+    showToast('Notification history cleared');
+  };
+
+  const handleResetAnnouncements = async () => {
+    await resetAnnouncementState();
+    await syncFeeds({ silent: false });
+  };
 
   // Tab Switcher
   const handleTabChange = (tab) => {
@@ -547,6 +778,14 @@ export default function App() {
           setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
         }
+        if (isNotificationCenterOpen) {
+          setIsNotificationCenterOpen(false);
+          return;
+        }
+        if (isUpdateModalOpen) {
+          setIsUpdateModalOpen(false);
+          return;
+        }
         if (exportConfirm) {
           setExportConfirm(null);
           return;
@@ -631,7 +870,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isQuickAddOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, lightboxData, exportConfirm]);
+  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isQuickAddOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, isNotificationCenterOpen, isUpdateModalOpen, lightboxData, exportConfirm]);
 
   return (
     <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
@@ -648,11 +887,18 @@ export default function App() {
         onCurrencyChange={handleCurrencyChange}
         goldRateTOMAN={goldRateTOMAN}
         onGoldRateTOMANChange={handleGoldRateTOMANChange}
+        closeToTray={closeToTray}
+        minimizeToTray={minimizeToTray}
         onOpenWorkModal={handleOpenWorkModal}
         onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         entriesCount={entries.length}
+        appVersion={CURRENT_APP_VERSION}
+        updateInfo={updateInfo}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
       />
 
       {/* 2. Mobile Top Header (Only on Web viewports) */}
@@ -787,6 +1033,12 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         globalCurrency={globalCurrency}
         onCurrencyChange={handleCurrencyChange}
+        closeToTray={closeToTray}
+        onCloseToTrayChange={handleCloseToTrayChange}
+        minimizeToTray={minimizeToTray}
+        onMinimizeToTrayChange={handleMinimizeToTrayChange}
+        onTestNotification={handleTestNotification}
+        onResetNotification={handleResetNotification}
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
@@ -794,6 +1046,30 @@ export default function App() {
         onClearAllData={handleClearAllData}
         onToast={showToast}
         entriesCount={entries.length}
+        appVersion={CURRENT_APP_VERSION}
+        updateInfo={updateInfo}
+        onCheckUpdates={handleCheckUpdates}
+        isCheckingUpdates={isCheckingUpdates}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+        onResetAnnouncements={handleResetAnnouncements}
+      />
+
+      <NotificationCenter
+        isOpen={isNotificationCenterOpen}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkNotificationAsRead}
+        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+        onDismiss={handleDismissNotification}
+        onClearAll={handleClearAllNotifications}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+      />
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        updateInfo={updateInfo}
+        onToast={showToast}
       />
 
       <ShortcutsModal

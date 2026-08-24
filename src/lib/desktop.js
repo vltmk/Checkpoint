@@ -3,6 +3,8 @@
  * Gracefully falls back when running in browser mode.
  */
 
+import { trackerDB } from './db';
+
 export const isTauri = () => {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);
 };
@@ -47,6 +49,128 @@ export async function closeWindow() {
     await getCurrentWindow().close();
   } catch (err) {
     console.error('Failed to close window:', err);
+  }
+}
+
+export async function hideWindow() {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().hide();
+  } catch (err) {
+    console.error('Failed to hide window:', err);
+  }
+}
+
+export async function showWindow() {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const win = getCurrentWindow();
+    await win.unminimize();
+    await win.show();
+    await win.setFocus();
+  } catch (err) {
+    console.error('Failed to show window:', err);
+  }
+}
+
+export async function isTrayNotificationSent() {
+  const local = localStorage.getItem('checkpoint_tray_notified');
+  if (local === 'true') return true;
+  try {
+    const dbVal = await trackerDB.getSetting('checkpoint_tray_notified', null);
+    if (dbVal === 'true') {
+      localStorage.setItem('checkpoint_tray_notified', 'true');
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+export async function setTrayNotificationSent() {
+  localStorage.setItem('checkpoint_tray_notified', 'true');
+  try {
+    await trackerDB.setSetting('checkpoint_tray_notified', 'true');
+  } catch (e) {}
+}
+
+export async function resetTrayNotificationFlag() {
+  localStorage.removeItem('checkpoint_tray_notified');
+  try {
+    await trackerDB.setSetting('checkpoint_tray_notified', 'false');
+  } catch (e) {}
+}
+
+/**
+ * Dispatches native Windows toast notification via @tauri-apps/plugin-notification
+ */
+export async function sendTrayNotification(force = false) {
+  if (!isTauri()) return false;
+  try {
+    if (!force) {
+      const alreadySent = await isTrayNotificationSent();
+      if (alreadySent) return false;
+    }
+
+    const {
+      isPermissionGranted,
+      requestPermission,
+      sendNotification,
+      onAction,
+    } = await import('@tauri-apps/plugin-notification');
+
+    let permissionGranted = await isPermissionGranted();
+    if (!permissionGranted) {
+      const permission = await requestPermission();
+      permissionGranted = permission === 'granted';
+    }
+
+    if (permissionGranted) {
+      // Register click listener to restore window
+      try {
+        await onAction((action) => {
+          showWindow();
+        });
+      } catch (e) {}
+
+      sendNotification({
+        title: 'CHECKPOINT',
+        body: 'App is minimized to the system tray. Click the tray icon to reopen.',
+      });
+
+      if (!force) {
+        await setTrayNotificationSent();
+      }
+      return true;
+    }
+  } catch (err) {
+    console.error('Failed to dispatch native notification:', err);
+  }
+  return false;
+}
+
+/**
+ * Listen to tray menu action events emitted from Rust backend
+ */
+export async function listenToTrayEvents({ onQuickAdd, onSettings }) {
+  if (!isTauri()) return () => {};
+  try {
+    const { listen } = await import('@tauri-apps/api/event');
+    const unlistenQuickAdd = await listen('tray-quick-add', () => {
+      showWindow();
+      onQuickAdd?.();
+    });
+    const unlistenSettings = await listen('tray-settings', () => {
+      showWindow();
+      onSettings?.();
+    });
+    return () => {
+      if (unlistenQuickAdd) unlistenQuickAdd();
+      if (unlistenSettings) unlistenSettings();
+    };
+  } catch (e) {
+    return () => {};
   }
 }
 
@@ -242,6 +366,24 @@ export function downloadImageBlob(blob, filename = 'checkpoint_receipt.png') {
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Open external URL safely in default system browser
+ */
+export async function openExternalUrl(url) {
+  if (!url || typeof url !== 'string') return;
+  const cleanUrl = url.trim();
+
+  // Enforce protocol safety (HTTPS or local development)
+  if (!cleanUrl.startsWith('https://') && !cleanUrl.startsWith('http://localhost')) {
+    console.warn('[Desktop] Refusing to open insecure or unapproved protocol URL:', cleanUrl);
+    return;
+  }
+
+  if (typeof window !== 'undefined') {
+    window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+  }
 }
 
 

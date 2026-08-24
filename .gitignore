@@ -46,3 +46,9 @@ Thumbs.db
 src-tauri/target/
 src-tauri/gen/
 
+# Tauri Signing Keys & Secrets
+*.key
+*.pem
+*.priv
+*.secret
+

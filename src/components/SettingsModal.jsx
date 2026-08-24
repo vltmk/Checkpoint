@@ -21,6 +21,11 @@ import {
   Banknote,
   Coins,
   AlertTriangle,
+  Monitor,
+  Bell,
+  ArrowUpCircle,
+  RotateCw,
+  Megaphone,
 } from 'lucide-react';
 import { isTauri } from '../lib/desktop';
 import { trackerDB } from '../lib/db';
@@ -31,6 +36,12 @@ export function SettingsModal({
   onClose,
   globalCurrency = 'TOMAN',
   onCurrencyChange,
+  closeToTray = true,
+  onCloseToTrayChange,
+  minimizeToTray = false,
+  onMinimizeToTrayChange,
+  onTestNotification,
+  onResetNotification,
   onExportCsv,
   onExportJson,
   onImportJson,
@@ -38,6 +49,12 @@ export function SettingsModal({
   onClearAllData,
   onToast,
   entriesCount = 0,
+  appVersion = '2.1.0',
+  updateInfo = null,
+  onCheckUpdates,
+  isCheckingUpdates = false,
+  onOpenUpdateModal,
+  onResetAnnouncements,
 }) {
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
@@ -136,7 +153,175 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 2. Data Backup & Portability */}
+        {/* 2. Desktop Window & System Tray Behavior */}
+        {isDesktop && (
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <Monitor className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Desktop Window & Tray</span>
+              </label>
+              <span className="text-[10px] font-mono text-zinc-500">
+                System Tray
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-0.5">
+              {/* Switch 1: Close to System Tray */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+                <div className="space-y-0.5 pr-2">
+                  <div className="text-xs font-medium text-zinc-200">
+                    Close to System Tray
+                  </div>
+                  <div className="text-[11px] text-zinc-500">
+                    Keep CHECKPOINT running in the background when window is closed
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={closeToTray}
+                  onClick={() => onCloseToTrayChange?.(!closeToTray)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    closeToTray ? 'bg-zinc-100' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      closeToTray ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Switch 2: Minimize to System Tray */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+                <div className="space-y-0.5 pr-2">
+                  <div className="text-xs font-medium text-zinc-200">
+                    Minimize to System Tray
+                  </div>
+                  <div className="text-[11px] text-zinc-500">
+                    Hide to system tray instead of the taskbar when minimized
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={minimizeToTray}
+                  onClick={() => onMinimizeToTrayChange?.(!minimizeToTray)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    minimizeToTray ? 'bg-zinc-100' : 'bg-zinc-800'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      minimizeToTray ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Helper actions for Notifications */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={onTestNotification}
+                  className="flex-1 justify-center gap-1.5 text-[11px] h-7"
+                >
+                  <Bell className="w-3 h-3 text-zinc-400" />
+                  <span>Test Notification</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={onResetNotification}
+                  className="flex-1 justify-center gap-1.5 text-[11px] h-7"
+                >
+                  <RotateCcw className="w-3 h-3 text-zinc-400" />
+                  <span>Reset One-Time Alert</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Software Updates & Announcements Feed */}
+        <div className="space-y-3 pt-2 border-t border-zinc-800">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <ArrowUpCircle className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Updates & Announcements</span>
+            </label>
+            <span className="text-[10px] font-mono text-zinc-500">
+              v{appVersion}
+            </span>
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-zinc-200">
+                  {updateInfo?.available
+                    ? `Update Available: v${updateInfo.version}`
+                    : 'Checkpoint is up to date'}
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  {updateInfo?.available
+                    ? 'A new version is ready for installation.'
+                    : `Running official build v${appVersion}.`}
+                </div>
+              </div>
+
+              {updateInfo?.available ? (
+                <Button
+                  variant="primary"
+                  size="xs"
+                  onClick={() => {
+                    onOpenUpdateModal?.();
+                    onClose();
+                  }}
+                  className="gap-1.5 text-xs h-7"
+                >
+                  <ArrowUpCircle className="w-3.5 h-3.5" />
+                  <span>Update...</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="xs"
+                  disabled={isCheckingUpdates}
+                  onClick={onCheckUpdates}
+                  className="gap-1.5 text-xs h-7"
+                >
+                  <RotateCw className={`w-3 h-3 text-zinc-400 ${isCheckingUpdates ? 'animate-spin' : ''}`} />
+                  <span>{isCheckingUpdates ? 'Checking...' : 'Check Now'}</span>
+                </Button>
+              )}
+            </div>
+
+            <div className="border-t border-zinc-800/80 pt-2 flex items-center justify-between">
+              <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                <Megaphone className="w-3 h-3 text-zinc-500" />
+                <span>Reset dismissed announcement history</span>
+              </div>
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={async () => {
+                  await onResetAnnouncements?.();
+                  onToast?.('Announcement feed history reset. Refreshing active feed...');
+                }}
+                className="gap-1 text-[11px] h-6 px-2 text-zinc-400 hover:text-zinc-200"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Feed</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Data Backup & Portability */}
         <div className="space-y-2 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-zinc-300">

@@ -46,5 +46,13 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4NzZENjhDQjk2NjA3RDkKUldUVlZkU3l6T3R0Njh5M2d3d3h5ZlJldkV1UW9zZml2TTV2ZlhqQ3BvS1QxVnB4V1N4YmR0K1AK",
+      "endpoints": [
+        "https://github.com/vltmk/Checkpoint/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

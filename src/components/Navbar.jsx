@@ -15,6 +15,8 @@ import {
   Square,
   Copy,
   X,
+  Bell,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
@@ -25,6 +27,8 @@ import {
   toggleMaximizeWindow,
   isWindowMaximized,
   closeWindow,
+  hideWindow,
+  sendTrayNotification,
   startDraggingWindow,
   isTauri,
 } from '../lib/desktop';
@@ -36,11 +40,18 @@ export function Navbar({
   onCurrencyChange,
   goldRateTOMAN = 3200,
   onGoldRateTOMANChange,
+  closeToTray = true,
+  minimizeToTray = false,
   onOpenWorkModal,
   onOpenQuickAdd,
   onOpenSettings,
   onOpenShortcuts,
   entriesCount = 0,
+  appVersion = '2.1.0',
+  updateInfo = null,
+  onOpenUpdateModal,
+  unreadNotificationsCount = 0,
+  onOpenNotifications,
 }) {
   const isDesktop = isTauri();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -101,9 +112,14 @@ export function Navbar({
     setIsRatesOpen(false);
   };
 
-  const handleMinimize = (e) => {
+  const handleMinimize = async (e) => {
     e.stopPropagation();
-    minimizeWindow();
+    if (minimizeToTray) {
+      await hideWindow();
+      sendTrayNotification(false);
+    } else {
+      minimizeWindow();
+    }
   };
 
   const handleToggleMaximize = async (e) => {
@@ -113,9 +129,14 @@ export function Navbar({
     setIsMaximized(max);
   };
 
-  const handleClose = (e) => {
+  const handleClose = async (e) => {
     e.stopPropagation();
-    closeWindow();
+    if (closeToTray) {
+      await hideWindow();
+      sendTrayNotification(false);
+    } else {
+      closeWindow();
+    }
   };
 
   const handleHeaderMouseDown = (e) => {
@@ -148,7 +169,7 @@ export function Navbar({
             CHECKPOINT
           </span>
           <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
-            v2.1.0
+            v{appVersion}
           </span>
         </div>
 
@@ -403,8 +424,35 @@ export function Navbar({
           )}
         </div>
 
-        {/* Settings & Shortcuts Buttons */}
+        {/* Optional Available Update Indicator */}
+        {updateInfo && updateInfo.available && (
+          <div data-no-drag className="flex items-center">
+            <button
+              type="button"
+              onClick={onOpenUpdateModal}
+              title={`Software Update v${updateInfo.version} Available`}
+              className="h-7 px-2 flex items-center gap-1.5 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/60 hover:text-emerald-100 text-xs font-mono transition-colors shadow-sm cursor-pointer"
+            >
+              <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="font-semibold text-[11px]">v{updateInfo.version}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Notifications, Settings & Shortcuts Buttons */}
         <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
+          <button
+            type="button"
+            onClick={onOpenNotifications}
+            title="Notifications & Feed"
+            className="relative p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-black" />
+            )}
+          </button>
+
           <button
             type="button"
             onClick={onOpenSettings}

@@ -1,0 +1,61 @@
+name: Checkpoint Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, Sign & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify SemVer consistency
+        run: npm run version:check
+
+      - name: Validate Release Tag matches Canonical Version
+        shell: pwsh
+        run: |
+          $tauriJson = Get-Content -Raw src-tauri/tauri.conf.json | ConvertFrom-Json
+          $expectedTag = "v" + $tauriJson.version
+          $actualTag = "${{ github.ref_name }}"
+          Write-Host "Canonical Tauri version: $($tauriJson.version)"
+          Write-Host "Expected Git tag:        $expectedTag"
+          Write-Host "Actual Git tag:          $actualTag"
+          if ($actualTag -ne $expectedTag) {
+            Write-Error "Release tag mismatch! Git tag ($actualTag) must exactly match canonical version ($expectedTag)."
+            exit 1
+          }
+
+      - name: Build and Publish Tauri Application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Checkpoint ${{ github.ref_name }}'
+          releaseBody: 'See release details for Checkpoint ${{ github.ref_name }}.'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

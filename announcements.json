@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-08-24T12:00:00Z",
+  "announcements": [
+    {
+      "id": "2026-08-24-welcome-v21",
+      "type": "info",
+      "title": "Welcome to Checkpoint v2.1",
+      "message": "High-density ledger designed for raid runners, boosters, and creators. Offline-first and bi-directional Toman/Gold engine.",
+      "published_at": "2026-08-24T00:00:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": false,
+      "action": {
+        "label": "Visit Nodra Marketplace",
+        "url": "https://github.com/vltmk/Checkpoint",
+        "type": "external_link"
+      }
+    }
+  ]
+}
