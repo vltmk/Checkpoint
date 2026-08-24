@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "updated_at": "2026-08-24T12:00:00Z",
+  "updated_at": "2026-08-24T18:00:00Z",
   "announcements": [
     {
       "id": "2026-08-24-welcome-v21",
@@ -12,10 +12,26 @@
       "dismissible": true,
       "pinned": false,
       "action": {
-        "label": "Visit Nodra Marketplace",
+        "label": "Nodra Marketplace Coming Soon",
+        "url": "https://github.com/vltmk/Checkpoint",
+        "type": "external_link"
+      }
+    },
+    {
+      "id": "2026-08-24-nodra-integration",
+      "type": "success",
+      "title": "Added Team Pots and cut split support",
+      "message": "Add work Pots and cut split support to your raid runs. Check out the new features in the Nodra integration.",
+      "published_at": "2026-08-24T18:00:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": false,
+      "action": {
+        "label": "Explore Nodra",
         "url": "https://github.com/vltmk/Checkpoint",
         "type": "external_link"
       }
     }
   ]
 }
+
