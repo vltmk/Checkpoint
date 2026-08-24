@@ -19,6 +19,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '
 import { Button } from './components/ui/Button';
 import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
+import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, CURRENT_APP_VERSION } from './lib/updater';
 import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
 import {
@@ -114,6 +115,11 @@ export default function App() {
 
   // Software Updates & Announcements State
   const [updateInfo, setUpdateInfo] = useState(null);
+  const updateInfoRef = useRef(updateInfo);
+  useEffect(() => {
+    updateInfoRef.current = updateInfo;
+  }, [updateInfo]);
+
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
@@ -213,7 +219,7 @@ export default function App() {
       try {
         const activeAnnouncements = await fetchAnnouncements(4000);
         currentMerged = mergeNotificationsIntoHistory(currentMerged, {
-          updateInfo,
+          updateInfo: updateInfoRef.current,
           announcements: activeAnnouncements,
         });
         setNotifications(currentMerged);
@@ -248,7 +254,7 @@ export default function App() {
     } finally {
       if (!opts.silent) setIsCheckingUpdates(false);
     }
-  }, [isDesktop, updateInfo, showToast]);
+  }, [isDesktop, showToast]);
 
   useEffect(() => {
     loadData();
