@@ -49,7 +49,7 @@ export function SettingsModal({
   onClearAllData,
   onToast,
   entriesCount = 0,
-  appVersion = '2.1.0',
+  appVersion = '',
   updateInfo = null,
   onCheckUpdates,
   isCheckingUpdates = false,
@@ -253,9 +253,11 @@ export function SettingsModal({
               <ArrowUpCircle className="w-3.5 h-3.5 text-zinc-400" />
               <span>Updates & Announcements</span>
             </label>
-            <span className="text-[10px] font-mono text-zinc-500">
-              v{appVersion}
-            </span>
+            {appVersion && (
+              <span className="text-[10px] font-mono text-zinc-500">
+                v{appVersion}
+              </span>
+            )}
           </div>
 
           <div className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 space-y-2.5">
@@ -269,7 +271,7 @@ export function SettingsModal({
                 <div className="text-[11px] text-zinc-500">
                   {updateInfo?.available
                     ? 'A new version is ready for installation.'
-                    : `Running official build v${appVersion}.`}
+                    : `Running official build${appVersion ? ` v${appVersion}` : ''}.`}
                 </div>
               </div>
 

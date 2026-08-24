@@ -31,8 +31,8 @@ export function UpdateModal({
 
   if (!isOpen || !updateInfo) return null;
 
-  const currentVersion = updateInfo.currentVersion || '2.1.0';
-  const newVersion = updateInfo.version || '2.2.0';
+  const currentVersion = updateInfo.currentVersion || updateInfo.rawUpdate?.currentVersion || '';
+  const newVersion = updateInfo.version || updateInfo.rawUpdate?.version || '';
 
   const handleStartUpdate = async () => {
     if (!updateInfo.rawUpdate) {

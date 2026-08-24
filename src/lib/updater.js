@@ -4,18 +4,46 @@
  */
 
 import { isTauri } from './desktop';
+import packageJson from '../../package.json';
 
-export const CURRENT_APP_VERSION = '2.1.0';
+let runtimeAppVersion = null;
+
+/**
+ * Obtain the current application version dynamically.
+ * In desktop Tauri runtime, queries the official Tauri API (@tauri-apps/api/app -> getVersion).
+ * In browser/dev mode, falls back to package.json metadata.
+ */
+export async function getAppVersion() {
+  if (runtimeAppVersion) return runtimeAppVersion;
+
+  if (isTauri()) {
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app');
+      const v = await getVersion();
+      if (v && typeof v === 'string') {
+        runtimeAppVersion = v;
+        return v;
+      }
+    } catch (e) {
+      console.warn('[Updater] Failed to obtain app version from Tauri API:', e);
+    }
+  }
+
+  runtimeAppVersion = packageJson.version || '0.0.0';
+  return runtimeAppVersion;
+}
 
 /**
  * Check if a newer version of Checkpoint is available.
  * Non-blocking, with strict timeout and offline graceful handling.
  */
 export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
+  const currentVersion = await getAppVersion();
+
   if (!isTauri()) {
     return {
       available: false,
-      currentVersion: CURRENT_APP_VERSION,
+      currentVersion,
       reason: 'not_tauri',
     };
   }
@@ -35,7 +63,7 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
       const releaseTag = update.version.startsWith('v') ? update.version : `v${update.version}`;
       return {
         available: true,
-        currentVersion: update.currentVersion || CURRENT_APP_VERSION,
+        currentVersion: update.currentVersion || currentVersion,
         version: update.version,
         date: update.date || null,
         body: update.body || '',
@@ -46,7 +74,7 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
 
     return {
       available: false,
-      currentVersion: update?.currentVersion || CURRENT_APP_VERSION,
+      currentVersion: update?.currentVersion || currentVersion,
       rawUpdate: update,
     };
   } catch (err) {
@@ -54,7 +82,7 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
     console.info('[Updater] Update check failed or offline:', msg);
     return {
       available: false,
-      currentVersion: CURRENT_APP_VERSION,
+      currentVersion,
       error: msg,
       isOffline: msg.includes('timeout') || msg.includes('network') || msg.includes('fetch'),
     };

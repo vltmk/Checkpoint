@@ -20,7 +20,7 @@ import { Button } from './components/ui/Button';
 import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileSpreadsheet, Download } from 'lucide-react';
-import { checkForUpdate, CURRENT_APP_VERSION } from './lib/updater';
+import { checkForUpdate, getAppVersion } from './lib/updater';
 import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
 import {
   getStoredNotifications,
@@ -44,6 +44,7 @@ import {
 
 export default function App() {
   const isDesktop = isTauri();
+  const [appVersion, setAppVersion] = useState('');
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -169,6 +170,11 @@ export default function App() {
   const loadData = useCallback(async () => {
     const startTime = Date.now();
     try {
+      // Hydrate runtime app version asynchronously
+      getAppVersion().then((v) => {
+        if (v) setAppVersion(v);
+      });
+
       await trackerDB.seedInitialDataIfEmpty();
       const all = await trackerDB.getAllEntries();
       setEntries(all);
@@ -245,7 +251,7 @@ export default function App() {
           if (res?.error) {
             showToast('Unable to connect to update server', { variant: 'destructive' });
           } else {
-            showToast(`Checkpoint is up to date (v${CURRENT_APP_VERSION})`);
+            showToast(`Checkpoint is up to date${res?.currentVersion ? ` (v${res.currentVersion})` : ''}`);
           }
         }
       }
@@ -347,7 +353,7 @@ export default function App() {
     } else if (res?.error) {
       showToast('Unable to connect to update server', { variant: 'destructive' });
     } else {
-      showToast(`Checkpoint is up to date (v${CURRENT_APP_VERSION})`);
+      showToast(`Checkpoint is up to date${(res?.currentVersion || appVersion) ? ` (v${res?.currentVersion || appVersion})` : ''}`);
     }
   };
 
@@ -676,7 +682,7 @@ export default function App() {
 
     const backupData = {
       app: 'CHECKPOINT',
-      version: '2.1.0',
+      version: appVersion || '0.0.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
       goldRateTOMAN,
@@ -900,7 +906,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         entriesCount={entries.length}
-        appVersion={CURRENT_APP_VERSION}
+        appVersion={appVersion}
         updateInfo={updateInfo}
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
@@ -911,6 +917,7 @@ export default function App() {
       {!isDesktop && (
         <MobileHeader
           globalCurrency={globalCurrency}
+          appVersion={appVersion}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenWorkModal={handleOpenWorkModal}
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
@@ -1052,7 +1059,7 @@ export default function App() {
         onClearAllData={handleClearAllData}
         onToast={showToast}
         entriesCount={entries.length}
-        appVersion={CURRENT_APP_VERSION}
+        appVersion={appVersion}
         updateInfo={updateInfo}
         onCheckUpdates={handleCheckUpdates}
         isCheckingUpdates={isCheckingUpdates}

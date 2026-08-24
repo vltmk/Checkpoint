@@ -13,6 +13,7 @@ export function MobileHeader({
   onOpenSettings,
   onOpenWorkModal,
   onOpenQuickAdd,
+  appVersion = '',
 }) {
   return (
     <header className="md:hidden sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
@@ -26,9 +27,11 @@ export function MobileHeader({
           <span className="text-sm font-black tracking-wider text-white uppercase">
             CHECKPOINT
           </span>
-          <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
-            v2.1.0
-          </span>
+          {appVersion && (
+            <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+              v{appVersion}
+            </span>
+          )}
         </div>
       </div>
 

@@ -186,9 +186,14 @@ export async function dismissNotificationItem(id, currentList = []) {
 }
 
 /**
- * Clear all notifications (excluding pinned update notifications)
+ * Clear all notifications (excluding pinned unread notifications)
  */
 export async function clearAllNotificationHistory(currentList = []) {
+  for (const item of currentList) {
+    if (item && item.announcementId) {
+      await markAnnouncementDismissed(item.announcementId);
+    }
+  }
   const preserved = currentList.filter((n) => n.pinned && !n.read);
   await saveStoredNotifications(preserved);
   return preserved;

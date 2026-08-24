@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "CHECKPOINT",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "identifier": "com.checkpoint.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -33,7 +33,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -49,7 +52,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4NzZENjhDQjk2NjA3RDkKUldUVlZkU3l6T3R0Njh5M2d3d3h5ZlJldkV1UW9zZml2TTV2ZlhqQ3BvS1QxVnB4V1N4YmR0K1AK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZCOUJDRkY0MENCODVEODgKUldTSVhiZ005TStiYXh1M0hpb0ZjNjhGejNwaDl2K3c3WUlJVUJudmErcTVGNHpja0RoaFF5c0oK",
       "endpoints": [
         "https://github.com/vltmk/Checkpoint/releases/latest/download/latest.json"
       ]

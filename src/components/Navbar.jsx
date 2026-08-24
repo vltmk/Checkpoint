@@ -47,7 +47,7 @@ export function Navbar({
   onOpenSettings,
   onOpenShortcuts,
   entriesCount = 0,
-  appVersion = '2.1.0',
+  appVersion = '',
   updateInfo = null,
   onOpenUpdateModal,
   unreadNotificationsCount = 0,
@@ -168,9 +168,11 @@ export function Navbar({
           <span className="text-xs font-black tracking-wider text-white pointer-events-none uppercase">
             CHECKPOINT
           </span>
-          <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
-            v{appVersion}
-          </span>
+          {appVersion && (
+            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
+              v{appVersion}
+            </span>
+          )}
         </div>
 
         <div className="h-4 w-px bg-zinc-800/80 pointer-events-none" />
