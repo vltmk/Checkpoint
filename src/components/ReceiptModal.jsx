@@ -61,7 +61,21 @@ export function ReceiptModal({
   const rateUnitText = isClassic ? '1 Gold' : '1,000 Gold';
   const rateDiscordText = isClassic ? '1 Gold' : '1k Gold';
   const hasTeammates = Array.isArray(safeEntry.teammates) && safeEntry.teammates.length > 0;
-  const teammatesStr = hasTeammates ? safeEntry.teammates.join(', ') : '';
+  const totalShares = 1 + (hasTeammates ? safeEntry.teammates.length : 0);
+  const isTeamWork = Boolean(safeEntry.teamMode || hasTeammates);
+  const totalPot = safeEntry.pot !== undefined && safeEntry.pot !== null
+    ? safeEntry.pot
+    : (safeEntry.income ? safeEntry.income * totalShares : 0);
+  const formattedPot = formatMoney(totalPot, entryCurrency);
+
+  const teamCutsBreakdown = hasTeammates
+    ? safeEntry.teammates
+        .map((tm) => {
+          const cut = safeEntry.teammateCuts?.[tm] || safeEntry.income;
+          return `${tm}: ${formatMoney(cut, entryCurrency)}`;
+        })
+        .join(' | ')
+    : '';
 
   // Copy Plain Text Receipt
   const handleCopyText = useCallback(async () => {
@@ -71,36 +85,69 @@ Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${safeEntry.game || 'World of Warcraft'}
 Work Title: ${safeEntry.title || 'Work Record'}
-Job Source: ${safeEntry.source || 'Direct Client'}${hasTeammates ? `\nTeammates: ${teammatesStr}` : ''}
+Job Source: ${safeEntry.source || 'Direct Client'}${
+      isTeamWork
+        ? `\nPot: ${formattedPot} (${totalShares} Shares)\nYour Share: ${formattedIncome}\nTeam Cuts: ${teamCutsBreakdown}`
+        : `\nAmount: ${formattedIncome}`
+    }
 Exchange Rate: ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
 Status: ${safeEntry.status || 'Paid'}
-Amount: ${formattedIncome}
 Notes: ${safeEntry.notes || 'None'}
 ==============================`;
 
     await copyTextNative(text);
     onToast?.('📋 Plain receipt copied to clipboard!');
-  }, [entry, receiptId, dateStr, timeStr, safeEntry, hasTeammates, teammatesStr, effectiveRate, rateUnitText, formattedIncome, onToast]);
+  }, [
+    entry,
+    receiptId,
+    dateStr,
+    timeStr,
+    safeEntry,
+    isTeamWork,
+    formattedPot,
+    totalShares,
+    formattedIncome,
+    teamCutsBreakdown,
+    effectiveRate,
+    rateUnitText,
+    onToast,
+  ]);
 
   // Copy Discord Markdown
   const handleCopyDiscordMarkdown = useCallback(async () => {
     if (!entry) return;
     const md = `\`\`\`ini
 [ CHECKPOINT - PROOF OF WORK RECEIPT ]
-ID      = ${receiptId}
-Date    = ${dateStr}
-Game    = ${safeEntry.game || 'World of Warcraft'}
-Title   = ${safeEntry.title || 'Work Record'}
-Source  = ${safeEntry.source || 'Direct Client'}${hasTeammates ? `\nTeam    = ${teammatesStr}` : ''}
-Rate    = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
-Status  = ${safeEntry.status || 'Paid'}
-Amount  = ${formattedIncome}
-Notes   = ${safeEntry.notes || 'None'}
+ID         = ${receiptId}
+Date       = ${dateStr}
+Game       = ${safeEntry.game || 'World of Warcraft'}
+Title      = ${safeEntry.title || 'Work Record'}
+Source     = ${safeEntry.source || 'Direct Client'}${
+      isTeamWork
+        ? `\nPot        = ${formattedPot} (${totalShares} Shares)\nYour Share = ${formattedIncome}\nTeam Cuts  = ${teamCutsBreakdown}`
+        : `\nAmount     = ${formattedIncome}`
+    }
+Rate       = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
+Status     = ${safeEntry.status || 'Paid'}
+Notes      = ${safeEntry.notes || 'None'}
 \`\`\``;
 
     await copyTextNative(md);
     onToast?.('🎮 Discord markdown copied to clipboard!');
-  }, [entry, receiptId, dateStr, safeEntry, hasTeammates, teammatesStr, effectiveRate, rateDiscordText, formattedIncome, onToast]);
+  }, [
+    entry,
+    receiptId,
+    dateStr,
+    safeEntry,
+    isTeamWork,
+    formattedPot,
+    totalShares,
+    formattedIncome,
+    teamCutsBreakdown,
+    effectiveRate,
+    rateDiscordText,
+    onToast,
+  ]);
 
   // Screenshot & Copy Image to Clipboard
   const handleScreenshotCopy = useCallback(async () => {
@@ -255,12 +302,23 @@ Notes   = ${safeEntry.notes || 'None'}
 
               <div>
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
-                  Amount Earned
+                  {isTeamWork ? 'Your Share' : 'Amount Earned'}
                 </span>
                 <div className="text-sm font-bold text-zinc-100 font-mono mt-0.5">
                   <MoneyDisplay amount={safeEntry.income || 0} currency={entryCurrency} />
                 </div>
               </div>
+
+              {isTeamWork && (
+                <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                    Pot ({totalShares} Shares)
+                  </span>
+                  <strong className="font-mono text-amber-300 font-bold">
+                    {formattedPot}
+                  </strong>
+                </div>
+              )}
 
               <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 flex items-center justify-between text-xs">
                 <span className="text-[10px] uppercase font-semibold text-zinc-500">
@@ -271,33 +329,37 @@ Notes   = ${safeEntry.notes || 'None'}
                 </span>
               </div>
 
-              {/* Interactive Teammate Badges with Click-to-Filter */}
+              {/* Interactive Teammate Badges with Individual Cuts */}
               {hasTeammates && (
                 <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-semibold text-zinc-500">
-                      Teammates / Crew
+                      Teammates & Cuts
                     </span>
                     <span className="text-[9px] text-zinc-500 font-mono hide-in-screenshot">
                       Click to filter in ledger
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {safeEntry.teammates.map((tm) => (
-                      <button
-                        key={tm}
-                        type="button"
-                        onClick={() => {
-                          onFilterTeammate?.(tm);
-                          onClose?.();
-                        }}
-                        title={`Filter ledger for ${tm}`}
-                        className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
-                      >
-                        <Users className="w-3 h-3 text-zinc-400" />
-                        <span>{tm}</span>
-                      </button>
-                    ))}
+                    {safeEntry.teammates.map((tm) => {
+                      const cut = safeEntry.teammateCuts?.[tm] || safeEntry.income;
+                      return (
+                        <button
+                          key={tm}
+                          type="button"
+                          onClick={() => {
+                            onFilterTeammate?.(tm);
+                            onClose?.();
+                          }}
+                          title={`Filter ledger for ${tm} (Cut: ${formatMoney(cut, entryCurrency)})`}
+                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                        >
+                          <Users className="w-3 h-3 text-zinc-400" />
+                          <span>{tm}</span>
+                          <span className="text-zinc-400 text-[10px]">({formatMoney(cut, entryCurrency)})</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

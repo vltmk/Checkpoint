@@ -102,7 +102,7 @@ export function TeammatesCombobox({
   );
 
   return (
-    <div ref={containerRef} className={cn('relative w-full space-y-1.5', isOpen && 'z-50')}>
+    <div ref={containerRef} className={cn('relative w-full space-y-1.5', isOpen ? 'z-50' : 'z-10')}>
       {/* Input container with chips */}
       <div
         onClick={() => inputRef.current?.focus()}
@@ -170,12 +170,12 @@ export function TeammatesCombobox({
 
       {/* Dropdown List */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950 border border-zinc-700 shadow-2xl p-1.5 space-y-1">
           {inputValue.trim() && !savedTeammates.some((s) => s.toLowerCase() === inputValue.trim().toLowerCase()) && (
             <button
               type="button"
               onClick={() => handleAddTeammate(inputValue)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group"
             >
               <span className="flex items-center gap-1.5 truncate">
                 <UserPlus className="w-3.5 h-3.5 text-zinc-300 shrink-0" />

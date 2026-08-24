@@ -122,6 +122,9 @@ export function Navbar({
   };
 
   const handleToggleMaximize = async (e) => {
+    if (e.target.closest('button, input, select, textarea, [data-no-drag]')) {
+      return;
+    }
     e.stopPropagation();
     await toggleMaximizeWindow();
     const max = await isWindowMaximized();
@@ -143,6 +146,20 @@ export function Navbar({
     if (e.button === 0 && !e.target.closest('button, input, select, textarea, [data-no-drag]')) {
       startDraggingWindow();
     }
+  };
+
+  const [isTourGuideDismissed, setIsTourGuideDismissed] = useState(false);
+  const showTourGuide = isRateUpdateNeeded && !isTourGuideDismissed && !isRatesOpen;
+
+  const handleDismissTour = () => {
+    setIsTourGuideDismissed(true);
+    recordRateInteraction();
+  };
+
+  const handleApplyPreset = (presetRate) => {
+    recordRateInteraction();
+    setIsTourGuideDismissed(true);
+    onGoldRateTOMANChange?.(presetRate);
   };
 
   return (
@@ -275,9 +292,9 @@ export function Navbar({
         </div>
       </div>
 
-      {/* 3. Right: Consolidated Currency & Rates Dropdown, Settings, Window Controls */}
+      {/* 3. Right: Gold Ratio Dropdown, Settings, Window Controls */}
       <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-1.5 shrink-0 z-10">
-        {/* Consolidated Currency & Gold Ratio Dropdown */}
+        {/* Dedicated Gold Ratio Dropdown */}
         <div className="relative" ref={ratesDropdownRef} data-no-drag>
           <div className={`relative rounded-md overflow-hidden ${isRateUpdateNeeded ? 'p-[1px]' : ''}`}>
             {/* Minimal Animated Monochromatic Rotating & Pulsing Border */}
@@ -321,10 +338,11 @@ export function Navbar({
               type="button"
               onClick={() => {
                 recordRateInteraction();
+                setIsTourGuideDismissed(true);
                 setTempRateTOMAN(goldRateTOMAN);
                 setIsRatesOpen((prev) => !prev);
               }}
-              title="Configure Display Currency and Gold Rate"
+              title="Configure Gold Ratio (Toman per 1,000 Gold)"
               className={`relative z-10 h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-[5px] text-xs transition-colors cursor-pointer select-none ${
                 isRateUpdateNeeded
                   ? isRatesOpen
@@ -335,17 +353,9 @@ export function Navbar({
                     : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100'
               }`}
             >
-              {globalCurrency === 'GOLD' ? (
-                <Coins className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              ) : (
-                <Banknote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              )}
-              <span className={globalCurrency === 'TOMAN' ? 'font-farsi font-medium text-[11px]' : 'font-sans font-medium text-[11px]'}>
-                {globalCurrency === 'TOMAN' ? 'تومان' : 'Gold'}
-              </span>
-              <span className="hidden xl:inline text-zinc-600 text-[10px]">•</span>
-              <span className="hidden xl:inline font-sans text-[11px] text-zinc-400">
-                1k={goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN}T
+              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="font-mono font-medium text-[11px] text-zinc-200">
+                1k = {goldRateTOMAN?.toLocaleString()} T
               </span>
               <ChevronDown
                 className={`w-3 h-3 text-zinc-500 transition-transform duration-150 ${
@@ -355,54 +365,64 @@ export function Navbar({
             </button>
           </div>
 
-          {/* Unified Downward Popover Menu */}
-          {isRatesOpen && (
-            <div className="absolute top-full right-0 mt-1.5 w-60 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50">
-              {/* Section 1: Display Currency Selector */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                  Display Currency
-                </label>
-                <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      recordRateInteraction();
-                      onCurrencyChange('TOMAN');
-                    }}
-                    className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
-                      globalCurrency === 'TOMAN'
-                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <Banknote className="w-3.5 h-3.5" />
-                    <span className="font-farsi font-medium">تومان</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      recordRateInteraction();
-                      onCurrencyChange('GOLD');
-                    }}
-                    className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
-                      globalCurrency === 'GOLD'
-                        ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    <Coins className="w-3.5 h-3.5" />
-                    <span>Gold</span>
-                  </button>
+          {/* Launch One-Step Tour Guide Floating Card */}
+          {showTourGuide && (
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              data-no-drag
+              onMouseDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 mt-2.5 w-64 p-3 bg-zinc-950 backdrop-blur-xl border border-zinc-700 shadow-2xl rounded-xl space-y-2 z-50 text-zinc-200"
+            >
+              {/* Little triangle pointing to the Gold Ratio button */}
+              <div className="absolute -top-1.5 right-6 w-3 h-3 bg-zinc-950 border-t border-l border-zinc-700 rotate-45 pointer-events-none" />
+
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-md bg-amber-950/50 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+                  <Coins className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+                    Daily Gold Ratio
+                  </h4>
+                  <p className="text-[10px] text-zinc-400">
+                    Live ledger conversions
+                  </p>
                 </div>
               </div>
 
-              <div className="border-t border-zinc-800/80" />
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Click this button anytime to adjust your gold conversion rate for all entries and totals.
+              </p>
 
-              {/* Section 2: Default Gold Rate Stepper */}
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end pt-1 border-t border-zinc-800/80">
+                <Button
+                  variant="primary"
+                  size="xs"
+                  onClick={handleDismissTour}
+                  className="text-xs font-medium h-6 px-3 bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer"
+                >
+                  Got it
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Dedicated Gold Ratio Popover Menu */}
+          {isRatesOpen && (
+            <div
+              data-no-drag
+              onMouseDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 mt-1.5 w-64 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50"
+            >
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-400">
-                  <span className="uppercase tracking-wider">Default Gold Rate</span>
+                  <span className="uppercase tracking-wider">Gold Exchange Ratio</span>
                   <span className="font-mono text-zinc-500">Toman / 1,000 G</span>
                 </div>
                 <NumberStepperInput
@@ -413,14 +433,47 @@ export function Navbar({
                   currency="TOMAN"
                   className="text-xs font-mono h-8"
                 />
+
+                {/* Dynamic Quick Presets based on current/typed rate */}
+                {(() => {
+                  const currentNum = Number(tempRateTOMAN) || Number(goldRateTOMAN) || 3200;
+                  const base = Math.max(100, Math.round(currentNum / 100) * 100);
+                  const presets = Array.from(
+                    new Set([
+                      Math.max(100, base - 200),
+                      base,
+                      base + 200,
+                      base + 500,
+                    ])
+                  );
+                  return (
+                    <div className="grid grid-cols-4 gap-1 pt-1">
+                      {presets.map((pr) => (
+                        <button
+                          key={pr}
+                          type="button"
+                          onClick={() => setTempRateTOMAN(pr)}
+                          className={`py-1 px-1 rounded text-[10px] font-mono border transition-colors ${
+                            Number(tempRateTOMAN) === pr
+                              ? 'bg-zinc-800 text-amber-300 border-amber-700/80 font-bold'
+                              : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                          }`}
+                        >
+                          {pr >= 1000 ? `${(pr / 1000).toFixed(1)}k` : pr}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 <Button
                   variant="primary"
                   size="xs"
                   onClick={handleSaveRate}
-                  className="w-full justify-center h-7 text-xs gap-1.5 mt-1"
+                  className="w-full justify-center h-7 text-xs gap-1.5 mt-2"
                 >
                   <Check className="w-3 h-3" />
-                  <span>Save Default Rate</span>
+                  <span>Save Gold Ratio</span>
                 </Button>
               </div>
             </div>

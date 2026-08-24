@@ -49,6 +49,7 @@ const ITEMS_PER_PAGE = 15;
 export function LedgerView({
   entries = [],
   globalCurrency = 'TOMAN',
+  onCurrencyChange,
   goldRateTOMAN = 3200,
   onOpenWorkModal,
   onOpenReceipt,
@@ -285,6 +286,13 @@ export function LedgerView({
         return;
       }
 
+      // 'T' key toggles display currency between Toman and Gold
+      if ((e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        onCurrencyChange?.(globalCurrency === 'TOMAN' ? 'GOLD' : 'TOMAN');
+        return;
+      }
+
       // 'S' key toggles select mode
       if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
@@ -320,6 +328,8 @@ export function LedgerView({
     isSelectMode,
     activeActionMenuId,
     paginatedEntries,
+    globalCurrency,
+    onCurrencyChange,
   ]);
 
   // Shift + Click Range Selection & Direct Toggle Handler
@@ -486,11 +496,56 @@ export function LedgerView({
     <div className="space-y-5 pb-20 md:pb-6 relative">
       {/* 1. Compact Total Earned Summary Card (Transparent & Dark Palette) */}
       <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
               Total Earned
             </span>
+
+            {/* Minimal Currency Switcher Pill Right in Front of Label */}
+            <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 shadow-inner">
+              <button
+                type="button"
+                onClick={() => onCurrencyChange?.('TOMAN')}
+                title="Display in Toman (Press T to toggle)"
+                className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
+                  globalCurrency === 'TOMAN'
+                    ? 'text-zinc-100 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {globalCurrency === 'TOMAN' && (
+                  <motion.div
+                    layoutId="totalEarnedCurrencyPill"
+                    className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <Banknote className="w-3 h-3 text-emerald-400" />
+                <span className="font-farsi font-medium">تومان</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onCurrencyChange?.('GOLD')}
+                title="Display in Gold (Press T to toggle)"
+                className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
+                  globalCurrency === 'GOLD'
+                    ? 'text-zinc-100 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                {globalCurrency === 'GOLD' && (
+                  <motion.div
+                    layoutId="totalEarnedCurrencyPill"
+                    className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <Coins className="w-3 h-3 text-amber-400" />
+                <span>Gold</span>
+              </button>
+            </div>
+
             {filteredEntries.length !== entries.length && (
               <button
                 type="button"
@@ -504,14 +559,14 @@ export function LedgerView({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-zinc-500 font-mono">
               {metrics.completionRate}% Paid
             </span>
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-300">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
             <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
           </div>
           {globalCurrency !== 'GOLD' && (
@@ -524,18 +579,18 @@ export function LedgerView({
           )}
         </div>
 
-        {/* Enhanced High-Density Segmented Progress Bar */}
+        {/* Enhanced High-Density Segmented Progress Bar with Accent Colors */}
         <div className="space-y-2 pt-0.5">
           <div className="h-2.5 w-full bg-zinc-950/80 rounded-full p-0.5 border border-zinc-800/80 shadow-inner flex overflow-hidden">
             <div
-              className="bg-zinc-100 h-full rounded-l-full transition-all duration-300 relative group"
+              className="bg-emerald-500 h-full rounded-l-full transition-all duration-300 relative group"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
               }}
               title={`Paid: ${metrics.completionRate}%`}
             />
             <div
-              className="bg-zinc-600 h-full transition-all duration-300 relative group"
+              className="bg-amber-500/80 h-full transition-all duration-300 relative group"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
               }}
@@ -543,25 +598,27 @@ export function LedgerView({
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-zinc-400">
-            <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-md border border-zinc-800/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-100 shrink-0" />
-              <span className="text-zinc-500 font-medium">Paid ({metrics.paidCount}):</span>
-              <strong className="text-zinc-200 font-medium font-mono text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
+            {/* Paid Accent Badge */}
+            <div className="flex items-center gap-1.5 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-800/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <span className="text-emerald-400/90 font-medium">Paid ({metrics.paidCount}):</span>
+              <strong className="text-emerald-200 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
-              <span className="text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-emerald-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
                 {metrics.completionRate}%
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-md border border-zinc-800/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0" />
-              <span className="text-zinc-500 font-medium">Pending ({metrics.pendingCount}):</span>
-              <strong className="text-zinc-300 font-medium font-mono text-xs">
+            {/* Pending Accent Badge */}
+            <div className="flex items-center gap-1.5 bg-amber-950/30 px-2.5 py-1 rounded-md border border-amber-800/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+              <span className="text-amber-400/90 font-medium">Pending ({metrics.pendingCount}):</span>
+              <strong className="text-amber-200 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
-              <span className="text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-amber-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
                 {metrics.totalValue > 0 ? 100 - metrics.completionRate : 0}%
               </span>
             </div>
@@ -1031,15 +1088,23 @@ export function LedgerView({
                                     )}
                                   </div>
 
-                                  {/* Line 3: Interactive Teammate Badges */}
+                                  {/* Line 3: Interactive Teammate Badges & Team Pot */}
                                   {entry.teammates && entry.teammates.length > 0 && (
                                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
                                       <span className="text-zinc-500 flex items-center gap-1">
                                         <Users className="w-3 h-3 text-zinc-500" />
                                         <span>Team:</span>
                                       </span>
+
+                                      {entry.pot && (
+                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-zinc-900/90 text-amber-300/90 border border-amber-800/40">
+                                          Pot: {formatMoney(entry.pot, entry.currency)} ({entry.teammates.length + 1} shares)
+                                        </span>
+                                      )}
+
                                       {entry.teammates.map((tm) => {
                                         const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                                        const customCut = entry.teammateCuts && entry.teammateCuts[tm];
                                         return (
                                           <button
                                             key={tm}
@@ -1048,14 +1113,19 @@ export function LedgerView({
                                               e.stopPropagation();
                                               setTeammateFilter(isMatch ? '' : tm);
                                             }}
-                                            title={`Click to filter jobs with ${tm}`}
-                                            className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border ${
+                                            title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
+                                            className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 ${
                                               isMatch
                                                 ? 'bg-zinc-900 text-zinc-300 border-zinc-700/80 shadow-sm'
                                                 : 'bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80'
                                             }`}
                                           >
-                                            {tm}
+                                            <span>{tm}</span>
+                                            {customCut && (
+                                              <span className="font-mono text-[9px] text-zinc-400">
+                                                ({formatMoney(customCut, entry.currency)})
+                                              </span>
+                                            )}
                                           </button>
                                         );
                                       })}
@@ -1064,9 +1134,14 @@ export function LedgerView({
                                 </div>
                               </div>
 
-                              {/* Right: Income, Status, Menu */}
+                              {/* Right: Income (Your Cut), Status, Menu */}
                               <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
                                 <div className="text-left sm:text-right">
+                                  {entry.teamMode && (
+                                    <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">
+                                      Your Share
+                                    </div>
+                                  )}
                                   <div className="text-xs font-medium text-zinc-300">
                                     <MoneyDisplay amount={entry.income} currency={entry.currency} />
                                   </div>

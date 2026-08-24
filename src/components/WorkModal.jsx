@@ -63,13 +63,17 @@ export function WorkModal({
     source: '',
     teamMode: false,
     teammates: [],
-    currency: 'TOMAN',
+    teamInputMode: 'pot', // 'pot' | 'income'
+    pot: '',
     income: '',
+    teammateCuts: {},
+    currency: 'TOMAN',
     exchangeRate: String(goldRateTOMAN || 3200),
     status: 'Pending',
     notes: '',
   });
 
+  const [isCustomCutsOpen, setIsCustomCutsOpen] = useState(false);
   const [proofs, setProofs] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
@@ -90,6 +94,19 @@ export function WorkModal({
       if (!['TOMAN', 'GOLD'].includes(entryCur)) entryCur = 'TOMAN';
 
       const entryTeammates = Array.isArray(editingEntry.teammates) ? editingEntry.teammates : [];
+      const totalShares = 1 + entryTeammates.length;
+      const initialPot =
+        editingEntry.pot !== undefined && editingEntry.pot !== null
+          ? String(editingEntry.pot)
+          : editingEntry.income !== undefined
+          ? String(Math.round(Number(editingEntry.income) * totalShares * 100) / 100)
+          : '';
+      const initialCuts =
+        editingEntry.teammateCuts && typeof editingEntry.teammateCuts === 'object'
+          ? { ...editingEntry.teammateCuts }
+          : Object.fromEntries(
+              entryTeammates.map((tm) => [tm, editingEntry.income ? String(editingEntry.income) : ''])
+            );
 
       setFormData({
         title: editingEntry.title || '',
@@ -100,8 +117,11 @@ export function WorkModal({
         source: editingEntry.source || '',
         teamMode: Boolean(editingEntry.teamMode || entryTeammates.length > 0),
         teammates: entryTeammates,
-        currency: entryCur,
+        teamInputMode: editingEntry.pot ? 'pot' : 'income',
+        pot: initialPot,
         income: editingEntry.income !== undefined && editingEntry.income !== null ? String(editingEntry.income) : '',
+        teammateCuts: initialCuts,
+        currency: entryCur,
         exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
         status: editingEntry.status || 'Pending',
         notes: editingEntry.notes || '',
@@ -130,13 +150,16 @@ export function WorkModal({
             source: parsed.source || '',
             teamMode: Boolean(parsed.teamMode || draftTeammates.length > 0),
             teammates: draftTeammates,
-            currency: parsed.currency || globalCurrency || 'TOMAN',
+            teamInputMode: parsed.teamInputMode || 'pot',
+            pot: parsed.pot || '',
             income: parsed.income || '',
+            teammateCuts: parsed.teammateCuts || {},
+            currency: parsed.currency || globalCurrency || 'TOMAN',
             exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
             notes: parsed.notes || '',
           });
-          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.notes || parsed.source || draftTeammates.length > 0));
+          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.pot || parsed.notes || parsed.source || draftTeammates.length > 0));
         } else {
           setIsDraftRestored(false);
           setFormData({
@@ -148,8 +171,11 @@ export function WorkModal({
             source: '',
             teamMode: false,
             teammates: [],
-            currency: globalCurrency || 'TOMAN',
+            teamInputMode: 'pot',
+            pot: '',
             income: '',
+            teammateCuts: {},
+            currency: globalCurrency || 'TOMAN',
             exchangeRate: String(goldRateTOMAN || 3200),
             status: 'Pending',
             notes: '',
@@ -186,8 +212,11 @@ export function WorkModal({
       source: '',
       teamMode: false,
       teammates: [],
-      currency: globalCurrency || 'TOMAN',
+      teamInputMode: 'pot',
+      pot: '',
       income: '',
+      teammateCuts: {},
+      currency: globalCurrency || 'TOMAN',
       exchangeRate: String(goldRateTOMAN || 3200),
       status: 'Pending',
       notes: '',
@@ -195,6 +224,140 @@ export function WorkModal({
     setProofs([]);
     onToast?.('Draft cleared');
   };
+
+  // Team Share Calculations
+  const totalTeamMembers = 1 + (formData.teammates ? formData.teammates.length : 0);
+
+  const handlePotChange = (newPotStr) => {
+    const potNum = parseFloat(newPotStr);
+    if (!isNaN(potNum) && potNum >= 0 && totalTeamMembers > 0) {
+      const equalShare = Math.round((potNum / totalTeamMembers) * 100) / 100;
+      const shareStr = String(equalShare);
+      const newCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, shareStr]));
+      updateFormData({
+        pot: newPotStr,
+        income: shareStr,
+        teammateCuts: newCuts,
+      });
+    } else {
+      updateFormData({
+        pot: newPotStr,
+        income: '',
+        teammateCuts: Object.fromEntries((formData.teammates || []).map((tm) => [tm, ''])),
+      });
+    }
+  };
+
+  const handleIncomeChange = (newIncomeStr) => {
+    const incNum = parseFloat(newIncomeStr);
+    if (formData.teamMode) {
+      if (!isNaN(incNum) && incNum >= 0) {
+        const totalPot = Math.round((incNum * totalTeamMembers) * 100) / 100;
+        const newCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, newIncomeStr]));
+        updateFormData({
+          income: newIncomeStr,
+          pot: String(totalPot),
+          teammateCuts: newCuts,
+        });
+      } else {
+        updateFormData({
+          income: newIncomeStr,
+          pot: '',
+          teammateCuts: Object.fromEntries((formData.teammates || []).map((tm) => [tm, ''])),
+        });
+      }
+    } else {
+      updateFormData({ income: newIncomeStr });
+    }
+  };
+
+  const handleTeammatesChange = (newTeammates) => {
+    const newCount = 1 + newTeammates.length;
+    let nextPot = formData.pot;
+    let nextIncome = formData.income;
+    let nextCuts = {};
+
+    if (formData.teamInputMode === 'pot' && formData.pot) {
+      const potNum = parseFloat(formData.pot) || 0;
+      const equalShare = newCount > 0 ? Math.round((potNum / newCount) * 100) / 100 : 0;
+      nextIncome = String(equalShare);
+      newTeammates.forEach((tm) => {
+        nextCuts[tm] = formData.teammateCuts?.[tm] || String(equalShare);
+      });
+    } else if (formData.income) {
+      const incNum = parseFloat(formData.income) || 0;
+      nextPot = String(Math.round((incNum * newCount) * 100) / 100);
+      newTeammates.forEach((tm) => {
+        nextCuts[tm] = formData.teammateCuts?.[tm] || formData.income;
+      });
+    } else {
+      newTeammates.forEach((tm) => {
+        nextCuts[tm] = formData.teammateCuts?.[tm] || '';
+      });
+    }
+
+    updateFormData({
+      teammates: newTeammates,
+      pot: nextPot,
+      income: nextIncome,
+      teammateCuts: nextCuts,
+    });
+  };
+
+  const handleCustomCutChange = (memberKey, cutValue) => {
+    if (memberKey === '__user__') {
+      const updatedIncome = cutValue;
+      const userCutNum = parseFloat(updatedIncome) || 0;
+      const teamSum = (formData.teammates || []).reduce(
+        (sum, tm) => sum + (parseFloat(formData.teammateCuts?.[tm]) || 0),
+        0
+      );
+      updateFormData({
+        income: updatedIncome,
+        pot: String(Math.round((userCutNum + teamSum) * 100) / 100),
+      });
+    } else {
+      const updatedCuts = {
+        ...(formData.teammateCuts || {}),
+        [memberKey]: cutValue,
+      };
+      const userCutNum = parseFloat(formData.income) || 0;
+      const teamSum = (formData.teammates || []).reduce(
+        (sum, tm) => sum + (parseFloat(updatedCuts[tm]) || 0),
+        0
+      );
+      updateFormData({
+        teammateCuts: updatedCuts,
+        pot: String(Math.round((userCutNum + teamSum) * 100) / 100),
+      });
+    }
+  };
+
+  const handleEqualizeShares = () => {
+    const potNum = parseFloat(formData.pot) || (parseFloat(formData.income) || 0) * totalTeamMembers;
+    if (potNum >= 0 && totalTeamMembers > 0) {
+      const equalCut = Math.round((potNum / totalTeamMembers) * 100) / 100;
+      const equalStr = String(equalCut);
+      const equalCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, equalStr]));
+      updateFormData({
+        pot: String(potNum),
+        income: equalStr,
+        teammateCuts: equalCuts,
+      });
+      onToast?.(`Equalized into ${totalTeamMembers} shares of ${equalStr} ${formData.currency}`);
+    }
+  };
+
+  // Live Allocation math
+  const userCutNum = parseFloat(formData.income) || 0;
+  const teamCutsSum = (formData.teammates || []).reduce(
+    (sum, tm) => sum + (parseFloat(formData.teammateCuts?.[tm]) || 0),
+    0
+  );
+  const totalAllocated = userCutNum + teamCutsSum;
+  const currentPotNum = parseFloat(formData.pot) || 0;
+  const potRemainder = Math.round((currentPotNum - totalAllocated) * 100) / 100;
+  const isPotBalanced = Math.abs(potRemainder) < 0.01;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -307,6 +470,10 @@ export function WorkModal({
     }
 
     const rateNum = parseFloat(formData.exchangeRate) || (isClassic ? 7000 : goldRateTOMAN || 3200);
+    const userIncomeNum = parseFloat(formData.income) || 0;
+    const finalPot = formData.teamMode
+      ? parseFloat(formData.pot) || (userIncomeNum * totalTeamMembers)
+      : null;
 
     const entryToSave = {
       id:
@@ -318,8 +485,10 @@ export function WorkModal({
       source: formData.source.trim() || 'Direct Client',
       teamMode: Boolean(formData.teamMode),
       teammates: formData.teamMode ? formData.teammates : [],
+      pot: finalPot,
+      income: userIncomeNum,
+      teammateCuts: formData.teamMode ? formData.teammateCuts : {},
       currency: formData.currency,
-      income: parseFloat(formData.income) || 0,
       exchangeRate: rateNum,
       rateUnit: isClassic ? '1' : '1k',
       status: formData.status,
@@ -426,12 +595,15 @@ export function WorkModal({
             />
           </div>
 
-          {/* Row 4: Team Mode Toggle & Animated Teammates Input */}
-          <div className="space-y-2">
+          {/* Row 4: Team Mode Toggle & Teammates Selector */}
+          <div className="space-y-2.5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 relative z-20">
             <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => updateFormData({ teamMode: !formData.teamMode })}
+                onClick={() => {
+                  const nextTeamMode = !formData.teamMode;
+                  updateFormData({ teamMode: nextTeamMode });
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                   formData.teamMode
                     ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
@@ -446,10 +618,13 @@ export function WorkModal({
                   }`}
                 />
               </button>
+
               {formData.teamMode && (
-                <span className="text-[10px] font-mono text-zinc-500">
-                  {formData.teammates.length} {formData.teammates.length === 1 ? 'member' : 'members'}
-                </span>
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                  <span>{totalTeamMembers} total shares</span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-zinc-500">(You + {formData.teammates.length} {formData.teammates.length === 1 ? 'teammate' : 'teammates'})</span>
+                </div>
               )}
             </div>
 
@@ -460,28 +635,73 @@ export function WorkModal({
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  className="overflow-hidden space-y-1"
+                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-30"
                 >
-                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                    Teammates / Crew Members
-                  </label>
-                  <TeammatesCombobox
-                    value={formData.teammates}
-                    onChange={(val) => updateFormData({ teammates: val })}
-                    onToast={onToast}
-                    placeholder="Type teammate username and press Enter..."
-                  />
+                  <div>
+                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">
+                      Teammates / Crew Members
+                    </label>
+                    <TeammatesCombobox
+                      value={formData.teammates}
+                      onChange={handleTeammatesChange}
+                      onToast={onToast}
+                      placeholder="Type teammate username and press Enter..."
+                    />
+                  </div>
+
+                  {/* Mode Selector: Input Pot vs Input My Cut */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[10px] uppercase font-semibold text-zinc-400">
+                      Calculation Target:
+                    </span>
+                    <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => updateFormData({ teamInputMode: 'pot' })}
+                        className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                          formData.teamInputMode === 'pot'
+                            ? 'bg-zinc-800 text-amber-300 font-semibold shadow-xs'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        Pot
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateFormData({ teamInputMode: 'income' })}
+                        className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                          formData.teamInputMode === 'income'
+                            ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
+                            : 'text-zinc-400 hover:text-zinc-200'
+                        }`}
+                      >
+                        My Cut
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Row 5: Income & Currency and Rate */}
+          {/* Row 5: Income / Pot & Currency and Rate */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start pt-1 border-t border-zinc-800/60">
             <div className="sm:col-span-7">
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Income & Currency *
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+                <span>
+                  {formData.teamMode
+                    ? formData.teamInputMode === 'pot'
+                      ? 'Pot *'
+                      : 'My Cut *'
+                    : 'Income & Currency *'}
+                </span>
+                {formData.teamMode && (
+                  <span className="text-[9px] font-mono text-zinc-400">
+                    {formData.teamInputMode === 'pot' ? `÷ ${totalTeamMembers} cuts` : `× ${totalTeamMembers} members`}
+                  </span>
+                )}
               </label>
+
               <div className="flex gap-2">
                 <div className="w-[125px] shrink-0">
                   <Select
@@ -492,14 +712,103 @@ export function WorkModal({
                 </div>
                 <div className="flex-1 min-w-0">
                   <NumberStepperInput
-                    value={formData.income}
-                    onChange={(e) => updateFormData({ income: e.target.value })}
+                    value={formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income}
+                    onChange={(e) => {
+                      if (formData.teamMode && formData.teamInputMode === 'pot') {
+                        handlePotChange(e.target.value);
+                      } else {
+                        handleIncomeChange(e.target.value);
+                      }
+                    }}
                     currency={formData.currency}
-                    placeholder={formData.currency === 'GOLD' ? '1,000' : '100,000'}
+                    placeholder={formData.currency === 'GOLD' ? '10,000' : '100,000'}
                     required
                   />
                 </div>
               </div>
+
+              {/* Team Split Live Indicator (Visible only when 'Pot' mode is selected) */}
+              {formData.teamMode && formData.teamInputMode === 'pot' && (
+                <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-[11px] space-y-1.5">
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="text-zinc-500">Your Share:</span>
+                    <strong className="font-mono text-emerald-300 font-semibold">
+                      {formData.income ? `${Number(formData.income).toLocaleString()} ${formData.currency}` : '--'}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span className="text-zinc-500">Pot:</span>
+                    <strong className="font-mono text-amber-300 font-semibold">
+                      {formData.pot ? `${Number(formData.pot).toLocaleString()} ${formData.currency}` : '--'}
+                    </strong>
+                  </div>
+
+                  {/* Toggle Custom Cuts Breakdown */}
+                  <div className="pt-1 flex items-center justify-between border-t border-zinc-800/60">
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomCutsOpen((prev) => !prev)}
+                      className="text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer"
+                    >
+                      {isCustomCutsOpen ? 'Hide Custom Cuts' : 'Edit Individual Cuts (Custom Split)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEqualizeShares}
+                      className="text-[10px] text-amber-400/90 hover:text-amber-300 font-mono transition-colors"
+                      title="Reset all shares to exact equal split"
+                    >
+                      Equalize Shares
+                    </button>
+                  </div>
+
+                  {/* Expandable Custom Cuts Table with Checkpoint NumberStepperInput */}
+                  <AnimatePresence>
+                    {isCustomCutsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-1.5 pt-1.5"
+                      >
+                        {/* You (Host) */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-zinc-400 font-medium truncate">You (Host):</span>
+                          <NumberStepperInput
+                            value={formData.income}
+                            onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
+                            currency={formData.currency}
+                            className="w-32 h-7"
+                            placeholder="0"
+                          />
+                        </div>
+
+                        {/* Each Teammate */}
+                        {formData.teammates.map((tm) => (
+                          <div key={tm} className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-zinc-400 font-medium truncate">{tm}:</span>
+                            <NumberStepperInput
+                              value={formData.teammateCuts?.[tm] || ''}
+                              onChange={(e) => handleCustomCutChange(tm, e.target.value)}
+                              currency={formData.currency}
+                              className="w-32 h-7"
+                              placeholder="0"
+                            />
+                          </div>
+                        ))}
+
+                        {/* Balance Status Line */}
+                        <div className="pt-1 flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-zinc-500">Allocated: {totalAllocated.toLocaleString()}</span>
+                          <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
+                            {isPotBalanced ? '✓ Balanced' : `Remaining: ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
 
             <div className="sm:col-span-5">

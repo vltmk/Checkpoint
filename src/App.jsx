@@ -974,6 +974,7 @@ export default function App() {
                   <LedgerView
                     entries={entries}
                     globalCurrency={globalCurrency}
+                    onCurrencyChange={handleCurrencyChange}
                     goldRateTOMAN={goldRateTOMAN}
                     onOpenWorkModal={handleOpenWorkModal}
                     onOpenReceipt={handleOpenReceipt}

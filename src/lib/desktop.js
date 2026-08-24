@@ -381,6 +381,16 @@ export async function openExternalUrl(url) {
     return;
   }
 
+  if (isTauri()) {
+    try {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      await openUrl(cleanUrl);
+      return;
+    } catch (err) {
+      console.warn('[Desktop] Native openUrl failed, falling back to window.open:', err);
+    }
+  }
+
   if (typeof window !== 'undefined') {
     window.open(cleanUrl, '_blank', 'noopener,noreferrer');
   }

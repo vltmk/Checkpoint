@@ -25,13 +25,17 @@ export function NotificationCenter({
   notifications = [],
   onMarkAsRead,
   onMarkAllAsRead,
-  onDismiss,
-  onClearAll,
   onOpenUpdateModal,
 }) {
+  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread'
+
   if (!isOpen) return null;
 
-  const activeNotifications = notifications.filter((item) => !item.dismissed);
+  const unreadList = notifications.filter((item) => !item.read);
+  const displayedNotifications =
+    filterMode === 'unread'
+      ? unreadList
+      : notifications;
 
   const getNotificationIcon = (item) => {
     if (item.source === 'updater') {
@@ -121,8 +125,34 @@ export function NotificationCenter({
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              {notifications.some((n) => !n.read) && (
+            <div className="flex items-center gap-1.5">
+              {/* All / Unread Filter Pills */}
+              <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('all')}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                    filterMode === 'all'
+                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  All ({notifications.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('unread')}
+                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                    filterMode === 'unread'
+                      ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Unread ({unreadList.length})
+                </button>
+              </div>
+
+              {unreadList.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onMarkAllAsRead?.()}
@@ -130,18 +160,7 @@ export function NotificationCenter({
                   className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
                 >
                   <CheckCheck className="w-3 h-3 text-zinc-400" />
-                  <span>Read all</span>
-                </button>
-              )}
-
-              {notifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onClearAll?.()}
-                  title="Clear history"
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Read all</span>
                 </button>
               )}
 
@@ -158,16 +177,20 @@ export function NotificationCenter({
 
           {/* List Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2.5 gpu-scroll">
-            {activeNotifications.length === 0 ? (
+            {displayedNotifications.length === 0 ? (
               <div className="h-48 flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
                 <Bell className="w-6 h-6 text-zinc-700 stroke-[1.5]" />
-                <p className="text-xs font-medium text-zinc-400">No notifications</p>
+                <p className="text-xs font-medium text-zinc-400">
+                  {filterMode === 'unread' ? 'No unread notifications' : 'No notifications'}
+                </p>
                 <p className="text-[11px] text-zinc-600 max-w-xs">
-                  No active announcements or updates at this time.
+                  {filterMode === 'unread'
+                    ? 'All announcements and release notes have been read.'
+                    : 'No active announcements or updates at this time.'}
                 </p>
               </div>
             ) : (
-              activeNotifications.map((item) => (
+              displayedNotifications.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => onMarkAsRead?.(item.id)}
@@ -177,7 +200,7 @@ export function NotificationCenter({
                       : 'bg-zinc-950/60 border-zinc-800/80 hover:border-zinc-700/60'
                   }`}
                 >
-                  {/* Top line: Icon, Type Badge, Published Date, Dismiss */}
+                  {/* Top line: Icon, Type Badge, Published Date */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
@@ -195,24 +218,9 @@ export function NotificationCenter({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[10px] text-zinc-500 font-mono">
-                        {formatTime(item.publishedAt)}
-                      </span>
-                      {item.dismissible !== false && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDismiss?.(item.id);
-                          }}
-                          title="Dismiss"
-                          className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors opacity-60 group-hover:opacity-100"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+                    <span className="text-[10px] text-zinc-500 font-mono shrink-0">
+                      {formatTime(item.publishedAt)}
+                    </span>
                   </div>
 
                   {/* Notification Title & Body */}
