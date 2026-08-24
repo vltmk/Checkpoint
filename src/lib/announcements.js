@@ -121,7 +121,6 @@ export async function fetchAnnouncements(timeoutMs = 5000) {
     try {
       const response = await fetch(`${url}?_t=${now}`, {
         signal: controller.signal,
-        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
       });
       clearTimeout(timer);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

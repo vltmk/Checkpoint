@@ -86,11 +86,11 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
       msg.toLowerCase().includes('could not fetch valid release') ||
       msg.toLowerCase().includes('invalid json');
     const isOffline =
-      msg.includes('timeout') ||
-      msg.includes('network') ||
-      msg.includes('fetch') ||
-      msg.includes('dns') ||
-      msg.includes('connection refused');
+      !isNotFound &&
+      (msg.includes('timeout') ||
+        msg.includes('network') ||
+        msg.includes('dns') ||
+        msg.includes('connection refused'));
     return {
       available: false,
       currentVersion,
