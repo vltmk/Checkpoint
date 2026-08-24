@@ -5,6 +5,7 @@
  */
 
 import { trackerDB } from './db';
+import localAnnouncementsFeed from '../../announcements.json';
 
 export const ANNOUNCEMENT_STORAGE_KEY = 'checkpoint_announcements_state';
 
@@ -40,23 +41,16 @@ export function sanitizeAnnouncement(item) {
   const title = typeof item.title === 'string' ? item.title.trim() : '';
   const message = typeof item.message === 'string' ? item.message.trim() : '';
 
-  if (!id || !title) return null;
+  if (!id || !title || !message) return null;
 
-  const type = ['info', 'success', 'warning', 'critical'].includes(item.type)
-    ? item.type
-    : 'info';
-
-  const publishedAt = item.published_at || item.publishedAt || new Date().toISOString();
-  const expiresAt = item.expires_at || item.expiresAt || null;
-  const dismissible = item.dismissible !== false;
-  const pinned = Boolean(item.pinned);
-
-  let action = null;
-  if (item.action && typeof item.action === 'object' && item.action.label && item.action.url) {
-    if (isSafeActionUrl(item.action.url)) {
-      action = {
-        label: String(item.action.label).trim(),
-        url: String(item.action.url).trim(),
+  let safeAction = null;
+  if (item.action && typeof item.action === 'object') {
+    const url = typeof item.action.url === 'string' ? item.action.url.trim() : '';
+    const label = typeof item.action.label === 'string' ? item.action.label.trim() : 'View Details';
+    if (url && isSafeActionUrl(url)) {
+      safeAction = {
+        label,
+        url,
         type: item.action.type || 'external_link',
       };
     }
@@ -64,45 +58,46 @@ export function sanitizeAnnouncement(item) {
 
   return {
     id,
-    type,
+    type: ['info', 'warning', 'critical', 'success'].includes(item.type) ? item.type : 'info',
     title,
     message,
-    publishedAt,
-    expiresAt,
-    dismissible,
-    pinned,
-    action,
+    publishedAt: item.published_at || item.publishedAt || new Date().toISOString(),
+    expiresAt: item.expires_at || item.expiresAt || null,
+    dismissible: item.dismissible !== false,
+    pinned: Boolean(item.pinned),
+    action: safeAction,
   };
 }
 
 /**
- * Retrieve local announcement persistence state from SQLite / IndexedDB
+ * Obtain persistent local announcement state
  */
 export async function getAnnouncementState() {
   try {
     const saved = await trackerDB.getSetting(ANNOUNCEMENT_STORAGE_KEY, null);
-    if (saved && typeof saved === 'object') {
+    if (saved) {
+      const parsed = JSON.parse(saved);
       return {
-        seenIds: Array.isArray(saved.seenIds) ? saved.seenIds : [],
-        dismissedIds: Array.isArray(saved.dismissedIds) ? saved.dismissedIds : [],
-        lastFetchedAt: saved.lastFetchedAt || null,
-        cachedAnnouncements: Array.isArray(saved.cachedAnnouncements) ? saved.cachedAnnouncements : [],
+        seenIds: Array.isArray(parsed.seenIds) ? parsed.seenIds : [],
+        dismissedIds: Array.isArray(parsed.dismissedIds) ? parsed.dismissedIds : [],
+        lastFetchedAt: parsed.lastFetchedAt || null,
+        cachedAnnouncements: Array.isArray(parsed.cachedAnnouncements) ? parsed.cachedAnnouncements : [],
       };
     }
-  } catch (e) {
-    console.warn('[Announcements] Failed to read local announcement state:', e);
+  } catch (err) {
+    console.warn('[Announcements] Failed to load local announcement state:', err);
   }
   return { ...DEFAULT_STATE };
 }
 
 /**
- * Save announcement state to SQLite / IndexedDB
+ * Save persistent local announcement state
  */
 export async function saveAnnouncementState(state) {
   try {
-    await trackerDB.setSetting(ANNOUNCEMENT_STORAGE_KEY, state);
-  } catch (e) {
-    console.warn('[Announcements] Failed to save local announcement state:', e);
+    await trackerDB.setSetting(ANNOUNCEMENT_STORAGE_KEY, JSON.stringify(state));
+  } catch (err) {
+    console.warn('[Announcements] Failed to save local announcement state:', err);
   }
 }
 
@@ -113,6 +108,12 @@ export async function saveAnnouncementState(state) {
 export async function fetchAnnouncements(timeoutMs = 5000) {
   const localState = await getAnnouncementState();
   const now = Date.now();
+
+  const localBundledList = Array.isArray(localAnnouncementsFeed?.announcements)
+    ? localAnnouncementsFeed.announcements
+        .map(sanitizeAnnouncement)
+        .filter(Boolean)
+    : [];
 
   const fetchUrl = async (url) => {
     const controller = new AbortController();
@@ -138,26 +139,41 @@ export async function fetchAnnouncements(timeoutMs = 5000) {
     try {
       rawData = await fetchUrl(FALLBACK_FEED_URL);
     } catch (fallbackErr) {
-      // Degrade gracefully offline without interrupting startup
-      console.info('[Announcements] Remote feed unavailable (offline or unreachable), using cached announcements.');
-      return filterActiveAnnouncements(localState.cachedAnnouncements, localState.dismissedIds);
+      console.info('[Announcements] Remote feed unavailable, using local bundled / cached feed.');
+      const fallbackList =
+        localState.cachedAnnouncements.length > 0
+          ? localState.cachedAnnouncements
+          : localBundledList;
+      return filterActiveAnnouncements(fallbackList, localState.dismissedIds);
     }
   }
 
   if (!rawData || !Array.isArray(rawData.announcements)) {
-    return filterActiveAnnouncements(localState.cachedAnnouncements, localState.dismissedIds);
+    const fallbackList =
+      localState.cachedAnnouncements.length > 0
+        ? localState.cachedAnnouncements
+        : localBundledList;
+    return filterActiveAnnouncements(fallbackList, localState.dismissedIds);
   }
 
   const sanitizedList = rawData.announcements
     .map(sanitizeAnnouncement)
     .filter(Boolean);
 
+  // In development, merge local announcements so additions appear immediately
+  const merged = [...sanitizedList];
+  for (const localItem of localBundledList) {
+    if (!merged.some((r) => r.id === localItem.id)) {
+      merged.push(localItem);
+    }
+  }
+
   // Update local cache
-  localState.cachedAnnouncements = sanitizedList;
+  localState.cachedAnnouncements = merged;
   localState.lastFetchedAt = now;
   await saveAnnouncementState(localState);
 
-  return filterActiveAnnouncements(sanitizedList, localState.dismissedIds);
+  return filterActiveAnnouncements(merged, localState.dismissedIds);
 }
 
 /**

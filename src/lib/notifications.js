@@ -110,9 +110,9 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
     }
   }
 
-  // 3. Retain ALL existing notifications (announcements, updater, system) that were not replaced or dismissed
+  // 3. Retain ALL existing notifications (announcements, updater, system) that were not replaced
   for (const item of existingList) {
-    if (!item || item.dismissed || processedIds.has(item.id)) continue;
+    if (!item || processedIds.has(item.id)) continue;
     merged.push(item);
   }
 
@@ -172,7 +172,7 @@ export async function markAllNotificationsAsRead(currentList = []) {
 }
 
 /**
- * Dismiss a notification
+ * Dismiss a notification (soft dismissal for persistent history)
  */
 export async function dismissNotificationItem(id, currentList = []) {
   const target = currentList.find((item) => item.id === id);
@@ -180,7 +180,12 @@ export async function dismissNotificationItem(id, currentList = []) {
     await markAnnouncementDismissed(target.announcementId);
   }
 
-  const updated = currentList.filter((item) => item.id !== id);
+  const updated = currentList.map((item) => {
+    if (item.id === id) {
+      return { ...item, dismissed: true, read: true };
+    }
+    return item;
+  });
   await saveStoredNotifications(updated);
   return updated;
 }

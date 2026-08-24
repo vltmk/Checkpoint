@@ -9,7 +9,6 @@ import {
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import {
-  Database,
   Download,
   Upload,
   FileSpreadsheet,
@@ -25,7 +24,7 @@ import {
   Bell,
   ArrowUpCircle,
   RotateCw,
-  Megaphone,
+  Keyboard,
 } from 'lucide-react';
 import { isTauri } from '../lib/desktop';
 import { trackerDB } from '../lib/db';
@@ -40,8 +39,6 @@ export function SettingsModal({
   onCloseToTrayChange,
   minimizeToTray = false,
   onMinimizeToTrayChange,
-  onTestNotification,
-  onResetNotification,
   onExportCsv,
   onExportJson,
   onImportJson,
@@ -54,7 +51,7 @@ export function SettingsModal({
   onCheckUpdates,
   isCheckingUpdates = false,
   onOpenUpdateModal,
-  onResetAnnouncements,
+  onOpenShortcuts,
 }) {
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
@@ -113,13 +110,7 @@ export function SettingsModal({
   return (
     <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-md">
       <DialogHeader onClose={onClose}>
-        <div className="flex items-center gap-2">
-          <DialogTitle>Settings & Data</DialogTitle>
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 flex items-center gap-1">
-            <Database className="w-3 h-3 text-emerald-400" />
-            {isDesktop ? 'SQLite Engine' : 'IndexedDB'}
-          </span>
-        </div>
+        <DialogTitle>Settings & Data</DialogTitle>
       </DialogHeader>
 
       <DialogContent className="space-y-5">
@@ -220,28 +211,6 @@ export function SettingsModal({
                   />
                 </button>
               </div>
-
-              {/* Helper actions for Notifications */}
-              <div className="flex items-center gap-2 pt-0.5">
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  onClick={onTestNotification}
-                  className="flex-1 justify-center gap-1.5 text-[11px] h-7"
-                >
-                  <Bell className="w-3 h-3 text-zinc-400" />
-                  <span>Test Notification</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  onClick={onResetNotification}
-                  className="flex-1 justify-center gap-1.5 text-[11px] h-7"
-                >
-                  <RotateCcw className="w-3 h-3 text-zinc-400" />
-                  <span>Reset One-Time Alert</span>
-                </Button>
-              </div>
             </div>
           </div>
         )}
@@ -301,25 +270,6 @@ export function SettingsModal({
                 </Button>
               )}
             </div>
-
-            <div className="border-t border-zinc-800/80 pt-2 flex items-center justify-between">
-              <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                <Megaphone className="w-3 h-3 text-zinc-500" />
-                <span>Reset dismissed announcement history</span>
-              </div>
-              <Button
-                variant="secondary"
-                size="xs"
-                onClick={async () => {
-                  await onResetAnnouncements?.();
-                  onToast?.('Announcement feed history reset. Refreshing active feed...');
-                }}
-                className="gap-1 text-[11px] h-6 px-2 text-zinc-400 hover:text-zinc-200"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset Feed</span>
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -349,7 +299,7 @@ export function SettingsModal({
               }}
               className="justify-start gap-2 text-xs"
             >
-              <Download className="w-4 h-4 text-zinc-400" />
+              <Upload className="w-4 h-4 text-zinc-400" />
               <span>Full JSON Backup</span>
             </Button>
 
@@ -366,7 +316,7 @@ export function SettingsModal({
               }}
               className="justify-start gap-2 text-xs"
             >
-              <Upload className="w-4 h-4 text-zinc-400" />
+              <Download className="w-4 h-4 text-zinc-400" />
               <span>Restore JSON</span>
             </Button>
 
@@ -469,7 +419,19 @@ export function SettingsModal({
         </div>
       </DialogContent>
 
-      <DialogFooter>
+      <DialogFooter className="justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            onOpenShortcuts?.();
+          }}
+          className="gap-1.5 text-xs text-zinc-400 hover:text-zinc-200"
+          title="Keyboard shortcuts (?)"
+        >
+          <Keyboard className="w-3.5 h-3.5" />
+          <span>Shortcuts</span>
+        </Button>
         <Button variant="primary" size="sm" onClick={onClose}>
           <Check className="w-3.5 h-3.5" />
           <span>Done</span>

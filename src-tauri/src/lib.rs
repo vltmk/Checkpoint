@@ -17,8 +17,8 @@ pub fn run() {
         .setup(|app| {
             // System Tray Menu Setup
             let show_i = MenuItem::with_id(app, "show", "Open CHECKPOINT", true, None::<&str>)?;
-            let quick_add_i = MenuItem::with_id(app, "quick_add", "⚡ Quick Add Work", true, None::<&str>)?;
-            let settings_i = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+            let quick_add_i = MenuItem::with_id(app, "quick_add", "Quick Add Work", true, None::<&str>)?;
+            let settings_i = MenuItem::with_id(app, "settings", "Settings & Preferences", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit CHECKPOINT", true, None::<&str>)?;
 

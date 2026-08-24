@@ -14,7 +14,7 @@ import {
   MessageSquare,
   Users,
 } from 'lucide-react';
-import nodraLogo from '../../nodra-vault.svg';
+import nodraLogo from '../assets/nodra-vault.svg';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../lib/desktop';
 import { toBlob } from 'html-to-image';
 

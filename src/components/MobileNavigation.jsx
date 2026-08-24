@@ -7,7 +7,8 @@ import {
   Settings,
   Bell,
 } from 'lucide-react';
-import nodraLogo from '../../nodra-vault.svg';
+import nodraLogo from '../assets/nodra-vault.svg';
+import { openExternalUrl } from '../lib/desktop';
 
 export function MobileHeader({
   globalCurrency = 'TOMAN',
@@ -20,7 +21,12 @@ export function MobileHeader({
 }) {
   return (
     <header className="md:hidden sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
-      <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint')}
+        title="Open Checkpoint on GitHub"
+        className="flex items-center gap-2 active:opacity-75 transition-opacity text-left cursor-pointer"
+      >
         <img
           src={nodraLogo}
           alt="CHECKPOINT"
@@ -36,7 +42,7 @@ export function MobileHeader({
             </span>
           )}
         </div>
-      </div>
+      </button>
 
       <div className="flex items-center gap-2">
         <button

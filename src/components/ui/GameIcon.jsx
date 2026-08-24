@@ -1,5 +1,5 @@
 import React from 'react';
-import wowIcon from '../../../world-of-warcraft-retail.svg';
+import wowIcon from '../../assets/world-of-warcraft-retail.svg';
 import { Gamepad2 } from 'lucide-react';
 
 export function GameIcon({ game, className = 'w-4 h-4' }) {

@@ -29,15 +29,9 @@ export function NotificationCenter({
   onClearAll,
   onOpenUpdateModal,
 }) {
-  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'updates' | 'announcements'
-
   if (!isOpen) return null;
 
-  const filteredNotifications = notifications.filter((item) => {
-    if (filterTab === 'updates') return item.source === 'updater';
-    if (filterTab === 'announcements') return item.source === 'announcement';
-    return true;
-  });
+  const activeNotifications = notifications.filter((item) => !item.dismissed);
 
   const getNotificationIcon = (item) => {
     if (item.source === 'updater') {
@@ -162,59 +156,18 @@ export function NotificationCenter({
             </div>
           </div>
 
-          {/* Categorized Filter Tabs */}
-          <div className="px-4 py-2 border-b border-zinc-900 bg-zinc-950 shrink-0">
-            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-zinc-900/80 border border-zinc-800/80 text-xs">
-              <button
-                type="button"
-                onClick={() => setFilterTab('all')}
-                className={`flex-1 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                  filterTab === 'all'
-                    ? 'bg-zinc-800 text-white font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                All ({notifications.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTab('updates')}
-                className={`flex-1 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                  filterTab === 'updates'
-                    ? 'bg-zinc-800 text-white font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Updates ({notifications.filter((n) => n.source === 'updater').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterTab('announcements')}
-                className={`flex-1 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                  filterTab === 'announcements'
-                    ? 'bg-zinc-800 text-white font-semibold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Feed ({notifications.filter((n) => n.source === 'announcement').length})
-              </button>
-            </div>
-          </div>
-
           {/* List Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2.5 gpu-scroll">
-            {filteredNotifications.length === 0 ? (
+            {activeNotifications.length === 0 ? (
               <div className="h-48 flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
                 <Bell className="w-6 h-6 text-zinc-700 stroke-[1.5]" />
                 <p className="text-xs font-medium text-zinc-400">No notifications</p>
                 <p className="text-[11px] text-zinc-600 max-w-xs">
-                  {filterTab === 'updates'
-                    ? 'You are running the latest version of Checkpoint.'
-                    : 'No active announcements or alerts at this time.'}
+                  No active announcements or updates at this time.
                 </p>
               </div>
             ) : (
-              filteredNotifications.map((item) => (
+              activeNotifications.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => onMarkAsRead?.(item.id)}

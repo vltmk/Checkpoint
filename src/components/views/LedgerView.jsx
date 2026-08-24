@@ -524,38 +524,47 @@ export function LedgerView({
           )}
         </div>
 
-        {/* Dual Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="h-1.5 w-full bg-zinc-800/80 rounded-full overflow-hidden flex">
+        {/* Enhanced High-Density Segmented Progress Bar */}
+        <div className="space-y-2 pt-0.5">
+          <div className="h-2.5 w-full bg-zinc-950/80 rounded-full p-0.5 border border-zinc-800/80 shadow-inner flex overflow-hidden">
             <div
-              className="bg-zinc-400 h-full transition-all duration-300"
+              className="bg-zinc-100 h-full rounded-l-full transition-all duration-300 relative group"
               style={{
-                width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : 0}%`,
+                width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
               }}
+              title={`Paid: ${metrics.completionRate}%`}
             />
             <div
-              className="bg-zinc-700 h-full transition-all duration-300"
+              className="bg-zinc-600 h-full transition-all duration-300 relative group"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
               }}
+              title={`Pending: ${100 - metrics.completionRate}%`}
             />
           </div>
 
-          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-500">
-            <span className="flex items-center gap-1">
-              <span>Paid:</span>
-              <strong className="text-zinc-400 font-medium">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-zinc-400">
+            <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-md border border-zinc-800/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-100 shrink-0" />
+              <span className="text-zinc-500 font-medium">Paid ({metrics.paidCount}):</span>
+              <strong className="text-zinc-200 font-medium font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
-              <span>({metrics.paidCount})</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <span>Pending:</span>
-              <strong className="text-zinc-400 font-medium">
+              <span className="text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+                {metrics.completionRate}%
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-md border border-zinc-800/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 shrink-0" />
+              <span className="text-zinc-500 font-medium">Pending ({metrics.pendingCount}):</span>
+              <strong className="text-zinc-300 font-medium font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
-              <span>({metrics.pendingCount})</span>
-            </span>
+              <span className="text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+                {metrics.totalValue > 0 ? 100 - metrics.completionRate : 0}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -877,7 +886,6 @@ export function LedgerView({
 
                       return (
                         <motion.div
-                          layout
                           key={entry.id}
                           initial={{ opacity: 0, height: 0, scale: 0.98 }}
                           animate={{ opacity: 1, height: 'auto', scale: 1 }}
@@ -1070,7 +1078,7 @@ export function LedgerView({
                                       rates={rates}
                                       customRate={entry.exchangeRate}
                                       isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
-                                      showRateLabel={true}
+                                      showRateLabel={false}
                                     />
                                   )}
                                 </div>

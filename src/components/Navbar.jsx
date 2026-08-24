@@ -6,7 +6,6 @@ import {
   Plus,
   Zap,
   Settings,
-  Keyboard,
   Banknote,
   Coins,
   ChevronDown,
@@ -21,7 +20,7 @@ import {
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
-import nodraLogo from '../../nodra-vault.svg';
+import nodraLogo from '../assets/nodra-vault.svg';
 import {
   minimizeWindow,
   toggleMaximizeWindow,
@@ -31,6 +30,7 @@ import {
   sendTrayNotification,
   startDraggingWindow,
   isTauri,
+  openExternalUrl,
 } from '../lib/desktop';
 
 export function Navbar({
@@ -45,7 +45,6 @@ export function Navbar({
   onOpenWorkModal,
   onOpenQuickAdd,
   onOpenSettings,
-  onOpenShortcuts,
   entriesCount = 0,
   appVersion = '',
   updateInfo = null,
@@ -153,27 +152,29 @@ export function Navbar({
       onDoubleClick={handleToggleMaximize}
       className="hidden md:flex h-12 w-full bg-black/95 border-b border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
     >
-      {/* 1. Left: Brand Identity (Draggable) & Add Work Button */}
+      {/* 1. Left: Brand Identity (Link to GitHub) & Add Work Button */}
       <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-2.5 shrink-0 z-10">
-        <div
-          data-tauri-drag-region
-          onMouseDown={handleHeaderMouseDown}
-          className="flex items-center gap-2 cursor-default select-none"
+        <button
+          type="button"
+          data-no-drag
+          onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint')}
+          title="Open Checkpoint repository on GitHub"
+          className="flex items-center gap-2 select-none cursor-pointer group p-1 -m-1 rounded-md hover:bg-zinc-900/80 transition-colors"
         >
           <img
             src={nodraLogo}
             alt="CHECKPOINT"
-            className="w-5 h-5 object-contain pointer-events-none"
+            className="w-5 h-5 object-contain group-hover:scale-105 transition-transform"
           />
-          <span className="text-xs font-black tracking-wider text-white pointer-events-none uppercase">
+          <span className="text-xs font-black tracking-wider text-white uppercase group-hover:text-zinc-200">
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 pointer-events-none">
+            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-colors">
               v{appVersion}
             </span>
           )}
-        </div>
+        </button>
 
         <div className="h-4 w-px bg-zinc-800/80 pointer-events-none" />
 
@@ -441,7 +442,7 @@ export function Navbar({
           </div>
         )}
 
-        {/* Notifications, Settings & Shortcuts Buttons */}
+        {/* Notifications & Settings Buttons */}
         <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
           <button
             type="button"
@@ -462,15 +463,6 @@ export function Navbar({
             className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
           >
             <Settings className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenShortcuts}
-            title="Keyboard shortcuts (?)"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
-          >
-            <Keyboard className="w-3.5 h-3.5" />
           </button>
         </div>
 

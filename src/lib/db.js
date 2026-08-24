@@ -710,33 +710,13 @@ export class StorageDB {
   }
 
   async seedInitialDataIfEmpty(force = false) {
-    const isSeeded = await this.getSetting('nodrapay_v2_seeded', false);
-    if (!force && isSeeded) {
-      // Auto-sanitize legacy over-inflated classic seed values if present in existing IndexedDB
-      const existing = await this.getAllEntries();
-      let hasOverinflated = false;
-      const sanitized = existing.map((entry) => {
-        if (
-          (entry.game === 'World of Warcraft Classic' || entry.rateUnit === '1') &&
-          entry.currency === 'GOLD' &&
-          Number(entry.income) >= 50000
-        ) {
-          hasOverinflated = true;
-          return { ...entry, income: Math.round(Number(entry.income) / 1000) };
-        }
-        return entry;
-      });
-      if (hasOverinflated) {
-        await this.bulkImport(sanitized);
-      }
+    if (!force) {
       return [];
     }
 
-    const existing = await this.getAllEntries();
-    if (existing.length === 0 || force) {
-      await this.setSetting('nodrapay_v2_seeded', true);
+    await this.setSetting('nodrapay_v2_seeded', true);
 
-      const now = new Date();
+    const now = new Date();
       const offsetDate = (daysAgo, hour = 14) => {
         const d = new Date(now.getTime() - daysAgo * 86400000);
         d.setHours(hour, Math.floor(Math.random() * 59), 0, 0);
@@ -1145,8 +1125,6 @@ export class StorageDB {
 
       await this.bulkImport(sampleEntries);
       return sampleEntries;
-    }
-    return existing;
   }
 }
 

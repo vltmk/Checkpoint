@@ -80,11 +80,24 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
   } catch (err) {
     const msg = err?.message || String(err);
     console.info('[Updater] Update check failed or offline:', msg);
+    const isNotFound =
+      msg.includes('404') ||
+      msg.toLowerCase().includes('not found') ||
+      msg.toLowerCase().includes('could not fetch valid release') ||
+      msg.toLowerCase().includes('invalid json');
+    const isOffline =
+      msg.includes('timeout') ||
+      msg.includes('network') ||
+      msg.includes('fetch') ||
+      msg.includes('dns') ||
+      msg.includes('connection refused');
     return {
       available: false,
       currentVersion,
       error: msg,
-      isOffline: msg.includes('timeout') || msg.includes('network') || msg.includes('fetch'),
+      isNotFound,
+      isOffline,
+      isDev: import.meta.env.DEV,
     };
   }
 }

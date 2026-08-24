@@ -37,6 +37,7 @@ import {
   openFileNative,
   enforceMinWindowSize,
   hideWindow,
+  showWindow,
   sendTrayNotification,
   resetTrayNotificationFlag,
   listenToTrayEvents,
@@ -175,7 +176,6 @@ export default function App() {
         if (v) setAppVersion(v);
       });
 
-      await trackerDB.seedInitialDataIfEmpty();
       const all = await trackerDB.getAllEntries();
       setEntries(all);
 
@@ -206,6 +206,16 @@ export default function App() {
       setTimeout(() => {
         setIsLoading(false);
       }, remaining);
+    }
+  }, []);
+
+  // Lightweight entry reload without full app re-hydration
+  const reloadEntries = useCallback(async () => {
+    try {
+      const all = await trackerDB.getAllEntries();
+      setEntries(all);
+    } catch (err) {
+      console.error('Failed to reload entries:', err);
     }
   }, []);
 
@@ -247,7 +257,11 @@ export default function App() {
             showToast(`Update available: v${res.version}`);
           }
         } else if (!opts.silent) {
-          if (res?.error) {
+          if (res?.isNotFound) {
+            showToast(`Checkpoint is up to date (v${res?.currentVersion || appVersion})`);
+          } else if (res?.isOffline) {
+            showToast('Unable to check for updates (offline)', { variant: 'destructive' });
+          } else if (res?.error) {
             showToast('Unable to connect to update server', { variant: 'destructive' });
           } else {
             showToast(`Checkpoint is up to date${res?.currentVersion ? ` (v${res.currentVersion})` : ''}`);
@@ -259,10 +273,11 @@ export default function App() {
     } finally {
       if (!opts.silent) setIsCheckingUpdates(false);
     }
-  }, [isDesktop, showToast]);
+  }, [isDesktop, showToast, appVersion]);
 
   useEffect(() => {
     loadData();
+    showWindow();
     enforceMinWindowSize(800, 560);
     // Asynchronous non-blocking background feed sync after UI render
     const timer = setTimeout(() => {
@@ -312,7 +327,7 @@ export default function App() {
     setCloseToTray(val);
     localStorage.setItem('checkpoint_close_to_tray', String(val));
     trackerDB.setSetting('checkpoint_close_to_tray', String(val));
-    showToast(val ? 'Close button will minimize to System Tray' : 'Close button will quit the application');
+    showToast(val ? 'Closing window will minimize to System Tray' : 'Closing window will quit application');
   };
 
   const handleMinimizeToTrayChange = (val) => {
@@ -320,20 +335,6 @@ export default function App() {
     localStorage.setItem('checkpoint_minimize_to_tray', String(val));
     trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
     showToast(val ? 'Minimize button will hide to System Tray' : 'Minimize button will minimize to Taskbar');
-  };
-
-  const handleTestNotification = async () => {
-    const sent = await sendTrayNotification(true);
-    if (sent) {
-      showToast('🔔 Sent test notification to Windows system tray');
-    } else {
-      showToast('⚠️ Unable to dispatch notification (check permissions)', { variant: 'destructive' });
-    }
-  };
-
-  const handleResetNotification = async () => {
-    await resetTrayNotificationFlag();
-    showToast('🔄 One-time background notification alert reset');
   };
 
   // Manual Check for Updates
@@ -349,6 +350,10 @@ export default function App() {
       await saveStoredNotifications(updated);
       showToast(`Update available: v${res.version}`);
       setIsUpdateModalOpen(true);
+    } else if (res?.isNotFound) {
+      showToast(`Checkpoint is up to date (v${res?.currentVersion || appVersion})`);
+    } else if (res?.isOffline) {
+      showToast('Unable to check for updates (offline)', { variant: 'destructive' });
     } else if (res?.error) {
       showToast('Unable to connect to update server', { variant: 'destructive' });
     } else {
@@ -412,7 +417,7 @@ export default function App() {
     await trackerDB.saveEntry(entryData);
     setIsWorkModalOpen(false);
     setEditingEntry(null);
-    await loadData();
+    await reloadEntries();
     if (isNew) {
       handleTabChange('ledger');
     }
@@ -423,31 +428,38 @@ export default function App() {
   const handleSaveQuickEntry = async (entryData) => {
     await trackerDB.saveEntry(entryData);
     setIsQuickAddOpen(false);
-    await loadData();
+    await reloadEntries();
     handleTabChange('ledger');
     showToast('⚡ Quick record added');
   };
 
   // Delete Single Entry (Called after in-line confirmation)
   const handleDeleteEntry = async (id) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
     await trackerDB.deleteEntry(id);
-    await loadData();
+    await reloadEntries();
     showToast('🗑️ Work record deleted');
   };
 
   // Bulk Delete Entries
   const handleBulkDelete = async (ids) => {
     if (!ids || ids.length === 0) return;
+    const idSet = new Set(ids);
+    setEntries((prev) => prev.filter((e) => !idSet.has(e.id)));
     await trackerDB.bulkDeleteEntries(ids);
-    await loadData();
+    await reloadEntries();
     showToast(`🗑️ Deleted ${ids.length} ${ids.length === 1 ? 'record' : 'records'}`);
   };
 
   // Bulk Update Status
   const handleBulkUpdateStatus = async (ids, nextStatus) => {
     if (!ids || ids.length === 0 || !nextStatus) return;
+    const idSet = new Set(ids);
+    setEntries((prev) =>
+      prev.map((e) => (idSet.has(e.id) ? { ...e, status: nextStatus, updatedAt: new Date().toISOString() } : e))
+    );
     await trackerDB.bulkUpdateStatus(ids, nextStatus);
-    await loadData();
+    await reloadEntries();
     showToast(`⚡ Updated ${ids.length} ${ids.length === 1 ? 'record' : 'records'} to ${nextStatus}`);
   };
 
@@ -541,13 +553,17 @@ export default function App() {
     };
 
     await trackerDB.saveEntry(copy);
-    await loadData();
+    await reloadEntries();
     showToast('⚡ Record duplicated');
   };
 
   // Status Change / Flip
   const handleFlipStatus = async (id, currentStatus, targetStatus = null) => {
     const nextStatus = targetStatus || STATUS_CONFIG[currentStatus]?.next || 'Paid';
+    setEntries((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, status: nextStatus, updatedAt: new Date().toISOString() } : e))
+    );
+
     const entry = await trackerDB.getEntry(id);
     if (!entry) return;
 
@@ -558,7 +574,7 @@ export default function App() {
     };
 
     await trackerDB.saveEntry(updated);
-    await loadData();
+    await reloadEntries();
   };
 
   // Modal Openers
@@ -903,7 +919,6 @@ export default function App() {
         onOpenWorkModal={handleOpenWorkModal}
         onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
         entriesCount={entries.length}
         appVersion={appVersion}
         updateInfo={updateInfo}
@@ -1051,8 +1066,6 @@ export default function App() {
         onCloseToTrayChange={handleCloseToTrayChange}
         minimizeToTray={minimizeToTray}
         onMinimizeToTrayChange={handleMinimizeToTrayChange}
-        onTestNotification={handleTestNotification}
-        onResetNotification={handleResetNotification}
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
@@ -1065,7 +1078,7 @@ export default function App() {
         onCheckUpdates={handleCheckUpdates}
         isCheckingUpdates={isCheckingUpdates}
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
-        onResetAnnouncements={handleResetAnnouncements}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
       />
 
       <NotificationCenter

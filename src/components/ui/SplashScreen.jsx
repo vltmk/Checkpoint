@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import nodraLogo from '../../../nodra-vault.svg';
+import nodraLogo from '../../assets/nodra-vault.svg';
 
 export function SplashScreen() {
   return (
@@ -21,8 +21,8 @@ export function SplashScreen() {
           />
         </div>
 
-        {/* Brand Title, Subtitle, and Emerald Accent Free Forever Badge */}
-        <div className="flex flex-col items-center space-y-2 text-center">
+        {/* Brand Title and Subtitle */}
+        <div className="flex flex-col items-center space-y-1.5 text-center">
           <span className="text-base font-black tracking-wider text-white uppercase">
             CHECKPOINT
           </span>
@@ -30,10 +30,6 @@ export function SplashScreen() {
           <p className="text-xs text-zinc-400 font-sans tracking-normal">
             Nodra's freelancing ledger
           </p>
-
-          <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded bg-emerald-950/20 border border-emerald-800/60 text-emerald-400 mt-0.5">
-            Open Source with ❤️
-          </span>
         </div>
 
         {/* Linear Time-Relative Progress Bar (0% to 100% in exactly 2.2s) */}
@@ -48,6 +44,13 @@ export function SplashScreen() {
             className="h-full bg-zinc-100 rounded-full"
           />
         </div>
+      </div>
+
+      {/* Dimmed Bottom-Centered Open Source Badge */}
+      <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none">
+        <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded bg-zinc-900/80 border border-zinc-800/80 text-zinc-500">
+          Open Source with ❤️
+        </span>
       </div>
     </motion.div>
   );
