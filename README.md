@@ -1,5 +1,4 @@
 # CHECKPOINT // Nodra Freelance & Gaming Ledger
-# CHECKPOINT دفتر کل و مدیریت کارهای فریلنسری و بوستینگ گیمینگ
 <img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/9948be18-06bc-49d3-978d-e448f80255bf" />
 <img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/edf81a8c-5dd2-41b6-b9ce-d37ee7b422a3" />
 
