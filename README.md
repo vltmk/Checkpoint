@@ -1,47 +1,29 @@
-# Vault // Nodra Freelance & Gaming Ledger
-# CHECKPOINT // دفتر کل و مدیریت کارهای فریلنسری و بوستینگ گیمینگ
+# CHECKPOINT // Nodra Freelance & Gaming Ledger
+# CHECKPOINT دفتر کل و مدیریت کارهای فریلنسری و بوستینگ گیمینگ
+<img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/9948be18-06bc-49d3-978d-e448f80255bf" />
+<img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/edf81a8c-5dd2-41b6-b9ce-d37ee7b422a3" />
 
-A monochromatic, high-density Shadcn mini-app ledger crafted for **freelancers, gaming boosters, raid runners, addon creators, and digital devs**.
+
+**چک‌پوینت نرم‌افزار مدیریت و لجر فریلنسینگ گیمینگ
+**
+چک پوینت یک نرم‌افزار بسیار سبک، تخصصی و کاملا آفلاین هست و برای ثبت، مدیریت و محاسبه‌ی درآمد روژه ها و بوست‌های گیمینگ طراحی شده.
+
+
 <div align="center">
 
 ![UI - Monochromatic Shadcn](https://img.shields.io/badge/UI-Monochromatic%20Shadcn-black?style=flat-square)
 ![Animation - Motion](https://img.shields.io/badge/Animation-Motion%20%28React%29-10b981?style=flat-square)
 ![Framework - Vite React](https://img.shields.io/badge/Stack-Vite%20%2B%20React-3b82f6?style=flat-square)
 ![Currencies](https://img.shields.io/badge/Currencies-USD%20%7C%20TOMAN%20%7C%20GOLD-fafafa?style=flat-square)
-**نرم‌افزار مدیریت کارهای فریلنسری، ثبت بوست‌ها و ریدهای گیمینگ (ویژه بوسترهای ایرانی و World of Warcraft)**
-
 ![Checkpoint UI](https://img.shields.io/badge/Platform-Windows%20Desktop%20%7C%20Web-black?style=for-the-badge)
 ![Offline First](https://img.shields.io/badge/Storage-100%25%20Offline%20%26%20Local-10b981?style=for-the-badge)
-![Currencies](https://img.shields.io/badge/Currencies-%D8%AA%D9%88%D9%85%D8%A7%D9%86%20%7C%20WoW%20Gold-f59e0b?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
 </div>
-
----
-
-## What's New in Vault 3.0
-## 🎯 چک‌پوینت (CHECKPOINT) چیست؟
-
-- 📱 **Tablet-Width Desktop Shell & Mobile Bottom Dock**: Centered `max-w-5xl` tablet shell with a sleek left sidebar navigation on desktop and a floating mobile navigation dock.
-- 🪙 **Mathematical Bi-Directional Currency Engine**: Full bi-directional conversion between **USD ($)**, **IRANIAN TOMAN (تومان)**, and **GOLD (🪙)** with configurable live rates.
-- 🔄 **Dedicated Gold Exchange View**: Live 2-way Gold to Fiat calculator, realm token presets, and portfolio gold valuation.
-- 📋 **Direct `Ctrl+V` Screenshot Paste**: Instant clipboard screenshot pasting (`Win+Shift+S`) into the work modal.
-- 🧾 **Proof-of-Work Receipts & Discord MD**: Printable work receipt slips and 1-click Discord Markdown copy for instant client sharing.
-- 📊 **Monochromatic Analytics & Overview**: High-contrast, clean Chart.js velocity and game share donut visualizations shown by default.
-- 💾 **Zero Quota Limit Storage**: Built on **IndexedDB** (`src/lib/db.js`) with full JSON backup/restore and CSV export.
-**چک‌پوینت** یک نرم‌افزار سبک، سریع و کاملاً آفلاین است که مخصوص **گیمرهای بوستر، رانرهای رید و دانجن، سازندگان ادان و ویراورا، و فریلنسرهای دیجیتال ایرانی** طراحی شده است.
-
-اگر در بازی‌هایی مثل **World of Warcraft (Retail & Classic)** یا پلتفرم‌هایی مثل **G2G، FunPay، Eldorado، دیسکورد یا ریدهای گیلدی (GDKP)** فعالیت می‌کنید، چک‌پوینت به شما کمک می‌کند تمام درآمدها، طلب‌ها، سهم هم‌تیمی‌ها و اسکرین‌شات‌های مدرک کارتان را به منظم‌ترین شکل ممکن ثبت و مدیریت کنید.
-
----
-
-## Keyboard Shortcuts
 ## ✨ قابلیت‌های اصلی چک‌پوینت
 
-| Shortcut | Action |
 ### ۱. 🔒 کاملاً آفلاین و امن (۱۰۰٪ Local & Private)
 - تمامی اطلاعات، مبالغ، یادداشت‌ها و اسکرین‌شات‌های شما **فقط روی کامپیوتر خودتان** ذخیره می‌شوند.
-- هیچ نیازی به اتصال اینترنت وجود ندارد و هیچ داده‌ای به هیچ سرور یا شخص ثالثی ارسال نمی‌شود.
 - سرعت فوق‌العاده بالا به لطف استفاده از موتور پایگاه‌داده محلی (**SQLite** در نسخه دسکتاپ و **IndexedDB** در مرورگر).
 
 ---
@@ -55,8 +37,8 @@ A monochromatic, high-density Shadcn mini-app ledger crafted for **freelancers, 
 
 ---
 
-### ۳. 📋 چسباندن فوری اسکرین‌شات مدرک با `Ctrl+V` (Proof of Work)
-- نیازی به ذخیره کردن فایل اسکرین‌شات روی دسکتاپ نیست!
+### ۳. 📋 ثبت و چسباندن اسکرین شات پایان کار/بوست `Ctrl+V` (Proof of Work)
+- نیازی به ذخیره کردن فایل اسکرین‌شات روی کامپیوتر نیست!
 - کافیست با ابزار عکس‌برداری ویندوز (`Win + Shift + S`) از پایان دانجن، ترید گلد یا تاییدیه مشتری عکس بگیرید و مستقیماً داخل پنجره ثبت کار `Ctrl + V` بزنید تا عکس ضمیمه شود.
 - امکان مشاهده تصاویر در اندازه کامل (Lightbox) و دانلود آن‌ها.
 
@@ -64,7 +46,7 @@ A monochromatic, high-density Shadcn mini-app ledger crafted for **freelancers, 
 
 ### ۴. 🧾 صدور رسید کار و خروجی دیسکورد (Receipt & Discord Export)
 - ایجاد فاکتور و رسید مرتب شامل عنوان کار، کارفرما/پلتفرم، زمان، دستمزد و اسکرین‌شات‌ها.
-- **کپی با یک کلیک برای دیسکورد (Discord Markdown)**: متن گزارش را به صورت آماده در دیسکورد برای کارفرما، لیدر یا مشتری بفرستید.
+- **کپی با یک کلیک برای دیسکورد (Discord Markdown)**: متن گزارش را به صورت آماده در دیسکورد برای ادورتایزر، لیدر یا مشتری بفرستید.
 - امکان ذخیره تصویر رسید برای ارسال در تلگرام یا دیسکورد.
 
 ---
@@ -76,7 +58,7 @@ A monochromatic, high-density Shadcn mini-app ledger crafted for **freelancers, 
 ---
 
 ### ۶. 📊 نمودارها و آمار مالی دقیق (Analytics)
-- نمایش روند درآمد ماهانه به تومان یا گلد.
+- نمایش روند درآمد روزانه، هفتگی، ماهانه و سالانه به تومان یا گلد.
 - تفکیک سهم درآمدی بازی‌ها و پلتفرم‌ها (Retail vs Classic vs Addons).
 
 ---
