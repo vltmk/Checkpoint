@@ -45,6 +45,8 @@ Thumbs.db
 # Tauri Build Outputs
 src-tauri/target/
 src-tauri/gen/
+.cargo/
+src-tauri/.cargo/
 
 # Tauri Signing Keys & Secrets
 *.key
