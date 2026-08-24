@@ -15,11 +15,20 @@
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/vltmk/Checkpoint/releases">
+    <img src="https://img.shields.io/badge/⬇️%20Download%20Latest%20Release-Windows%20(exe%20%2F%20msi)-10b981?style=for-the-badge&logo=windows&logoColor=white" alt="Download Latest Release" />
+  </a>
+</p>
+
 ---
 
 ## چک‌پوینت نرم‌افزار مدیریت و لجر فریلنسینگ گیمینگ
 
 چک پوینت یک نرم‌افزار بسیار سبک، تخصصی و کاملا آفلاین هست و برای ثبت، مدیریت و محاسبه‌ی درآمد پروژه‌ها و بوست‌های گیمینگ طراحی شده.
+
+> **📥 راهنمای دانلود برای کاربران ویندوز:**
+> برای دریافت نرم‌افزار، روی دکمه سبز بالا یا [اینجا (صفحه Releases)](https://github.com/vltmk/Checkpoint/releases) کلیک کنید. در صفحه باز شده، از بخش **Assets** فایل نصبی (با پسوند `.exe` یا `.msi`) را دانلود و نصب کنید.
 
 ---
 
