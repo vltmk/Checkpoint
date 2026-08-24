@@ -48,6 +48,14 @@ export function Navbar({
   const [tempRateTOMAN, setTempRateTOMAN] = useState(goldRateTOMAN);
   const ratesDropdownRef = useRef(null);
 
+  // Plays monochromatic border pulse after each reload until user interacts with the button
+  const [hasInteractedThisSession, setHasInteractedThisSession] = useState(false);
+  const isRateUpdateNeeded = !hasInteractedThisSession;
+
+  const recordRateInteraction = () => {
+    setHasInteractedThisSession(true);
+  };
+
   // Desktop window maximize state listener
   useEffect(() => {
     if (!isDesktop) return;
@@ -88,6 +96,7 @@ export function Navbar({
   }, [isRatesOpen]);
 
   const handleSaveRate = () => {
+    recordRateInteraction();
     onGoldRateTOMANChange?.(Number(tempRateTOMAN) || 3200);
     setIsRatesOpen(false);
   };
@@ -246,50 +255,97 @@ export function Navbar({
       <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-1.5 shrink-0 z-10">
         {/* Consolidated Currency & Gold Ratio Dropdown */}
         <div className="relative" ref={ratesDropdownRef} data-no-drag>
-          <button
-            type="button"
-            onClick={() => {
-              setTempRateTOMAN(goldRateTOMAN);
-              setIsRatesOpen((prev) => !prev);
-            }}
-            title="Configure Display Currency and Gold Rate"
-            className={`h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-md border text-xs transition-colors ${
-              isRatesOpen
-                ? 'bg-zinc-800 text-zinc-100 border-zinc-700 shadow-sm'
-                : 'bg-zinc-900/60 hover:bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-zinc-100'
-            }`}
-          >
-            {globalCurrency === 'GOLD' ? (
-              <Coins className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-            ) : (
-              <Banknote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <div className={`relative rounded-md overflow-hidden ${isRateUpdateNeeded ? 'p-[1px]' : ''}`}>
+            {/* Minimal Animated Monochromatic Rotating & Pulsing Border */}
+            {isRateUpdateNeeded && (
+              <motion.div
+                className="absolute inset-[-200%] pointer-events-none"
+                style={{
+                  background:
+                    'conic-gradient(from 0deg, #3f3f46, #e4e4e7, #71717a, #ffffff, #27272a, #d4d4d8, #3f3f46)',
+                }}
+                animate={{
+                  rotate: 360,
+                  opacity: [0.25, 0.95, 0.25],
+                  filter: [
+                    'drop-shadow(0 0 1px rgba(255, 255, 255, 0.1))',
+                    'drop-shadow(0 0 5px rgba(255, 255, 255, 0.45))',
+                    'drop-shadow(0 0 1px rgba(255, 255, 255, 0.1))',
+                  ],
+                }}
+                transition={{
+                  rotate: {
+                    repeat: Infinity,
+                    duration: 5,
+                    ease: 'linear',
+                  },
+                  opacity: {
+                    repeat: Infinity,
+                    duration: 2.2,
+                    ease: 'easeInOut',
+                  },
+                  filter: {
+                    repeat: Infinity,
+                    duration: 2.2,
+                    ease: 'easeInOut',
+                  },
+                }}
+              />
             )}
-            <span className={globalCurrency === 'TOMAN' ? 'font-farsi font-medium text-[11px]' : 'font-sans font-medium text-[11px]'}>
-              {globalCurrency === 'TOMAN' ? 'تومان' : 'Gold'}
-            </span>
-            <span className="hidden xl:inline text-zinc-600 text-[10px]">•</span>
-            <span className="hidden xl:inline font-sans text-[11px] text-zinc-400">
-              1k={goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN}T
-            </span>
-            <ChevronDown
-              className={`w-3 h-3 text-zinc-500 transition-transform duration-150 ${
-                isRatesOpen ? 'rotate-180 text-zinc-300' : ''
+
+            <button
+              type="button"
+              onClick={() => {
+                recordRateInteraction();
+                setTempRateTOMAN(goldRateTOMAN);
+                setIsRatesOpen((prev) => !prev);
+              }}
+              title="Configure Display Currency and Gold Rate"
+              className={`relative z-10 h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-[5px] text-xs transition-colors cursor-pointer select-none ${
+                isRateUpdateNeeded
+                  ? isRatesOpen
+                    ? 'bg-zinc-900 text-zinc-100 shadow-sm'
+                    : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100'
+                  : isRatesOpen
+                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
+                    : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100'
               }`}
-            />
-          </button>
+            >
+              {globalCurrency === 'GOLD' ? (
+                <Coins className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              ) : (
+                <Banknote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              )}
+              <span className={globalCurrency === 'TOMAN' ? 'font-farsi font-medium text-[11px]' : 'font-sans font-medium text-[11px]'}>
+                {globalCurrency === 'TOMAN' ? 'تومان' : 'Gold'}
+              </span>
+              <span className="hidden xl:inline text-zinc-600 text-[10px]">•</span>
+              <span className="hidden xl:inline font-sans text-[11px] text-zinc-400">
+                1k={goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN}T
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 text-zinc-500 transition-transform duration-150 ${
+                  isRatesOpen ? 'rotate-180 text-zinc-300' : ''
+                }`}
+              />
+            </button>
+          </div>
 
           {/* Unified Downward Popover Menu */}
           {isRatesOpen && (
-            <div className="absolute top-full right-0 mt-1.5 w-60 p-3 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50">
+            <div className="absolute top-full right-0 mt-1.5 w-60 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50">
               {/* Section 1: Display Currency Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
                   Display Currency
                 </label>
-                <div className="grid grid-cols-2 gap-1 bg-zinc-900/90 p-0.5 rounded-lg border border-zinc-800">
+                <div className="grid grid-cols-2 gap-1 bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
                   <button
                     type="button"
-                    onClick={() => onCurrencyChange('TOMAN')}
+                    onClick={() => {
+                      recordRateInteraction();
+                      onCurrencyChange('TOMAN');
+                    }}
                     className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
                       globalCurrency === 'TOMAN'
                         ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'
@@ -301,7 +357,10 @@ export function Navbar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onCurrencyChange('GOLD')}
+                    onClick={() => {
+                      recordRateInteraction();
+                      onCurrencyChange('GOLD');
+                    }}
                     className={`flex items-center justify-center gap-1.5 py-1 px-2 rounded-md text-xs font-medium transition-colors ${
                       globalCurrency === 'GOLD'
                         ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/80 font-semibold shadow-sm'

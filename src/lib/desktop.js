@@ -152,7 +152,61 @@ export async function saveImageNative({ defaultPath, dataUrl, filename }) {
 }
 
 /**
- * Native Clipboard helper
+ * Native & Web Image Clipboard helper
+ * Accepts { blob, dataUrl } and writes to system clipboard.
+ */
+export async function copyImageNative({ blob, dataUrl }) {
+  // 1. Try Tauri native writeImage
+  if (isTauri()) {
+    try {
+      const { writeImage } = await import('@tauri-apps/plugin-clipboard-manager');
+      if (blob) {
+        const arrayBuffer = await blob.arrayBuffer();
+        await writeImage(new Uint8Array(arrayBuffer));
+        return true;
+      } else if (dataUrl) {
+        const base64 = dataUrl.split(',')[1] || dataUrl;
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        await writeImage(bytes);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Native clipboard writeImage failed, falling back to navigator.clipboard:', e);
+    }
+  }
+
+  // 2. Try modern Web Async Clipboard API
+  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard && navigator.clipboard.write) {
+    try {
+      let imageBlob = blob;
+      if (!imageBlob && dataUrl) {
+        const res = await fetch(dataUrl);
+        imageBlob = await res.blob();
+      }
+      if (imageBlob) {
+        // Ensure standard PNG type for clipboard compatibility
+        const pngBlob =
+          imageBlob.type === 'image/png'
+            ? imageBlob
+            : new Blob([imageBlob], { type: 'image/png' });
+        const item = new ClipboardItem({ 'image/png': pngBlob });
+        await navigator.clipboard.write([item]);
+        return true;
+      }
+    } catch (e) {
+      console.error('Browser clipboard image write error:', e);
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Native & Web Text Clipboard helper
  */
 export async function copyTextNative(text) {
   if (isTauri()) {
@@ -175,3 +229,19 @@ export async function copyTextNative(text) {
   }
   return false;
 }
+
+/**
+ * Web Download helper for Blobs / Images
+ */
+export function downloadImageBlob(blob, filename = 'checkpoint_receipt.png') {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+

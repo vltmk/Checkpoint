@@ -12,6 +12,7 @@ export function ShortcutsModal({ isOpen, onClose }) {
         { keys: ['N'], desc: 'Add work record (Full)' },
         { keys: ['Q'], desc: 'Quick add work record' },
         { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof into modal' },
+        { keys: ['C'], desc: 'Copy receipt screenshot (in Receipt view)' },
         { keys: ['Esc'], desc: 'Close dialogs, cancel confirmation, or clear selection' },
       ],
     },
