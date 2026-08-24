@@ -5,6 +5,7 @@ import {
   Plus,
   Zap,
   Settings,
+  Bell,
 } from 'lucide-react';
 import nodraLogo from '../../nodra-vault.svg';
 
@@ -13,6 +14,8 @@ export function MobileHeader({
   onOpenSettings,
   onOpenWorkModal,
   onOpenQuickAdd,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
   appVersion = '',
 }) {
   return (
@@ -36,6 +39,17 @@ export function MobileHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenNotifications}
+          title="Notifications & Feed"
+          className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 active:scale-95 transition-all cursor-pointer hover:text-white"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          {unreadNotificationsCount > 0 && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-black" />
+          )}
+        </button>
         <button
           type="button"
           onClick={onOpenQuickAdd}

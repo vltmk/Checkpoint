@@ -40,7 +40,7 @@ export async function saveStoredNotifications(notifications) {
  * Synchronize and merge active announcements & updates into persistent notification history.
  * Preserves user's read and dismissed flags.
  */
-export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = null, announcements = [] } = {}) {
+export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = null, announcements = null } = {}) {
   const existingMap = new Map();
   for (const item of existingList) {
     if (item && item.id) {
@@ -49,6 +49,7 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
   }
 
   const merged = [];
+  const processedIds = new Set();
 
   // 1. Process Update Notification
   if (updateInfo && updateInfo.available && updateInfo.version) {
@@ -76,9 +77,10 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
         releaseUrl: updateInfo.releaseUrl,
       },
     });
+    processedIds.add(updateId);
   }
 
-  // 2. Process Remote Announcements
+  // 2. Process Remote Announcements (if provided)
   if (Array.isArray(announcements)) {
     for (const ann of announcements) {
       const annId = `announcement-${ann.id}`;
@@ -104,16 +106,14 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
         dismissed: false,
         action: ann.action || null,
       });
+      processedIds.add(annId);
     }
   }
 
-  // 3. Retain other non-ephemeral past system notifications
+  // 3. Retain ALL existing notifications (announcements, updater, system) that were not replaced or dismissed
   for (const item of existingList) {
-    if (item.source === 'system' && !item.dismissed) {
-      if (!merged.some((m) => m.id === item.id)) {
-        merged.push(item);
-      }
-    }
+    if (!item || item.dismissed || processedIds.has(item.id)) continue;
+    merged.push(item);
   }
 
   // Sort by pinned first, then newest publishedAt

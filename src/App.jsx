@@ -240,7 +240,6 @@ export default function App() {
           setUpdateInfo(res);
           currentMerged = mergeNotificationsIntoHistory(currentMerged, {
             updateInfo: res,
-            announcements: [],
           });
           setNotifications(currentMerged);
           await saveStoredNotifications(currentMerged);
@@ -345,7 +344,7 @@ export default function App() {
     if (res && res.available) {
       setUpdateInfo(res);
       const stored = await getStoredNotifications();
-      const updated = mergeNotificationsIntoHistory(stored, { updateInfo: res, announcements: [] });
+      const updated = mergeNotificationsIntoHistory(stored, { updateInfo: res });
       setNotifications(updated);
       await saveStoredNotifications(updated);
       showToast(`Update available: v${res.version}`);
@@ -921,6 +920,8 @@ export default function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenWorkModal={handleOpenWorkModal}
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+          unreadNotificationsCount={unreadNotificationsCount}
         />
       )}
 
