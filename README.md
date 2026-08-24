@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CHECKPOINT // Nodra Freelance & Gaming Ledger
 <img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/9948be18-06bc-49d3-978d-e448f80255bf" />
 <img width="1121" height="967" alt="image" src="https://github.com/user-attachments/assets/edf81a8c-5dd2-41b6-b9ce-d37ee7b422a3" />
@@ -9,19 +10,28 @@
 
 
 <div align="center">
+=======
+# Vault // Nodra Freelance & Gaming Ledger
+
+A monochromatic, high-density Shadcn mini-app ledger crafted for **freelancers, gaming boosters, raid runners, addon creators, and digital devs**.
+>>>>>>> d3a9287 (docs: update repository README with comprehensive Persian guide, offline privacy, and backup workflows)
 
 ![UI - Monochromatic Shadcn](https://img.shields.io/badge/UI-Monochromatic%20Shadcn-black?style=flat-square)
 ![Animation - Motion](https://img.shields.io/badge/Animation-Motion%20%28React%29-10b981?style=flat-square)
 ![Framework - Vite React](https://img.shields.io/badge/Stack-Vite%20%2B%20React-3b82f6?style=flat-square)
 ![Currencies](https://img.shields.io/badge/Currencies-USD%20%7C%20TOMAN%20%7C%20GOLD-fafafa?style=flat-square)
+<<<<<<< HEAD
 ![Checkpoint UI](https://img.shields.io/badge/Platform-Windows%20Desktop%20%7C%20Web-black?style=for-the-badge)
 ![Offline First](https://img.shields.io/badge/Storage-100%25%20Offline%20%26%20Local-10b981?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
 </div>
+=======
+>>>>>>> d3a9287 (docs: update repository README with comprehensive Persian guide, offline privacy, and backup workflows)
 
 # ✨ قابلیت‌های اصلی چک‌پوینت
 
+<<<<<<< HEAD
 ### ۱. 🔒 کاملاً آفلاین و امن (۱۰۰٪ Local & Private)
 - تمامی اطلاعات، مبالغ، یادداشت‌ها و اسکرین‌شات‌های شما **فقط روی کامپیوتر خودتان** ذخیره می‌شوند.
 - سرعت فوق‌العاده بالا به لطف استفاده از موتور پایگاه‌داده محلی (**SQLite** در نسخه دسکتاپ و **IndexedDB** در مرورگر).
@@ -88,6 +98,23 @@
 برای اینکه سریع‌تر و بدون نیاز به موس با برنامه کار کنید، کلیدهای زیر در دسترس هستند:
 
 | کلید میانبر | عملکرد |
+=======
+## What's New in Vault 3.0
+
+- 📱 **Tablet-Width Desktop Shell & Mobile Bottom Dock**: Centered `max-w-5xl` tablet shell with a sleek left sidebar navigation on desktop and a floating mobile navigation dock.
+- 🪙 **Mathematical Bi-Directional Currency Engine**: Full bi-directional conversion between **USD ($)**, **IRANIAN TOMAN (تومان)**, and **GOLD (🪙)** with configurable live rates.
+- 🔄 **Dedicated Gold Exchange View**: Live 2-way Gold to Fiat calculator, realm token presets, and portfolio gold valuation.
+- 📋 **Direct `Ctrl+V` Screenshot Paste**: Instant clipboard screenshot pasting (`Win+Shift+S`) into the work modal.
+- 🧾 **Proof-of-Work Receipts & Discord MD**: Printable work receipt slips and 1-click Discord Markdown copy for instant client sharing.
+- 📊 **Monochromatic Analytics & Overview**: High-contrast, clean Chart.js velocity and game share donut visualizations shown by default.
+- 💾 **Zero Quota Limit Storage**: Built on **IndexedDB** (`src/lib/db.js`) with full JSON backup/restore and CSV export.
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+>>>>>>> d3a9287 (docs: update repository README with comprehensive Persian guide, offline privacy, and backup workflows)
 | :--- | :--- |
 | <kbd>?</kbd> | Open Keyboard Shortcuts Guide |
 | <kbd>N</kbd> | Log New Work Entry |
@@ -100,58 +127,24 @@
 | <kbd>Alt</kbd>+<kbd>B</kbd> | Full JSON Backup with Screenshots |
 | <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste Screenshot Proof (in modal) |
 | <kbd>Esc</kbd> | Close any open modal or clear search |
-| <kbd>N</kbd> | باز کردن پنجره ثبت کار جدید (**Add Work**) |
-| <kbd>Q</kbd> | باز کردن پنجره ثبت سریع کار (**Quick Add**) |
-| <kbd>/</kbd> | فوکوس فوری روی کادر جستجو و فیلترها |
-| <kbd>?</kbd> | نمایش لیست راهنمای کلیدهای میانبر |
-| <kbd>Ctrl</kbd> + <kbd>,</kbd> | باز کردن تنظیمات و بخش پشتیبان‌گیری |
-| <kbd>Ctrl</kbd> + <kbd>V</kbd> | چسباندن اسکرین‌شات کپی‌شده از کلیپ‌بورد در فرم کار |
-| <kbd>Esc</kbd> | بستن پنجره‌ها یا خروج از حالت جستجو |
 
 ---
 
 ## Getting Started
-## 🚀 نصب و راه‌اندازی برای برنامه‌نویسان (Development)
-
-اگر می‌خواهید روی پروژه توسعه دهید یا تغییرات اختصاصی اعمال کنید:
 
 ```bash
 # 1. Install dependencies
-# ۱. کلون کردن ریپازیتوری
-git clone https://github.com/your-username/checkpoint.git
-cd checkpoint
-
-# ۲. نصب پکیج‌ها
 npm install
 
 # 2. Run local development server
-# ۳. اجرای سرور توسعه (Vite Web)
 npm run dev
 
 # 3. Build for production
 npm run build
-# ۴. اجرای نسخه دسکتاپ (Tauri Desktop Dev)
-npm run desktop:dev
-
-# ۵. ساخت فایل نصبی ویندوز (Build NSIS & MSI Installer)
-npm run desktop:build
 ```
 
 ---
 
 ## Developer Guide
-## 🛠️ تکنولوژی‌های استفاده شده
 
 For code conventions, component hierarchy, and git manual workflow, see [`AGENTS.md`](./AGENTS.md).
-- **هسته دسکتاپ**: [Tauri 2](https://tauri.app/) + Rust
-- **فرانت‌اند**: React 18 + Vite
-- **استایل و دیزاین**: Tailwind CSS + Shadcn Dark Zinc Design System
-- **انیمیشن‌ها**: Motion (`motion/react`)
-- **پایگاه داده**: SQLite محلی (Tauri Plugin SQL) / IndexedDB
-- **فونت‌ها**: IRANYekanRd (فارسی) + Ioskeley Mono (اعداد و مقادیر) + Inter
-
----
-
-## 📄 لایسنس (License)
-
-این پروژه تحت لایسنس **MIT** منتشر شده است. استفاده، شخصی‌سازی و توسعه آن برای تمامی کاربران و گیمرها آزاد است.
