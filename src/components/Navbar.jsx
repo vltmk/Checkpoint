@@ -20,7 +20,7 @@ import {
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
-import nodraLogo from '../assets/nodra-vault.svg';
+import checkpointLogo from '../assets/checkpoint.svg';
 import {
   minimizeWindow,
   toggleMaximizeWindow,
@@ -179,7 +179,7 @@ export function Navbar({
           className="flex items-center gap-2 select-none cursor-pointer group p-1 -m-1 rounded-md hover:bg-zinc-900/80 transition-colors"
         >
           <img
-            src={nodraLogo}
+            src={checkpointLogo}
             alt="CHECKPOINT"
             className="w-5 h-5 object-contain group-hover:scale-105 transition-transform"
           />

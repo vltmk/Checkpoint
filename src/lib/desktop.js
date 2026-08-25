@@ -1,5 +1,5 @@
 /**
- * desktop.js - Native Tauri desktop integration helpers for Nodra Vault
+ * desktop.js - Native Tauri desktop integration helpers for CHECKPOINT
  * Gracefully falls back when running in browser mode.
  */
 
@@ -375,8 +375,8 @@ export async function openExternalUrl(url) {
   if (!url || typeof url !== 'string') return;
   const cleanUrl = url.trim();
 
-  // Enforce protocol safety (HTTPS or local development)
-  if (!cleanUrl.startsWith('https://') && !cleanUrl.startsWith('http://localhost')) {
+  // Enforce protocol safety (HTTPS, mailto, or local development)
+  if (!cleanUrl.startsWith('https://') && !cleanUrl.startsWith('http://localhost') && !cleanUrl.startsWith('mailto:')) {
     console.warn('[Desktop] Refusing to open insecure or unapproved protocol URL:', cleanUrl);
     return;
   }
@@ -518,5 +518,74 @@ export async function optimizeImageProof(blobOrDataUrl, maxDimension = 1920, qua
     }
   });
 }
+
+/**
+ * Generates a lightweight deterministic fingerprint of ledger state and financial parameters.
+ * Used by automated backup systems to skip redundant export writes when no data has changed.
+ */
+export function generateLedgerFingerprint(entries = [], currency = 'TOMAN', goldRate = 0) {
+  try {
+    let sumUpdated = 0;
+    let sumIncome = 0;
+    const ids = [];
+
+    for (const e of entries) {
+      if (!e) continue;
+      ids.push(e.id || '');
+      sumIncome += Number(e.income) || 0;
+      sumUpdated += Number(e.updated_at) || 0;
+    }
+
+    return `${entries.length}_${sumIncome}_${sumUpdated}_${currency}_${goldRate}_${ids.slice(0, 10).join(':')}`;
+  } catch (err) {
+    return `${Date.now()}`;
+  }
+}
+
+/**
+ * Native Directory Pruner for Scheduled Backups
+ * Lists files matching prefix pattern in target directory, sorts chronologically,
+ * and deletes older files exceeding maxFiles retention limit.
+ */
+export async function pruneOldBackupsNative({ backupDir, maxFiles = 5, prefix = 'checkpoint_autobackup_' } = {}) {
+  if (!isTauri() || !backupDir || maxFiles <= 0) return { pruned: 0, total: 0 };
+  try {
+    const { readDir, remove } = await import('@tauri-apps/plugin-fs');
+    const entries = await readDir(backupDir);
+    if (!Array.isArray(entries)) return { pruned: 0, total: 0 };
+
+    const sep = backupDir.includes('\\') ? '\\' : '/';
+    const cleanDir = backupDir.replace(/[/\\]+$/, '');
+
+    // Match files strictly named checkpoint_autobackup_*.json
+    const backupFiles = entries
+      .filter((file) => {
+        const name = file?.name || '';
+        return name.startsWith(prefix) && name.endsWith('.json') && !file.isDirectory;
+      })
+      .map((file) => file.name)
+      .sort((a, b) => b.localeCompare(a)); // Descending: newest first (ISO timestamps sort alphabetically)
+
+    let pruned = 0;
+    if (backupFiles.length > maxFiles) {
+      const filesToDelete = backupFiles.slice(maxFiles);
+      for (const fileName of filesToDelete) {
+        try {
+          const filePath = `${cleanDir}${sep}${fileName}`;
+          await remove(filePath);
+          pruned++;
+        } catch (delErr) {
+          console.warn(`[AutoBackup] Failed to prune old backup file: ${fileName}`, delErr);
+        }
+      }
+    }
+
+    return { pruned, total: backupFiles.length - pruned };
+  } catch (err) {
+    console.warn('[AutoBackup] Pruning failed:', err);
+    return { pruned: 0, total: 0, error: err };
+  }
+}
+
 
 

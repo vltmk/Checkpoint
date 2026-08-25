@@ -5,6 +5,7 @@
  */
 
 import { trackerDB } from './db';
+import { isRTL } from './utils';
 import localAnnouncementsFeed from '../../announcements.json';
 
 export const ANNOUNCEMENT_STORAGE_KEY = 'checkpoint_announcements_state';
@@ -56,6 +57,10 @@ export function sanitizeAnnouncement(item) {
     }
   }
 
+  const explicitDir = item.dir === 'rtl' || item.dir === 'ltr' ? item.dir : null;
+  const lang = typeof item.lang === 'string' ? item.lang.trim().toLowerCase() : null;
+  const computedDir = explicitDir || (lang === 'fa' || lang === 'per' || lang === 'ar' || isRTL(title) || isRTL(message) ? 'rtl' : 'ltr');
+
   return {
     id,
     type: ['info', 'warning', 'critical', 'success'].includes(item.type) ? item.type : 'info',
@@ -66,6 +71,8 @@ export function sanitizeAnnouncement(item) {
     dismissible: item.dismissible !== false,
     pinned: Boolean(item.pinned),
     action: safeAction,
+    dir: computedDir,
+    lang: lang || (computedDir === 'rtl' ? 'fa' : 'en'),
   };
 }
 

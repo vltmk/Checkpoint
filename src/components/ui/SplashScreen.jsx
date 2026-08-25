@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import nodraLogo from '../../assets/nodra-vault.svg';
+import checkpointLogo from '../../assets/checkpoint.svg';
 
 export function SplashScreen() {
   return (
@@ -15,7 +15,7 @@ export function SplashScreen() {
         {/* Crisp Unboxed Geometric Logo */}
         <div className="w-14 h-14 flex items-center justify-center">
           <img
-            src={nodraLogo}
+            src={checkpointLogo}
             alt="CHECKPOINT"
             className="w-full h-full object-contain"
           />
@@ -28,7 +28,7 @@ export function SplashScreen() {
           </span>
 
           <p className="text-xs text-zinc-400 font-sans tracking-normal">
-            Nodra's freelancing ledger
+            High-density freelance & gaming ledger
           </p>
         </div>
 

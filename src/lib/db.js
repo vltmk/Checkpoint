@@ -1,12 +1,12 @@
 /**
- * db.js - Unified Hybrid Storage Engine for Nodra Vault
+ * db.js - Unified Hybrid Storage Engine for CHECKPOINT
  * Automatically routes to SQLite in Tauri Desktop mode, or IndexedDB in Web Browser mode.
  * Features lazy-loaded proof attachments, WAL mode, and rolling snapshots.
  */
 
 import { isTauri } from './desktop';
 
-const DB_NAME_IDB = 'NodraVaultDB_v1';
+const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
 const STORE_ENTRIES = 'work_entries';
 const STORE_SETTINGS = 'app_settings';
@@ -24,8 +24,9 @@ export class StorageDB {
     if (this.isDesktop) {
       try {
         const Database = (await import('@tauri-apps/plugin-sql')).default;
-        this.sqliteDb = await Database.load('sqlite:nodra_vault.db');
+        this.sqliteDb = await Database.load('sqlite:checkpoint.db');
         await this.initSqliteSchema();
+        await this.migrateLegacySqliteData(Database);
         return this.sqliteDb;
       } catch (err) {
         console.warn('Failed to initialize Tauri SQLite, falling back to IndexedDB:', err);
@@ -128,6 +129,86 @@ export class StorageDB {
         created_at TEXT NOT NULL
       );
     `);
+  }
+
+  async migrateLegacySqliteData(Database) {
+    if (!this.sqliteDb) return;
+    try {
+      // Check if checkpoint.db already has entries
+      const countRows = await this.sqliteDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+      const hasEntries = countRows && countRows[0] && countRows[0].cnt > 0;
+      if (hasEntries) return;
+
+      // Check if legacy nodra_vault.db exists and has data to migrate
+      let legacyDb = null;
+      try {
+        legacyDb = await Database.load('sqlite:nodra_vault.db');
+        const legacyCount = await legacyDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+        if (legacyCount && legacyCount[0] && legacyCount[0].cnt > 0) {
+          // Migrate work_entries
+          const oldEntries = await legacyDb.select('SELECT * FROM work_entries');
+          for (const row of oldEntries) {
+            await this.sqliteDb.execute(
+              `INSERT OR IGNORE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                row.id, row.title, row.game, row.source || 'Direct Client',
+                row.teamMode || 0, row.teammates || '[]', row.income || 0,
+                row.currency || 'TOMAN', row.exchangeRate || 3200, row.rateUnit || '1k',
+                row.status || 'Working', row.dateTime, row.hours || 0,
+                row.notes || '', row.created_at || Math.floor(Date.now() / 1000), row.updated_at || Math.floor(Date.now() / 1000)
+              ]
+            );
+          }
+
+          // Migrate proof_attachments
+          try {
+            const oldProofs = await legacyDb.select('SELECT * FROM proof_attachments');
+            for (const p of oldProofs) {
+              await this.sqliteDb.execute(
+                `INSERT OR IGNORE INTO proof_attachments (id, entry_id, name, data_blob, size, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [p.id, p.entry_id, p.name, p.data_blob, p.size || 0, p.created_at]
+              );
+            }
+          } catch (e) {}
+
+          // Migrate app_settings
+          try {
+            const oldSettings = await legacyDb.select('SELECT * FROM app_settings');
+            for (const s of oldSettings) {
+              await this.sqliteDb.execute(
+                `INSERT OR IGNORE INTO app_settings (key, value, updated_at)
+                 VALUES (?, ?, ?)`,
+                [s.key, s.value, s.updated_at || Math.floor(Date.now() / 1000)]
+              );
+            }
+          } catch (e) {}
+
+          // Migrate db_snapshots
+          try {
+            const oldSnapshots = await legacyDb.select('SELECT * FROM db_snapshots');
+            for (const snap of oldSnapshots) {
+              await this.sqliteDb.execute(
+                `INSERT OR IGNORE INTO db_snapshots (id, name, snapshot_json, entries_count, created_at)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [snap.id, snap.name, snap.snapshot_json, snap.entries_count || 0, snap.created_at]
+              );
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        // No legacy database or migration not needed
+      } finally {
+        if (legacyDb) {
+          try {
+            await legacyDb.close();
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      console.warn('Legacy migration check skipped:', e);
+    }
   }
 
   /* =========================================================================
@@ -546,31 +627,55 @@ export class StorageDB {
 
   async getSetting(key, fallback = null) {
     await this.initPromise;
-    if (this.isDesktop && this.sqliteDb) {
-      try {
-        const rows = await this.sqliteDb.select('SELECT value FROM app_settings WHERE key = ? LIMIT 1', [key]);
-        if (rows && rows.length > 0) {
+
+    const legacyKeyMap = {
+      checkpoint_currency: 'nodrapay_currency',
+      checkpoint_gold_rate_toman: 'nodrapay_gold_rate_toman',
+      checkpoint_tab: 'nodrapay_tab',
+      checkpoint_last_auto_snapshot_date: 'vault_last_auto_snapshot_date',
+      checkpoint_quick_last_game: 'vault_quick_last_game',
+      checkpoint_quick_last_custom_game: 'vault_quick_last_custom_game',
+      checkpoint_quick_last_source: 'vault_quick_last_source',
+      checkpoint_quick_last_currency: 'vault_quick_last_currency',
+      checkpoint_work_draft: 'vault_work_draft',
+      checkpoint_user_saved_sources: 'vault_user_saved_sources_v2',
+      checkpoint_analytics_timeframe: 'vault_analytics_timeframe',
+      checkpoint_v2_seeded: 'nodrapay_v2_seeded',
+    };
+
+    const keysToTry = [key];
+    if (legacyKeyMap[key]) {
+      keysToTry.push(legacyKeyMap[key]);
+    }
+
+    for (const k of keysToTry) {
+      if (this.isDesktop && this.sqliteDb) {
+        try {
+          const rows = await this.sqliteDb.select('SELECT value FROM app_settings WHERE key = ? LIMIT 1', [k]);
+          if (rows && rows.length > 0) {
+            try {
+              return JSON.parse(rows[0].value);
+            } catch (e) {
+              return rows[0].value;
+            }
+          }
+        } catch (err) {
+          console.error('SQLite getSetting error:', err);
+        }
+      }
+
+      if (typeof localStorage !== 'undefined') {
+        const val = localStorage.getItem(k);
+        if (val !== null) {
           try {
-            return JSON.parse(rows[0].value);
+            return JSON.parse(val);
           } catch (e) {
-            return rows[0].value;
+            return val;
           }
         }
-      } catch (err) {
-        console.error('SQLite getSetting error:', err);
       }
     }
 
-    if (typeof localStorage !== 'undefined') {
-      const val = localStorage.getItem(key);
-      if (val !== null) {
-        try {
-          return JSON.parse(val);
-        } catch (e) {
-          return val;
-        }
-      }
-    }
     return fallback;
   }
 
@@ -601,7 +706,7 @@ export class StorageDB {
   async autoCreateDailySnapshot() {
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const lastSnapKey = 'vault_last_auto_snapshot_date';
+      const lastSnapKey = 'checkpoint_last_auto_snapshot_date';
       const lastDate = await this.getSetting(lastSnapKey, '');
 
       if (lastDate !== today) {
@@ -619,8 +724,8 @@ export class StorageDB {
       // Get all entries with full proofs
       const entries = await this.getAllEntriesFull();
       const snapshot = {
-        app: 'Nodra Vault',
-        version: '2.0.0',
+        app: 'CHECKPOINT',
+        version: '2.2.0',
         timestamp: new Date().toISOString(),
         entries,
       };
@@ -695,436 +800,6 @@ export class StorageDB {
       full.push(fullEntry || item);
     }
     return full;
-  }
-
-  /* =========================================================================
-   * 6. Sample Data Seeding
-   * ========================================================================= */
-
-  async resetWithFreshSeed() {
-    await this.clearAll();
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('nodrapay_v2_seeded');
-    }
-    return await this.seedInitialDataIfEmpty(true);
-  }
-
-  async seedInitialDataIfEmpty(force = false) {
-    if (!force) {
-      return [];
-    }
-
-    await this.setSetting('nodrapay_v2_seeded', true);
-
-    const now = new Date();
-      const offsetDate = (daysAgo, hour = 14) => {
-        const d = new Date(now.getTime() - daysAgo * 86400000);
-        d.setHours(hour, Math.floor(Math.random() * 59), 0, 0);
-        return d.toISOString().slice(0, 16);
-      };
-
-      const sampleEntries = [
-        {
-          id: 'job_' + Date.now() + '_1',
-          title: 'Mythic+ +20 Keystone Carry (Armor Funnel)',
-          game: 'World of Warcraft',
-          source: 'Discord Direct',
-          teamMode: true,
-          teammates: ['ShadowPriest', 'TankGod'],
-          income: 450000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(0, 15),
-          hours: 2.5,
-          notes: 'Timed +20 dungeon run with specific cloth armor loot funnel.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_2',
-          title: 'Ulduar 25 GDKP Guild Run Cut Split',
-          game: 'World of Warcraft Classic',
-          source: 'Guild Run',
-          teamMode: true,
-          teammates: ['Valkyrie', 'HealBot'],
-          income: 850,
-          currency: 'GOLD',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Paid',
-          dateTime: offsetDate(0, 11),
-          hours: 4.0,
-          notes: 'Full clear GDKP raid with high cut payout.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_3',
-          title: 'Powerleveling 1-80 Speed Service',
-          game: 'World of Warcraft Classic',
-          source: 'G2G',
-          teamMode: false,
-          teammates: [],
-          income: 3500000,
-          currency: 'TOMAN',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Working',
-          dateTime: offsetDate(1, 16),
-          hours: 12.0,
-          notes: 'Fast questing and dungeon leveling service.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_4',
-          title: 'Custom Mythic Raid WeakAuras Suite',
-          game: 'World of Warcraft',
-          source: 'Personal Client',
-          teamMode: false,
-          teammates: [],
-          income: 1800000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Pending',
-          dateTime: offsetDate(1, 10),
-          hours: 5.0,
-          notes: 'Custom Mythic raid aura suite and action bar integration.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_5',
-          title: 'Profession Crafting Max-Rank Batch',
-          game: 'World of Warcraft',
-          source: 'FunPay',
-          teamMode: false,
-          teammates: [],
-          income: 600000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'On Hold',
-          dateTime: offsetDate(2, 18),
-          hours: 6.0,
-          notes: 'Max-rank craft orders fulfilled; awaiting client trade.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_6',
-          title: 'Diablo IV Pit Tier 100+ Carry',
-          game: 'Diablo IV',
-          source: 'Discord Direct',
-          teamMode: true,
-          teammates: ['BarbKing', 'SorcererX'],
-          income: 2200000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(3, 14),
-          hours: 3.5,
-          notes: 'Speed runs for glyph upgrades and Masterworking materials.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_7',
-          title: 'Heroic Raid Full Clear (Personal Loot)',
-          game: 'World of Warcraft',
-          source: 'Eldorado',
-          teamMode: true,
-          teammates: ['RaidLead', 'DPSGod'],
-          income: 550000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(4, 20),
-          hours: 2.0,
-          notes: 'Fast 8/8 heroic clear with bonus loot traders.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_8',
-          title: 'PoE T17 Abomination Map Boss Carry',
-          game: 'Path of Exile',
-          source: 'Discord Direct',
-          teamMode: false,
-          teammates: [],
-          income: 1650000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(5, 17),
-          hours: 1.5,
-          notes: 'Deathless boss carry with fragment delivery.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_9',
-          title: 'LoL Diamond Duo Queue Placement Boost',
-          game: 'League of Legends',
-          source: 'G2G',
-          teamMode: true,
-          teammates: ['DuoPartner'],
-          income: 2800000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(6, 19),
-          hours: 6.0,
-          notes: '5-0 placement matches streak in Diamond MMR.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_10',
-          title: 'Gladiator Arena 3v3 Coaching Session',
-          game: 'World of Warcraft',
-          source: 'Personal Client',
-          teamMode: true,
-          teammates: ['GladCoach', 'R1Rogue'],
-          income: 4200000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(7, 21),
-          hours: 4.0,
-          notes: 'Cross-cc setups, positioning, and defensive cooldown coaching.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_11',
-          title: 'Icecrown Citadel 25H Shadowmourne Shards',
-          game: 'World of Warcraft Classic',
-          source: 'Guild Run',
-          teamMode: true,
-          teammates: ['GuildMaster', 'MainTank'],
-          income: 1200,
-          currency: 'GOLD',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Paid',
-          dateTime: offsetDate(8, 20),
-          hours: 3.5,
-          notes: 'Shadowfrost Shard reservation split payout.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_12',
-          title: 'Diablo IV Torment 4 Boss Rotation Bundle',
-          game: 'Diablo IV',
-          source: 'FunPay',
-          income: 1400000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Working',
-          dateTime: offsetDate(9, 13),
-          hours: 2.0,
-          notes: '20x Duriel and Andariel summon rotations.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_13',
-          title: 'Mage Tower Challenge Completion (All 7)',
-          game: 'World of Warcraft',
-          source: 'PlayerAuctions',
-          income: 900000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(10, 16),
-          hours: 3.0,
-          notes: 'Soaring Spelltome mount unlock achieved.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_14',
-          title: 'PoE Uber Elder & Maven Carry',
-          game: 'Path of Exile',
-          source: 'Discord Direct',
-          income: 1950000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Pending',
-          dateTime: offsetDate(12, 15),
-          hours: 2.0,
-          notes: 'Feared invitation set carry.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_15',
-          title: 'WoW Classic Hardcore 1-60 Duo Safe Escort',
-          game: 'World of Warcraft Classic',
-          source: 'Personal Client',
-          income: 5500000,
-          currency: 'TOMAN',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Paid',
-          dateTime: offsetDate(13, 11),
-          hours: 25.0,
-          notes: 'Safe leveling escort with zero deaths.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_16',
-          title: 'Mythic Raid 8/8 Vault Bosses Package',
-          game: 'World of Warcraft',
-          source: 'Discord Direct',
-          income: 2400000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(15, 20),
-          hours: 3.5,
-          notes: 'Cutting Edge achievement and mount package.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_17',
-          title: 'Diablo IV Masterworking 12/12 Gear Prep',
-          game: 'Diablo IV',
-          source: 'G2G',
-          income: 2100000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(16, 14),
-          hours: 5.0,
-          notes: 'Triple crit masterworking on client weapons.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_18',
-          title: 'LoL Master Tier Promo Series Boost',
-          game: 'League of Legends',
-          source: 'FunPay',
-          income: 3900000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(18, 19),
-          hours: 8.0,
-          notes: 'Diamond 1 to Master promotion series won 3-1.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_19',
-          title: 'Custom ElvUI / Plater Profile Commission',
-          game: 'World of Warcraft',
-          source: 'Personal Client',
-          income: 1200000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(19, 12),
-          hours: 3.0,
-          notes: 'Pixel-perfect high contrast arena & M+ UI profile.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_20',
-          title: 'GDKP Naxxramas 25 Immortal Title Run',
-          game: 'World of Warcraft Classic',
-          source: 'Guild Run',
-          income: 1500,
-          currency: 'GOLD',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Paid',
-          dateTime: offsetDate(21, 21),
-          hours: 4.0,
-          notes: 'Flawless zero death clear with bonus pot split.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_21',
-          title: 'PoE 40/40 League Challenges Service',
-          game: 'Path of Exile',
-          source: 'Discord Direct',
-          income: 4800000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(22, 16),
-          hours: 14.0,
-          notes: 'Complete end-game league challenge fulfillment and totem reward.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_22',
-          title: 'Mythic+ 0 to 2500 Rating Sprint',
-          game: 'World of Warcraft',
-          source: 'Eldorado',
-          income: 1800000,
-          currency: 'GOLD',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(24, 18),
-          hours: 7.0,
-          notes: 'All 8 dungeons timed on Fortified and Tyrannical.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_23',
-          title: 'WoW Classic Gold Delivery 50,000g Batch',
-          game: 'World of Warcraft Classic',
-          source: 'FunPay',
-          income: 750,
-          currency: 'GOLD',
-          exchangeRate: 7000,
-          rateUnit: '1',
-          status: 'Paid',
-          dateTime: offsetDate(25, 14),
-          hours: 1.0,
-          notes: 'Guild bank direct deposit delivery.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_24',
-          title: 'Diablo IV Paragon 1-300 Leveling Service',
-          game: 'Diablo IV',
-          source: 'G2G',
-          income: 2700000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(27, 13),
-          hours: 9.0,
-          notes: 'Infernal Hordes tier 8 fast leveling grind.',
-          proofs: [],
-        },
-        {
-          id: 'job_' + Date.now() + '_25',
-          title: 'LoL Clash Tournament Win Coaching',
-          game: 'League of Legends',
-          source: 'Personal Client',
-          income: 1500000,
-          currency: 'TOMAN',
-          exchangeRate: 3200,
-          rateUnit: '1k',
-          status: 'Paid',
-          dateTime: offsetDate(29, 20),
-          hours: 4.0,
-          notes: 'Draft phase strategy, warding patterns, and trophy victory.',
-          proofs: [],
-        },
-      ];
-
-      await this.bulkImport(sampleEntries);
-      return sampleEntries;
   }
 }
 

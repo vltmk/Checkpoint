@@ -39,6 +39,9 @@ ChartJS.register(
   Legend
 );
 
+// Configure Chart.js global defaults to prioritize IRANYekanRd for Persian text (تومان)
+ChartJS.defaults.font.family = "'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
 const TIMEFRAMES = [
   { id: 'daily', label: 'Daily', windowText: 'Last 14 Days' },
   { id: 'weekly', label: 'Weekly', windowText: 'Last 8 Weeks' },
@@ -52,13 +55,13 @@ export function AnalyticsView({
   goldRateTOMAN = 3200,
 }) {
   const [timeframe, setTimeframe] = useState(() => {
-    return localStorage.getItem('vault_analytics_timeframe') || 'monthly';
+    return localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe') || 'monthly';
   });
 
   const handleTimeframeChange = (tf) => {
     setTimeframe(tf);
     try {
-      localStorage.setItem('vault_analytics_timeframe', tf);
+      localStorage.setItem('checkpoint_analytics_timeframe', tf);
     } catch (e) {
       // Ignore quota errors
     }
@@ -293,6 +296,15 @@ export function AnalyticsView({
         borderWidth: 1,
         padding: 8,
         cornerRadius: 6,
+        titleFont: {
+          family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif",
+          size: 11,
+          weight: '600',
+        },
+        bodyFont: {
+          family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace",
+          size: 11,
+        },
         callbacks: {
           label: (context) => ` ${formatMoney(context.parsed.y, globalCurrency)}`,
         },
@@ -301,14 +313,17 @@ export function AnalyticsView({
     scales: {
       x: {
         grid: { display: false },
-        ticks: { color: '#71717a', font: { size: 11, family: 'Inter' } },
+        ticks: {
+          color: '#71717a',
+          font: { size: 11, family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif" },
+        },
         border: { display: false },
       },
       y: {
         grid: { color: 'rgba(255, 255, 255, 0.04)' },
         ticks: {
           color: '#71717a',
-          font: { size: 10, family: 'IoskeleyMono' },
+          font: { size: 10, family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace" },
           callback: (value) => formatMoney(value, globalCurrency, true),
         },
         border: { display: false },
@@ -329,6 +344,15 @@ export function AnalyticsView({
         borderWidth: 1,
         padding: 8,
         cornerRadius: 6,
+        titleFont: {
+          family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif",
+          size: 11,
+          weight: '600',
+        },
+        bodyFont: {
+          family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace",
+          size: 11,
+        },
         callbacks: {
           label: (context) => ` ${formatMoney(context.parsed, globalCurrency)}`,
         },

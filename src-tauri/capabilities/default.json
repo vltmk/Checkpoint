@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default permissions for Nodra Vault desktop shell",
+  "description": "Default permissions for CHECKPOINT desktop shell",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -39,6 +39,8 @@
     "fs:allow-write-text-file",
     "fs:allow-read-file",
     "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-remove",
     "updater:default",
     "updater:allow-check",
     "updater:allow-download-and-install",
@@ -60,6 +62,14 @@
     },
     {
       "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
       "allow": [{ "path": "**" }]
     }
   ]

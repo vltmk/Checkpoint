@@ -17,7 +17,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { DiscordIcon } from './ui/Icons';
 import { openExternalUrl } from '../lib/desktop';
+import { isNotificationRTL, isRTL } from '../lib/utils';
 
 export function NotificationCenter({
   isOpen,
@@ -232,110 +234,152 @@ export function NotificationCenter({
                 </p>
               </div>
             ) : (
-              displayedNotifications.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => onMarkAsRead?.(item.id)}
-                  className={`group relative p-3 rounded-xl border transition-all text-xs space-y-2 cursor-default ${
-                    !item.read
-                      ? 'bg-zinc-900/90 border-zinc-700/80 shadow-md'
-                      : 'bg-zinc-950/60 border-zinc-800/80 hover:border-zinc-700/60'
-                  }`}
-                >
-                  {/* Top line: Icon, Type Badge, Published Date */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
-                        {getNotificationIcon(item)}
+              displayedNotifications.map((item) => {
+                const isRTLItem = isNotificationRTL(item);
+                const isActionRTL = item.action?.label ? isRTL(item.action.label) : isRTLItem;
+
+                return (
+                  <div
+                    key={item.id}
+                    dir={isRTLItem ? 'rtl' : 'ltr'}
+                    onClick={() => onMarkAsRead?.(item.id)}
+                    className={`group relative p-3 rounded-xl border transition-all text-xs space-y-2 cursor-default ${
+                      !item.read
+                        ? 'bg-zinc-900/90 border-zinc-700/80 shadow-md'
+                        : 'bg-zinc-950/60 border-zinc-800/80 hover:border-zinc-700/60'
+                    }`}
+                  >
+                    {/* Top line: Icon, Type Badge, Published Date */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0">
+                          {getNotificationIcon(item)}
+                        </div>
+                        <span
+                          dir="ltr"
+                          className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.2 rounded border ${getBadgeStyle(
+                            item
+                          )}`}
+                        >
+                          {item.source === 'updater' ? 'Release' : item.type}
+                        </span>
+                        {!item.read && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                        )}
                       </div>
-                      <span
-                        className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.2 rounded border ${getBadgeStyle(
-                          item
-                        )}`}
-                      >
-                        {item.source === 'updater' ? 'Release' : item.type}
+
+                      <span dir="ltr" className="text-[10px] text-zinc-500 font-mono shrink-0">
+                        {formatTime(item.publishedAt)}
                       </span>
-                      {!item.read && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                    </div>
+
+                    {/* Notification Title & Body */}
+                    <div className="space-y-1">
+                      <div
+                        className={`font-semibold text-zinc-100 break-words ${
+                          isRTLItem
+                            ? 'text-right font-farsi tracking-normal text-xs leading-[1.65]'
+                            : 'leading-snug'
+                        }`}
+                      >
+                        {item.title}
+                      </div>
+                      {item.message && (
+                        <p
+                          className={`text-zinc-400 break-words whitespace-pre-line ${
+                            isRTLItem
+                              ? 'text-right font-farsi tracking-normal text-[11px] leading-[1.75]'
+                              : 'text-[11px] leading-relaxed'
+                          }`}
+                        >
+                          {item.message}
+                        </p>
                       )}
                     </div>
 
-                    <span className="text-[10px] text-zinc-500 font-mono shrink-0">
-                      {formatTime(item.publishedAt)}
-                    </span>
-                  </div>
-
-                  {/* Notification Title & Body */}
-                  <div className="space-y-1">
-                    <div className="font-semibold text-zinc-100 leading-snug break-words">
-                      {item.title}
-                    </div>
-                    {item.message && (
-                      <p className="text-[11px] text-zinc-400 leading-relaxed break-words whitespace-pre-line">
-                        {item.message}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Actions (if configured) */}
-                  {item.action && (
-                    <div className="pt-1 flex items-center gap-2">
-                      {item.source === 'updater' ? (
-                        <>
-                          <Button
-                            variant="primary"
-                            size="xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenUpdateModal?.();
-                              onClose();
-                            }}
-                            className="gap-1.5 text-[11px] h-6 px-2.5 font-semibold"
-                          >
-                            <Download className="w-3 h-3" />
-                            <span>Update Checkpoint</span>
-                          </Button>
-                          {item.action.url && (
+                    {/* Actions (if configured) */}
+                    {item.action && (
+                      <div className="pt-1 flex items-center gap-2">
+                        {item.source === 'updater' ? (
+                          <>
                             <Button
-                              variant="secondary"
+                              variant="primary"
                               size="xs"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                openExternalUrl(item.action.url);
+                                onOpenUpdateModal?.();
+                                onClose();
                               }}
-                              className="gap-1 text-[11px] h-6 px-2 text-zinc-400"
+                              className="gap-1.5 text-[11px] h-6 px-2.5 font-semibold"
                             >
-                              <ExternalLink className="w-3 h-3" />
-                              <span>Release Notes</span>
+                              <Download className="w-3 h-3" />
+                              <span>Update Checkpoint</span>
                             </Button>
-                          )}
-                        </>
-                      ) : (
-                        <Button
-                          variant="secondary"
-                          size="xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (item.action.url) {
-                              openExternalUrl(item.action.url);
-                            }
-                          }}
-                          className="gap-1.5 text-[11px] h-6 px-2.5 text-zinc-200"
-                        >
-                          <span>{item.action.label || 'Open Link'}</span>
-                          <ExternalLink className="w-3 h-3 text-zinc-400" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
+                            {item.action.url && (
+                              <Button
+                                variant="secondary"
+                                size="xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openExternalUrl(item.action.url);
+                                }}
+                                className="gap-1 text-[11px] h-6 px-2 text-zinc-400"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Release Notes</span>
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (item.action.url) {
+                                openExternalUrl(item.action.url);
+                              }
+                            }}
+                            className={`gap-1.5 text-[11px] h-6 px-2.5 text-zinc-200 ${
+                              isActionRTL ? 'font-farsi tracking-normal' : ''
+                            }`}
+                          >
+                            <span>{item.action.label || 'Open Link'}</span>
+                            <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
 
-          {/* Footer Info */}
-          <div className="p-3 border-t border-zinc-900 bg-zinc-950/80 text-[10px] text-zinc-500 text-center font-mono">
-            Checkpoint • Local-First Ledger Engine
+          {/* Footer: Official Discord Community */}
+          <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/90 flex items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 text-zinc-400">
+                <DiscordIcon className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-zinc-200 truncate">
+                  Official Discord Server
+                </div>
+                <div className="text-[10px] text-zinc-500 font-mono truncate">
+                  discord.gg/TYPRXeKPp
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => openExternalUrl('https://discord.gg/TYPRXeKPp')}
+              className="gap-1 text-xs h-7 px-2.5 shrink-0 text-zinc-200 hover:text-white"
+            >
+              <span>Join</span>
+              <ExternalLink className="w-3 h-3 text-zinc-400" />
+            </Button>
           </div>
         </motion.div>
       </div>

@@ -285,4 +285,26 @@ button, a, input, textarea, select, .no-drag {
   -webkit-app-region: no-drag;
 }
 
+/* Persian (Farsi) & RTL Typography Utilities */
+.font-farsi {
+  font-family: 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  letter-spacing: normal !important;
+}
+
+.rtl-text {
+  direction: rtl;
+  text-align: right;
+  font-family: 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: normal !important;
+  line-height: 1.75;
+  unicode-bidi: isolate;
+}
+
+.rtl-text bdi,
+.rtl-text code,
+.rtl-text .bdi-isolate {
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
 

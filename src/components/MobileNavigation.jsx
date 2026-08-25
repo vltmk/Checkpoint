@@ -7,7 +7,7 @@ import {
   Settings,
   Bell,
 } from 'lucide-react';
-import nodraLogo from '../assets/nodra-vault.svg';
+import checkpointLogo from '../assets/checkpoint.svg';
 import { openExternalUrl } from '../lib/desktop';
 
 export function MobileHeader({
@@ -28,7 +28,7 @@ export function MobileHeader({
         className="flex items-center gap-2 active:opacity-75 transition-opacity text-left cursor-pointer"
       >
         <img
-          src={nodraLogo}
+          src={checkpointLogo}
           alt="CHECKPOINT"
           className="w-5 h-5 object-contain"
         />

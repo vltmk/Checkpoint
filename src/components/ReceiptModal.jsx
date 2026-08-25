@@ -14,9 +14,10 @@ import {
   MessageSquare,
   Users,
 } from 'lucide-react';
-import nodraLogo from '../assets/nodra-vault.svg';
+import checkpointLogo from '../assets/checkpoint.svg';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../lib/desktop';
 import { toBlob } from 'html-to-image';
+import { incrementLocalReceiptCount } from '../lib/telemetry';
 
 export function ReceiptModal({
   isOpen,
@@ -96,6 +97,7 @@ Notes: ${safeEntry.notes || 'None'}
 ==============================`;
 
     await copyTextNative(text);
+    incrementLocalReceiptCount();
     onToast?.('📋 Plain receipt copied to clipboard!');
   }, [
     entry,
@@ -133,6 +135,7 @@ Notes      = ${safeEntry.notes || 'None'}
 \`\`\``;
 
     await copyTextNative(md);
+    incrementLocalReceiptCount();
     onToast?.('🎮 Discord markdown copied to clipboard!');
   }, [
     entry,
@@ -185,6 +188,7 @@ Notes      = ${safeEntry.notes || 'None'}
       }
 
       const copied = await copyImageNative({ blob });
+      incrementLocalReceiptCount();
       if (copied) {
         setCopiedState(true);
         setTimeout(() => setCopiedState(false), 2000);
@@ -241,7 +245,7 @@ Notes      = ${safeEntry.notes || 'None'}
           <div className="flex items-start justify-between border-b border-zinc-800 pb-4">
             <div className="flex items-center gap-3">
               <img
-                src={nodraLogo}
+                src={checkpointLogo}
                 alt="CHECKPOINT"
                 className="w-7 h-7 object-contain"
               />

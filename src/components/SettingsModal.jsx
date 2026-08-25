@@ -27,8 +27,11 @@ import {
   Keyboard,
   FolderArchive,
   Folder,
+  Mail,
+  ExternalLink,
 } from 'lucide-react';
-import { isTauri, selectDirectoryNative } from '../lib/desktop';
+import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative } from '../lib/desktop';
+import { DiscordIcon, TelegramIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
 import { Input } from './ui/Input';
 
@@ -44,7 +47,6 @@ export function SettingsModal({
   onExportCsv,
   onExportJson,
   onImportJson,
-  onResetData,
   onClearAllData,
   onToast,
   entriesCount = 0,
@@ -60,6 +62,9 @@ export function SettingsModal({
   onAutoBackupPathChange,
   autoBackupFrequency = 'daily',
   onAutoBackupFrequencyChange,
+  autoBackupRetention = 5,
+  onAutoBackupRetentionChange,
+  onManualAutoBackup,
 }) {
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
@@ -132,14 +137,16 @@ export function SettingsModal({
         />
 
         {/* 1. Global Currency Preference */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-zinc-300">
-            Default Display Currency
-          </label>
-          <p className="text-[11px] text-zinc-500">
-            Choose the default primary currency used across dashboard metrics and financial charts.
-          </p>
-          <div className="pt-1">
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+          <div className="space-y-0.5 min-w-0 pr-1">
+            <label className="block text-xs font-semibold text-zinc-200">
+              Default Display Currency
+            </label>
+            <p className="text-[11px] text-zinc-500 leading-tight">
+              Primary currency for dashboard metrics and charts
+            </p>
+          </div>
+          <div className="w-36 shrink-0">
             <Select
               value={globalCurrency}
               onChange={(val) => {
@@ -147,7 +154,7 @@ export function SettingsModal({
                 onToast?.(`Currency switched to ${val}`);
               }}
               options={currencyOptions}
-              className="h-9 text-xs"
+              className="h-8 text-xs bg-zinc-950/80"
             />
           </div>
         </div>
@@ -223,7 +230,199 @@ export function SettingsModal({
           </div>
         )}
 
-        {/* 3. Software Updates & Announcements Feed */}
+
+        {/* 3. Scheduled Folder Backups (Custom User Directory) */}
+        {isDesktop && (
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <FolderArchive className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Scheduled Folder Backups</span>
+              </label>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {autoBackupEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Automatically save timestamped JSON ledger backups to a designated folder on your PC.
+            </p>
+
+            {/* Toggle Switch */}
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+              <div className="space-y-0.5 pr-2">
+                <div className="text-xs font-medium text-zinc-200">
+                  Auto-Export to Folder
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  {autoBackupEnabled
+                    ? (autoBackupPath ? 'Automated backups active' : 'Select a folder to activate')
+                    : 'Disabled by default'}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoBackupEnabled}
+                onClick={async () => {
+                  if (!autoBackupEnabled && !autoBackupPath) {
+                    const dir = await selectDirectoryNative({ title: 'Select Automated Backup Folder' });
+                    if (dir) {
+                      onAutoBackupPathChange?.(dir);
+                      onAutoBackupEnabledChange?.(true);
+                    } else {
+                      onToast?.('Backup folder selection cancelled');
+                    }
+                  } else {
+                    onAutoBackupEnabledChange?.(!autoBackupEnabled);
+                  }
+                }}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  autoBackupEnabled ? 'bg-zinc-100' : 'bg-zinc-800'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    autoBackupEnabled ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Directory & Frequency Configuration when Enabled */}
+            {autoBackupEnabled && (
+              <div className="space-y-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                {/* Folder Selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                    Backup Folder Path
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-xs font-mono text-zinc-300 truncate">
+                      {autoBackupPath || 'No folder selected'}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={async () => {
+                        const dir = await selectDirectoryNative({ title: 'Select Automated Backup Folder' });
+                        if (dir) {
+                          onAutoBackupPathChange?.(dir);
+                          onToast?.('Backup folder selected');
+                        }
+                      }}
+                      className="gap-1 h-7 text-xs shrink-0"
+                    >
+                      <Folder className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Browse...</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={() => {
+                        if (!autoBackupPath) {
+                          onToast?.('Please select a backup folder first', 'error');
+                          return;
+                        }
+                        onManualAutoBackup?.();
+                      }}
+                      className="gap-1 h-7 text-xs shrink-0"
+                      title="Trigger an immediate backup snapshot"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Backup Now</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Frequency & Retention Grid */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {/* Frequency Selector */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                      Export Frequency
+                    </span>
+                    <Select
+                      value={autoBackupFrequency}
+                      onChange={(val) => onAutoBackupFrequencyChange?.(val)}
+                      options={[
+                        { value: 'on_start', label: 'On Startup' },
+                        { value: 'daily', label: 'Daily (24h)' },
+                        { value: 'weekly', label: 'Weekly (7d)' },
+                      ]}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+
+                  {/* Retention Limit Selector */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                      Retention Limit
+                    </span>
+                    <Select
+                      value={String(autoBackupRetention)}
+                      onChange={(val) => onAutoBackupRetentionChange?.(Number(val))}
+                      options={[
+                        { value: '5', label: 'Keep 5 (Default)' },
+                        { value: '10', label: 'Keep 10 Backups' },
+                        { value: '20', label: 'Keep 20 Backups' },
+                        { value: '0', label: 'Keep All (No Limit)' },
+                      ]}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-zinc-500 pt-0.5 leading-relaxed">
+                  Smart change detection skips redundant exports when ledger data is unchanged. Older backups beyond the retention limit are automatically rotated.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Automatic Daily Rolling Snapshots (Desktop/SQLite) */}
+        {snapshots.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Automatic Snapshots</span>
+              </label>
+              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                Protected
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Rolling daily recovery points saved automatically to prevent data loss.
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex-1">
+                <Select
+                  value={selectedSnapshot}
+                  onChange={setSelectedSnapshot}
+                  options={snapshots.map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.entries_count} records)`,
+                  }))}
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleRestoreSnapshot}
+                className="gap-1.5 text-xs shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Restore</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* 5. Software Updates & Announcements Feed */}
         <div className="space-y-3 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
@@ -281,7 +480,104 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 4. Data Backup & Portability */}
+        {/* 6. Community & Contact Info */}
+        <div className="space-y-2.5 pt-2 border-t border-zinc-800">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+              <DiscordIcon className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Community & Contact</span>
+            </label>
+            <span className="text-[10px] font-mono text-zinc-500">
+              Direct Support
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-0.5">
+            {/* Discord */}
+            <button
+              type="button"
+              onClick={() => openExternalUrl('https://discord.gg/TYPRXeKPp')}
+              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              title="Join official Discord server: https://discord.gg/TYPRXeKPp"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <DiscordIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                    Discord
+                  </span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              </div>
+              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
+                discord.gg/TYPRXeKPp
+              </div>
+            </button>
+
+            {/* Telegram */}
+            <button
+              type="button"
+              onClick={() => openExternalUrl('https://t.me/sovrgn0')}
+              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              title="Message @sovrgn0 on Telegram"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <TelegramIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                    Telegram
+                  </span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              </div>
+              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
+                @sovrgn0
+              </div>
+            </button>
+
+            {/* Email */}
+            <button
+              type="button"
+              onClick={async () => {
+                await copyTextNative('sovrgnx@proton.me');
+                onToast?.('Copied sovrgnx@proton.me to clipboard');
+                openExternalUrl('mailto:sovrgnx@proton.me');
+              }}
+              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              title="Copy email: sovrgnx@proton.me"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Mail className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                    Email
+                  </span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              </div>
+              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
+                sovrgnx@proton.me
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* 7. Privacy & Anonymous Diagnostics Notice */}
+        <div className="pt-2 border-t border-zinc-800">
+          <div className="p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/70 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <div className="text-xs font-medium text-zinc-300">
+                Privacy & Usage Diagnostics
+              </div>
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                CHECKPOINT only collects anonymous active user counts and high-level 24-hour feature rollups. No financial data, earnings, client names, notes, or ledger records are ever collected or transmitted.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 8. Data Backup & Portability */}
         <div className="space-y-2 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-semibold text-zinc-300">
@@ -343,167 +639,16 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 3. Automatic Daily Rolling Snapshots (Desktop/SQLite) */}
-        {snapshots.length > 0 && (
-          <div className="space-y-2 pt-2 border-t border-zinc-800">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Automatic Snapshots</span>
-              </label>
-              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                Protected
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500">
-              Rolling daily recovery points saved automatically to prevent data loss.
-            </p>
-
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex-1">
-                <Select
-                  value={selectedSnapshot}
-                  onChange={setSelectedSnapshot}
-                  options={snapshots.map((s) => ({
-                    value: s.id,
-                    label: `${s.name} (${s.entries_count} records)`,
-                  }))}
-                  className="h-8 text-xs font-mono"
-                />
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleRestoreSnapshot}
-                className="gap-1.5 text-xs shrink-0"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Restore</span>
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* 4. Scheduled Folder Backups (Custom User Directory) */}
-        {isDesktop && (
-          <div className="space-y-3 pt-2 border-t border-zinc-800">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <FolderArchive className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Scheduled Folder Backups</span>
-              </label>
-              <span className="text-[10px] font-mono text-zinc-500">
-                {autoBackupEnabled ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500">
-              Automatically save timestamped JSON ledger backups to a designated folder on your PC.
-            </p>
-
-            {/* Toggle Switch */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
-              <div className="space-y-0.5 pr-2">
-                <div className="text-xs font-medium text-zinc-200">
-                  Auto-Export to Folder
-                </div>
-                <div className="text-[11px] text-zinc-500">
-                  {autoBackupEnabled ? 'Backup will run on schedule' : 'Disabled by default'}
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoBackupEnabled}
-                onClick={() => onAutoBackupEnabledChange?.(!autoBackupEnabled)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  autoBackupEnabled ? 'bg-zinc-100' : 'bg-zinc-800'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    autoBackupEnabled ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Directory & Frequency Configuration when Enabled */}
-            {autoBackupEnabled && (
-              <div className="space-y-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
-                {/* Folder Selector */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                    Backup Folder Path
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-xs font-mono text-zinc-300 truncate">
-                      {autoBackupPath || 'No folder selected'}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="xs"
-                      onClick={async () => {
-                        const dir = await selectDirectoryNative({ title: 'Select Automated Backup Folder' });
-                        if (dir) {
-                          onAutoBackupPathChange?.(dir);
-                          onToast?.('Backup folder selected');
-                        }
-                      }}
-                      className="gap-1 h-7 text-xs shrink-0"
-                    >
-                      <Folder className="w-3.5 h-3.5 text-zinc-400" />
-                      <span>Browse...</span>
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Frequency Selector */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                    Export Frequency
-                  </span>
-                  <Select
-                    value={autoBackupFrequency}
-                    onChange={(val) => onAutoBackupFrequencyChange?.(val)}
-                    options={[
-                      { value: 'on_start', label: 'On Every App Startup' },
-                      { value: 'daily', label: 'Daily (Once per day)' },
-                      { value: 'weekly', label: 'Weekly (Once every 7 days)' },
-                    ]}
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 5. Danger Zone: Reset & Clear All Data */}
+        {/* 9. Danger Zone: Clear All Data */}
         <div className="space-y-3 pt-2 border-t border-zinc-800">
           <label className="block text-xs font-semibold text-rose-400">
             Danger Zone
           </label>
           <p className="text-[11px] text-zinc-500">
-            Re-populate with default mock data or completely wipe the database.
+            Permanently purge all local ledger entries, income records, and proof attachments.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-2 pt-0.5">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                if (window.confirm('Reset database with 25 fresh sample records? All existing custom records will be replaced.')) {
-                  onResetData?.();
-                  onClose();
-                }
-              }}
-              className="gap-2 text-xs flex-1 justify-center"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Reset Sample Data</span>
-            </Button>
-
+          <div className="pt-0.5">
             <Button
               variant="danger"
               size="sm"
@@ -512,7 +657,7 @@ export function SettingsModal({
                 setPurgeSnapshots(false);
                 setIsClearConfirmOpen(true);
               }}
-              className="gap-2 text-xs flex-1 justify-center bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-900/80"
+              className="gap-2 text-xs w-full justify-center bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-900/80"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
               <span>Clear All Data...</span>

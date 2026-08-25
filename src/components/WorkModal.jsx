@@ -43,7 +43,8 @@ const STATUS_OPTIONS = [
   { value: 'On Hold', label: 'On Hold' },
 ];
 
-const DRAFT_KEY = 'vault_work_draft';
+const DRAFT_KEY = 'checkpoint_work_draft';
+const LEGACY_DRAFT_KEY = 'vault_work_draft';
 
 export function WorkModal({
   isOpen,
@@ -138,7 +139,7 @@ export function WorkModal({
       }
     } else {
       try {
-        const savedDraft = localStorage.getItem(DRAFT_KEY);
+        const savedDraft = localStorage.getItem(DRAFT_KEY) || localStorage.getItem(LEGACY_DRAFT_KEY);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           const draftTeammates = Array.isArray(parsed.teammates) ? parsed.teammates : [];
@@ -203,6 +204,7 @@ export function WorkModal({
 
   const handleClearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(LEGACY_DRAFT_KEY);
     setIsDraftRestored(false);
     setFormData({
       title: '',
@@ -515,6 +517,7 @@ export function WorkModal({
     };
 
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(LEGACY_DRAFT_KEY);
     onSave(entryToSave);
   };
 

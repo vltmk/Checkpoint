@@ -1,5 +1,5 @@
 /**
- * currencies.js - Currency definitions, formatters, and conversion engine for Nodra Vault
+ * currencies.js - Currency definitions, formatters, and conversion engine for CHECKPOINT
  * Strictly supports Iranian Toman (تومان) and World of Warcraft Gold (G).
  */
 

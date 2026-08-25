@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { installUpdate, relaunchApp } from '../lib/updater';
 import { openExternalUrl } from '../lib/desktop';
+import { isRTL } from '../lib/utils';
 
 export function UpdateModal({
   isOpen,
@@ -108,14 +109,26 @@ export function UpdateModal({
         </div>
 
         {/* Release Notes Preview */}
-        <div className="space-y-1.5">
-          <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-            What's New in v{newVersion}
-          </label>
-          <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 max-h-40 overflow-y-auto font-sans leading-relaxed whitespace-pre-wrap select-text">
-            {updateInfo.body || 'Performance enhancements, optimizations, and stability improvements.'}
-          </div>
-        </div>
+        {(() => {
+          const isBodyRTL = isRTL(updateInfo.body);
+          return (
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                What's New in v{newVersion}
+              </label>
+              <div
+                dir={isBodyRTL ? 'rtl' : 'ltr'}
+                className={`p-3 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 max-h-40 overflow-y-auto whitespace-pre-wrap select-text ${
+                  isBodyRTL
+                    ? 'font-farsi text-right tracking-normal leading-[1.75]'
+                    : 'font-sans leading-relaxed'
+                }`}
+              >
+                {updateInfo.body || 'Performance enhancements, optimizations, and stability improvements.'}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Download Progress State */}
         {installState === 'downloading' && (

@@ -164,6 +164,8 @@ export function mergeNotificationsIntoHistory(
         read: previous ? Boolean(previous.read) : false,
         dismissed: false,
         action: ann.action || null,
+        dir: ann.dir || null,
+        lang: ann.lang || null,
       });
       processedIds.add(annId);
     }

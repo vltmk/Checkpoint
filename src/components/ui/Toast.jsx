@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, isRTL } from '../../lib/utils';
 
 export function Toast({ toast, onClose }) {
   if (!toast) return null;
 
-  const { title, description, variant = 'default' } = toast;
+  const { title, description, variant = 'default', dir } = toast;
+  const isToastRTL = dir === 'rtl' || isRTL(title) || isRTL(description);
 
   const getIcon = () => {
     switch (variant) {
@@ -23,6 +24,7 @@ export function Toast({ toast, onClose }) {
 
   return (
     <motion.div
+      dir={isToastRTL ? 'rtl' : 'ltr'}
       initial={{ opacity: 0, y: -20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -16, scale: 0.95 }}
@@ -42,14 +44,28 @@ export function Toast({ toast, onClose }) {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 min-w-0 pr-1">
+      <div className={cn('flex-1 min-w-0', isToastRTL ? 'pl-1' : 'pr-1')}>
         {title && (
-          <div className="text-sm font-semibold text-zinc-100 tracking-tight leading-snug break-words">
+          <div
+            className={cn(
+              'font-semibold text-zinc-100 break-words',
+              isToastRTL
+                ? 'text-right font-farsi tracking-normal text-sm leading-[1.6]'
+                : 'text-sm tracking-tight leading-snug'
+            )}
+          >
             {title}
           </div>
         )}
         {description && (
-          <div className="text-xs text-zinc-400 leading-relaxed mt-0.5 break-words">
+          <div
+            className={cn(
+              'text-zinc-400 break-words mt-0.5',
+              isToastRTL
+                ? 'text-right font-farsi tracking-normal text-xs leading-[1.7]'
+                : 'text-xs leading-relaxed'
+            )}
+          >
             {description}
           </div>
         )}

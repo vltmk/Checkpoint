@@ -11,7 +11,8 @@ const LEGACY_PRESETS = new Set([
   'guild',
 ]);
 
-const SAVED_SOURCES_KEY = 'vault_user_saved_sources_v2';
+const SAVED_SOURCES_KEY = 'checkpoint_user_saved_sources_v2';
+const LEGACY_SAVED_SOURCES_KEY = 'vault_user_saved_sources_v2';
 
 export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e.g. Enter seller, broker, or client...' }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +20,7 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
     try {
       // Purge old preset key from localStorage
       localStorage.removeItem('vault_saved_sources');
-      const saved = localStorage.getItem(SAVED_SOURCES_KEY);
+      const saved = localStorage.getItem(SAVED_SOURCES_KEY) || localStorage.getItem(LEGACY_SAVED_SOURCES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {

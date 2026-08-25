@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    nodra_vault_lib::run()
+    checkpoint_lib::run()
 }

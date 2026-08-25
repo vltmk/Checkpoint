@@ -1,12 +1,12 @@
 [package]
-name = "nodra-vault"
+name = "checkpoint"
 version = "2.2.0"
 description = "High-density offline freelance ledger for gaming boosters, devs, and creators"
-authors = ["Nodra"]
+authors = ["CHECKPOINT"]
 edition = "2021"
 
 [lib]
-name = "nodra_vault_lib"
+name = "checkpoint_lib"
 crate-type = ["rlib"]
 
 [build-dependencies]

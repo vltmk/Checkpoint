@@ -43,7 +43,10 @@ import {
   resetTrayNotificationFlag,
   listenToTrayEvents,
   sendDesktopNotification,
+  pruneOldBackupsNative,
+  generateLedgerFingerprint,
 } from './lib/desktop';
+import { initTelemetry, incrementLocalWorkCount, flushDailyTelemetry } from './lib/telemetry';
 
 export default function App() {
   const isDesktop = isTauri();
@@ -84,17 +87,21 @@ export default function App() {
   const [autoBackupFrequency, setAutoBackupFrequency] = useState(() => {
     return localStorage.getItem('checkpoint_auto_backup_frequency') || 'daily';
   });
+  const [autoBackupRetention, setAutoBackupRetention] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_auto_backup_retention');
+    return saved !== null ? Number(saved) : 5;
+  });
 
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem('nodrapay_tab');
+    const saved = localStorage.getItem('checkpoint_tab') || localStorage.getItem('nodrapay_tab');
     if (saved === 'analytics') return 'analytics';
     return 'ledger';
   });
 
   // User Currency Preferences (TOMAN | GOLD)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
-    const saved = localStorage.getItem('nodrapay_currency');
+    const saved = localStorage.getItem('checkpoint_currency') || localStorage.getItem('nodrapay_currency');
     if (saved === 'WOW_GOLD') return 'GOLD';
     if (saved === 'GOLD') return 'GOLD';
     return 'TOMAN';
@@ -102,7 +109,7 @@ export default function App() {
 
   // Gold Exchange Rate in Toman (default 3,200 Toman per 1,000 Gold)
   const [goldRateTOMAN, setGoldRateTOMAN] = useState(() => {
-    const saved = localStorage.getItem('nodrapay_gold_rate_toman');
+    const saved = localStorage.getItem('checkpoint_gold_rate_toman') || localStorage.getItem('nodrapay_gold_rate_toman');
     if (saved !== null) {
       const parsed = parseFloat(saved);
       return !isNaN(parsed) && parsed > 0 ? parsed : 3200;
@@ -216,11 +223,11 @@ export default function App() {
       setEntries(all);
 
       // Also hydrate persistent settings from SQLite / DB
-      const savedCur = await trackerDB.getSetting('nodrapay_currency', null);
+      const savedCur = await trackerDB.getSetting('checkpoint_currency', null);
       if (savedCur && ['TOMAN', 'GOLD'].includes(savedCur)) {
         setGlobalCurrency(savedCur);
       }
-      const savedRate = await trackerDB.getSetting('nodrapay_gold_rate_toman', null);
+      const savedRate = await trackerDB.getSetting('checkpoint_gold_rate_toman', null);
       if (savedRate && Number(savedRate) > 0) {
         setGoldRateTOMAN(Number(savedRate));
       }
@@ -248,6 +255,11 @@ export default function App() {
       if (savedAutoBackupFreq) {
         setAutoBackupFrequency(savedAutoBackupFreq);
         localStorage.setItem('checkpoint_auto_backup_frequency', savedAutoBackupFreq);
+      }
+      const savedAutoBackupRetention = await trackerDB.getSetting('checkpoint_auto_backup_retention', null);
+      if (savedAutoBackupRetention !== null) {
+        setAutoBackupRetention(Number(savedAutoBackupRetention));
+        localStorage.setItem('checkpoint_auto_backup_retention', savedAutoBackupRetention);
       }
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
@@ -342,9 +354,10 @@ export default function App() {
   }, [isDesktop, showToast, appVersion]);
 
   // Execute scheduled automated backups (if enabled)
-  const runScheduledAutoBackup = useCallback(async () => {
+  const runScheduledAutoBackup = useCallback(async (opts = {}) => {
     if (!isDesktop || !autoBackupEnabled || !autoBackupPath) return;
     try {
+      const isManual = opts.force === true;
       const lastRunStr = await trackerDB.getSetting('checkpoint_last_auto_backup_timestamp', '');
       const lastRun = lastRunStr ? Number(lastRunStr) : 0;
       const now = Date.now();
@@ -356,13 +369,22 @@ export default function App() {
         intervalMs = 7 * 24 * 60 * 60 * 1000;
       }
 
-      if (now - lastRun >= intervalMs) {
+      if (isManual || now - lastRun >= intervalMs) {
         const fullEntries = await trackerDB.getAllEntriesFull();
+        const currentFingerprint = generateLedgerFingerprint(fullEntries, globalCurrency, goldRateTOMAN);
+        const lastFingerprint = await trackerDB.getSetting('checkpoint_last_auto_backup_hash', '');
+
+        // Smart Change Detection: Skip export if no financial/entry data changed and not a manual trigger
+        if (!isManual && currentFingerprint === lastFingerprint && lastRun > 0) {
+          await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
+          return;
+        }
+
         const backupData = {
           app: 'CHECKPOINT',
           version: appVersion || '0.0.0',
           exportDate: new Date().toISOString(),
-          type: 'scheduled_auto_backup',
+          type: isManual ? 'manual_auto_backup' : 'scheduled_auto_backup',
           currency: globalCurrency,
           goldRateTOMAN,
           entriesCount: fullEntries.length,
@@ -377,32 +399,62 @@ export default function App() {
 
         await writeTextFile(fullPath, JSON.stringify(backupData, null, 2));
         await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
+        await trackerDB.setSetting('checkpoint_last_auto_backup_hash', currentFingerprint);
+
+        // Auto-Pruning: Enforce retention limit (e.g. keep last N backups)
+        if (autoBackupRetention > 0) {
+          await pruneOldBackupsNative({
+            backupDir: autoBackupPath,
+            maxFiles: autoBackupRetention,
+          });
+        }
+
+        if (isManual) {
+          showToast('Backup snapshot saved to folder');
+        }
       }
     } catch (err) {
-      console.warn('[AutoBackup] Scheduled backup failed:', err);
+      console.warn('[AutoBackup] Backup execution failed:', err);
+      if (opts.force) {
+        showToast('Backup failed: check folder permissions', 'error');
+      }
     }
-  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, appVersion, globalCurrency, goldRateTOMAN]);
+  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN, showToast]);
 
+  const syncFeedsRef = useRef(syncFeeds);
+  useEffect(() => {
+    syncFeedsRef.current = syncFeeds;
+  }, [syncFeeds]);
+
+  const runScheduledAutoBackupRef = useRef(runScheduledAutoBackup);
+  useEffect(() => {
+    runScheduledAutoBackupRef.current = runScheduledAutoBackup;
+  }, [runScheduledAutoBackup]);
+
+  // Initial application bootstrap and background synchronization timers (runs once on mount)
   useEffect(() => {
     loadData();
     showWindow();
     enforceMinWindowSize(800, 560);
 
-    // Initial background feed sync shortly after render
+    // Initial background feed sync & telemetry shortly after render
     const timer = setTimeout(() => {
-      syncFeeds({ silent: true });
-      runScheduledAutoBackup();
+      syncFeedsRef.current?.({ silent: true });
+      runScheduledAutoBackupRef.current?.();
+      initTelemetry();
+      flushDailyTelemetry();
     }, 700);
 
     // Periodic polling every 4 hours for long-running / tray sessions
     const intervalTimer = setInterval(() => {
-      syncFeeds({ silent: true });
-      runScheduledAutoBackup();
+      syncFeedsRef.current?.({ silent: true });
+      runScheduledAutoBackupRef.current?.();
+      flushDailyTelemetry();
     }, 4 * 60 * 60 * 1000);
 
     // Window focus listener to refresh feeds when switching back
     const handleFocus = () => {
-      syncFeeds({ silent: true });
+      syncFeedsRef.current?.({ silent: true });
     };
     window.addEventListener('focus', handleFocus);
 
@@ -411,7 +463,7 @@ export default function App() {
       clearInterval(intervalTimer);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [loadData, syncFeeds, runScheduledAutoBackup]);
+  }, [loadData]);
 
   // Desktop Window & System Tray Event Listeners
   useEffect(() => {
@@ -450,38 +502,62 @@ export default function App() {
   }, [isDesktop]);
 
   // Tray Setting Handlers
-  const handleCloseToTrayChange = (val) => {
+  const handleCloseToTrayChange = async (val) => {
     setCloseToTray(val);
     localStorage.setItem('checkpoint_close_to_tray', String(val));
-    trackerDB.setSetting('checkpoint_close_to_tray', String(val));
+    try {
+      await trackerDB.setSetting('checkpoint_close_to_tray', String(val));
+    } catch (e) {}
     showToast(val ? 'Closing window will minimize to System Tray' : 'Closing window will quit application');
   };
 
-  const handleMinimizeToTrayChange = (val) => {
+  const handleMinimizeToTrayChange = async (val) => {
     setMinimizeToTray(val);
     localStorage.setItem('checkpoint_minimize_to_tray', String(val));
-    trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
+    try {
+      await trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
+    } catch (e) {}
     showToast(val ? 'Minimize button will hide to System Tray' : 'Minimize button will minimize to Taskbar');
   };
 
-  const handleAutoBackupEnabledChange = (val) => {
+  const handleAutoBackupEnabledChange = async (val) => {
     setAutoBackupEnabled(val);
     localStorage.setItem('checkpoint_auto_backup_enabled', String(val));
-    trackerDB.setSetting('checkpoint_auto_backup_enabled', String(val));
+    try {
+      await trackerDB.setSetting('checkpoint_auto_backup_enabled', String(val));
+    } catch (e) {}
     showToast(val ? 'Scheduled folder backup enabled' : 'Scheduled folder backup disabled');
   };
 
-  const handleAutoBackupPathChange = (val) => {
+  const handleAutoBackupPathChange = async (val) => {
     setAutoBackupPath(val);
     localStorage.setItem('checkpoint_auto_backup_path', val);
-    trackerDB.setSetting('checkpoint_auto_backup_path', val);
+    try {
+      await trackerDB.setSetting('checkpoint_auto_backup_path', val);
+    } catch (e) {}
   };
 
-  const handleAutoBackupFrequencyChange = (val) => {
+  const handleAutoBackupFrequencyChange = async (val) => {
     setAutoBackupFrequency(val);
     localStorage.setItem('checkpoint_auto_backup_frequency', val);
-    trackerDB.setSetting('checkpoint_auto_backup_frequency', val);
+    try {
+      await trackerDB.setSetting('checkpoint_auto_backup_frequency', val);
+    } catch (e) {}
     showToast(`Backup frequency set to: ${val}`);
+  };
+
+  const handleAutoBackupRetentionChange = async (val) => {
+    const num = Number(val);
+    setAutoBackupRetention(num);
+    localStorage.setItem('checkpoint_auto_backup_retention', String(num));
+    try {
+      await trackerDB.setSetting('checkpoint_auto_backup_retention', String(num));
+    } catch (e) {}
+    showToast(num > 0 ? `Backup retention: keep last ${num}` : 'Backup retention: Unlimited');
+  };
+
+  const handleManualAutoBackup = () => {
+    runScheduledAutoBackup({ force: true });
   };
 
   // Manual Check for Updates
@@ -539,23 +615,23 @@ export default function App() {
   // Tab Switcher
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    localStorage.setItem('nodrapay_tab', tab);
-    trackerDB.setSetting('nodrapay_tab', tab);
+    localStorage.setItem('checkpoint_tab', tab);
+    trackerDB.setSetting('checkpoint_tab', tab);
   };
 
   // Currency Handlers
   const handleCurrencyChange = (newCurr) => {
     const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (newCurr === 'USD' ? 'TOMAN' : newCurr);
     setGlobalCurrency(cur);
-    localStorage.setItem('nodrapay_currency', cur);
-    trackerDB.setSetting('nodrapay_currency', cur);
+    localStorage.setItem('checkpoint_currency', cur);
+    trackerDB.setSetting('checkpoint_currency', cur);
   };
 
   const handleGoldRateTOMANChange = (newRate) => {
     const r = Number(newRate) || 3200;
     setGoldRateTOMAN(r);
-    localStorage.setItem('nodrapay_gold_rate_toman', String(r));
-    trackerDB.setSetting('nodrapay_gold_rate_toman', String(r));
+    localStorage.setItem('checkpoint_gold_rate_toman', String(r));
+    trackerDB.setSetting('checkpoint_gold_rate_toman', String(r));
   };
 
   // Save Entry (Create / Edit)
@@ -567,6 +643,7 @@ export default function App() {
     await reloadEntries();
     if (isNew) {
       handleTabChange('ledger');
+      incrementLocalWorkCount();
     }
     showToast(isNew ? 'Work record saved' : 'Work record updated');
   };
@@ -577,6 +654,7 @@ export default function App() {
     setIsQuickAddOpen(false);
     await reloadEntries();
     handleTabChange('ledger');
+    incrementLocalWorkCount();
     showToast('⚡ Quick record added');
   };
 
@@ -649,7 +727,7 @@ export default function App() {
     const csvContent =
       '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 
-    const fileName = `nodravault_selected_${listToExport.length}_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
+    const fileName = `checkpoint_selected_${listToExport.length}_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
 
     if (isTauri()) {
       const res = await saveFileNative({
@@ -803,7 +881,7 @@ export default function App() {
     const csvContent =
       '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 
-    const fileName = `nodravault_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+    const fileName = `checkpoint_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
 
     if (isTauri()) {
       const res = await saveFileNative({
@@ -936,12 +1014,6 @@ export default function App() {
     }
   };
 
-  // Reset Data with Fresh Seed
-  const handleResetData = async () => {
-    await trackerDB.resetWithFreshSeed();
-    await loadData();
-    showToast('Database reset with fresh sample data');
-  };
 
   // Keyboard Shortcuts Listener
   useEffect(() => {
@@ -1217,7 +1289,6 @@ export default function App() {
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
-        onResetData={handleResetData}
         onClearAllData={handleClearAllData}
         onToast={showToast}
         entriesCount={entries.length}
@@ -1233,6 +1304,9 @@ export default function App() {
         onAutoBackupPathChange={handleAutoBackupPathChange}
         autoBackupFrequency={autoBackupFrequency}
         onAutoBackupFrequencyChange={handleAutoBackupFrequencyChange}
+        autoBackupRetention={autoBackupRetention}
+        onAutoBackupRetentionChange={handleAutoBackupRetentionChange}
+        onManualAutoBackup={handleManualAutoBackup}
       />
 
       <NotificationCenter

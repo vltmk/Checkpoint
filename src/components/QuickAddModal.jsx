@@ -19,10 +19,15 @@ const GAME_OPTIONS = [
   { value: '__custom__', label: '+ Custom Game / Realm' },
 ];
 
-const LAST_GAME_KEY = 'vault_quick_last_game';
-const LAST_CUSTOM_GAME_KEY = 'vault_quick_last_custom_game';
-const LAST_SOURCE_KEY = 'vault_quick_last_source';
-const LAST_CURRENCY_KEY = 'vault_quick_last_currency';
+const LAST_GAME_KEY = 'checkpoint_quick_last_game';
+const LAST_CUSTOM_GAME_KEY = 'checkpoint_quick_last_custom_game';
+const LAST_SOURCE_KEY = 'checkpoint_quick_last_source';
+const LAST_CURRENCY_KEY = 'checkpoint_quick_last_currency';
+
+const LEGACY_LAST_GAME_KEY = 'vault_quick_last_game';
+const LEGACY_LAST_CUSTOM_GAME_KEY = 'vault_quick_last_custom_game';
+const LEGACY_LAST_SOURCE_KEY = 'vault_quick_last_source';
+const LEGACY_LAST_CURRENCY_KEY = 'vault_quick_last_currency';
 
 export function QuickAddModal({
   isOpen,
@@ -50,10 +55,10 @@ export function QuickAddModal({
     setPrice('');
 
     try {
-      const savedGame = localStorage.getItem(LAST_GAME_KEY);
-      const savedCustomGame = localStorage.getItem(LAST_CUSTOM_GAME_KEY);
-      const savedSource = localStorage.getItem(LAST_SOURCE_KEY);
-      const savedCurrency = localStorage.getItem(LAST_CURRENCY_KEY);
+      const savedGame = localStorage.getItem(LAST_GAME_KEY) || localStorage.getItem(LEGACY_LAST_GAME_KEY);
+      const savedCustomGame = localStorage.getItem(LAST_CUSTOM_GAME_KEY) || localStorage.getItem(LEGACY_LAST_CUSTOM_GAME_KEY);
+      const savedSource = localStorage.getItem(LAST_SOURCE_KEY) || localStorage.getItem(LEGACY_LAST_SOURCE_KEY);
+      const savedCurrency = localStorage.getItem(LAST_CURRENCY_KEY) || localStorage.getItem(LEGACY_LAST_CURRENCY_KEY);
 
       if (savedGame) {
         if (savedGame === '__custom__') {
