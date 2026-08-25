@@ -54,3 +54,8 @@ src-tauri/.cargo/
 *.priv
 *.secret
 
+
+# AI Agent & IDE Configs
+AGENTS.md
+.cursorrules
+.windsurfrules
