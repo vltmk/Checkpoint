@@ -10,6 +10,30 @@ import { markAnnouncementDismissed, markAnnouncementSeen } from './announcements
 export const NOTIFICATIONS_STORAGE_KEY = 'checkpoint_notifications_history';
 
 /**
+ * Compare two semver strings (e.g. "2.1.4" vs "2.1.5", ignores leading 'v').
+ * Returns > 0 if v1 > v2, < 0 if v1 < v2, and 0 if equal.
+ */
+export function compareSemver(v1, v2) {
+  if (!v1 && !v2) return 0;
+  if (!v1) return -1;
+  if (!v2) return 1;
+
+  const clean1 = String(v1).replace(/^v/i, '').trim();
+  const clean2 = String(v2).replace(/^v/i, '').trim();
+
+  const p1 = clean1.split('.').map((x) => parseInt(x, 10) || 0);
+  const p2 = clean2.split('.').map((x) => parseInt(x, 10) || 0);
+
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
+/**
  * Load all stored notifications from SQLite / IndexedDB
  */
 export async function getStoredNotifications() {
@@ -38,9 +62,12 @@ export async function saveStoredNotifications(notifications) {
 
 /**
  * Synchronize and merge active announcements & updates into persistent notification history.
- * Preserves user's read and dismissed flags.
+ * Preserves user's read and dismissed flags while pruning stale update notifications.
  */
-export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = null, announcements = null } = {}) {
+export function mergeNotificationsIntoHistory(
+  existingList = [],
+  { updateInfo = null, announcements = null, currentVersion = null, postUpdateInfo = null } = {}
+) {
   const existingMap = new Map();
   for (const item of existingList) {
     if (item && item.id) {
@@ -51,36 +78,68 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
   const merged = [];
   const processedIds = new Set();
 
-  // 1. Process Update Notification
+  // 1. Process Update Notification (Only if version is strictly newer than current installed version)
   if (updateInfo && updateInfo.available && updateInfo.version) {
-    const updateId = `update-${updateInfo.version}`;
-    const previous = existingMap.get(updateId);
-    merged.push({
-      id: updateId,
-      source: 'updater',
-      type: 'info',
-      title: `Checkpoint v${updateInfo.version} Available`,
-      message: updateInfo.body
-        ? `A new version of Checkpoint is ready to download. ${updateInfo.body.slice(0, 140)}...`
-        : `A new version of Checkpoint is ready to download and install.`,
-      publishedAt: updateInfo.date || new Date().toISOString(),
-      read: previous ? Boolean(previous.read) : false,
-      dismissed: previous ? Boolean(previous.dismissed) : false,
-      pinned: true,
-      action: {
-        label: 'Install Update',
-        type: 'open_update_modal',
-        url: updateInfo.releaseUrl,
-      },
-      data: {
-        version: updateInfo.version,
-        releaseUrl: updateInfo.releaseUrl,
-      },
-    });
-    processedIds.add(updateId);
+    const isNewer = currentVersion ? compareSemver(updateInfo.version, currentVersion) > 0 : true;
+    if (isNewer) {
+      const updateId = `update-${updateInfo.version}`;
+      const previous = existingMap.get(updateId);
+      merged.push({
+        id: updateId,
+        source: 'updater',
+        type: 'info',
+        title: `Checkpoint v${updateInfo.version} Available`,
+        message: updateInfo.body
+          ? `A new version of Checkpoint is ready to download. ${updateInfo.body.slice(0, 160)}...`
+          : `A new version of Checkpoint is ready to download and install.`,
+        publishedAt: updateInfo.date || new Date().toISOString(),
+        read: previous ? Boolean(previous.read) : false,
+        dismissed: previous ? Boolean(previous.dismissed) : false,
+        pinned: true,
+        action: {
+          label: 'Install Update',
+          type: 'open_update_modal',
+          url: updateInfo.releaseUrl,
+        },
+        data: {
+          version: updateInfo.version,
+          releaseUrl: updateInfo.releaseUrl,
+        },
+      });
+      processedIds.add(updateId);
+    }
   }
 
-  // 2. Process Remote Announcements (if provided)
+  // 2. Process Post-Update "What's New" Welcome Card
+  if (postUpdateInfo && postUpdateInfo.version) {
+    const welcomeId = `welcome-v${postUpdateInfo.version}`;
+    const previous = existingMap.get(welcomeId);
+    if (!previous || !previous.dismissed) {
+      merged.push({
+        id: welcomeId,
+        source: 'system',
+        type: 'success',
+        title: `Updated to Checkpoint v${postUpdateInfo.version}`,
+        message: postUpdateInfo.body
+          ? `Checkpoint was successfully updated. Highlights: ${postUpdateInfo.body.slice(0, 160)}...`
+          : `You are running the latest version of Checkpoint. Enjoy improved speed and reliability.`,
+        publishedAt: new Date().toISOString(),
+        read: previous ? Boolean(previous.read) : false,
+        dismissed: false,
+        pinned: false,
+        action: postUpdateInfo.releaseUrl
+          ? {
+              label: 'View Changelog',
+              type: 'external_link',
+              url: postUpdateInfo.releaseUrl,
+            }
+          : null,
+      });
+      processedIds.add(welcomeId);
+    }
+  }
+
+  // 3. Process Remote Announcements (if provided)
   if (Array.isArray(announcements)) {
     for (const ann of announcements) {
       const annId = `announcement-${ann.id}`;
@@ -110,9 +169,18 @@ export function mergeNotificationsIntoHistory(existingList = [], { updateInfo = 
     }
   }
 
-  // 3. Retain ALL existing notifications (announcements, updater, system) that were not replaced
+  // 4. Retain existing notifications that were not replaced, but prune obsolete update notifications
   for (const item of existingList) {
     if (!item || processedIds.has(item.id)) continue;
+
+    // Prune stale updater notifications for versions at or below current installed version
+    if (item.source === 'updater' && currentVersion) {
+      const itemVersion = item.data?.version || item.id.replace(/^update-/, '');
+      if (itemVersion && compareSemver(itemVersion, currentVersion) <= 0) {
+        continue; // Prune obsolete update prompt
+      }
+    }
+
     merged.push(item);
   }
 
@@ -203,3 +271,4 @@ export async function clearAllNotificationHistory(currentList = []) {
   await saveStoredNotifications(preserved);
   return preserved;
 }
+

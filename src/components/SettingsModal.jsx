@@ -25,8 +25,10 @@ import {
   ArrowUpCircle,
   RotateCw,
   Keyboard,
+  FolderArchive,
+  Folder,
 } from 'lucide-react';
-import { isTauri } from '../lib/desktop';
+import { isTauri, selectDirectoryNative } from '../lib/desktop';
 import { trackerDB } from '../lib/db';
 import { Input } from './ui/Input';
 
@@ -52,6 +54,12 @@ export function SettingsModal({
   isCheckingUpdates = false,
   onOpenUpdateModal,
   onOpenShortcuts,
+  autoBackupEnabled = false,
+  onAutoBackupEnabledChange,
+  autoBackupPath = '',
+  onAutoBackupPathChange,
+  autoBackupFrequency = 'daily',
+  onAutoBackupFrequencyChange,
 }) {
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
@@ -377,7 +385,101 @@ export function SettingsModal({
           </div>
         )}
 
-        {/* 4. Danger Zone: Reset & Clear All Data */}
+        {/* 4. Scheduled Folder Backups (Custom User Directory) */}
+        {isDesktop && (
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                <FolderArchive className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Scheduled Folder Backups</span>
+              </label>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {autoBackupEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              Automatically save timestamped JSON ledger backups to a designated folder on your PC.
+            </p>
+
+            {/* Toggle Switch */}
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+              <div className="space-y-0.5 pr-2">
+                <div className="text-xs font-medium text-zinc-200">
+                  Auto-Export to Folder
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  {autoBackupEnabled ? 'Backup will run on schedule' : 'Disabled by default'}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoBackupEnabled}
+                onClick={() => onAutoBackupEnabledChange?.(!autoBackupEnabled)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  autoBackupEnabled ? 'bg-zinc-100' : 'bg-zinc-800'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    autoBackupEnabled ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Directory & Frequency Configuration when Enabled */}
+            {autoBackupEnabled && (
+              <div className="space-y-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80">
+                {/* Folder Selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                    Backup Folder Path
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-md text-xs font-mono text-zinc-300 truncate">
+                      {autoBackupPath || 'No folder selected'}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={async () => {
+                        const dir = await selectDirectoryNative({ title: 'Select Automated Backup Folder' });
+                        if (dir) {
+                          onAutoBackupPathChange?.(dir);
+                          onToast?.('Backup folder selected');
+                        }
+                      }}
+                      className="gap-1 h-7 text-xs shrink-0"
+                    >
+                      <Folder className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Browse...</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Frequency Selector */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                    Export Frequency
+                  </span>
+                  <Select
+                    value={autoBackupFrequency}
+                    onChange={(val) => onAutoBackupFrequencyChange?.(val)}
+                    options={[
+                      { value: 'on_start', label: 'On Every App Startup' },
+                      { value: 'daily', label: 'Daily (Once per day)' },
+                      { value: 'weekly', label: 'Weekly (Once every 7 days)' },
+                    ]}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. Danger Zone: Reset & Clear All Data */}
         <div className="space-y-3 pt-2 border-t border-zinc-800">
           <label className="block text-xs font-semibold text-rose-400">
             Danger Zone

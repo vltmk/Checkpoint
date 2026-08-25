@@ -30,6 +30,7 @@ import {
   markAllNotificationsAsRead,
   dismissNotificationItem,
   clearAllNotificationHistory,
+  compareSemver,
 } from './lib/notifications';
 import {
   isTauri,
@@ -41,6 +42,7 @@ import {
   sendTrayNotification,
   resetTrayNotificationFlag,
   listenToTrayEvents,
+  sendDesktopNotification,
 } from './lib/desktop';
 
 export default function App() {
@@ -70,6 +72,18 @@ export default function App() {
   useEffect(() => {
     minimizeToTrayRef.current = minimizeToTray;
   }, [minimizeToTray]);
+
+  // Automated Scheduled Backups to Custom Directory (Disabled by default)
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_auto_backup_enabled');
+    return saved === 'true';
+  });
+  const [autoBackupPath, setAutoBackupPath] = useState(() => {
+    return localStorage.getItem('checkpoint_auto_backup_path') || '';
+  });
+  const [autoBackupFrequency, setAutoBackupFrequency] = useState(() => {
+    return localStorage.getItem('checkpoint_auto_backup_frequency') || 'daily';
+  });
 
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
@@ -126,6 +140,7 @@ export default function App() {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const hasNotifiedUpdateThisSession = useRef(false);
 
   // Toast Notification
   const [toast, setToast] = useState(null);
@@ -164,16 +179,37 @@ export default function App() {
     setToast(toastObj);
     toastTimeoutRef.current = setTimeout(() => {
       setToast(null);
-    }, 3600);
+    }, 3800);
   }, []);
 
   // Data Loading
   const loadData = useCallback(async () => {
     const startTime = Date.now();
     try {
-      // Hydrate runtime app version asynchronously
-      getAppVersion().then((v) => {
-        if (v) setAppVersion(v);
+      // Hydrate runtime app version asynchronously and check for upgrade
+      getAppVersion().then(async (v) => {
+        if (v) {
+          setAppVersion(v);
+          try {
+            const lastKnown = await trackerDB.getSetting('checkpoint_last_known_version', null);
+            if (lastKnown && compareSemver(v, lastKnown) > 0) {
+              // App was just upgraded! Post welcome notification
+              const stored = await getStoredNotifications();
+              const updated = mergeNotificationsIntoHistory(stored, {
+                currentVersion: v,
+                postUpdateInfo: {
+                  version: v,
+                  releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/v${v}`,
+                },
+              });
+              setNotifications(updated);
+              await saveStoredNotifications(updated);
+              showToast(`🎉 Checkpoint updated to v${v}!`);
+            }
+            await trackerDB.setSetting('checkpoint_last_known_version', v);
+            localStorage.setItem('checkpoint_last_known_version', v);
+          } catch (e) {}
+        }
       });
 
       const all = await trackerDB.getAllEntries();
@@ -198,6 +234,21 @@ export default function App() {
         setMinimizeToTray(savedMinToTray === 'true');
         localStorage.setItem('checkpoint_minimize_to_tray', savedMinToTray);
       }
+      const savedAutoBackupEnabled = await trackerDB.getSetting('checkpoint_auto_backup_enabled', null);
+      if (savedAutoBackupEnabled !== null) {
+        setAutoBackupEnabled(savedAutoBackupEnabled === 'true');
+        localStorage.setItem('checkpoint_auto_backup_enabled', savedAutoBackupEnabled);
+      }
+      const savedAutoBackupPath = await trackerDB.getSetting('checkpoint_auto_backup_path', null);
+      if (savedAutoBackupPath) {
+        setAutoBackupPath(savedAutoBackupPath);
+        localStorage.setItem('checkpoint_auto_backup_path', savedAutoBackupPath);
+      }
+      const savedAutoBackupFreq = await trackerDB.getSetting('checkpoint_auto_backup_frequency', null);
+      if (savedAutoBackupFreq) {
+        setAutoBackupFrequency(savedAutoBackupFreq);
+        localStorage.setItem('checkpoint_auto_backup_frequency', savedAutoBackupFreq);
+      }
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
     } finally {
@@ -207,7 +258,7 @@ export default function App() {
         setIsLoading(false);
       }, remaining);
     }
-  }, []);
+  }, [showToast]);
 
   // Lightweight entry reload without full app re-hydration
   const reloadEntries = useCallback(async () => {
@@ -237,6 +288,7 @@ export default function App() {
         currentMerged = mergeNotificationsIntoHistory(currentMerged, {
           updateInfo: updateInfoRef.current,
           announcements: activeAnnouncements,
+          currentVersion: appVersion,
         });
         setNotifications(currentMerged);
         await saveStoredNotifications(currentMerged);
@@ -245,16 +297,30 @@ export default function App() {
       // 2. Check for software updates (if desktop)
       if (isDesktop) {
         if (!opts.silent) setIsCheckingUpdates(true);
-        const res = await checkForUpdate({ timeoutMs: 6000 });
+        const res = await checkForUpdate({ timeoutMs: 6500 });
         if (res && res.available) {
           setUpdateInfo(res);
           currentMerged = mergeNotificationsIntoHistory(currentMerged, {
             updateInfo: res,
+            currentVersion: appVersion || res.currentVersion,
           });
           setNotifications(currentMerged);
           await saveStoredNotifications(currentMerged);
+
+          // Alert user on discovery
           if (!opts.silent) {
             showToast(`Update available: v${res.version}`);
+          } else if (!hasNotifiedUpdateThisSession.current) {
+            hasNotifiedUpdateThisSession.current = true;
+            showToast({
+              title: `Checkpoint v${res.version} Available`,
+              description: 'A new release was published on GitHub. Check notifications or top bar to update.',
+              variant: 'info',
+            });
+            sendDesktopNotification({
+              title: 'CHECKPOINT Update Available',
+              body: `Version v${res.version} is published on GitHub and ready to download.`,
+            });
           }
         } else if (!opts.silent) {
           if (res?.isNotFound) {
@@ -275,16 +341,77 @@ export default function App() {
     }
   }, [isDesktop, showToast, appVersion]);
 
+  // Execute scheduled automated backups (if enabled)
+  const runScheduledAutoBackup = useCallback(async () => {
+    if (!isDesktop || !autoBackupEnabled || !autoBackupPath) return;
+    try {
+      const lastRunStr = await trackerDB.getSetting('checkpoint_last_auto_backup_timestamp', '');
+      const lastRun = lastRunStr ? Number(lastRunStr) : 0;
+      const now = Date.now();
+
+      let intervalMs = 24 * 60 * 60 * 1000; // daily default
+      if (autoBackupFrequency === 'on_start') {
+        intervalMs = 0;
+      } else if (autoBackupFrequency === 'weekly') {
+        intervalMs = 7 * 24 * 60 * 60 * 1000;
+      }
+
+      if (now - lastRun >= intervalMs) {
+        const fullEntries = await trackerDB.getAllEntriesFull();
+        const backupData = {
+          app: 'CHECKPOINT',
+          version: appVersion || '0.0.0',
+          exportDate: new Date().toISOString(),
+          type: 'scheduled_auto_backup',
+          currency: globalCurrency,
+          goldRateTOMAN,
+          entriesCount: fullEntries.length,
+          entries: fullEntries,
+        };
+
+        const todayStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `checkpoint_autobackup_${todayStr}.json`;
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        const sep = autoBackupPath.includes('\\') ? '\\' : '/';
+        const fullPath = `${autoBackupPath.replace(/[/\\]+$/, '')}${sep}${fileName}`;
+
+        await writeTextFile(fullPath, JSON.stringify(backupData, null, 2));
+        await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
+      }
+    } catch (err) {
+      console.warn('[AutoBackup] Scheduled backup failed:', err);
+    }
+  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, appVersion, globalCurrency, goldRateTOMAN]);
+
   useEffect(() => {
     loadData();
     showWindow();
     enforceMinWindowSize(800, 560);
-    // Asynchronous non-blocking background feed sync after UI render
+
+    // Initial background feed sync shortly after render
     const timer = setTimeout(() => {
       syncFeeds({ silent: true });
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [loadData, syncFeeds]);
+      runScheduledAutoBackup();
+    }, 700);
+
+    // Periodic polling every 4 hours for long-running / tray sessions
+    const intervalTimer = setInterval(() => {
+      syncFeeds({ silent: true });
+      runScheduledAutoBackup();
+    }, 4 * 60 * 60 * 1000);
+
+    // Window focus listener to refresh feeds when switching back
+    const handleFocus = () => {
+      syncFeeds({ silent: true });
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(intervalTimer);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadData, syncFeeds, runScheduledAutoBackup]);
 
   // Desktop Window & System Tray Event Listeners
   useEffect(() => {
@@ -335,6 +462,26 @@ export default function App() {
     localStorage.setItem('checkpoint_minimize_to_tray', String(val));
     trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
     showToast(val ? 'Minimize button will hide to System Tray' : 'Minimize button will minimize to Taskbar');
+  };
+
+  const handleAutoBackupEnabledChange = (val) => {
+    setAutoBackupEnabled(val);
+    localStorage.setItem('checkpoint_auto_backup_enabled', String(val));
+    trackerDB.setSetting('checkpoint_auto_backup_enabled', String(val));
+    showToast(val ? 'Scheduled folder backup enabled' : 'Scheduled folder backup disabled');
+  };
+
+  const handleAutoBackupPathChange = (val) => {
+    setAutoBackupPath(val);
+    localStorage.setItem('checkpoint_auto_backup_path', val);
+    trackerDB.setSetting('checkpoint_auto_backup_path', val);
+  };
+
+  const handleAutoBackupFrequencyChange = (val) => {
+    setAutoBackupFrequency(val);
+    localStorage.setItem('checkpoint_auto_backup_frequency', val);
+    trackerDB.setSetting('checkpoint_auto_backup_frequency', val);
+    showToast(`Backup frequency set to: ${val}`);
   };
 
   // Manual Check for Updates
@@ -1080,6 +1227,12 @@ export default function App() {
         isCheckingUpdates={isCheckingUpdates}
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        autoBackupEnabled={autoBackupEnabled}
+        onAutoBackupEnabledChange={handleAutoBackupEnabledChange}
+        autoBackupPath={autoBackupPath}
+        onAutoBackupPathChange={handleAutoBackupPathChange}
+        autoBackupFrequency={autoBackupFrequency}
+        onAutoBackupFrequencyChange={handleAutoBackupFrequencyChange}
       />
 
       <NotificationCenter

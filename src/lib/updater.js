@@ -4,6 +4,7 @@
  */
 
 import { isTauri } from './desktop';
+import { compareSemver } from './notifications';
 import packageJson from '../../package.json';
 
 let runtimeAppVersion = null;
@@ -40,66 +41,82 @@ export async function getAppVersion() {
 export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
   const currentVersion = await getAppVersion();
 
-  if (!isTauri()) {
-    return {
-      available: false,
-      currentVersion,
-      reason: 'not_tauri',
-    };
-  }
+  // 1. If in Tauri desktop runtime, run official Tauri updater plugin
+  if (isTauri()) {
+    try {
+      const { check } = await import('@tauri-apps/plugin-updater');
 
-  try {
-    const { check } = await import('@tauri-apps/plugin-updater');
+      // Run check with timeout to prevent hung requests on spotty networks
+      const checkPromise = check();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Update check timeout')), timeoutMs)
+      );
 
-    // Run check with timeout to prevent hung requests on spotty networks
-    const checkPromise = check();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Update check timeout')), timeoutMs)
-    );
+      const update = await Promise.race([checkPromise, timeoutPromise]);
 
-    const update = await Promise.race([checkPromise, timeoutPromise]);
+      if (update && update.available) {
+        const cleanTag = update.version.replace(/^v/i, '');
+        const releaseTag = update.version.startsWith('v') ? update.version : `v${update.version}`;
+        return {
+          available: true,
+          currentVersion: update.currentVersion || currentVersion,
+          version: cleanTag,
+          date: update.date || null,
+          body: update.body || '',
+          releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
+          rawUpdate: update,
+        };
+      }
 
-    if (update && update.available) {
-      const releaseTag = update.version.startsWith('v') ? update.version : `v${update.version}`;
-      return {
-        available: true,
-        currentVersion: update.currentVersion || currentVersion,
-        version: update.version,
-        date: update.date || null,
-        body: update.body || '',
-        releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
-        rawUpdate: update,
-      };
+      if (update && !update.available) {
+        return {
+          available: false,
+          currentVersion: update?.currentVersion || currentVersion,
+          rawUpdate: update,
+        };
+      }
+    } catch (err) {
+      const msg = err?.message || String(err);
+      console.info('[Updater] Official updater plugin check error:', msg);
     }
-
-    return {
-      available: false,
-      currentVersion: update?.currentVersion || currentVersion,
-      rawUpdate: update,
-    };
-  } catch (err) {
-    const msg = err?.message || String(err);
-    console.info('[Updater] Update check failed or offline:', msg);
-    const isNotFound =
-      msg.includes('404') ||
-      msg.toLowerCase().includes('not found') ||
-      msg.toLowerCase().includes('could not fetch valid release') ||
-      msg.toLowerCase().includes('invalid json');
-    const isOffline =
-      !isNotFound &&
-      (msg.includes('timeout') ||
-        msg.includes('network') ||
-        msg.includes('dns') ||
-        msg.includes('connection refused'));
-    return {
-      available: false,
-      currentVersion,
-      error: msg,
-      isNotFound,
-      isOffline,
-      isDev: import.meta.env.DEV,
-    };
   }
+
+  // 2. Fallback / Dev / Redundancy: query GitHub Releases latest metadata
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch('https://github.com/vltmk/Checkpoint/releases/latest/download/latest.json', {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.version) {
+        const cleanRemote = json.version.replace(/^v/i, '').trim();
+        const cleanCurrent = (currentVersion || '0.0.0').replace(/^v/i, '').trim();
+        if (compareSemver(cleanRemote, cleanCurrent) > 0) {
+          const releaseTag = json.version.startsWith('v') ? json.version : `v${json.version}`;
+          return {
+            available: true,
+            currentVersion: cleanCurrent,
+            version: cleanRemote,
+            date: json.pub_date || null,
+            body: json.notes || '',
+            releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
+            rawUpdate: null,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore fallback fetch error
+  }
+
+  return {
+    available: false,
+    currentVersion,
+  };
 }
 
 /**

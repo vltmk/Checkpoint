@@ -12,6 +12,7 @@ import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
 import { UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
 import { trackerDB } from '../lib/db';
+import { optimizeImageProof } from '../lib/desktop';
 
 const GAME_OPTIONS = [
   { value: 'World of Warcraft', label: 'World of Warcraft' },
@@ -400,22 +401,38 @@ export function WorkModal({
     };
   }, [isOpen, onToast, formData, proofs, editingEntry]);
 
-  const readImageBlob = (blob, fileName) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
+  const readImageBlob = async (blob, fileName) => {
+    try {
+      const opt = await optimizeImageProof(blob);
+      const dataUrl = opt?.dataUrl || '';
+      if (!dataUrl) return;
+
       setProofs((prev) => [
         ...prev,
         {
           id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
           name: fileName || 'Proof Screenshot',
           data: dataUrl,
-          size: blob.size,
+          size: opt.size || blob.size || 0,
           createdAt: new Date().toISOString(),
         },
       ]);
-    };
-    reader.readAsDataURL(blob);
+    } catch (e) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setProofs((prev) => [
+          ...prev,
+          {
+            id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            name: fileName || 'Proof Screenshot',
+            data: ev.target.result,
+            size: blob.size || 0,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      };
+      reader.readAsDataURL(blob);
+    }
   };
 
   const handleFiles = (fileList) => {

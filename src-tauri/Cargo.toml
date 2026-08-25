@@ -1,6 +1,6 @@
 [package]
 name = "nodra-vault"
-version = "2.1.4"
+version = "2.2.0"
 description = "High-density offline freelance ledger for gaming boosters, devs, and creators"
 authors = ["Nodra"]
 edition = "2021"

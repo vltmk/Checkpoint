@@ -76,13 +76,15 @@ export async function getAnnouncementState() {
   try {
     const saved = await trackerDB.getSetting(ANNOUNCEMENT_STORAGE_KEY, null);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        seenIds: Array.isArray(parsed.seenIds) ? parsed.seenIds : [],
-        dismissedIds: Array.isArray(parsed.dismissedIds) ? parsed.dismissedIds : [],
-        lastFetchedAt: parsed.lastFetchedAt || null,
-        cachedAnnouncements: Array.isArray(parsed.cachedAnnouncements) ? parsed.cachedAnnouncements : [],
-      };
+      const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+      if (parsed && typeof parsed === 'object') {
+        return {
+          seenIds: Array.isArray(parsed.seenIds) ? parsed.seenIds : [],
+          dismissedIds: Array.isArray(parsed.dismissedIds) ? parsed.dismissedIds : [],
+          lastFetchedAt: parsed.lastFetchedAt || null,
+          cachedAnnouncements: Array.isArray(parsed.cachedAnnouncements) ? parsed.cachedAnnouncements : [],
+        };
+      }
     }
   } catch (err) {
     console.warn('[Announcements] Failed to load local announcement state:', err);

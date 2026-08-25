@@ -27,19 +27,34 @@ export function NotificationCenter({
   onMarkAllAsRead,
   onOpenUpdateModal,
 }) {
-  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread'
+  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread' | 'releases' | 'announcements'
 
   if (!isOpen) return null;
 
   const unreadList = notifications.filter((item) => !item.read);
-  const displayedNotifications =
-    filterMode === 'unread'
-      ? unreadList
-      : notifications;
+  const releaseList = notifications.filter((item) => item.source === 'updater' || item.source === 'system');
+  const announcementList = notifications.filter((item) => item.source === 'announcement');
+
+  const displayedNotifications = (() => {
+    switch (filterMode) {
+      case 'unread':
+        return unreadList;
+      case 'releases':
+        return releaseList;
+      case 'announcements':
+        return announcementList;
+      case 'all':
+      default:
+        return notifications;
+    }
+  })();
 
   const getNotificationIcon = (item) => {
     if (item.source === 'updater') {
       return <ArrowUpCircle className="w-4 h-4 text-emerald-400" />;
+    }
+    if (item.source === 'system') {
+      return <Sparkles className="w-4 h-4 text-emerald-400" />;
     }
     switch (item.type) {
       case 'critical':
@@ -57,6 +72,9 @@ export function NotificationCenter({
   const getBadgeStyle = (item) => {
     if (item.source === 'updater') {
       return 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60';
+    }
+    if (item.source === 'system') {
+      return 'bg-cyan-950/50 text-cyan-300 border-cyan-800/60';
     }
     switch (item.type) {
       case 'critical':
@@ -110,67 +128,91 @@ export function NotificationCenter({
           data-no-drag
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
-                <Bell className="w-3.5 h-3.5 text-zinc-300" />
+          <div className="px-4 py-3.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur shrink-0 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
+                  <Bell className="w-3.5 h-3.5 text-zinc-300" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+                    Notifications & Feed
+                  </h2>
+                  <p className="text-[10px] text-zinc-500 font-mono">
+                    {notifications.length} {notifications.length === 1 ? 'record' : 'records'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
-                  Notifications & Feed
-                </h2>
-                <p className="text-[10px] text-zinc-500 font-mono">
-                  {notifications.length} {notifications.length === 1 ? 'record' : 'records'}
-                </p>
+
+              <div className="flex items-center gap-1.5">
+                {unreadList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onMarkAllAsRead?.()}
+                    title="Mark all as read"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                  >
+                    <CheckCheck className="w-3 h-3 text-zinc-400" />
+                    <span>Read all</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors ml-1"
+                  aria-label="Close Notification Center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {/* All / Unread Filter Pills */}
-              <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setFilterMode('all')}
-                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                    filterMode === 'all'
-                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  All ({notifications.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterMode('unread')}
-                  className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                    filterMode === 'unread'
-                      ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'
-                  }`}
-                >
-                  Unread ({unreadList.length})
-                </button>
-              </div>
-
-              {unreadList.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onMarkAllAsRead?.()}
-                  title="Mark all as read"
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
-                >
-                  <CheckCheck className="w-3 h-3 text-zinc-400" />
-                  <span className="hidden sm:inline">Read all</span>
-                </button>
-              )}
-
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1 bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-800 text-[10px] overflow-x-auto">
               <button
                 type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors ml-1"
-                aria-label="Close Notification Center"
+                onClick={() => setFilterMode('all')}
+                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                  filterMode === 'all'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
               >
-                <X className="w-4 h-4" />
+                All ({notifications.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('unread')}
+                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                  filterMode === 'unread'
+                    ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Unread ({unreadList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('releases')}
+                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                  filterMode === 'releases'
+                    ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Releases ({releaseList.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('announcements')}
+                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                  filterMode === 'announcements'
+                    ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Feed ({announcementList.length})
               </button>
             </div>
           </div>

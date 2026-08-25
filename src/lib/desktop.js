@@ -396,4 +396,127 @@ export async function openExternalUrl(url) {
   }
 }
 
+/**
+ * Select a local directory using native folder dialog
+ */
+export async function selectDirectoryNative({ title, defaultPath } = {}) {
+  if (!isTauri()) return null;
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: title || 'Select Backup Directory',
+      defaultPath,
+    });
+    return typeof selected === 'string' ? selected : null;
+  } catch (err) {
+    console.error('Failed to select directory:', err);
+    return null;
+  }
+}
+
+/**
+ * Dispatches a native desktop notification
+ */
+export async function sendDesktopNotification({ title = 'CHECKPOINT', body = '' } = {}) {
+  if (!isTauri()) return false;
+  try {
+    const {
+      isPermissionGranted,
+      requestPermission,
+      sendNotification,
+    } = await import('@tauri-apps/plugin-notification');
+
+    let permissionGranted = await isPermissionGranted();
+    if (!permissionGranted) {
+      const permission = await requestPermission();
+      permissionGranted = permission === 'granted';
+    }
+
+    if (permissionGranted) {
+      sendNotification({
+        title,
+        body,
+      });
+      return true;
+    }
+  } catch (err) {
+    console.warn('Failed to send desktop notification:', err);
+  }
+  return false;
+}
+
+/**
+ * Asynchronously optimizes screenshot proofs (resizes large 4K/wide screenshots to maxDimension, e.g. 1920px)
+ * Keeps proof files crisp, legible, and compact for SQLite persistence.
+ */
+export async function optimizeImageProof(blobOrDataUrl, maxDimension = 1920, quality = 0.85) {
+  if (!blobOrDataUrl) return null;
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          return resolve(typeof blobOrDataUrl === 'string' ? blobOrDataUrl : null);
+        }
+
+        // Calculate scaling ratio if larger than maxDimension
+        let scale = 1;
+        if (width > maxDimension || height > maxDimension) {
+          scale = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return resolve(typeof blobOrDataUrl === 'string' ? blobOrDataUrl : null);
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let dataUrl;
+        try {
+          dataUrl = canvas.toDataURL('image/webp', quality);
+          if (!dataUrl.startsWith('data:image/webp')) {
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+        } catch (e) {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+
+        const approxSize = Math.round((dataUrl.length * 3) / 4);
+        resolve({ dataUrl, width, height, size: approxSize });
+      };
+
+      img.onerror = () => {
+        resolve(typeof blobOrDataUrl === 'string' ? { dataUrl: blobOrDataUrl, size: 0 } : null);
+      };
+
+      if (typeof blobOrDataUrl === 'string') {
+        img.src = blobOrDataUrl;
+      } else if (blobOrDataUrl instanceof Blob || blobOrDataUrl instanceof File) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          img.src = ev.target.result;
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blobOrDataUrl);
+      } else {
+        resolve(null);
+      }
+    } catch (err) {
+      console.warn('Image proof optimization failed:', err);
+      resolve(typeof blobOrDataUrl === 'string' ? { dataUrl: blobOrDataUrl, size: 0 } : null);
+    }
+  });
+}
+
 
