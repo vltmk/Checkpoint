@@ -1,47 +1,17 @@
 {
   "version": "1.0",
-  "updated_at": "2026-08-25T07:15:00Z",
+  "updated_at": "2026-08-25T07:35:00Z",
   "announcements": [
     {
-      "id": "2026-08-25-checkpoint-backups",
+      "id": "2026-08-25-checkpoint-backups-fa",
       "type": "info",
-      "title": "Local Backups & Quick Restores",
-      "message": "Checkpoint stores your ledger locally on your device. You can export a full JSON backup or restore past records at any time under Settings.",
-      "published_at": "2026-08-25T07:15:00Z",
+      "title": "پشتیبان‌گیری محلی و بازیابی اطلاعات",
+      "message": "چک‌پوینت تمامی داده‌های حساب و لجر شما را به صورت امن و محلی روی سیستم ذخیره می‌کند. در هر زمان می‌توانید از بخش تنظیمات (Settings) یک بکاپ کامل JSON دریافت کرده یا اطلاعات قبلی را بازیابی کنید.",
+      "published_at": "2026-08-25T07:35:00Z",
       "expires_at": null,
       "dismissible": true,
       "pinned": false,
       "action": null
-    },
-    {
-      "id": "2026-08-24-welcome-v21",
-      "type": "info",
-      "title": "Welcome to Checkpoint v2.1",
-      "message": "High-density ledger designed for raid runners, boosters, and creators. Offline-first and bi-directional Toman/Gold engine.",
-      "published_at": "2026-08-24T00:00:00Z",
-      "expires_at": null,
-      "dismissible": true,
-      "pinned": false,
-      "action": {
-        "label": "Nodra Marketplace Coming Soon",
-        "url": "https://github.com/vltmk/Checkpoint",
-        "type": "external_link"
-      }
-    },
-    {
-      "id": "2026-08-24-nodra-integration",
-      "type": "success",
-      "title": "Added Team Pots and cut split support",
-      "message": "Add work Pots and cut split support to your raid runs. Check out the new features in the Nodra integration.",
-      "published_at": "2026-08-24T18:00:00Z",
-      "expires_at": null,
-      "dismissible": true,
-      "pinned": false,
-      "action": {
-        "label": "Explore Nodra",
-        "url": "https://github.com/vltmk/Checkpoint",
-        "type": "external_link"
-      }
     }
   ]
 }
