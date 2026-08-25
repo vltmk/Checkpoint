@@ -1,6 +1,6 @@
 [package]
 name = "checkpoint"
-version = "2.3.0"
+version = "2.3.1"
 description = "High-density offline freelance ledger for gaming boosters, devs, and creators"
 authors = ["CHECKPOINT"]
 edition = "2021"
