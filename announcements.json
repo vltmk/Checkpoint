@@ -1,7 +1,18 @@
 {
   "version": "1.0",
-  "updated_at": "2026-08-24T18:00:00Z",
+  "updated_at": "2026-08-25T07:15:00Z",
   "announcements": [
+    {
+      "id": "2026-08-25-checkpoint-backups",
+      "type": "info",
+      "title": "Local Backups & Quick Restores",
+      "message": "Checkpoint stores your ledger locally on your device. You can export a full JSON backup or restore past records at any time under Settings.",
+      "published_at": "2026-08-25T07:15:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": false,
+      "action": null
+    },
     {
       "id": "2026-08-24-welcome-v21",
       "type": "info",
