@@ -723,9 +723,10 @@ export class StorageDB {
     try {
       // Get all entries with full proofs
       const entries = await this.getAllEntriesFull();
+      const version = await import('./updater').then(m => m.getAppVersion());
       const snapshot = {
         app: 'CHECKPOINT',
-        version: '2.2.0',
+        version: version || '0.0.0',
         timestamp: new Date().toISOString(),
         entries,
       };

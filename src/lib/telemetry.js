@@ -16,6 +16,8 @@ const STORAGE_KEYS = {
   PENDING_WORKS: 'checkpoint_telemetry_pending_works_count',
   PENDING_RECEIPTS: 'checkpoint_telemetry_pending_receipts_count',
   LAST_APP_STARTED_DATE: 'checkpoint_telemetry_last_app_started_date',
+  LAST_REPORTED_VERSION: 'checkpoint_telemetry_last_reported_version',
+  LAST_REPORTED_ENV: 'checkpoint_telemetry_last_reported_env',
 };
 
 let isInitialized = false;
@@ -30,24 +32,29 @@ export async function initTelemetry() {
 
   try {
     const version = await getAppVersion();
+    const isDev = !!(import.meta.env && import.meta.env.DEV);
+    const currentEnv = isDev ? 'development' : 'production';
 
     init(APTABASE_APP_KEY, {
       appVersion: version || '0.0.0',
+      isDebug: isDev,
     });
 
-    const isDev = import.meta.env && import.meta.env.DEV;
-
-    // Send daily app_started event (once per calendar day)
+    // Send daily app_started event (once per calendar day or if version/env changes)
     const todayStr = new Date().toISOString().slice(0, 10);
     const lastStartedDate = await trackerDB.getSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, '');
+    const lastReportedVersion = await trackerDB.getSetting(STORAGE_KEYS.LAST_REPORTED_VERSION, '');
+    const lastReportedEnv = await trackerDB.getSetting(STORAGE_KEYS.LAST_REPORTED_ENV, '');
 
-    if (lastStartedDate !== todayStr) {
+    if (lastStartedDate !== todayStr || lastReportedVersion !== version || lastReportedEnv !== currentEnv) {
       await trackEvent('app_started', {
         platform: isTauri() ? 'windows_desktop' : 'web_preview',
         version: version || '0.0.0',
-        env: isDev ? 'development' : 'production',
+        env: currentEnv,
       });
       await trackerDB.setSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, todayStr);
+      await trackerDB.setSetting(STORAGE_KEYS.LAST_REPORTED_VERSION, version || '0.0.0');
+      await trackerDB.setSetting(STORAGE_KEYS.LAST_REPORTED_ENV, currentEnv);
     }
 
     // Check if daily summary flush is due
