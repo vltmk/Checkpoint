@@ -304,13 +304,23 @@ export function QuickAddModal({
             <div className="space-y-2">
               <div className="relative">
                 <Input
-                  type="number"
-                  min="0"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) => {
+                    let val = e.target.value
+                      .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+                      .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+                      .replace(/,/g, '').replace(/\\s/g, '')
+                      .replace(/(?!^)-/g, '')
+                      .replace(/[^0-9.-]/g, '');
+                    const parts = val.split('.');
+                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('').replace(/\\./g, '');
+                    setPrice(val);
+                  }}
                   placeholder="0"
                   className="font-mono text-sm bg-zinc-900/80 border-zinc-700/80 text-zinc-100 pr-12"
+                  required
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 pointer-events-none">
                   {currency === 'TOMAN' ? 'تومان' : 'G'}

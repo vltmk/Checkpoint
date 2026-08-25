@@ -79,17 +79,36 @@ export function NumberStepperInput({
       )}
     >
       <input
-        type="number"
+        type="text"
+        inputMode="decimal"
         value={value}
-        onChange={onChange}
+        onChange={(e) => {
+          // Convert Persian/Arabic digits to English digits
+          let val = e.target.value
+            .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+            .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+          
+          // Remove commas and spaces
+          val = val.replace(/,/g, '').replace(/\\s/g, '');
+          
+          // Only allow digits, minus sign (at start), and one decimal point
+          val = val.replace(/(?!^)-/g, ''); // only allow - at start
+          val = val.replace(/[^0-9.-]/g, '');
+          
+          const parts = val.split('.');
+          if (parts.length > 2) {
+            val = parts[0] + '.' + parts.slice(1).join('').replace(/\\./g, '');
+          }
+          
+          e.target.value = val;
+          onChange?.(e);
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        min={min}
-        max={max}
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none',
           inputClassName
         )}
         {...props}
