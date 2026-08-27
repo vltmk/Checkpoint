@@ -35,12 +35,14 @@ import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Kbd } from '../ui/Tooltip';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLanguage, formatShamsiDate, normalizeDigits } from '../../lib/i18n';
 import {
   formatMoney,
   convertCurrency,
   convertEntryCurrency,
-  formatConvertedSecondary,
   STATUSES,
+  STATUS_CONFIG,
+  STATUS_LABELS,
   GAMES,
 } from '../../lib/currencies';
 
@@ -63,8 +65,8 @@ export function LedgerView({
   searchInputRef,
   externalTeammateFilter = '',
   onClearExternalTeammateFilter,
-  onToast,
 }) {
+  const { t, language, isRtl, formatNumber, formatDate } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
@@ -125,16 +127,19 @@ export function LedgerView({
     let list = [...entries];
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (e) =>
-          (e.title && e.title.toLowerCase().includes(q)) ||
-          (e.game && e.game.toLowerCase().includes(q)) ||
-          (e.source && e.source.toLowerCase().includes(q)) ||
-          (e.notes && e.notes.toLowerCase().includes(q)) ||
-          (e.status && e.status.toLowerCase().includes(q)) ||
-          (e.teammates && Array.isArray(e.teammates) && e.teammates.some((t) => t.toLowerCase().includes(q)))
-      );
+      const q = searchQuery.toLowerCase().trim();
+      const normQ = normalizeDigits(q);
+      list = list.filter((e) => {
+        const shamsiDate = e.dateTime ? formatShamsiDate(e.dateTime, { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+        const matchTitle = e.title && e.title.toLowerCase().includes(q);
+        const matchGame = e.game && e.game.toLowerCase().includes(q);
+        const matchSource = e.source && e.source.toLowerCase().includes(q);
+        const matchNotes = e.notes && e.notes.toLowerCase().includes(q);
+        const matchStatus = e.status && e.status.toLowerCase().includes(q);
+        const matchTeammates = e.teammates && Array.isArray(e.teammates) && e.teammates.some((t) => t.toLowerCase().includes(q));
+        const matchDate = (e.dateTime && (e.dateTime.includes(q) || e.dateTime.includes(normQ))) || (shamsiDate && (shamsiDate.includes(q) || shamsiDate.includes(normQ)));
+        return matchTitle || matchGame || matchSource || matchNotes || matchStatus || matchTeammates || matchDate;
+      });
     }
 
     if (statusFilter) {
@@ -160,21 +165,21 @@ export function LedgerView({
       );
     }
 
-    list.sort((a, b) => {
-      if (sortOption === 'date_desc') return new Date(b.dateTime || 0) - new Date(a.dateTime || 0);
-      if (sortOption === 'date_asc') return new Date(a.dateTime || 0) - new Date(b.dateTime || 0);
-      if (sortOption === 'income_desc') {
-        const valA = convertEntryCurrency(a, globalCurrency, rates);
-        const valB = convertEntryCurrency(b, globalCurrency, rates);
-        return valB - valA;
+    if (sortOption === 'date_desc') {
+      list.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
+    } else if (sortOption === 'date_asc') {
+      list.sort((a, b) => new Date(a.dateTime || 0) - new Date(b.dateTime || 0));
+    } else if (sortOption === 'income_desc' || sortOption === 'income_asc') {
+      const incomeMap = new Map();
+      for (const item of list) {
+        incomeMap.set(item, convertEntryCurrency(item, globalCurrency, rates));
       }
-      if (sortOption === 'income_asc') {
-        const valA = convertEntryCurrency(a, globalCurrency, rates);
-        const valB = convertEntryCurrency(b, globalCurrency, rates);
-        return valA - valB;
-      }
-      return 0;
-    });
+      list.sort((a, b) => {
+        const valA = incomeMap.get(a) || 0;
+        const valB = incomeMap.get(b) || 0;
+        return sortOption === 'income_desc' ? valB - valA : valA - valB;
+      });
+    }
 
     return list;
   }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sortOption, globalCurrency, rates]);
@@ -377,15 +382,15 @@ export function LedgerView({
 
     paginatedEntries.forEach((entry) => {
       const d = new Date(entry.dateTime);
-      let groupTitle = 'Earlier';
+      let groupTitle = t('ledger.earlier');
       if (!isNaN(d.getTime())) {
         const dStr = d.toDateString();
         if (dStr === todayStr) {
-          groupTitle = 'Today';
+          groupTitle = t('ledger.today');
         } else if (dStr === yesterdayStr) {
-          groupTitle = 'Yesterday';
+          groupTitle = t('ledger.yesterday');
         } else {
-          groupTitle = d.toLocaleDateString(undefined, {
+          groupTitle = formatDate(d, {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
@@ -406,7 +411,7 @@ export function LedgerView({
       );
       return { groupTitle, groupItems, dayTotal };
     });
-  }, [paginatedEntries, globalCurrency, rates]);
+  }, [paginatedEntries, globalCurrency, rates, t, formatDate]);
 
   // Multi-day calculation summary
   const selectedDaysSummary = useMemo(() => {
@@ -456,15 +461,15 @@ export function LedgerView({
   };
 
   const gameOptions = [
-    { value: '', label: 'All Games' },
+    { value: '', label: t('ledger.allGames') },
     ...GAMES.map((g) => ({ value: g, label: g })),
   ];
 
   const sortOptions = [
-    { value: 'date_desc', label: 'Newest First' },
-    { value: 'date_asc', label: 'Oldest First' },
-    { value: 'income_desc', label: 'Highest Income' },
-    { value: 'income_asc', label: 'Lowest Income' },
+    { value: 'date_desc', label: t('ledger.sortDateDesc') },
+    { value: 'date_asc', label: t('ledger.sortDateAsc') },
+    { value: 'income_desc', label: t('ledger.sortIncomeDesc') },
+    { value: 'income_asc', label: t('ledger.sortIncomeAsc') },
   ];
 
   const handleClearFilters = () => {
@@ -498,8 +503,8 @@ export function LedgerView({
       <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-              Total Earned
+            <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+              {t('ledger.totalEarned')}
             </span>
 
             {/* Minimal Currency Switcher Pill Right in Front of Label */}
@@ -550,17 +555,17 @@ export function LedgerView({
               <button
                 type="button"
                 onClick={handleClearFilters}
-                title="Click to clear all active filters"
+                title={t('ledger.clearFilters')}
                 className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80 transition-colors"
               >
-                <span>Filtered ({filteredEntries.length}/{entries.length})</span>
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
                 <X className="w-2.5 h-2.5 text-zinc-500" />
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 font-mono">
-              {metrics.completionRate}% Paid
+            <span className={cn('text-xs text-zinc-500 font-mono', isRtl && 'font-farsi')}>
+              {formatNumber(metrics.completionRate)}% {t('status.Paid')}
             </span>
           </div>
         </div>
@@ -587,14 +592,14 @@ export function LedgerView({
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
               }}
-              title={`Paid: ${metrics.completionRate}%`}
+              title={`${t('status.Paid')}: ${metrics.completionRate}%`}
             />
             <div
               className="bg-amber-500/80 h-full transition-all duration-300 relative group"
               style={{
                 width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
               }}
-              title={`Pending: ${100 - metrics.completionRate}%`}
+              title={`${t('status.Pending')}: ${100 - metrics.completionRate}%`}
             />
           </div>
 
@@ -602,24 +607,24 @@ export function LedgerView({
             {/* Paid Accent Badge */}
             <div className="flex items-center gap-1.5 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-800/50">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-emerald-400/90 font-medium">Paid ({metrics.paidCount}):</span>
+              <span className={cn('text-emerald-400/90 font-medium', isRtl && 'font-farsi')}>{t('status.Paid')} ({formatNumber(metrics.paidCount)}):</span>
               <strong className="text-emerald-200 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
               <span className="text-emerald-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
-                {metrics.completionRate}%
+                {formatNumber(metrics.completionRate)}%
               </span>
             </div>
 
             {/* Pending Accent Badge */}
             <div className="flex items-center gap-1.5 bg-amber-950/30 px-2.5 py-1 rounded-md border border-amber-800/50">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-              <span className="text-amber-400/90 font-medium">Pending ({metrics.pendingCount}):</span>
+              <span className={cn('text-amber-400/90 font-medium', isRtl && 'font-farsi')}>{t('status.Pending')} ({formatNumber(metrics.pendingCount)}):</span>
               <strong className="text-amber-200 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
               <span className="text-amber-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
-                {metrics.totalValue > 0 ? 100 - metrics.completionRate : 0}%
+                {formatNumber(metrics.totalValue > 0 ? 100 - metrics.completionRate : 0)}%
               </span>
             </div>
           </div>
@@ -631,17 +636,17 @@ export function LedgerView({
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span>Jobs Done</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
           </div>
           <div className="text-lg sm:text-xl font-bold text-zinc-400">
-            {metrics.paidCount} <span className="text-xs text-zinc-600 font-normal">/ {filteredEntries.length}</span>
+            {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-600 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Clock className="w-3.5 h-3.5 text-amber-500/80" />
-            <span>Pending Payout</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
           </div>
           <div className="text-lg sm:text-xl font-bold text-zinc-400 truncate">
             <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
@@ -651,7 +656,7 @@ export function LedgerView({
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1 col-span-2 sm:col-span-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Average Rate</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
           </div>
           <div className="text-lg sm:text-xl font-bold text-zinc-400 truncate">
             <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
@@ -667,7 +672,7 @@ export function LedgerView({
         {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Expanding Search Drawer Toggle) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
           {/* Filter Chips group */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1">
             {/* Status Chips */}
             <div className="flex items-center gap-1">
               <button
@@ -679,7 +684,7 @@ export function LedgerView({
                     : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                 }`}
               >
-                All ({entries.length})
+                <span className={cn(isRtl && 'font-farsi')}>{t('status.all')} ({formatNumber(entries.length)})</span>
               </button>
 
               {STATUSES.map((st) => (
@@ -688,12 +693,14 @@ export function LedgerView({
                   type="button"
                   onClick={() => setStatusFilter(statusFilter === st ? '' : st)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center transition-colors whitespace-nowrap leading-none ${
+                    isRtl ? 'font-farsi' : ''
+                  } ${
                     statusFilter === st
                       ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
                       : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
                   }`}
                 >
-                  {st}
+                  {t('status.' + st, STATUS_LABELS[st] || st)}
                 </button>
               ))}
 
@@ -707,7 +714,7 @@ export function LedgerView({
                 }`}
               >
                 <FileImage className="w-3 h-3 text-zinc-500" />
-                <span>Proof</span>
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.proof')}</span>
               </button>
             </div>
 
@@ -757,7 +764,7 @@ export function LedgerView({
           </div>
 
           {/* Right Action Buttons: Select Mode Toggle & Search Drawer Toggle */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto ml-auto">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto ml-auto shrink-0 justify-end">
             {/* Dedicated Multi-Select Mode Toggle Button */}
             <button
               type="button"
@@ -780,10 +787,10 @@ export function LedgerView({
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span>Select</span>
+              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.select')}</span>
               {selectedEntryIds.size > 0 ? (
                 <span className="inline-flex items-center justify-center min-w-[17px] h-4 px-1 rounded-full bg-zinc-100 text-zinc-950 font-semibold font-mono text-[10px] leading-none shrink-0 shadow-sm">
-                  {selectedEntryIds.size}
+                  {formatNumber(selectedEntryIds.size)}
                 </span>
               ) : (
                 <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 hidden sm:inline-flex shrink-0">S</Kbd>
@@ -800,7 +807,7 @@ export function LedgerView({
                 }
               }}
               title="Toggle Search, Games & Sort (Press / to search)"
-              className={`flex-1 sm:flex-initial h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center justify-between sm:justify-center gap-2 border transition-colors leading-none ${
+              className={`h-7 px-2 lg:px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center gap-1.5 lg:gap-2 border transition-colors shrink-0 ${
                 isSearchExpanded || hasAdvancedFilters
                   ? 'bg-zinc-900 text-zinc-200 border-zinc-700/80 font-medium shadow-sm'
                   : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
@@ -808,14 +815,12 @@ export function LedgerView({
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                <span className="truncate">Search & Filters</span>
+                <span className={cn('hidden lg:inline whitespace-nowrap', isRtl && 'font-farsi')}>{t('ledger.searchAndFilters')}</span>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 px-1 py-0">/</Kbd>
-                {hasAdvancedFilters && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 ml-0.5" />
-                )}
-              </div>
+              <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 px-1 py-0 hidden lg:inline-flex shrink-0">/</Kbd>
+              {hasAdvancedFilters && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 shrink-0" />
+              )}
             </button>
           </div>
         </div>
@@ -837,10 +842,13 @@ export function LedgerView({
                     <Input
                       ref={searchInputRef}
                       type="text"
-                      placeholder="Search jobs, games, seller source, teammates, notes... (Press / to focus)"
+                      placeholder={t('ledger.searchPlaceholder')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-7 h-8 text-xs bg-black border-zinc-800/80 text-zinc-300 placeholder:text-zinc-600"
+                      className={cn(
+                        'pl-8 pr-7 h-8 text-xs bg-black border-zinc-800/80 text-zinc-300 placeholder:text-zinc-600',
+                        isRtl && 'font-farsi placeholder:font-farsi text-right'
+                      )}
                     />
                     {searchQuery && (
                       <button
@@ -880,14 +888,14 @@ export function LedgerView({
       {/* 4. Grouped Job Feed */}
       {filteredEntries.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-800/80 p-12 text-center space-y-3">
-          <p className="text-xs text-zinc-500">
+          <p className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>
             {searchQuery || statusFilter || gameFilter || hasProofFilter || teammateFilter
-              ? 'No jobs match the selected filters.'
-              : 'No work records logged yet.'}
+              ? t('ledger.noJobsMatch')
+              : t('ledger.emptyDesc')}
           </p>
-          <Button variant="primary" size="sm" onClick={() => onOpenWorkModal?.()}>
+          <Button variant="primary" size="sm" onClick={() => onOpenWorkModal?.()} className={cn(isRtl && 'font-farsi')}>
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Work</span>
+            <span>{t('nav.addWork')}</span>
           </Button>
         </div>
       ) : (
@@ -904,8 +912,8 @@ export function LedgerView({
                     <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                       {groupTitle}
                     </span>
-                    <span className="text-[10px] text-zinc-600">
-                      ({groupItems.length} {groupItems.length === 1 ? 'job' : 'jobs'})
+                    <span className={cn('text-[10px] text-zinc-600', isRtl && 'font-farsi')}>
+                      ({formatNumber(groupItems.length)} {groupItems.length === 1 ? t('ledger.job') : t('ledger.jobs')})
                     </span>
                   </div>
 
@@ -913,15 +921,15 @@ export function LedgerView({
                   <button
                     type="button"
                     onClick={() => handleToggleDaySelection(groupTitle)}
-                    title={`Click to ${isDaySelected ? 'deselect' : 'select and sum'} ${groupTitle}'s earnings`}
+                    title={isDaySelected ? t('ledger.deselectDayTitle') : t('ledger.selectDayTitle')}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] transition-all select-none border ${
                       isDaySelected
                         ? 'bg-zinc-900 text-zinc-200 font-medium border-zinc-700/80 shadow-sm'
                         : 'bg-transparent border-zinc-800/60 text-zinc-500 hover:border-zinc-700/70 hover:text-zinc-400'
                     }`}
                   >
-                    <span className={`text-[9px] uppercase font-medium ${isDaySelected ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                      Day Total:
+                    <span className={cn(`text-[9px] uppercase font-medium ${isDaySelected ? 'text-zinc-400' : 'text-zinc-600'}`, isRtl && 'font-farsi')}>
+                      {t('ledger.dayTotal')}:
                     </span>
                     <strong className={isDaySelected ? 'text-zinc-200 font-medium' : 'text-zinc-400 font-normal'}>
                       <MoneyDisplay amount={dayTotal} currency={globalCurrency} />
@@ -1003,6 +1011,7 @@ export function LedgerView({
                           ) : (
                             /* 2. Standard Work Record Card */
                             <div
+                              dir="ltr"
                               onClick={(e) => {
                                 if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
                                   return;
@@ -1069,7 +1078,7 @@ export function LedgerView({
                                       {entry.title}
                                     </span>
                                     {entry.source && (
-                                      <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-transparent text-zinc-500 border border-zinc-800/80">
+                                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-transparent text-zinc-500 border border-zinc-800/80">
                                         {entry.source}
                                       </span>
                                     )}
@@ -1097,8 +1106,10 @@ export function LedgerView({
                                       </span>
 
                                       {entry.pot && (
-                                        <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-zinc-900/90 text-amber-300/90 border border-amber-800/40">
-                                          Pot: {formatMoney(entry.pot, entry.currency)} ({entry.teammates.length + 1} shares)
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-900/90 text-amber-300/90 border border-amber-800/40 inline-flex items-baseline gap-1">
+                                          <span>Pot:</span>
+                                          <MoneyDisplay amount={entry.pot} currency={entry.currency} />
+                                          <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
                                         </span>
                                       )}
 
@@ -1114,7 +1125,7 @@ export function LedgerView({
                                               setTeammateFilter(isMatch ? '' : tm);
                                             }}
                                             title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
-                                            className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 ${
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 ${
                                               isMatch
                                                 ? 'bg-zinc-900 text-zinc-300 border-zinc-700/80 shadow-sm'
                                                 : 'bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80'
@@ -1122,8 +1133,8 @@ export function LedgerView({
                                           >
                                             <span>{tm}</span>
                                             {customCut && (
-                                              <span className="font-mono text-[9px] text-zinc-400">
-                                                ({formatMoney(customCut, entry.currency)})
+                                              <span className="font-mono text-[9px] text-zinc-400 inline-flex items-baseline">
+                                                (<MoneyDisplay amount={customCut} currency={entry.currency} />)
                                               </span>
                                             )}
                                           </button>
@@ -1181,8 +1192,9 @@ export function LedgerView({
                                     {isActionOpen && (
                                       <div
                                         onClick={(e) => e.stopPropagation()}
+                                        dir={isRtl ? 'rtl' : 'ltr'}
                                         className={cn(
-                                          'absolute right-0 w-36 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs',
+                                          'absolute w-36 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs right-0',
                                           isNearBottom ? 'bottom-full mb-1' : 'top-full mt-1'
                                         )}
                                       >
@@ -1195,7 +1207,7 @@ export function LedgerView({
                                           className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                         >
                                           <Receipt className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span>Client Receipt</span>
+                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.clientReceipt')}</span>
                                         </button>
 
                                         <button
@@ -1207,7 +1219,7 @@ export function LedgerView({
                                           className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                         >
                                           <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span>Edit Record</span>
+                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.edit')}</span>
                                         </button>
 
                                         <button
@@ -1219,7 +1231,7 @@ export function LedgerView({
                                           className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
                                         >
                                           <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span>Duplicate</span>
+                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.duplicate')}</span>
                                         </button>
 
                                         <div className="border-t border-zinc-800 my-0.5" />
@@ -1233,7 +1245,7 @@ export function LedgerView({
                                           className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
                                         >
                                           <Trash2 className="w-3.5 h-3.5" />
-                                          <span>Delete</span>
+                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.delete')}</span>
                                         </button>
                                       </div>
                                     )}
@@ -1251,16 +1263,17 @@ export function LedgerView({
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                                 transition={{ duration: 0.15 }}
+                                dir={isRtl ? 'rtl' : 'ltr'}
                                 className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-emerald-900/60 shadow-xl flex items-center justify-between gap-3 text-xs"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                  <span className="text-zinc-200 font-medium truncate">
-                                    Marked as Paid! Would you like to attach screenshot proof?
+                                  <span className={cn('text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
+                                    {t('ledger.attachProofPrompt')}
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
                                   <Button
                                     variant="primary"
                                     size="xs"
@@ -1268,18 +1281,18 @@ export function LedgerView({
                                       onOpenWorkModal?.(entry);
                                       setPromptProofEntryId(null);
                                     }}
-                                    className="h-7 text-xs gap-1"
+                                    className={cn('h-7 text-xs gap-1', isRtl && 'font-farsi')}
                                   >
                                     <UploadCloud className="w-3 h-3" />
-                                    <span>Attach Proof</span>
+                                    <span>{t('ledger.attachProof')}</span>
                                   </Button>
                                   <Button
                                     variant="ghost"
                                     size="xs"
                                     onClick={() => setPromptProofEntryId(null)}
-                                    className="h-7 text-xs text-zinc-400 hover:text-zinc-200"
+                                    className={cn('h-7 text-xs text-zinc-400 hover:text-zinc-200', isRtl && 'font-farsi')}
                                   >
-                                    <span>Dismiss</span>
+                                    <span>{t('ledger.dismiss')}</span>
                                   </Button>
                                 </div>
                               </motion.div>
@@ -1297,8 +1310,10 @@ export function LedgerView({
           {/* 5. Numbered Pagination Toolbar */}
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-800/80 text-xs text-zinc-400">
-              <span className="text-zinc-500 font-mono text-[11px]">
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)} of {filteredEntries.length} jobs
+              <span className={cn('text-zinc-500 font-mono text-[11px]', isRtl && 'font-farsi')}>
+                {language === 'fa'
+                  ? `نمایش ${formatNumber((currentPage - 1) * ITEMS_PER_PAGE + 1)} تا ${formatNumber(Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length))} از ${formatNumber(filteredEntries.length)} کار`
+                  : `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)} of ${filteredEntries.length} jobs`}
               </span>
 
               <div className="flex items-center gap-1">
@@ -1306,9 +1321,9 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className="h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors', isRtl && 'font-farsi')}
                 >
-                  Previous
+                  {t('ledger.previous')}
                 </button>
 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
@@ -1333,13 +1348,13 @@ export function LedgerView({
                       key={pageNum}
                       type="button"
                       onClick={() => handlePageChange(pageNum)}
-                      className={`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
+                      className={cn(`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
                         currentPage === pageNum
                           ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
                           : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                      }`}
+                      }`, isRtl && 'font-farsi')}
                     >
-                      {pageNum}
+                      {formatNumber(pageNum)}
                     </button>
                   );
                 })}
@@ -1348,9 +1363,9 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  className="h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors', isRtl && 'font-farsi')}
                 >
-                  Next
+                  {t('ledger.next')}
                 </button>
               </div>
             </div>
@@ -1366,68 +1381,76 @@ export function LedgerView({
             animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
             exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed bottom-20 md:bottom-8 left-1/2 z-[90] bg-zinc-950/75 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-4 sm:px-5 py-3 flex items-center gap-3.5 sm:gap-5 max-w-[95vw] sm:max-w-xl"
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className={cn(
+              'fixed bottom-20 md:bottom-8 left-1/2 z-[90] bg-zinc-950/85 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
+              isRtl && 'font-farsi'
+            )}
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900/90 text-zinc-200 border border-zinc-700/80 shrink-0">
-                {selectedDaysSummary.daysCount} {selectedDaysSummary.daysCount === 1 ? 'Day' : 'Days'}
+            <div className="flex items-center gap-3 min-w-0 shrink-0">
+              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900/90 text-zinc-200 border border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
+                {formatNumber(selectedDaysSummary.daysCount)} {selectedDaysSummary.daysCount === 1 ? t('ledger.day') : t('ledger.days')}
               </span>
 
-              <div className="flex items-baseline gap-2 min-w-0 truncate">
-                <span className="text-zinc-400 text-xs hidden sm:inline">Sum:</span>
-                <strong className="text-zinc-100 font-bold text-base sm:text-lg tracking-tight">
+              <div className="flex items-baseline gap-2 min-w-0 shrink-0">
+                <span className={cn('text-zinc-400 text-xs hidden sm:inline', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
+                <strong className="text-zinc-100 font-bold text-base sm:text-lg tracking-tight shrink-0">
                   <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
                 </strong>
-                <span className="text-[11px] text-zinc-500 shrink-0">
-                  ({selectedDaysSummary.totalJobs} {selectedDaysSummary.totalJobs === 1 ? 'job' : 'jobs'})
+                <span className={cn('text-[11px] text-zinc-500 shrink-0', isRtl && 'font-farsi')}>
+                  ({formatNumber(selectedDaysSummary.totalJobs)} {selectedDaysSummary.totalJobs === 1 ? t('ledger.job') : t('ledger.jobs')})
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-3 border-l border-zinc-800/80">
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
-                  navigator.clipboard.writeText(formatted);
-                  setIsSumCopied(true);
-                  setTimeout(() => setIsSumCopied(false), 2000);
-                  onToast?.(`📋 Copied selected days sum (${formatted}) to clipboard!`);
-                }}
-                title="Copy sum to clipboard"
-                className={`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
-                  isSumCopied
-                    ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80'
-                    : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80 border-transparent hover:border-zinc-700'
-                }`}
-              >
-                {isSumCopied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in-50 duration-150" />
-                    <span className="hidden sm:inline font-medium text-emerald-300">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="hidden sm:inline">Copy</span>
-                  </>
-                )}
-              </Button>
+            {/* Right Group with Standalone Vertical Divider */}
+            <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+              <div className="h-5 w-px bg-zinc-800/90 shrink-0" />
 
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  setSelectedDayKeys(new Set());
-                  setIsSumCopied(false);
-                }}
-                title="Clear day selection"
-                className="h-8 px-2 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-700 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Clear</span>
-              </Button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
+                    navigator.clipboard.writeText(formatted);
+                    setIsSumCopied(true);
+                    setTimeout(() => setIsSumCopied(false), 2000);
+                  }}
+                  title={t('ledger.copyTooltip')}
+                  className={cn(`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
+                    isSumCopied
+                      ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80'
+                      : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80 border-transparent hover:border-zinc-700'
+                  }`, isRtl && 'font-farsi')}
+                >
+                  {isSumCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400 animate-in zoom-in-50 duration-150" />
+                      <span className="hidden sm:inline font-medium text-emerald-300">{t('ledger.copied')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                      <span className="hidden sm:inline">{t('ledger.copySum')}</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setSelectedDayKeys(new Set());
+                    setIsSumCopied(false);
+                  }}
+                  title={t('ledger.clearSelection')}
+                  className={cn('h-8 px-2 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-700 transition-colors', isRtl && 'font-farsi')}
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{t('common.cancel')}</span>
+                </Button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1441,159 +1464,180 @@ export function LedgerView({
             animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
             exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed bottom-20 md:bottom-8 left-1/2 z-[95] bg-zinc-950/85 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2.5 sm:gap-4 max-w-[96vw] sm:max-w-2xl"
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className={cn(
+              'fixed bottom-20 md:bottom-8 left-1/2 z-[95] bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2 sm:py-2.5 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
+              isRtl && 'font-farsi'
+            )}
           >
             {/* Left: Count Badge & Live Converted Total Income Sum */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0">
-                {selectedEntryIds.size} Selected
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0', isRtl ? 'font-farsi' : 'font-mono')}>
+                {formatNumber(selectedEntryIds.size)} <span className="hidden xs:inline">{t('ledger.selected')}</span>
               </span>
 
-              <div className="flex items-baseline gap-1.5 min-w-0 truncate">
-                <span className="text-zinc-400 text-xs hidden sm:inline">Sum:</span>
-                <strong className="text-zinc-100 font-bold text-xs sm:text-sm tracking-tight truncate">
+              <div className="flex items-baseline gap-1.5 sm:gap-2 min-w-0 shrink-0">
+                <span className={cn('text-zinc-400 text-xs', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
+                <strong className="text-zinc-100 font-bold text-xs sm:text-sm tracking-tight shrink-0">
                   <MoneyDisplay amount={bulkMetrics.totalSum} currency={globalCurrency} />
                 </strong>
                 {globalCurrency !== 'GOLD' ? (
-                  <span className="hidden md:inline text-[10px] text-amber-400/80 font-mono shrink-0">
+                  <span dir="ltr" className="text-[10px] sm:text-[11px] text-amber-400/80 font-mono shrink-0 select-none">
                     (~{Math.round(bulkMetrics.totalSum / (goldRateTOMAN / 1000)).toLocaleString()} G)
                   </span>
                 ) : (
-                  <span className="hidden md:inline text-[10px] text-zinc-400 font-mono shrink-0">
-                    (~{Math.round(bulkMetrics.totalSum * (goldRateTOMAN / 1000)).toLocaleString()} تومان)
+                  <span dir={isRtl ? 'rtl' : 'ltr'} className={cn('text-[10px] sm:text-[11px] text-zinc-400 font-mono shrink-0 select-none', isRtl && 'font-farsi')}>
+                    (~{formatMoney(Math.round(bulkMetrics.totalSum * (goldRateTOMAN / 1000)), 'TOMAN')})
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Middle: Mixed Status Breakdown Pill (Tablet/Desktop) */}
-            <div className="hidden lg:flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-800/60 shrink-0">
-              {bulkMetrics.paid > 0 && <span className="text-emerald-400 font-medium">{bulkMetrics.paid} Paid</span>}
+            {/* Middle: Mixed Status Breakdown Pill (XL Screens Only) */}
+            <div className={cn('hidden xl:flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-800/60 shrink-0', isRtl && 'font-farsi')}>
+              {bulkMetrics.paid > 0 && <span className="text-emerald-400 font-medium">{formatNumber(bulkMetrics.paid)} {t('status.Paid')}</span>}
               {bulkMetrics.paid > 0 && (bulkMetrics.pending > 0 || bulkMetrics.working > 0 || bulkMetrics.cancelled > 0) && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.pending > 0 && <span className="text-amber-400 font-medium">{bulkMetrics.pending} Pending</span>}
+              {bulkMetrics.pending > 0 && <span className="text-amber-400 font-medium">{formatNumber(bulkMetrics.pending)} {t('status.Pending')}</span>}
               {bulkMetrics.pending > 0 && (bulkMetrics.working > 0 || bulkMetrics.cancelled > 0) && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.working > 0 && <span className="text-cyan-400 font-medium">{bulkMetrics.working} Working</span>}
+              {bulkMetrics.working > 0 && <span className="text-cyan-400 font-medium">{formatNumber(bulkMetrics.working)} {t('status.Working')}</span>}
               {bulkMetrics.working > 0 && bulkMetrics.cancelled > 0 && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.cancelled > 0 && <span className="text-zinc-500 font-medium">{bulkMetrics.cancelled} Cancelled</span>}
+              {bulkMetrics.cancelled > 0 && <span className="text-zinc-500 font-medium">{formatNumber(bulkMetrics.cancelled)} {t('status.On Hold')}</span>}
             </div>
 
-            {/* Right: Actions (Status Changer Popover + CSV Export + In-Line Morphing Delete + Deselect) */}
-            <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2 border-l border-zinc-800/80">
-              {/* 1. Bulk Status Changer Dropdown */}
-              <div className="relative">
+            {/* Right: Actions with Standalone Clean Vertical Divider */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {/* Standalone Vertical Divider with Safe Margins */}
+              <div className="h-5 w-px bg-zinc-800/90 shrink-0" />
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* 1. Bulk Status Changer Dropdown */}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsStatusDropdownOpen((prev) => !prev);
+                    }}
+                    title={t('ledger.bulkStatus')}
+                    className={cn('h-7 px-2 text-[11px] gap-1.5 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm shrink-0 flex items-center', isRtl && 'font-farsi')}
+                  >
+                    <div className="flex items-center -space-x-1 shrink-0 rtl:space-x-reverse" aria-hidden="true">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-zinc-950" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 ring-1 ring-zinc-950" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-zinc-950" />
+                    </div>
+                    <span>{t('ledger.bulkStatus')}</span>
+                    <ChevronDown className={cn('w-3 h-3 text-zinc-400 shrink-0 transition-transform duration-150', isStatusDropdownOpen && 'rotate-180 text-zinc-200')} />
+                  </Button>
+
+                  {isStatusDropdownOpen && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      className={cn(
+                        'absolute bottom-full mb-1.5 w-36 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[110] text-xs animate-in fade-in zoom-in-95 duration-100',
+                        isRtl ? 'right-0' : 'left-0'
+                      )}
+                    >
+                      {STATUSES.map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => {
+                            onBulkUpdateStatus?.(Array.from(selectedEntryIds), st);
+                            setIsStatusDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white text-start transition-colors"
+                        >
+                          <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              st === 'Paid'
+                                ? 'bg-emerald-400'
+                                : st === 'Working'
+                                ? 'bg-cyan-400'
+                                : st === 'Pending'
+                                ? 'bg-amber-400'
+                                : 'bg-zinc-500'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Bulk CSV Export Button */}
                 <Button
                   variant="ghost"
                   size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsStatusDropdownOpen((prev) => !prev);
-                  }}
-                  className="h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm"
+                  onClick={() => onBulkExportCsv?.(Array.from(selectedEntryIds))}
+                  title={t('ledger.bulkCsvTooltip', t('ledger.bulkCsv'))}
+                  className={cn('h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm flex items-center shrink-0', isRtl && 'font-farsi')}
                 >
-                  <span>Status</span>
-                  <ChevronDown className="w-3 h-3 text-zinc-400" />
+                  <Download className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span>{t('ledger.bulkCsv')}</span>
                 </Button>
 
-                {isStatusDropdownOpen && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute bottom-full mb-1.5 left-0 w-36 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[110] text-xs animate-in fade-in zoom-in-95 duration-100"
+                {/* 3. In-Line Morphing Delete (N) Confirmation */}
+                {!isBulkDeleting ? (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => setIsBulkDeleting(true)}
+                    title={`${t('ledger.bulkDelete')} (${formatNumber(selectedEntryIds.size)})`}
+                    className={cn('h-7 px-2 text-[11px] gap-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/60 transition-colors shrink-0', isRtl && 'font-farsi')}
                   >
-                    {STATUSES.map((st) => (
-                      <button
-                        key={st}
-                        type="button"
-                        onClick={() => {
-                          onBulkUpdateStatus?.(Array.from(selectedEntryIds), st);
-                          setIsStatusDropdownOpen(false);
-                        }}
-                        className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white text-left transition-colors"
-                      >
-                        <span>{st}</span>
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            st === 'Paid'
-                              ? 'bg-emerald-400'
-                              : st === 'Working'
-                              ? 'bg-cyan-400'
-                              : st === 'Pending'
-                              ? 'bg-amber-400'
-                              : 'bg-zinc-500'
-                          }`}
-                        />
-                      </button>
-                    ))}
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t('ledger.bulkDelete')}</span>
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-1 p-0.5 bg-rose-950/60 border border-rose-900/90 rounded-md animate-in fade-in zoom-in-95 duration-150 h-7 shrink-0">
+                    <span className={cn('text-[10px] font-medium text-rose-300 px-1 whitespace-nowrap', isRtl && 'font-farsi')}>
+                      {t('ledger.delete')} {formatNumber(selectedEntryIds.size)}?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkDeleting(false)}
+                      className={cn('h-5 px-1.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center', isRtl && 'font-farsi')}
+                    >
+                      {t('common.cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onBulkDelete?.(Array.from(selectedEntryIds));
+                        setSelectedEntryIds(new Set());
+                        setIsBulkDeleting(false);
+                        setIsSelectMode(false);
+                        setLastSelectedId(null);
+                      }}
+                      className={cn('h-5 px-1.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm flex items-center', isRtl && 'font-farsi')}
+                    >
+                      {t('common.confirm')}
+                    </button>
                   </div>
                 )}
-              </div>
 
-              {/* 2. Bulk CSV Export Button */}
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => onBulkExportCsv?.(Array.from(selectedEntryIds))}
-                title="Export selected records to CSV"
-                className="h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm hidden sm:flex"
-              >
-                <Download className="w-3 h-3 text-zinc-400" />
-                <span>CSV</span>
-              </Button>
-
-              {/* 3. In-Line Morphing Delete (N) Confirmation */}
-              {!isBulkDeleting ? (
+                {/* 4. Clear / Deselect Button */}
                 <Button
                   variant="ghost"
-                  size="xs"
-                  onClick={() => setIsBulkDeleting(true)}
-                  className="h-7 px-2 text-[11px] gap-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/60 transition-colors"
+                  size="icon-sm"
+                  onClick={() => {
+                    setSelectedEntryIds(new Set());
+                    setIsBulkDeleting(false);
+                    setIsStatusDropdownOpen(false);
+                    setIsSelectMode(false);
+                    setLastSelectedId(null);
+                  }}
+                  title={`${t('ledger.bulkClear')} (Esc)`}
+                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 rounded-md shrink-0 flex items-center justify-center"
                 >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete</span>
+                  <X className="w-3.5 h-3.5 shrink-0" />
                 </Button>
-              ) : (
-                <div className="flex items-center gap-1 p-0.5 bg-rose-950/60 border border-rose-900/90 rounded-md animate-in fade-in zoom-in-95 duration-150">
-                  <span className="text-[10px] font-medium text-rose-300 px-1">
-                    Delete {selectedEntryIds.size}?
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsBulkDeleting(false)}
-                    className="px-1.5 py-0.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onBulkDelete?.(Array.from(selectedEntryIds));
-                      setSelectedEntryIds(new Set());
-                      setIsBulkDeleting(false);
-                      setIsSelectMode(false);
-                      setLastSelectedId(null);
-                    }}
-                    className="px-1.5 py-0.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm"
-                  >
-                    Confirm
-                  </button>
-                </div>
-              )}
-
-              {/* 4. Clear / Deselect Button */}
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => {
-                  setSelectedEntryIds(new Set());
-                  setIsBulkDeleting(false);
-                  setIsStatusDropdownOpen(false);
-                  setIsSelectMode(false);
-                  setLastSelectedId(null);
-                }}
-                title="Clear selection (Esc)"
-                className="h-7 w-7 p-0 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-md"
-              >
-                <X className="w-3.5 h-3.5" />
-              </Button>
+              </div>
             </div>
           </motion.div>
         )}

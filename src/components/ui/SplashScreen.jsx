@@ -10,8 +10,9 @@ export function SplashScreen() {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
       className="fixed inset-0 z-[999] bg-black flex flex-col items-center justify-center select-none overflow-hidden"
+      dir="ltr"
     >
-      <div className="flex flex-col items-center space-y-6">
+      <div className="flex flex-col items-center space-y-6" dir="ltr">
         {/* Crisp Unboxed Geometric Logo */}
         <div className="w-14 h-14 flex items-center justify-center">
           <img
@@ -32,8 +33,8 @@ export function SplashScreen() {
           </p>
         </div>
 
-        {/* Linear Time-Relative Progress Bar (0% to 100% in exactly 2.2s) */}
-        <div className="w-44 h-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800">
+        {/* Linear Time-Relative Progress Bar (0% to 100% in exactly 2.2s) - Forced LTR */}
+        <div className="w-44 h-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800" dir="ltr">
           <motion.div
             initial={{ width: '0%' }}
             animate={{ width: '100%' }}

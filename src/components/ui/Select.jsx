@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../lib/i18n';
 
 export function Select({
   value,
@@ -11,7 +12,9 @@ export function Select({
   className,
   disabled = false,
   dropUp = false,
+  align = 'auto', // 'auto' | 'start' | 'end' | 'left' | 'right'
 }) {
+  const { isRtl } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -179,9 +182,22 @@ export function Select({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: 'easeOut' }}
+            dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
-              'absolute left-0 z-[100] min-w-[180px] max-h-64 overflow-y-auto bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1',
-              dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5 right-0 sm:right-auto'
+              'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto bg-zinc-950/95 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1',
+              // Alignment handling for RTL and LTR
+              align === 'left'
+                ? 'left-0 right-auto text-left'
+                : align === 'right'
+                ? 'right-0 left-auto text-right'
+                : align === 'end'
+                ? isRtl
+                  ? 'left-0 right-auto text-left'
+                  : 'right-0 left-auto text-right'
+                : isRtl
+                ? 'right-0 left-auto text-right font-farsi'
+                : 'left-0 right-auto text-left',
+              dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
           >
             {groups ? (

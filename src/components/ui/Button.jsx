@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '../../lib/utils';
 
 export function Button({
   children,
@@ -11,7 +12,7 @@ export function Button({
   ...props
 }) {
   const baseStyles =
-    'inline-flex items-center justify-center font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] select-none';
+    'inline-flex items-center justify-center font-medium leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] select-none';
 
   const variants = {
     primary:
@@ -27,12 +28,12 @@ export function Button({
   };
 
   const sizes = {
-    xs: 'h-7 px-2 text-xs rounded-lg gap-1.5',
-    sm: 'h-8 px-2.5 text-xs rounded-lg gap-1.5',
-    md: 'h-9 px-3.5 text-xs rounded-lg gap-2',
-    lg: 'h-10 px-4 text-sm rounded-xl gap-2',
-    icon: 'h-8 w-8 p-0 rounded-lg',
-    'icon-sm': 'h-7 w-7 p-0 rounded-lg',
+    xs: 'h-7 px-2.5 text-xs rounded-md gap-1.5',
+    sm: 'h-8 px-3 text-xs rounded-md gap-1.5',
+    md: 'h-9 px-3.5 text-xs rounded-md gap-2',
+    lg: 'h-10 px-4 text-sm rounded-lg gap-2',
+    icon: 'h-8 w-8 p-0 rounded-md',
+    'icon-sm': 'h-7 w-7 p-0 rounded-md',
   };
 
   const variantClass = variants[variant] || variants.secondary;
@@ -43,7 +44,7 @@ export function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`${baseStyles} ${variantClass} ${sizeClass} ${className}`}
+      className={cn(baseStyles, variantClass, sizeClass, className)}
       {...props}
     >
       {children}

@@ -18,17 +18,42 @@ import {
 } from 'lucide-react';
 import { installUpdate, relaunchApp } from '../lib/updater';
 import { openExternalUrl } from '../lib/desktop';
+import { getReleaseNotesForVersion } from '../lib/releaseNotes';
 import { isRTL } from '../lib/utils';
+import { useLanguage } from '../lib/i18n';
+import { cn } from '../lib/utils';
 
 export function UpdateModal({
   isOpen,
   onClose,
   updateInfo,
-  onToast,
 }) {
+  const { t, language, isRtl, formatNumber } = useLanguage();
   const [installState, setInstallState] = useState('idle'); // 'idle' | 'downloading' | 'ready_to_restart' | 'error'
   const [progress, setProgress] = useState({ downloadedBytes: 0, totalBytes: 0, percent: 0 });
   const [errorMessage, setErrorMessage] = useState('');
+
+  const getTagBadge = (tag) => {
+    switch (tag) {
+      case 'new':
+        return {
+          label: t('notifications.tagNew', 'NEW'),
+          style: 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80',
+        };
+      case 'improved':
+        return {
+          label: t('notifications.tagImproved', 'IMPROVED'),
+          style: 'bg-indigo-950/60 text-indigo-300 border-indigo-800/80',
+        };
+      case 'fix':
+        return {
+          label: t('notifications.tagFix', 'FIX'),
+          style: 'bg-zinc-800 text-zinc-300 border-zinc-700/80',
+        };
+      default:
+        return null;
+    }
+  };
 
   if (!isOpen || !updateInfo) return null;
 
@@ -51,12 +76,10 @@ export function UpdateModal({
       });
 
       setInstallState('ready_to_restart');
-      onToast?.('Checkpoint update downloaded successfully. Ready to restart.');
     } catch (err) {
       console.error('[UpdateModal] Install failed:', err);
       setInstallState('error');
       setErrorMessage(err?.message || 'Failed to download and apply update.');
-      onToast?.('Update download failed', { variant: 'destructive' });
     }
   };
 
@@ -79,7 +102,7 @@ export function UpdateModal({
           <div className="w-6 h-6 rounded-md bg-emerald-950/60 border border-emerald-800/80 flex items-center justify-center text-emerald-400">
             <ArrowUpCircle className="w-3.5 h-3.5" />
           </div>
-          <DialogTitle>Software Update Available</DialogTitle>
+          <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('update.title')}</DialogTitle>
         </div>
       </DialogHeader>
 
@@ -87,8 +110,8 @@ export function UpdateModal({
         {/* Version Comparison Card */}
         <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between">
           <div className="space-y-0.5">
-            <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider block">
-              Current Version
+            <span className={cn('text-[10px] text-zinc-500 font-mono uppercase tracking-wider block', isRtl && 'font-farsi')}>
+              {t('update.currentVersion')}
             </span>
             <span className="text-xs font-mono font-medium text-zinc-400">
               v{currentVersion}
@@ -98,8 +121,8 @@ export function UpdateModal({
           <div className="h-6 w-px bg-zinc-800" />
 
           <div className="space-y-0.5 text-right">
-            <span className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider block font-semibold">
-              New Version
+            <span className={cn('text-[10px] text-emerald-400 font-mono uppercase tracking-wider block font-semibold', isRtl && 'font-farsi')}>
+              {t('update.newVersion')}
             </span>
             <span className="text-xs font-mono font-bold text-white flex items-center justify-end gap-1">
               <Sparkles className="w-3 h-3 text-emerald-400" />
@@ -110,21 +133,71 @@ export function UpdateModal({
 
         {/* Release Notes Preview */}
         {(() => {
-          const isBodyRTL = isRTL(updateInfo.body);
+          const notes = getReleaseNotesForVersion(newVersion, language, updateInfo.body);
+          const hasItems = Array.isArray(notes.items) && notes.items.length > 0;
+          const isBodyRTL = isRTL(notes.summary || updateInfo.body);
+
           return (
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-                What's New in v{newVersion}
+              <label className={cn('text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+                {t('update.releaseNotes')}
               </label>
               <div
                 dir={isBodyRTL ? 'rtl' : 'ltr'}
-                className={`p-3 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 max-h-40 overflow-y-auto whitespace-pre-wrap select-text ${
-                  isBodyRTL
-                    ? 'font-farsi text-right tracking-normal leading-[1.75]'
-                    : 'font-sans leading-relaxed'
-                }`}
+                className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 max-h-48 overflow-y-auto space-y-2 select-text"
               >
-                {updateInfo.body || 'Performance enhancements, optimizations, and stability improvements.'}
+                {notes.summary && (
+                  <p className={cn('text-zinc-300 text-[11px] leading-relaxed', isBodyRTL && 'font-farsi text-right')}>
+                    {notes.summary}
+                  </p>
+                )}
+
+                {hasItems ? (
+                  <ul className="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                    {notes.items.map((it, idx) => {
+                      const tagInfo = it.tag ? getTagBadge(it.tag) : null;
+                      const text = it.text || String(it);
+                      const itemRtl = isRTL(text);
+
+                      return (
+                        <li
+                          key={idx}
+                          dir={itemRtl ? 'rtl' : 'ltr'}
+                          className="flex items-start gap-1.5 text-[11px] text-zinc-300 leading-relaxed"
+                        >
+                          {tagInfo ? (
+                            <span
+                              dir="ltr"
+                              className={cn(
+                                'text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                tagInfo.style,
+                                language === 'fa' && 'font-farsi text-[8.5px]'
+                              )}
+                            >
+                              {tagInfo.label}
+                            </span>
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                          )}
+
+                          <span className={cn('break-words min-w-0 flex-1', itemRtl && 'text-right font-farsi')}>
+                            {text}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div
+                    className={`whitespace-pre-wrap ${
+                      isBodyRTL
+                        ? 'font-farsi text-right tracking-normal leading-[1.75]'
+                        : 'font-sans leading-relaxed'
+                    }`}
+                  >
+                    {updateInfo.body || 'Performance enhancements, optimizations, and stability improvements.'}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -134,15 +207,15 @@ export function UpdateModal({
         {installState === 'downloading' && (
           <div className="space-y-2 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-zinc-400 flex items-center gap-1.5">
+              <span className={cn('text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 <RotateCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                <span>Downloading update...</span>
+                <span>{t('update.downloading')}</span>
               </span>
-              <span className="font-semibold text-white">{progress.percent}%</span>
+              <span className="font-semibold text-white">{formatNumber(progress.percent)}%</span>
             </div>
 
             {/* Monochromatic Progress Bar */}
-            <div className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div dir="ltr" className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
               <div
                 className="h-full bg-zinc-100 transition-all duration-150"
                 style={{ width: `${progress.percent}%` }}
@@ -160,10 +233,10 @@ export function UpdateModal({
         {installState === 'ready_to_restart' && (
           <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900/60 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <div className="text-xs text-emerald-200">
-              <p className="font-semibold">Update ready to install</p>
+            <div className={cn('text-xs text-emerald-200', isRtl && 'font-farsi')}>
+              <p className="font-semibold">{t('update.readyRestart')}</p>
               <p className="text-[11px] text-emerald-300/80">
-                Restart Checkpoint now to apply version {newVersion}.
+                {language === 'fa' ? `برنامه را مجدداً راه‌اندازی کنید تا نسخه ${newVersion} اعمال شود.` : `Restart Checkpoint now to apply version ${newVersion}.`}
               </p>
             </div>
           </div>
@@ -173,8 +246,8 @@ export function UpdateModal({
         {installState === 'error' && (
           <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/60 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-            <div className="text-xs text-rose-200">
-              <p className="font-semibold">Update failed</p>
+            <div className={cn('text-xs text-rose-200', isRtl && 'font-farsi')}>
+              <p className="font-semibold">{language === 'fa' ? 'خطا در به‌روزرسانی' : 'Update failed'}</p>
               <p className="text-[11px] text-rose-300/80">{errorMessage}</p>
             </div>
           </div>
@@ -186,7 +259,7 @@ export function UpdateModal({
           <button
             type="button"
             onClick={() => openExternalUrl(updateInfo.releaseUrl)}
-            className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+            className={cn('flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors', isRtl && 'font-farsi')}
           >
             <span>GitHub Release</span>
             <ExternalLink className="w-3 h-3" />
@@ -196,8 +269,8 @@ export function UpdateModal({
         )}
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {installState === 'ready_to_restart' ? 'Later' : 'Close'}
+          <Button variant="ghost" size="sm" onClick={onClose} className={cn(isRtl && 'font-farsi')}>
+            {installState === 'ready_to_restart' ? (language === 'fa' ? 'بعداً' : 'Later') : t('common.close')}
           </Button>
 
           {installState === 'ready_to_restart' ? (
@@ -205,10 +278,10 @@ export function UpdateModal({
               variant="primary"
               size="sm"
               onClick={handleRelaunch}
-              className="gap-1.5 font-semibold"
+              className={cn('gap-1.5 font-semibold', isRtl && 'font-farsi')}
             >
               <RotateCw className="w-3.5 h-3.5" />
-              <span>Restart & Apply</span>
+              <span>{t('update.readyRestart')}</span>
             </Button>
           ) : (
             <Button
@@ -216,17 +289,17 @@ export function UpdateModal({
               size="sm"
               disabled={installState === 'downloading'}
               onClick={handleStartUpdate}
-              className="gap-1.5 font-semibold"
+              className={cn('gap-1.5 font-semibold', isRtl && 'font-farsi')}
             >
               {installState === 'downloading' ? (
                 <>
                   <RotateCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Downloading...</span>
+                  <span>{t('update.downloading')}</span>
                 </>
               ) : (
                 <>
                   <Download className="w-3.5 h-3.5" />
-                  <span>Update Now</span>
+                  <span>{t('update.installNow')}</span>
                 </>
               )}
             </Button>

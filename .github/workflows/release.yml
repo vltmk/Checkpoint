@@ -46,6 +46,16 @@ jobs:
             exit 1
           }
 
+      - name: Extract Release Notes
+        id: release_notes
+        shell: pwsh
+        run: |
+          $notes = node scripts/extractReleaseNotes.mjs "${{ github.ref_name }}"
+          $delimiter = [System.Guid]::NewGuid().ToString()
+          "body<<$delimiter" >> $env:GITHUB_OUTPUT
+          $notes >> $env:GITHUB_OUTPUT
+          "$delimiter" >> $env:GITHUB_OUTPUT
+
       - name: Build and Publish Tauri Application
         uses: tauri-apps/tauri-action@v1.0.0
         env:
@@ -55,7 +65,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Checkpoint ${{ github.ref_name }}'
-          releaseBody: 'See release details for Checkpoint ${{ github.ref_name }}.'
+          releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           uploadUpdaterJson: true

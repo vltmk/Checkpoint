@@ -6,6 +6,11 @@
 
 import { trackerDB } from './db';
 import { markAnnouncementDismissed, markAnnouncementSeen } from './announcements';
+import {
+  getReleaseNotesForVersion,
+  getAggregatedReleaseNotes,
+  parseMarkdownChangelog,
+} from './releaseNotes';
 
 export const NOTIFICATIONS_STORAGE_KEY = 'checkpoint_notifications_history';
 
@@ -84,14 +89,17 @@ export function mergeNotificationsIntoHistory(
     if (isNewer) {
       const updateId = `update-${updateInfo.version}`;
       const previous = existingMap.get(updateId);
+      const parsedItems = updateInfo.body ? parseMarkdownChangelog(updateInfo.body) : [];
+
       merged.push({
         id: updateId,
         source: 'updater',
         type: 'info',
         title: `Checkpoint v${updateInfo.version} Available`,
         message: updateInfo.body
-          ? `A new version of Checkpoint is ready to download. ${updateInfo.body.slice(0, 160)}...`
+          ? `A new version of Checkpoint is ready to download. ${updateInfo.body.slice(0, 140)}...`
           : `A new version of Checkpoint is ready to download and install.`,
+        items: parsedItems.slice(0, 4),
         publishedAt: updateInfo.date || new Date().toISOString(),
         read: previous ? Boolean(previous.read) : false,
         dismissed: previous ? Boolean(previous.dismissed) : false,
@@ -115,25 +123,48 @@ export function mergeNotificationsIntoHistory(
     const welcomeId = `welcome-v${postUpdateInfo.version}`;
     const previous = existingMap.get(welcomeId);
     if (!previous || !previous.dismissed) {
+      const language = postUpdateInfo.language || 'en';
+      const notesList = postUpdateInfo.fromVersion
+        ? getAggregatedReleaseNotes(postUpdateInfo.fromVersion, postUpdateInfo.version, language)
+        : [getReleaseNotesForVersion(postUpdateInfo.version, language, postUpdateInfo.body)];
+
+      const primaryNote = notesList[0] || getReleaseNotesForVersion(postUpdateInfo.version, language);
+      const allItems = [];
+
+      for (const n of notesList) {
+        if (Array.isArray(n.items)) {
+          for (const it of n.items) {
+            allItems.push({
+              tag: it.tag || null,
+              text: it.text || String(it),
+              version: notesList.length > 1 ? n.version : undefined,
+            });
+          }
+        }
+      }
+
       merged.push({
         id: welcomeId,
         source: 'system',
         type: 'success',
-        title: `Updated to Checkpoint v${postUpdateInfo.version}`,
-        message: postUpdateInfo.body
+        title: primaryNote.title || `Updated to Checkpoint v${postUpdateInfo.version}`,
+        message: primaryNote.summary || (postUpdateInfo.body
           ? `Checkpoint was successfully updated. Highlights: ${postUpdateInfo.body.slice(0, 160)}...`
-          : `You are running the latest version of Checkpoint. Enjoy improved speed and reliability.`,
-        publishedAt: new Date().toISOString(),
+          : `You are running the latest version of Checkpoint. Enjoy improved speed and reliability.`),
+        items: allItems.length > 0 ? allItems : (postUpdateInfo.items || []),
+        publishedAt: primaryNote.date ? new Date(primaryNote.date).toISOString() : new Date().toISOString(),
         read: previous ? Boolean(previous.read) : false,
         dismissed: false,
-        pinned: false,
-        action: postUpdateInfo.releaseUrl
-          ? {
-              label: 'View Changelog',
-              type: 'external_link',
-              url: postUpdateInfo.releaseUrl,
-            }
-          : null,
+        pinned: true,
+        action: {
+          label: language === 'fa' ? 'مشاهده لیست تغییرات' : 'View Changelog',
+          type: 'external_link',
+          url: postUpdateInfo.releaseUrl || `https://github.com/vltmk/Checkpoint/releases/tag/v${postUpdateInfo.version}`,
+        },
+        data: {
+          version: postUpdateInfo.version,
+          releaseUrl: postUpdateInfo.releaseUrl,
+        },
       });
       processedIds.add(welcomeId);
     }

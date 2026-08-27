@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatMoneyParts, convertCurrency } from '../../lib/currencies';
+import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 
 export function MoneyDisplay({
@@ -10,18 +11,35 @@ export function MoneyDisplay({
   unitClassName = '',
   prefix = '',
 }) {
-  const { amount: formattedNum, unit } = formatMoneyParts(amount, currency, compact);
+  const { language } = useLanguage();
+  const isGold = currency === 'GOLD' || currency === 'WOW_GOLD';
+  const usePersianDigits = language === 'fa' && !isGold;
+  const { amount: formattedNum, magnitude, unit } = formatMoneyParts(amount, currency, compact, usePersianDigits);
 
   return (
-    <span className={cn('inline-flex items-baseline gap-1 tracking-tight', className)}>
+    <span
+      dir={isGold ? 'ltr' : undefined}
+      className={cn(
+        'inline-flex items-baseline gap-1 tracking-tight',
+        isGold && '[direction:ltr]',
+        className
+      )}
+    >
       {prefix && <span className="text-zinc-500 font-normal mr-0.5">{prefix}</span>}
-      <span>{formattedNum}</span>
+      <span dir="ltr" className="inline-flex items-baseline [direction:ltr]">
+        <span>{formattedNum}</span>
+        {magnitude && (
+          <span className="text-[0.72em] text-zinc-500 font-medium select-none ml-0.5">
+            {magnitude}
+          </span>
+        )}
+      </span>
       {unit && (
         <span
           className={cn(
-            unit === 'تومان'
-              ? 'text-[0.72em] font-farsi font-medium text-zinc-400 opacity-85 select-none'
-              : 'text-[0.8em] font-medium text-zinc-400 select-none',
+            isGold
+              ? 'text-[0.8em] font-bold text-amber-400 select-none'
+              : 'text-[0.72em] font-farsi font-medium text-zinc-400 opacity-85 select-none',
             unitClassName
           )}
         >
@@ -57,18 +75,25 @@ export function ConvertedSecondaryDisplay({
         amount={converted}
         currency={to}
         prefix="≈"
-        unitClassName="text-[0.7em] text-zinc-500"
+        unitClassName={to === 'GOLD' ? 'text-[0.75em] font-bold text-amber-400' : 'text-[0.7em] text-zinc-500'}
       />
       {showRateLabel && (
         <span
-          className="text-[9px] text-zinc-600 tracking-tight"
+          className="text-[9px] text-zinc-600 tracking-tight inline-flex items-baseline"
           title={
             isPerOneGold
               ? `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1 Gold`
               : `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1,000 Gold`
           }
         >
-          @{effectiveRate >= 1000 ? `${(effectiveRate / 1000).toFixed(1)}k` : effectiveRate}
+          @{effectiveRate >= 1000 ? (
+            <>
+              {(effectiveRate / 1000).toFixed(1)}
+              <span className="text-[0.8em] text-zinc-500 font-medium">k</span>
+            </>
+          ) : (
+            effectiveRate
+          )}
           {isPerOneGold ? 'T/G' : 'T'}
         </span>
       )}

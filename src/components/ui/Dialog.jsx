@@ -3,6 +3,22 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+let openDialogCount = 0;
+
+function lockBodyScroll() {
+  openDialogCount++;
+  if (openDialogCount === 1) {
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function unlockBodyScroll() {
+  openDialogCount = Math.max(0, openDialogCount - 1);
+  if (openDialogCount === 0) {
+    document.body.style.overflow = '';
+  }
+}
+
 export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl' }) {
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -14,16 +30,14 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  // Lock scroll when dialog is open
+  // Lock scroll when dialog is open (ref-counted for nested modals)
   useEffect(() => {
     if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      lockBodyScroll();
+      return () => {
+        unlockBodyScroll();
+      };
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [open]);
 
   return (
@@ -63,6 +77,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
 export function DialogHeader({ children, className, onClose }) {
   return (
     <div
+      dir="ltr"
       className={cn(
         'flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
         className
@@ -97,6 +112,7 @@ export function DialogContent({ children, className }) {
 export function DialogFooter({ children, className }) {
   return (
     <div
+      dir="ltr"
       className={cn(
         'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
         className

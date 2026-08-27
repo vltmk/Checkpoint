@@ -5,6 +5,7 @@
  */
 
 import { isTauri } from './desktop';
+import { getAppVersion } from './updater';
 
 const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
@@ -514,9 +515,13 @@ export class StorageDB {
 
     if (this.isDesktop && this.sqliteDb) {
       try {
-        const placeholders = ids.map(() => '?').join(',');
-        await this.sqliteDb.execute(`DELETE FROM proof_attachments WHERE entry_id IN (${placeholders})`, ids);
-        await this.sqliteDb.execute(`DELETE FROM work_entries WHERE id IN (${placeholders})`, ids);
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+          const chunk = ids.slice(i, i + CHUNK_SIZE);
+          const placeholders = chunk.map(() => '?').join(',');
+          await this.sqliteDb.execute(`DELETE FROM proof_attachments WHERE entry_id IN (${placeholders})`, chunk);
+          await this.sqliteDb.execute(`DELETE FROM work_entries WHERE id IN (${placeholders})`, chunk);
+        }
         return true;
       } catch (err) {
         console.error('SQLite bulkDeleteEntries error:', err);
@@ -542,12 +547,16 @@ export class StorageDB {
 
     if (this.isDesktop && this.sqliteDb) {
       try {
-        const placeholders = ids.map(() => '?').join(',');
+        const CHUNK_SIZE = 400;
         const nowSec = Math.floor(Date.now() / 1000);
-        await this.sqliteDb.execute(
-          `UPDATE work_entries SET status = ?, updated_at = ? WHERE id IN (${placeholders})`,
-          [nextStatus, nowSec, ...ids]
-        );
+        for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+          const chunk = ids.slice(i, i + CHUNK_SIZE);
+          const placeholders = chunk.map(() => '?').join(',');
+          await this.sqliteDb.execute(
+            `UPDATE work_entries SET status = ?, updated_at = ? WHERE id IN (${placeholders})`,
+            [nextStatus, nowSec, ...chunk]
+          );
+        }
         return true;
       } catch (err) {
         console.error('SQLite bulkUpdateStatus error:', err);
@@ -723,7 +732,7 @@ export class StorageDB {
     try {
       // Get all entries with full proofs
       const entries = await this.getAllEntriesFull();
-      const version = await import('./updater').then(m => m.getAppVersion());
+      const version = await getAppVersion();
       const snapshot = {
         app: 'CHECKPOINT',
         version: version || '0.0.0',
@@ -794,18 +803,43 @@ export class StorageDB {
   }
 
   async getAllEntriesFull() {
-    const list = await this.getAllEntries();
-    const full = [];
-    for (const item of list) {
-      const fullEntry = await this.getEntry(item.id);
-      full.push(fullEntry || item);
+    await this.initPromise;
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const entries = await this.getAllEntries();
+        if (!entries || entries.length === 0) return [];
+
+        const proofRows = await this.sqliteDb.select(
+          'SELECT id, entry_id, name, data_blob as data, size, created_at as createdAt FROM proof_attachments ORDER BY created_at ASC'
+        );
+
+        const proofMap = new Map();
+        if (Array.isArray(proofRows)) {
+          for (const p of proofRows) {
+            if (!proofMap.has(p.entry_id)) {
+              proofMap.set(p.entry_id, []);
+            }
+            proofMap.get(p.entry_id).push(p);
+          }
+        }
+
+        return entries.map((entry) => ({
+          ...entry,
+          proofs: proofMap.get(entry.id) || [],
+        }));
+      } catch (err) {
+        console.error('SQLite getAllEntriesFull batch error:', err);
+        return this.getAllEntries();
+      }
     }
-    return full;
+
+    // IndexedDB fallback (already preserves complete object in STORE_ENTRIES)
+    return this.getAllEntries();
   }
 }
 
 export const trackerDB = new StorageDB();
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && import.meta.env && import.meta.env.DEV) {
   window.trackerDB = trackerDB;
 }

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import checkpointLogo from '../assets/checkpoint.svg';
 import { openExternalUrl } from '../lib/desktop';
+import { useLanguage } from '../lib/i18n';
+import { cn } from '../lib/utils';
 
 export function MobileHeader({
   globalCurrency = 'TOMAN',
@@ -19,8 +21,9 @@ export function MobileHeader({
   unreadNotificationsCount = 0,
   appVersion = '',
 }) {
+  const { t } = useLanguage();
   return (
-    <header className="md:hidden sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
+    <header dir="ltr" className="md:hidden sticky top-0 z-40 w-full bg-zinc-950/95 border-b border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
       <button
         type="button"
         onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint')}
@@ -37,7 +40,7 @@ export function MobileHeader({
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
               v{appVersion}
             </span>
           )}
@@ -84,6 +87,7 @@ export function MobileBottomNav({
   onOpenWorkModal,
   onOpenQuickAdd,
 }) {
+  const { t, isRtl } = useLanguage();
   return (
     <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 border-t border-zinc-800/80 px-4 py-1.5 safe-bottom">
       <div className="flex items-center justify-around max-w-sm mx-auto">
@@ -96,7 +100,7 @@ export function MobileBottomNav({
           }`}
         >
           <Layers className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-100' : 'text-zinc-500'}`} />
-          <span>Ledger</span>
+          <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
         </button>
 
         {/* Center CTA Group: + Add Work & ⚡ Quick Add */}
@@ -104,7 +108,7 @@ export function MobileBottomNav({
           <button
             type="button"
             onClick={onOpenWorkModal}
-            title="Add Work Record (N)"
+            title={`${t('nav.addWork')} (N)`}
             className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-95 transition-all border border-zinc-300 hover:bg-white cursor-pointer"
           >
             <Plus className="w-5 h-5" />
@@ -112,7 +116,7 @@ export function MobileBottomNav({
           <button
             type="button"
             onClick={onOpenQuickAdd}
-            title="Quick Add Record (Q)"
+            title={`${t('nav.quickAdd')} (Q)`}
             className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-900 text-zinc-200 border border-zinc-700 shadow-md active:scale-95 transition-all hover:bg-zinc-800 hover:text-white cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -128,7 +132,7 @@ export function MobileBottomNav({
           }`}
         >
           <BarChart3 className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-zinc-100' : 'text-zinc-500'}`} />
-          <span>Analytics</span>
+          <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
         </button>
       </div>
     </nav>

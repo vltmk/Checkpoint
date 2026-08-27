@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, X, Bookmark, Check, Users, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../lib/i18n';
 
 const SAVED_TEAMMATES_KEY = 'checkpoint_saved_teammates_v1';
 
 export function TeammatesCombobox({
   value = [],
   onChange,
-  onToast,
   placeholder = 'Add teammate name and press Enter...',
 }) {
+  const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [savedTeammates, setSavedTeammates] = useState(() => {
@@ -49,7 +50,6 @@ export function TeammatesCombobox({
     if (!trimmed) return;
 
     if (value.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
-      onToast?.(`"${trimmed}" is already added to this job.`);
       setInputValue('');
       return;
     }
@@ -85,7 +85,6 @@ export function TeammatesCombobox({
     const updated = savedTeammates.filter((s) => s !== nameToDelete);
     setSavedTeammates(updated);
     saveToStorage(updated);
-    onToast?.(`Removed "${nameToDelete}" from saved teammates`);
   };
 
   const handleKeyDown = (e) => {
@@ -122,14 +121,15 @@ export function TeammatesCombobox({
                 e.stopPropagation();
                 handleRemoveTeammate(idx);
               }}
-              className="p-0.5 rounded hover:bg-zinc-700 text-zinc-400 hover:text-zinc-100 transition-colors"
+              className="p-0.5 rounded text-zinc-400 hover:text-red-400 hover:bg-zinc-700/60 transition-colors ml-0.5"
+              title={language === 'fa' ? `حذف ${name}` : `Remove ${name}`}
             >
               <X className="w-2.5 h-2.5" />
             </button>
           </span>
         ))}
 
-        {/* Text Input */}
+        {/* Input box */}
         <input
           ref={inputRef}
           type="text"
@@ -140,18 +140,18 @@ export function TeammatesCombobox({
           }}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder={value.length === 0 ? placeholder : 'Add more...'}
-          className="flex-1 min-w-[120px] bg-transparent border-0 text-zinc-100 text-xs placeholder:text-zinc-500 focus:outline-none p-1"
+          placeholder={value.length === 0 ? placeholder : (language === 'fa' ? 'افزودن نام بیشتر...' : 'Add more...')}
+          className={cn('flex-1 min-w-[120px] bg-transparent border-0 text-zinc-100 text-xs placeholder:text-zinc-500 focus:outline-none p-1', isRtl && 'font-farsi')}
         />
 
         {/* Dropdown Toggle / Add Action */}
-        <div className="flex items-center gap-0.5 ml-auto shrink-0">
+        <div className="flex items-center gap-0.5 ml-auto shrink-0" dir="ltr">
           {inputValue.trim() && (
             <button
               type="button"
               onClick={() => handleAddTeammate(inputValue)}
               className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-              title={`Add "${inputValue.trim()}"`}
+              title={language === 'fa' ? `افزودن "${inputValue.trim()}"` : `Add "${inputValue.trim()}"`}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -161,7 +161,7 @@ export function TeammatesCombobox({
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            title="Saved Teammates"
+            title={language === 'fa' ? 'هم‌تیمی‌های ذخیره' : 'Saved Teammates'}
           >
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-150', isOpen && 'rotate-180')} />
           </button>
@@ -170,28 +170,31 @@ export function TeammatesCombobox({
 
       {/* Dropdown List */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950 border border-zinc-700 shadow-2xl p-1.5 space-y-1">
+        <div
+          dir={isRtl ? 'rtl' : 'ltr'}
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950 border border-zinc-700 shadow-2xl p-1.5 space-y-1"
+        >
           {inputValue.trim() && !savedTeammates.some((s) => s.toLowerCase() === inputValue.trim().toLowerCase()) && (
             <button
               type="button"
               onClick={() => handleAddTeammate(inputValue)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group"
+              className={cn('w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group', isRtl && 'font-farsi text-right')}
             >
               <span className="flex items-center gap-1.5 truncate">
                 <UserPlus className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
-                <span>Add <strong className="text-zinc-100 font-semibold">"{inputValue.trim()}"</strong></span>
+                <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-100 font-semibold">"{inputValue.trim()}"</strong></span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">Add</span>
+              <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Add'}</span>
             </button>
           )}
 
-          <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-            <span>Saved Team Members ({savedTeammates.length})</span>
+          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
+            <span>{language === 'fa' ? `هم‌تیمی‌های ذخیره‌شده (${formatNumber(savedTeammates.length)})` : `Saved Team Members (${savedTeammates.length})`}</span>
           </div>
 
           {savedTeammates.length === 0 ? (
-            <div className="px-3 py-3 text-center text-xs text-zinc-500">
-              No saved teammates yet. Type a name and press Enter.
+            <div className={cn('px-3 py-3 text-center text-xs text-zinc-500', isRtl && 'font-farsi')}>
+              {language === 'fa' ? 'هنوز هم‌تیمی‌ای ثبت نشده است. نامی تایپ کرده و Enter بزنید.' : 'No saved teammates yet. Type a name and press Enter.'}
             </div>
           ) : filteredSaved.length > 0 ? (
             filteredSaved.map((member) => {
@@ -208,17 +211,17 @@ export function TeammatesCombobox({
                   )}
                 >
                   <span className="flex items-center gap-2 truncate">
-                    <Users className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400" />
+                    <Users className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400 shrink-0" />
                     <span className="truncate">{member}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  <div className="flex items-center gap-1 shrink-0 ml-2" dir="ltr">
+                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                     <button
                       type="button"
                       onClick={(e) => handleDeleteSaved(e, member)}
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-all"
-                      title={`Remove "${member}" from saved teammates`}
+                      title={language === 'fa' ? `حذف "${member}"` : `Remove "${member}" from saved teammates`}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -227,8 +230,8 @@ export function TeammatesCombobox({
               );
             })
           ) : (
-            <div className="px-2.5 py-2 text-center text-xs text-zinc-500">
-              No matching teammates found
+            <div className={cn('px-2.5 py-2 text-center text-xs text-zinc-500', isRtl && 'font-farsi')}>
+              {language === 'fa' ? 'هم‌تیمی‌ای مطابق با جستجو یافت نشد' : 'No matching teammates found'}
             </div>
           )}
         </div>

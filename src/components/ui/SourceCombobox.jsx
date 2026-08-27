@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, X, Bookmark, Check, Store } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../lib/i18n';
 
 const LEGACY_PRESETS = new Set([
   'direct client',
@@ -14,7 +15,8 @@ const LEGACY_PRESETS = new Set([
 const SAVED_SOURCES_KEY = 'checkpoint_user_saved_sources_v2';
 const LEGACY_SAVED_SOURCES_KEY = 'vault_user_saved_sources_v2';
 
-export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e.g. Enter seller, broker, or client...' }) {
+export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter seller, broker, or client...' }) {
+  const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [savedSources, setSavedSources] = useState(() => {
     try {
@@ -61,14 +63,12 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
     if (!trimmed) return;
 
     if (savedSources.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
-      onToast?.(`"${trimmed}" is already in your saved sources.`);
       return;
     }
 
     const updated = [trimmed, ...savedSources];
     setSavedSources(updated);
     saveToStorage(updated);
-    onToast?.(`⭐ Saved "${trimmed}" to your job sources!`);
   };
 
   const handleDeleteSource = (e, srcToDelete) => {
@@ -76,7 +76,6 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
     const updated = savedSources.filter((s) => s !== srcToDelete);
     setSavedSources(updated);
     saveToStorage(updated);
-    onToast?.(`Removed "${srcToDelete}" from saved sources`);
   };
 
   const trimmedValue = value.trim();
@@ -104,17 +103,20 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
             if (savedSources.length > 0) setIsOpen(true);
           }}
           placeholder={placeholder}
-          className="w-full h-9 pl-3 pr-16 rounded-lg bg-zinc-900/60 border border-zinc-800 text-zinc-100 text-xs placeholder:text-zinc-500 hover:border-zinc-700 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150"
+          className={cn(
+            'w-full h-9 pl-3 pr-16 rounded-lg bg-zinc-900/60 border border-zinc-800 text-zinc-100 text-xs placeholder:text-zinc-500 hover:border-zinc-700 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150',
+            isRtl && 'font-farsi'
+          )}
         />
 
         {/* Action icons in input */}
-        <div className="absolute right-1.5 flex items-center gap-0.5">
+        <div className="absolute right-1.5 flex items-center gap-0.5" dir="ltr">
           {trimmedValue && !isAlreadySaved && (
             <button
               type="button"
               onClick={() => handleSaveCurrentSource(trimmedValue)}
               className="p-1 rounded text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition-colors"
-              title={`Save "${trimmedValue}" to your saved sources`}
+              title={language === 'fa' ? `ذخیره "${trimmedValue}" در سورس‌ها` : `Save "${trimmedValue}" to your saved sources`}
             >
               <Bookmark className="w-3.5 h-3.5" />
             </button>
@@ -124,7 +126,7 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
             className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            title="Show saved sources"
+            title={language === 'fa' ? 'نمایش سورس‌های ذخیره‌شده' : 'Show saved sources'}
           >
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-150', isOpen && 'rotate-180')} />
           </button>
@@ -133,29 +135,32 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1">
+        <div
+          dir={isRtl ? 'rtl' : 'ltr'}
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1"
+        >
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
             <button
               type="button"
               onClick={() => handleSaveCurrentSource(trimmedValue)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group"
+              className={cn('w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group', isRtl && 'font-farsi text-right')}
             >
               <span className="flex items-center gap-1.5 truncate">
                 <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>Save <strong className="text-zinc-100 font-semibold">"{trimmedValue}"</strong></span>
+                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-100 font-semibold">"{trimmedValue}"</strong></span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">Save</span>
+              <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
             </button>
           )}
 
-          <div className="px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
-            <span>Saved Sources ({savedSources.length})</span>
+          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
+            <span>{language === 'fa' ? `سورس‌های ذخیره (${formatNumber(savedSources.length)})` : `Saved Sources (${savedSources.length})`}</span>
           </div>
 
           {savedSources.length === 0 ? (
-            <div className="px-3 py-3 text-center text-xs text-zinc-500">
-              No saved sources yet. Type a source above and click <Bookmark className="w-3 h-3 inline text-zinc-400 mx-0.5" /> to save.
+            <div className={cn('px-3 py-3 text-center text-xs text-zinc-500', isRtl && 'font-farsi')}>
+              {language === 'fa' ? 'هنوز سورسی ذخیره نشده است.' : <>No saved sources yet. Type a source above and click <Bookmark className="w-3 h-3 inline text-zinc-400 mx-0.5" /> to save.</>}
             </div>
           ) : filteredSources.length > 0 ? (
             filteredSources.map((src) => {
@@ -172,17 +177,17 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
                   )}
                 >
                   <span className="flex items-center gap-2 truncate">
-                    <Store className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400" />
+                    <Store className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400 shrink-0" />
                     <span className="truncate">{src}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+                  <div className="flex items-center gap-1 shrink-0 ml-2" dir="ltr">
+                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                     <button
                       type="button"
                       onClick={(e) => handleDeleteSource(e, src)}
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-all"
-                      title={`Remove "${src}" from saved sources`}
+                      title={language === 'fa' ? `حذف "${src}"` : `Remove "${src}" from saved sources`}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -191,8 +196,8 @@ export function SourceCombobox({ value = '', onChange, onToast, placeholder = 'e
               );
             })
           ) : (
-            <div className="px-2.5 py-2 text-center text-xs text-zinc-500">
-              No matching sources found
+            <div className={cn('px-2.5 py-2 text-center text-xs text-zinc-500', isRtl && 'font-farsi')}>
+              {language === 'fa' ? 'سورسی مطابق با جستجو یافت نشد' : 'No matching sources found'}
             </div>
           )}
         </div>

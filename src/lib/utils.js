@@ -20,14 +20,6 @@ export function isRTL(text) {
 }
 
 /**
- * Returns 'rtl' or 'ltr' based on explicit direction setting or auto-detected content
- */
-export function getTextDirection(text, explicitDir) {
-  if (explicitDir === 'rtl' || explicitDir === 'ltr') return explicitDir;
-  return isRTL(text) ? 'rtl' : 'ltr';
-}
-
-/**
  * Determines if a notification or announcement item should be rendered in RTL mode.
  */
 export function isNotificationRTL(item) {

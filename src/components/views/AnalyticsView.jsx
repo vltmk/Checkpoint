@@ -39,24 +39,27 @@ ChartJS.register(
   Legend
 );
 
+import { useLanguage, formatShamsiDate } from '../../lib/i18n';
+
 // Configure Chart.js global defaults to prioritize IRANYekanRd for Persian text (تومان)
 ChartJS.defaults.font.family = "'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-
-const TIMEFRAMES = [
-  { id: 'daily', label: 'Daily', windowText: 'Last 14 Days' },
-  { id: 'weekly', label: 'Weekly', windowText: 'Last 8 Weeks' },
-  { id: 'monthly', label: 'Monthly', windowText: 'Last 6 Months' },
-  { id: 'all', label: 'All-Time', windowText: 'All Recorded Data' },
-];
 
 export function AnalyticsView({
   entries = [],
   globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
 }) {
+  const { t, language, isRtl, formatNumber } = useLanguage();
   const [timeframe, setTimeframe] = useState(() => {
     return localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe') || 'monthly';
   });
+
+  const TIMEFRAMES = [
+    { id: 'daily', label: t('analytics.daily'), windowText: t('analytics.last14Days') },
+    { id: 'weekly', label: t('analytics.weekly'), windowText: t('analytics.last8Weeks') },
+    { id: 'monthly', label: t('analytics.monthly'), windowText: t('analytics.last6Months') },
+    { id: 'all', label: t('analytics.allTime'), windowText: t('analytics.allRecordedData') },
+  ];
 
   const handleTimeframeChange = (tf) => {
     setTimeframe(tf);
@@ -141,78 +144,91 @@ export function AnalyticsView({
     const now = new Date();
 
     if (timeframe === 'daily') {
+      const dayMap = new Map();
+      filteredEntries.forEach((e) => {
+        if (e.dateTime) {
+          const dayKey = e.dateTime.slice(0, 10);
+          const inc = convertEntryCurrency(e, globalCurrency, rates);
+          dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + inc);
+        }
+      });
+
       const days = [];
       const data = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
         const dayStr = d.toISOString().slice(0, 10);
-        const label = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+        const label = language === 'fa'
+          ? formatShamsiDate(d, { month: 'numeric', day: 'numeric' })
+          : d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
         days.push(label);
-
-        const sum = filteredEntries.reduce((acc, e) => {
-          if (e.dateTime && e.dateTime.startsWith(dayStr)) {
-            return acc + convertEntryCurrency(e, globalCurrency, rates);
-          }
-          return acc;
-        }, 0);
-        data.push(sum);
+        data.push(dayMap.get(dayStr) || 0);
       }
       return {
-        title: 'Daily Earnings Velocity (14-Day)',
+        title: language === 'fa' ? 'روند درآمد روزانه (۱۴ روز)' : 'Daily Earnings Velocity (14-Day)',
         labels: days,
         data,
       };
     }
 
     if (timeframe === 'weekly') {
-      const weeks = [];
-      const data = [];
-      for (let i = 7; i >= 0; i--) {
-        const start = new Date(now.getTime() - (i + 1) * 7 * 86400000);
-        const end = new Date(now.getTime() - i * 7 * 86400000);
-        const label = `Wk ${8 - i}`;
-        weeks.push(label);
+      const weekBuckets = new Array(8).fill(0);
+      const nowMs = now.getTime();
+      const ONE_WEEK_MS = 7 * 86400000;
 
-        const sum = filteredEntries.reduce((acc, e) => {
-          const dt = new Date(e.dateTime);
-          if (dt >= start && dt < end) {
-            return acc + convertEntryCurrency(e, globalCurrency, rates);
+      filteredEntries.forEach((e) => {
+        const dt = e.dateTime ? new Date(e.dateTime) : null;
+        if (dt && !isNaN(dt.getTime())) {
+          const diffMs = nowMs - dt.getTime();
+          if (diffMs >= 0) {
+            const weekIndex = Math.floor(diffMs / ONE_WEEK_MS);
+            if (weekIndex >= 0 && weekIndex < 8) {
+              const reverseIdx = 7 - weekIndex;
+              weekBuckets[reverseIdx] += convertEntryCurrency(e, globalCurrency, rates);
+            }
           }
-          return acc;
-        }, 0);
-        data.push(sum);
+        }
+      });
+
+      const weeks = [];
+      for (let i = 7; i >= 0; i--) {
+        const label = language === 'fa' ? `هفته ${formatNumber(8 - i)}` : `Wk ${8 - i}`;
+        weeks.push(label);
       }
+
       return {
-        title: 'Weekly Earnings Velocity (8-Week)',
+        title: language === 'fa' ? 'روند درآمد هفتگی (۸ هفته)' : 'Weekly Earnings Velocity (8-Week)',
         labels: weeks,
-        data,
+        data: weekBuckets,
       };
     }
 
     if (timeframe === 'monthly') {
+      const monthBuckets = new Map();
       const months = [];
-      const data = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = d.toLocaleString('en-US', { month: 'short' });
-        months.push(monthKey);
-
-        const sum = filteredEntries.reduce((acc, e) => {
-          const dt = new Date(e.dateTime);
-          if (
-            dt.getFullYear() === d.getFullYear() &&
-            dt.getMonth() === d.getMonth()
-          ) {
-            return acc + convertEntryCurrency(e, globalCurrency, rates);
-          }
-          return acc;
-        }, 0);
-        data.push(sum);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const monthLabel = language === 'fa'
+          ? formatShamsiDate(d, { month: 'short' })
+          : d.toLocaleString('en-US', { month: 'short' });
+        months.push({ key, label: monthLabel });
+        monthBuckets.set(key, 0);
       }
+
+      filteredEntries.forEach((e) => {
+        if (e.dateTime) {
+          const key = e.dateTime.slice(0, 7);
+          if (monthBuckets.has(key)) {
+            monthBuckets.set(key, monthBuckets.get(key) + convertEntryCurrency(e, globalCurrency, rates));
+          }
+        }
+      });
+
       return {
-        title: 'Monthly Earnings Velocity (6-Month)',
-        labels: months,
-        data,
+        title: language === 'fa' ? 'روند درآمد ماهانه (۶ ماه)' : 'Monthly Earnings Velocity (6-Month)',
+        labels: months.map((m) => m.label),
+        data: months.map((m) => monthBuckets.get(m.key) || 0),
       };
     }
 
@@ -221,23 +237,28 @@ export function AnalyticsView({
     entries.forEach((e) => {
       const dt = new Date(e.dateTime);
       if (!isNaN(dt)) {
-        const key = dt.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        const key = language === 'fa'
+          ? formatShamsiDate(dt, { month: 'short', year: '2-digit' })
+          : dt.toLocaleString('en-US', { month: 'short', year: '2-digit' });
         monthMap[key] = (monthMap[key] || 0) + convertEntryCurrency(e, globalCurrency, rates);
       }
     });
 
     const labels = Object.keys(monthMap);
     if (labels.length === 0) {
-      labels.push(now.toLocaleString('en-US', { month: 'short', year: '2-digit' }));
+      const nowLabel = language === 'fa'
+        ? formatShamsiDate(now, { month: 'short', year: '2-digit' })
+        : now.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+      labels.push(nowLabel);
       monthMap[labels[0]] = 0;
     }
 
     return {
-      title: 'All-Time Earnings Velocity',
+      title: language === 'fa' ? 'روند کل درآمد' : 'All-Time Earnings Velocity',
       labels,
       data: labels.map((l) => monthMap[l] || 0),
     };
-  }, [filteredEntries, entries, timeframe, globalCurrency, rates]);
+  }, [filteredEntries, entries, timeframe, globalCurrency, rates, language, formatNumber]);
 
   // ChartJS Datasets
   const barChartData = useMemo(() => {
@@ -245,7 +266,7 @@ export function AnalyticsView({
       labels: velocityChartData.labels,
       datasets: [
         {
-          label: `Earnings (${globalCurrency})`,
+          label: `${t('analytics.totalEarned')} (${globalCurrency})`,
           data: velocityChartData.data,
           backgroundColor: '#fafafa',
           hoverBackgroundColor: '#e4e4e7',
@@ -254,7 +275,7 @@ export function AnalyticsView({
         },
       ],
     };
-  }, [velocityChartData, globalCurrency]);
+  }, [velocityChartData, globalCurrency, t]);
 
   // Game Distribution Donut Data
   const donutChartData = useMemo(() => {
@@ -306,7 +327,7 @@ export function AnalyticsView({
           size: 11,
         },
         callbacks: {
-          label: (context) => ` ${formatMoney(context.parsed.y, globalCurrency)}`,
+          label: (context) => ` ${formatMoney(context.parsed.y, globalCurrency, false, language === 'fa')}`,
         },
       },
     },
@@ -324,7 +345,7 @@ export function AnalyticsView({
         ticks: {
           color: '#71717a',
           font: { size: 10, family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace" },
-          callback: (value) => formatMoney(value, globalCurrency, true),
+          callback: (value) => formatMoney(value, globalCurrency, true, language === 'fa'),
         },
         border: { display: false },
       },
@@ -354,7 +375,7 @@ export function AnalyticsView({
           size: 11,
         },
         callbacks: {
-          label: (context) => ` ${formatMoney(context.parsed, globalCurrency)}`,
+          label: (context) => ` ${formatMoney(context.parsed, globalCurrency, false, language === 'fa')}`,
         },
       },
     },
@@ -369,10 +390,10 @@ export function AnalyticsView({
         <div>
           <h2 className="text-base font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-zinc-300" />
-            <span>Analytics & Performance</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.title')}</span>
           </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            {currentTfObj.windowText} • Realized Historical Valuation
+          <p className={cn('text-xs text-zinc-500 mt-0.5', isRtl && 'font-farsi')}>
+            {currentTfObj.windowText}
           </p>
         </div>
 
@@ -387,6 +408,7 @@ export function AnalyticsView({
                 onClick={() => handleTimeframeChange(tf.id)}
                 className={cn(
                   'px-3 py-1 rounded-lg text-xs font-medium transition-all select-none',
+                  isRtl && 'font-farsi',
                   isSelected
                     ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60 font-semibold'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
@@ -404,7 +426,7 @@ export function AnalyticsView({
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Coins className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Total Earned</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
           </div>
           <div className="text-xl font-bold text-zinc-200 truncate">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
@@ -414,7 +436,7 @@ export function AnalyticsView({
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Trophy className="w-3.5 h-3.5 text-zinc-400" />
-            <span>Average Job</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
           </div>
           <div className="text-xl font-bold text-zinc-200 truncate">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
@@ -424,20 +446,20 @@ export function AnalyticsView({
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span>Paid Jobs</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
           </div>
           <div className="text-xl font-bold text-zinc-200">
-            {stats.paidCount} <span className="text-xs text-zinc-600 font-normal">/ {filteredEntries.length}</span>
+            {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-600 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
 
         <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span>Completion Rate</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
           </div>
           <div className="text-xl font-bold text-zinc-200">
-            {stats.completionRate}%
+            {formatNumber(stats.completionRate)}%
           </div>
         </div>
       </div>
@@ -447,9 +469,9 @@ export function AnalyticsView({
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-zinc-400" />
-            <span>{velocityChartData.title}</span>
+            <span className={cn(isRtl && 'font-farsi')}>{velocityChartData.title}</span>
           </h3>
-          <span className="text-[11px] text-zinc-500">
+          <span className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
             {currentTfObj.windowText}
           </span>
         </div>
@@ -465,10 +487,10 @@ export function AnalyticsView({
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <PieChart className="w-4 h-4 text-zinc-400" />
-              <span>Revenue by Game</span>
+              <span className={cn(isRtl && 'font-farsi')}>{t('analytics.revenueByGame')}</span>
             </h3>
-            <span className="text-[10px] text-zinc-500">
-              {stats.sortedGames.length} {stats.sortedGames.length === 1 ? 'game' : 'games'}
+            <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
+              {formatNumber(stats.sortedGames.length)} {stats.sortedGames.length === 1 ? t('analytics.gameCount') : t('analytics.gamesCount')}
             </span>
           </div>
 
@@ -476,7 +498,7 @@ export function AnalyticsView({
             {stats.sortedGames.length > 0 ? (
               <Doughnut data={donutChartData} options={donutOptions} />
             ) : (
-              <p className="text-xs text-zinc-500">No data in this period</p>
+              <p className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>{t('analytics.noDataPeriod')}</p>
             )}
           </div>
         </div>
@@ -484,10 +506,10 @@ export function AnalyticsView({
         {/* Breakdown Ranking List */}
         <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">
-              Top Games Breakdown
+            <h3 className={cn('text-xs font-medium uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+              {t('analytics.topGamesBreakdown')}
             </h3>
-            <span className="text-[10px] text-zinc-500">Period Share</span>
+            <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>{t('analytics.periodShare')}</span>
           </div>
 
           <div className="space-y-3">
@@ -503,7 +525,7 @@ export function AnalyticsView({
                       <MoneyDisplay amount={item.revenue} currency={globalCurrency} />
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                  <div dir="ltr" className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-zinc-100 rounded-full transition-all duration-300"
                       style={{ width: `${item.percentage}%` }}
@@ -512,7 +534,7 @@ export function AnalyticsView({
                 </div>
               ))
             ) : (
-              <p className="text-xs text-zinc-500 py-6 text-center">No recorded jobs in this timeframe</p>
+              <p className={cn('text-xs text-zinc-500 py-6 text-center', isRtl && 'font-farsi')}>{t('analytics.noDataPeriod')}</p>
             )}
           </div>
         </div>

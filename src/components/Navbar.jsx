@@ -33,6 +33,9 @@ import {
   openExternalUrl,
 } from '../lib/desktop';
 
+import { useLanguage } from '../lib/i18n';
+import { cn } from '../lib/utils';
+
 export function Navbar({
   activeTab = 'ledger',
   onTabChange,
@@ -52,6 +55,7 @@ export function Navbar({
   unreadNotificationsCount = 0,
   onOpenNotifications,
 }) {
+  const { t, formatNumber, isRtl, language } = useLanguage();
   const isDesktop = isTauri();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isRatesOpen, setIsRatesOpen] = useState(false);
@@ -164,6 +168,7 @@ export function Navbar({
 
   return (
     <header
+      dir="ltr"
       data-tauri-drag-region
       onMouseDown={handleHeaderMouseDown}
       onDoubleClick={handleToggleMaximize}
@@ -187,7 +192,7 @@ export function Navbar({
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.2 rounded bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-colors">
+            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-colors">
               v{appVersion}
             </span>
           )}
@@ -201,12 +206,12 @@ export function Navbar({
             <button
               type="button"
               onClick={() => onOpenWorkModal?.()}
-              title="Add Work Record (N)"
+              title={`${t('nav.addWork')} (N)`}
               className="flex items-center gap-1.5 h-6 px-2 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Add Work</span>
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 ml-0.5">
+              <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 ml-0.5 font-mono">
                 N
               </Kbd>
             </button>
@@ -218,11 +223,11 @@ export function Navbar({
             <button
               type="button"
               onClick={() => onOpenQuickAdd?.()}
-              title="Quick Add Record (Q)"
+              title={`${t('nav.quickAdd')} (Q)`}
               className="flex items-center justify-center h-6 px-1.5 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
             >
               <Zap className="w-3.5 h-3.5 text-zinc-950" strokeWidth={1.5} />
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1">
+              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 font-mono">
                 Q
               </Kbd>
             </button>
@@ -241,7 +246,7 @@ export function Navbar({
           <button
             type="button"
             onClick={() => onTabChange?.('ledger')}
-            className={`relative isolate flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors select-none ${
+            className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'ledger'
                 ? 'text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200 font-medium'
@@ -255,16 +260,16 @@ export function Navbar({
               />
             )}
             <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-white' : 'text-zinc-500'}`} />
-            <span>Ledger</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
             {entriesCount > 0 && (
               <span
-                className={`text-[10px] font-mono px-1 py-0.2 rounded border ${
+                className={`text-[10px] font-mono px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
                   activeTab === 'ledger'
                     ? 'bg-zinc-900 text-zinc-100 border-zinc-700 font-semibold'
                     : 'bg-zinc-900/80 text-zinc-400 border-zinc-800/80'
                 }`}
               >
-                {entriesCount}
+                {formatNumber(entriesCount)}
               </span>
             )}
           </button>
@@ -273,7 +278,7 @@ export function Navbar({
           <button
             type="button"
             onClick={() => onTabChange?.('analytics')}
-            className={`relative isolate flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors select-none ${
+            className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'analytics'
                 ? 'text-white font-semibold'
                 : 'text-zinc-400 hover:text-zinc-200 font-medium'
@@ -287,7 +292,7 @@ export function Navbar({
               />
             )}
             <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-white' : 'text-zinc-500'}`} />
-            <span>Analytics</span>
+            <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
           </button>
         </div>
       </div>
@@ -296,42 +301,10 @@ export function Navbar({
       <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-1.5 shrink-0 z-10">
         {/* Dedicated Gold Ratio Dropdown */}
         <div className="relative" ref={ratesDropdownRef} data-no-drag>
-          <div className={`relative rounded-md overflow-hidden ${isRateUpdateNeeded ? 'p-[1px]' : ''}`}>
-            {/* Minimal Animated Monochromatic Rotating & Pulsing Border */}
+          <div className="relative rounded-md">
+            {/* Subtle Rate Update Indicator */}
             {isRateUpdateNeeded && (
-              <motion.div
-                className="absolute inset-[-200%] pointer-events-none"
-                style={{
-                  background:
-                    'conic-gradient(from 0deg, #3f3f46, #e4e4e7, #71717a, #ffffff, #27272a, #d4d4d8, #3f3f46)',
-                }}
-                animate={{
-                  rotate: 360,
-                  opacity: [0.25, 0.95, 0.25],
-                  filter: [
-                    'drop-shadow(0 0 1px rgba(255, 255, 255, 0.1))',
-                    'drop-shadow(0 0 5px rgba(255, 255, 255, 0.45))',
-                    'drop-shadow(0 0 1px rgba(255, 255, 255, 0.1))',
-                  ],
-                }}
-                transition={{
-                  rotate: {
-                    repeat: Infinity,
-                    duration: 5,
-                    ease: 'linear',
-                  },
-                  opacity: {
-                    repeat: Infinity,
-                    duration: 2.2,
-                    ease: 'easeInOut',
-                  },
-                  filter: {
-                    repeat: Infinity,
-                    duration: 2.2,
-                    ease: 'easeInOut',
-                  },
-                }}
-              />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-zinc-950 z-20" />
             )}
 
             <button
@@ -343,19 +316,19 @@ export function Navbar({
                 setIsRatesOpen((prev) => !prev);
               }}
               title="Configure Gold Ratio (Toman per 1,000 Gold)"
-              className={`relative z-10 h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-[5px] text-xs transition-colors cursor-pointer select-none ${
-                isRateUpdateNeeded
-                  ? isRatesOpen
-                    ? 'bg-zinc-900 text-zinc-100 shadow-sm'
-                    : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-300 hover:text-zinc-100'
-                  : isRatesOpen
-                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
-                    : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100'
+              className={`relative z-10 h-7 flex items-center gap-1.5 px-2 lg:px-2.5 rounded-md text-xs transition-colors cursor-pointer select-none ${
+                isRatesOpen
+                  ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
+                  : isRateUpdateNeeded
+                  ? 'bg-zinc-950 hover:bg-zinc-900 border border-amber-500/50 text-zinc-200 hover:text-white'
+                  : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100'
               }`}
             >
               <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="font-mono font-medium text-[11px] text-zinc-200">
-                1k = {goldRateTOMAN?.toLocaleString()} T
+              <span className="font-mono font-medium text-[11px] text-zinc-200 inline-flex items-baseline">
+                1<span className="text-[0.78em] text-zinc-400 font-medium select-none">k</span>
+                <span className="mx-1 text-zinc-500">=</span>
+                {goldRateTOMAN?.toLocaleString()} <span className="text-zinc-400 font-farsi text-[10px] ml-0.5">ت</span>
               </span>
               <ChevronDown
                 className={`w-3 h-3 text-zinc-500 transition-transform duration-150 ${
@@ -373,40 +346,48 @@ export function Navbar({
               exit={{ opacity: 0, y: -6, scale: 0.95 }}
               transition={{ duration: 0.2 }}
               data-no-drag
+              dir={isRtl ? 'rtl' : 'ltr'}
               onMouseDown={(e) => e.stopPropagation()}
               onDoubleClick={(e) => e.stopPropagation()}
-              className="absolute top-full right-0 mt-2.5 w-64 p-3 bg-zinc-950 backdrop-blur-xl border border-zinc-700 shadow-2xl rounded-xl space-y-2 z-50 text-zinc-200"
+              className="absolute top-full right-0 mt-2.5 w-72 p-3.5 bg-zinc-900/98 backdrop-blur-2xl border border-zinc-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.08)] ring-1 ring-zinc-700/50 rounded-xl space-y-2.5 z-50 text-zinc-200"
             >
               {/* Little triangle pointing to the Gold Ratio button */}
-              <div className="absolute -top-1.5 right-6 w-3 h-3 bg-zinc-950 border-t border-l border-zinc-700 rotate-45 pointer-events-none" />
+              <div className="absolute -top-1.5 right-6 w-3 h-3 bg-zinc-900 border-t border-l border-zinc-700/80 rotate-45 pointer-events-none" />
 
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-amber-950/50 border border-amber-800/60 flex items-center justify-center text-amber-400 shrink-0">
+                <div className="w-6 h-6 rounded-md bg-amber-950/70 border border-amber-800/70 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
                   <Coins className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
-                    Daily Gold Ratio
+                  <h4 className={cn('text-xs font-bold text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                    {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
                   </h4>
-                  <p className="text-[10px] text-zinc-400">
-                    Live ledger conversions
+                  <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
+                    {language === 'fa' ? 'تبدیل زنده محاسبات دفتر کل' : 'Live ledger conversions'}
                   </p>
                 </div>
               </div>
 
-              <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Click this button anytime to adjust your gold conversion rate for all entries and totals.
+              <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
+                {language === 'fa'
+                  ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها و محاسبات روزانه تغییر دهید.'
+                  : 'Click this button anytime to adjust your gold conversion rate for all entries and totals.'}
               </p>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end pt-1 border-t border-zinc-800/80">
+              <div className="flex items-center justify-end pt-1.5 border-t border-zinc-800">
                 <Button
                   variant="primary"
                   size="xs"
                   onClick={handleDismissTour}
-                  className="text-xs font-medium h-6 px-3 bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer"
+                  className={cn(
+                    'h-7 px-3.5 text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer shadow-sm active:scale-95 leading-none',
+                    isRtl && 'font-farsi'
+                  )}
                 >
-                  Got it
+                  <span className={cn('inline-flex items-center justify-center leading-none', isRtl && '-translate-y-[0.5px]')}>
+                    {language === 'fa' ? 'متوجه شدم' : 'Got it'}
+                  </span>
                 </Button>
               </div>
             </motion.div>
@@ -416,14 +397,15 @@ export function Navbar({
           {isRatesOpen && (
             <div
               data-no-drag
+              dir={isRtl ? 'rtl' : 'ltr'}
               onMouseDown={(e) => e.stopPropagation()}
               onDoubleClick={(e) => e.stopPropagation()}
               className="absolute top-full right-0 mt-1.5 w-64 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50"
             >
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-400">
-                  <span className="uppercase tracking-wider">Gold Exchange Ratio</span>
-                  <span className="font-mono text-zinc-500">Toman / 1,000 G</span>
+                  <span className={cn('uppercase tracking-wider', isRtl && 'font-farsi')}>{language === 'fa' ? 'نرخ تبدیل گلد' : 'Gold Exchange Ratio'}</span>
+                  <span className="font-mono text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
                 </div>
                 <NumberStepperInput
                   step={50}
@@ -447,7 +429,7 @@ export function Navbar({
                     ])
                   );
                   return (
-                    <div className="grid grid-cols-4 gap-1 pt-1">
+                    <div className="grid grid-cols-4 gap-1 pt-1" dir="ltr">
                       {presets.map((pr) => (
                         <button
                           key={pr}
@@ -459,7 +441,14 @@ export function Navbar({
                               : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-800'
                           }`}
                         >
-                          {pr >= 1000 ? `${(pr / 1000).toFixed(1)}k` : pr}
+                          {pr >= 1000 ? (
+                            <>
+                              {(pr / 1000).toFixed(1)}
+                              <span className="text-[0.78em] text-zinc-500 font-medium">k</span>
+                            </>
+                          ) : (
+                            pr
+                          )}
                         </button>
                       ))}
                     </div>
@@ -470,10 +459,10 @@ export function Navbar({
                   variant="primary"
                   size="xs"
                   onClick={handleSaveRate}
-                  className="w-full justify-center h-7 text-xs gap-1.5 mt-2"
+                  className={cn('w-full justify-center h-7 text-xs gap-1.5 mt-2', isRtl && 'font-farsi')}
                 >
                   <Check className="w-3 h-3" />
-                  <span>Save Gold Ratio</span>
+                  <span>{language === 'fa' ? 'ذخیره نرخ تبدیل' : 'Save Gold Ratio'}</span>
                 </Button>
               </div>
             </div>

@@ -13,35 +13,8 @@ import { Kbd } from './ui/Tooltip';
 import { UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
 import { trackerDB } from '../lib/db';
 import { optimizeImageProof } from '../lib/desktop';
-
-const GAME_OPTIONS = [
-  { value: 'World of Warcraft', label: 'World of Warcraft' },
-  { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
-  { value: 'Diablo IV', label: 'Diablo IV' },
-  { value: 'Path of Exile', label: 'Path of Exile' },
-  { value: 'League of Legends', label: 'League of Legends' },
-  { value: '__custom__', label: '+ Custom Game / Realm' },
-];
-
-const CURRENCY_OPTIONS = [
-  {
-    value: 'TOMAN',
-    label: 'تومان',
-    icon: <Banknote className="w-3.5 h-3.5" />,
-  },
-  {
-    value: 'GOLD',
-    label: 'Gold',
-    icon: <Coins className="w-3.5 h-3.5" />,
-  },
-];
-
-const STATUS_OPTIONS = [
-  { value: 'Pending', label: 'Pending' },
-  { value: 'Paid', label: 'Paid' },
-  { value: 'Working', label: 'Working' },
-  { value: 'On Hold', label: 'On Hold' },
-];
+import { useLanguage, normalizeDigits } from '../lib/i18n';
+import { cn } from '../lib/utils';
 
 const DRAFT_KEY = 'checkpoint_work_draft';
 const LEGACY_DRAFT_KEY = 'vault_work_draft';
@@ -54,8 +27,39 @@ export function WorkModal({
   globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
   onOpenLightbox,
-  onToast,
 }) {
+  const { t, language, isRtl, formatNumber } = useLanguage();
+  const [fieldErrors, setFieldErrors] = useState({ title: false, game: false, dateTime: false });
+  const [proofPasted, setProofPasted] = useState(false);
+
+  const GAME_OPTIONS = [
+    { value: 'World of Warcraft', label: 'World of Warcraft' },
+    { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
+    { value: 'Diablo IV', label: 'Diablo IV' },
+    { value: 'Path of Exile', label: 'Path of Exile' },
+    { value: 'League of Legends', label: 'League of Legends' },
+    { value: '__custom__', label: `+ ${t('work.customGameOption', 'Custom Game / Realm')}` },
+  ];
+
+  const CURRENCY_OPTIONS = [
+    {
+      value: 'TOMAN',
+      label: language === 'fa' ? 'تومان' : 'Toman',
+      icon: <Banknote className="w-3.5 h-3.5" />,
+    },
+    {
+      value: 'GOLD',
+      label: 'Gold',
+      icon: <Coins className="w-3.5 h-3.5" />,
+    },
+  ];
+
+  const STATUS_OPTIONS = [
+    { value: 'Pending', label: t('status.Pending') },
+    { value: 'Paid', label: t('status.Paid') },
+    { value: 'Working', label: t('status.Working') },
+    { value: 'On Hold', label: t('status.On Hold') },
+  ];
   const [formData, setFormData] = useState({
     title: '',
     dateTime: '',
@@ -188,9 +192,13 @@ export function WorkModal({
         setIsDraftRestored(false);
       }
     }
+    setFieldErrors({ title: false, game: false, dateTime: false });
   }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN]);
 
   const updateFormData = (patch) => {
+    if (patch.title) setFieldErrors((prev) => ({ ...prev, title: false }));
+    if (patch.game || patch.customGameText) setFieldErrors((prev) => ({ ...prev, game: false }));
+    if (patch.dateTime) setFieldErrors((prev) => ({ ...prev, dateTime: false }));
     setFormData((prev) => {
       const next = { ...prev, ...patch };
       if (!editingEntry) {
@@ -206,6 +214,7 @@ export function WorkModal({
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(LEGACY_DRAFT_KEY);
     setIsDraftRestored(false);
+    setFieldErrors({ title: false, game: false, dateTime: false });
     setFormData({
       title: '',
       dateTime: toLocalISOString(new Date()),
@@ -225,26 +234,26 @@ export function WorkModal({
       notes: '',
     });
     setProofs([]);
-    onToast?.('Draft cleared');
   };
 
   // Team Share Calculations
   const totalTeamMembers = 1 + (formData.teammates ? formData.teammates.length : 0);
 
   const handlePotChange = (newPotStr) => {
-    const potNum = parseFloat(newPotStr);
+    const cleanStr = normalizeDigits(newPotStr);
+    const potNum = parseFloat(cleanStr);
     if (!isNaN(potNum) && potNum >= 0 && totalTeamMembers > 0) {
       const equalShare = Math.round((potNum / totalTeamMembers) * 100) / 100;
       const shareStr = String(equalShare);
       const newCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, shareStr]));
       updateFormData({
-        pot: newPotStr,
+        pot: cleanStr,
         income: shareStr,
         teammateCuts: newCuts,
       });
     } else {
       updateFormData({
-        pot: newPotStr,
+        pot: cleanStr,
         income: '',
         teammateCuts: Object.fromEntries((formData.teammates || []).map((tm) => [tm, ''])),
       });
@@ -252,25 +261,26 @@ export function WorkModal({
   };
 
   const handleIncomeChange = (newIncomeStr) => {
-    const incNum = parseFloat(newIncomeStr);
+    const cleanStr = normalizeDigits(newIncomeStr);
+    const incNum = parseFloat(cleanStr);
     if (formData.teamMode) {
       if (!isNaN(incNum) && incNum >= 0) {
         const totalPot = Math.round((incNum * totalTeamMembers) * 100) / 100;
-        const newCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, newIncomeStr]));
+        const newCuts = Object.fromEntries((formData.teammates || []).map((tm) => [tm, cleanStr]));
         updateFormData({
-          income: newIncomeStr,
+          income: cleanStr,
           pot: String(totalPot),
           teammateCuts: newCuts,
         });
       } else {
         updateFormData({
-          income: newIncomeStr,
+          income: cleanStr,
           pot: '',
           teammateCuts: Object.fromEntries((formData.teammates || []).map((tm) => [tm, ''])),
         });
       }
     } else {
-      updateFormData({ income: newIncomeStr });
+      updateFormData({ income: cleanStr });
     }
   };
 
@@ -308,8 +318,9 @@ export function WorkModal({
   };
 
   const handleCustomCutChange = (memberKey, cutValue) => {
+    const cleanCut = normalizeDigits(cutValue);
     if (memberKey === '__user__') {
-      const updatedIncome = cutValue;
+      const updatedIncome = cleanCut;
       const userCutNum = parseFloat(updatedIncome) || 0;
       const teamSum = (formData.teammates || []).reduce(
         (sum, tm) => sum + (parseFloat(formData.teammateCuts?.[tm]) || 0),
@@ -322,7 +333,7 @@ export function WorkModal({
     } else {
       const updatedCuts = {
         ...(formData.teammateCuts || {}),
-        [memberKey]: cutValue,
+        [memberKey]: cleanCut,
       };
       const userCutNum = parseFloat(formData.income) || 0;
       const teamSum = (formData.teammates || []).reduce(
@@ -347,7 +358,6 @@ export function WorkModal({
         income: equalStr,
         teammateCuts: equalCuts,
       });
-      onToast?.(`Equalized into ${totalTeamMembers} shares of ${equalStr} ${formData.currency}`);
     }
   };
 
@@ -384,7 +394,8 @@ export function WorkModal({
 
       if (hasImage) {
         e.preventDefault();
-        onToast?.('📸 Screenshot proof attached!');
+        setProofPasted(true);
+        setTimeout(() => setProofPasted(false), 1500);
       }
     };
 
@@ -401,7 +412,7 @@ export function WorkModal({
       window.removeEventListener('paste', handlePaste);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onToast, formData, proofs, editingEntry]);
+  }, [isOpen, formData, proofs, editingEntry]);
 
   const readImageBlob = async (blob, fileName) => {
     try {
@@ -483,8 +494,19 @@ export function WorkModal({
       ? formData.customGameText.trim() || 'Custom Game'
       : formData.game;
 
-    if (!formData.title.trim() || !selectedGame.trim() || !formData.dateTime) {
-      onToast?.('Please fill required fields (Title, Game, Date)');
+    const titleMissing = !formData.title.trim();
+    const gameMissing = !selectedGame.trim();
+    const dateMissing = !formData.dateTime;
+
+    if (titleMissing || gameMissing || dateMissing) {
+      setFieldErrors({
+        title: titleMissing,
+        game: gameMissing,
+        dateTime: dateMissing,
+      });
+      if (titleMissing) {
+        titleInputRef.current?.focus();
+      }
       return;
     }
 
@@ -525,18 +547,18 @@ export function WorkModal({
     <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-xl">
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
-          <DialogTitle>
-            {editingEntry ? 'Edit Work Record' : 'Add Work'}
+          <DialogTitle className={cn(isRtl && 'font-farsi')}>
+            {editingEntry ? t('work.editTitle') : t('work.addTitle')}
           </DialogTitle>
           <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
-            {editingEntry ? 'EDIT' : 'NEW'}
+            {editingEntry ? t('work.editBadge') : t('work.newBadge')}
           </span>
         </div>
 
         {!editingEntry && isDraftRestored && (
           <div className="flex items-center gap-1.5 ml-auto mr-1">
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/40">
-              Draft Restored
+              {t('work.draftRestored')}
             </span>
             <button
               type="button"
@@ -544,7 +566,7 @@ export function WorkModal({
               className="text-[10px] text-zinc-500 hover:text-zinc-300 underline cursor-pointer"
               title="Discard saved draft"
             >
-              Clear
+              {t('common.clear', 'Clear')}
             </button>
           </div>
         )}
@@ -555,9 +577,14 @@ export function WorkModal({
           {/* Row 1: Game & Seller Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1.5">
-                <GameIcon game={formData.game} className="w-3.5 h-3.5" />
-                <span>Game / Platform *</span>
+              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                <span className="flex items-center gap-1.5">
+                  <GameIcon game={formData.game} className="w-3.5 h-3.5" />
+                  <span>{t('work.gamePlatform')} *</span>
+                </span>
+                {fieldErrors.game && (
+                  <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                )}
               </label>
               <Select
                 value={formData.game}
@@ -570,53 +597,68 @@ export function WorkModal({
                     required
                     value={formData.customGameText}
                     onChange={(e) => updateFormData({ customGameText: e.target.value })}
-                    placeholder="Custom game / realm name..."
+                    placeholder={t('work.customGamePlaceholder')}
+                    className={cn(
+                      fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+                    )}
                   />
                 </div>
               )}
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
-                <span>Seller / Job Source</span>
-                <span className="text-[9px] font-mono text-zinc-500">Saved Sources</span>
+              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                <span>{t('work.sellerSource')}</span>
+                <span className="text-[9px] font-mono text-zinc-500">{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
               </label>
               <SourceCombobox
                 value={formData.source}
                 onChange={(val) => updateFormData({ source: val })}
-                onToast={onToast}
-                placeholder="e.g. Enter seller, broker, or client..."
+                placeholder={language === 'fa' ? 'مثال: سورس، دیسکورد مشتری...' : 'e.g. Enter seller, broker, or client...'}
               />
             </div>
           </div>
 
           {/* Row 2: Work Title */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Work Title *
+            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <span>{t('work.workTitle')} *</span>
+              {fieldErrors.title && (
+                <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+              )}
             </label>
             <Input
               ref={titleInputRef}
               required
               value={formData.title}
               onChange={(e) => updateFormData({ title: e.target.value })}
-              placeholder="e.g. Keystone +20, GDKP Raid Pot, UI Addon Dev"
+              placeholder={t('work.titlePlaceholder')}
+              className={cn(
+                'transition-colors',
+                fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+              )}
             />
           </div>
 
           {/* Row 3: Date & Time */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Date & Time *
+            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <span>{t('work.dateTime')} *</span>
+              {fieldErrors.dateTime && (
+                <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+              )}
             </label>
             <DateTimePicker
               value={formData.dateTime}
-              onChange={(val) => updateFormData({ dateTime: val })}
+              onChange={(iso) => updateFormData({ dateTime: iso })}
+              className={cn(
+                fieldErrors.dateTime && 'border-rose-500/80 ring-1 ring-rose-500/60'
+              )}
             />
           </div>
 
-          {/* Row 4: Team Mode Toggle & Teammates Selector */}
-          <div className="space-y-2.5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80 relative z-20">
+          {/* Row 4: Team / Split Mode Toggle */}
+          <div className="pt-2 border-t border-zinc-800/80 space-y-3">
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -624,14 +666,14 @@ export function WorkModal({
                   const nextTeamMode = !formData.teamMode;
                   updateFormData({ teamMode: nextTeamMode });
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                className={cn(`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                   formData.teamMode
                     ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
                     : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                }`}
+                }`, isRtl && 'font-farsi')}
               >
                 <Users className="w-3.5 h-3.5 text-zinc-400" />
-                <span>Team Mode</span>
+                <span>{t('work.teamMode')}</span>
                 <span
                   className={`w-1.5 h-1.5 rounded-full ml-1 ${
                     formData.teamMode ? 'bg-emerald-400' : 'bg-zinc-600'
@@ -641,9 +683,9 @@ export function WorkModal({
 
               {formData.teamMode && (
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
-                  <span>{totalTeamMembers} total shares</span>
+                  <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
                   <span className="text-zinc-600">•</span>
-                  <span className="text-zinc-500">(You + {formData.teammates.length} {formData.teammates.length === 1 ? 'teammate' : 'teammates'})</span>
+                  <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
                 </div>
               )}
             </div>
@@ -658,23 +700,22 @@ export function WorkModal({
                   className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-30"
                 >
                   <div>
-                    <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">
-                      Teammates / Crew Members
+                    <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
+                      {t('work.teammatesCrew')}
                     </label>
                     <TeammatesCombobox
                       value={formData.teammates}
                       onChange={handleTeammatesChange}
-                      onToast={onToast}
-                      placeholder="Type teammate username and press Enter..."
+                      placeholder={language === 'fa' ? 'نام هم‌تیمی را وارد کرده و Enter بزنید...' : 'Type teammate username and press Enter...'}
                     />
                   </div>
 
                   {/* Mode Selector: Input Pot vs Input My Cut */}
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-[10px] uppercase font-semibold text-zinc-400">
-                      Calculation Target:
+                    <span className={cn('text-[10px] uppercase font-semibold text-zinc-400', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'مبنای محاسبه:' : 'Calculation Target:'}
                     </span>
-                    <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]">
+                    <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]" dir="ltr">
                       <button
                         type="button"
                         onClick={() => updateFormData({ teamInputMode: 'pot' })}
@@ -684,7 +725,7 @@ export function WorkModal({
                             : 'text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        Pot
+                        {language === 'fa' ? 'پات کل' : 'Pot'}
                       </button>
                       <button
                         type="button"
@@ -695,7 +736,7 @@ export function WorkModal({
                             : 'text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        My Cut
+                        {language === 'fa' ? 'سهم من' : 'My Cut'}
                       </button>
                     </div>
                   </div>
@@ -707,17 +748,17 @@ export function WorkModal({
           {/* Row 5: Income / Pot & Currency and Rate */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start pt-1 border-t border-zinc-800/60">
             <div className="sm:col-span-7">
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span>
                   {formData.teamMode
                     ? formData.teamInputMode === 'pot'
-                      ? 'Pot *'
-                      : 'My Cut *'
-                    : 'Income & Currency *'}
+                      ? (language === 'fa' ? 'مجموع پات *' : 'Pot *')
+                      : (language === 'fa' ? 'سهم من *' : 'My Cut *')
+                    : `${t('work.incomeCurrency')} *`}
                 </span>
                 {formData.teamMode && (
                   <span className="text-[9px] font-mono text-zinc-400">
-                    {formData.teamInputMode === 'pot' ? `÷ ${totalTeamMembers} cuts` : `× ${totalTeamMembers} members`}
+                    {formData.teamInputMode === 'pot' ? `÷ ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'سهم' : 'cuts'}` : `× ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'عضو' : 'members'}`}
                   </span>
                 )}
               </label>
@@ -751,15 +792,15 @@ export function WorkModal({
               {formData.teamMode && formData.teamInputMode === 'pot' && (
                 <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-[11px] space-y-1.5">
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span className="text-zinc-500">Your Share:</span>
+                    <span className="text-zinc-500">{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
                     <strong className="font-mono text-emerald-300 font-semibold">
-                      {formData.income ? `${Number(formData.income).toLocaleString()} ${formData.currency}` : '--'}
+                      {formData.income ? `${Number(formData.income).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span className="text-zinc-500">Pot:</span>
+                    <span className="text-zinc-500">{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
                     <strong className="font-mono text-amber-300 font-semibold">
-                      {formData.pot ? `${Number(formData.pot).toLocaleString()} ${formData.currency}` : '--'}
+                      {formData.pot ? `${Number(formData.pot).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
                     </strong>
                   </div>
 
@@ -770,7 +811,9 @@ export function WorkModal({
                       onClick={() => setIsCustomCutsOpen((prev) => !prev)}
                       className="text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer"
                     >
-                      {isCustomCutsOpen ? 'Hide Custom Cuts' : 'Edit Individual Cuts (Custom Split)'}
+                      {isCustomCutsOpen
+                        ? (language === 'fa' ? 'بستن سهم اختصاصی' : 'Hide Custom Cuts')
+                        : (language === 'fa' ? 'تنظیم سهم اختصاصی هم‌تیمی‌ها' : 'Edit Individual Cuts (Custom Split)')}
                     </button>
                     <button
                       type="button"
@@ -778,7 +821,7 @@ export function WorkModal({
                       className="text-[10px] text-amber-400/90 hover:text-amber-300 font-mono transition-colors"
                       title="Reset all shares to exact equal split"
                     >
-                      Equalize Shares
+                      {language === 'fa' ? 'تقسیم مساوی' : 'Equalize Shares'}
                     </button>
                   </div>
 
@@ -793,7 +836,7 @@ export function WorkModal({
                       >
                         {/* You (Host) */}
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-zinc-400 font-medium truncate">You (Host):</span>
+                          <span className="text-[10px] text-zinc-400 font-medium truncate">{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
                           <NumberStepperInput
                             value={formData.income}
                             onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
@@ -819,9 +862,9 @@ export function WorkModal({
 
                         {/* Balance Status Line */}
                         <div className="pt-1 flex items-center justify-between text-[10px] font-mono">
-                          <span className="text-zinc-500">Allocated: {totalAllocated.toLocaleString()}</span>
+                          <span className="text-zinc-500">{language === 'fa' ? 'تخصیص‌یافته:' : 'Allocated:'} {totalAllocated.toLocaleString()}</span>
                           <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
-                            {isPotBalanced ? '✓ Balanced' : `Remaining: ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
+                            {isPotBalanced ? (language === 'fa' ? '✓ تراز شده' : '✓ Balanced') : `${language === 'fa' ? 'باقی‌مانده:' : 'Remaining:'} ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
                           </span>
                         </div>
                       </motion.div>
@@ -832,9 +875,9 @@ export function WorkModal({
             </div>
 
             <div className="sm:col-span-5">
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span className="truncate">
-                  {isClassic ? 'Rate (T / 1 Gold)' : 'Rate (T / 1k Gold)'}
+                  {t('work.exchangeRate')}
                 </span>
                 {isClassic ? (
                   Number(formData.exchangeRate) !== 7000 ? (
@@ -844,10 +887,10 @@ export function WorkModal({
                       className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
                       title="Reset to classic default (7,000 T)"
                     >
-                      Reset (7k T)
+                      {language === 'fa' ? 'ریست (۷ک ت)' : 'Reset (7k T)'}
                     </button>
                   ) : (
-                    <span className="text-[9px] font-mono text-zinc-500 shrink-0">Classic (1 G)</span>
+                    <span className="text-[9px] font-mono text-zinc-500 shrink-0">{language === 'fa' ? 'کلاسیک (۱ گلد)' : 'Classic (1 G)'}</span>
                   )
                 ) : Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
                   <button
@@ -856,17 +899,17 @@ export function WorkModal({
                     className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
                     title="Reset to current navbar rate"
                   >
-                    Reset ({goldRateTOMAN?.toLocaleString()} T)
+                    {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
                   </button>
                 ) : (
                   <span className="text-[9px] font-mono text-zinc-500 shrink-0">
-                    Active ({goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)
+                    {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
                   </span>
                 )}
               </label>
               <NumberStepperInput
                 value={formData.exchangeRate}
-                onChange={(e) => updateFormData({ exchangeRate: e.target.value })}
+                onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
                 step={isClassic ? 100 : 50}
                 placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
               />
@@ -875,25 +918,41 @@ export function WorkModal({
 
           {/* Row 6: Notes */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Notes / Client Details
+            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5', isRtl && 'font-farsi')}>
+              {t('work.notes')}
             </label>
             <Textarea
               rows={2}
               value={formData.notes}
               onChange={(e) => updateFormData({ notes: e.target.value })}
-              placeholder="Add client username, realm name, transaction ID, or completion notes..."
+              placeholder={t('work.notesPlaceholder')}
             />
           </div>
 
           {/* Row 7: Proof Upload & Screenshot Paste */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                Proof of Completion
-              </label>
-              <span className="text-[10px] font-mono text-zinc-400">
-                ⚡ Press Ctrl+V to paste screenshot
+              <div className="flex items-center gap-2">
+                <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+                  {t('work.proof')}
+                </label>
+                <AnimatePresence>
+                  {proofPasted && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60"
+                    >
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span>{language === 'fa' ? 'اسکرین‌شات پیوست شد' : 'Proof attached'}</span>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </div>
+              <span className={cn('text-[10px] font-mono text-zinc-400', isRtl && 'font-farsi')}>
+                {language === 'fa' ? '⚡ کلید Ctrl+V برای چسباندن اسکرین‌شات' : '⚡ Press Ctrl+V to paste screenshot'}
               </span>
             </div>
 
@@ -926,11 +985,11 @@ export function WorkModal({
               />
               <div className="flex flex-col items-center justify-center gap-1">
                 <UploadCloud className="w-4 h-4 text-zinc-500" />
-                <div className="text-xs text-zinc-300">
-                  <span className="font-semibold text-zinc-100">Click to upload</span> or drag screenshot
+                <div className={cn('text-xs text-zinc-300', isRtl && 'font-farsi')}>
+                  <span className="font-semibold text-zinc-100">{t('work.clickUpload')}</span>
                 </div>
-                <div className="text-[10px] text-zinc-500">
-                  Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool
+                <div className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
+                  {language === 'fa' ? 'یا مستقیماً با Ctrl+V از Snipping Tool تصویر را بچسبانید' : <>Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool</>}
                 </div>
               </div>
             </div>
@@ -972,8 +1031,8 @@ export function WorkModal({
         <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
           {/* Left: Desaturated Muted Status Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              Status:
+            <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
+              {t('work.status')}:
             </span>
             <div className="w-28 sm:w-32">
               <Select
@@ -988,12 +1047,12 @@ export function WorkModal({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose} type="button">
-              Cancel
+            <Button variant="ghost" size="sm" onClick={onClose} type="button" className={cn(isRtl && 'font-farsi')}>
+              {t('common.cancel')}
             </Button>
-            <Button variant="primary" size="sm" type="submit">
+            <Button variant="primary" size="sm" type="submit" className={cn(isRtl && 'font-farsi')}>
               <Check className="w-3.5 h-3.5" />
-              <span>{editingEntry ? 'Update Record' : 'Save Record'}</span>
+              <span>{editingEntry ? t('work.updateRecord') : t('work.saveRecord')}</span>
             </Button>
           </div>
         </DialogFooter>

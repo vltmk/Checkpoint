@@ -76,31 +76,6 @@
   unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF, U+0750-077F, U+08A0-08FF;
 }
 
-/* Alias IranYekanRd */
-@font-face {
-  font-family: 'IranYekanRd';
-  src: url('../fonts/IranYekanRd/IRANYekanRegularRd.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'IranYekanRd';
-  src: url('../fonts/IranYekanRd/IRANYekanMediumRd.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'IranYekanRd';
-  src: url('../fonts/IranYekanRd/IRANYekanBoldRd.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* IoskeleyMono */
 @font-face {
   font-family: 'IoskeleyMono';
@@ -151,6 +126,7 @@
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   html,
@@ -211,11 +187,6 @@
   overscroll-behavior-y: contain;
 }
 
-.job-row-item {
-  /* Clean relative layer */
-  position: relative;
-}
-
 /* Mobile Safe Area Insets */
 .safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
@@ -225,17 +196,6 @@
   padding-top: max(0.75rem, env(safe-area-inset-top));
 }
 
-/* Smooth Focus Rings */
-.focus-ring {
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.focus-ring:focus-visible {
-  border-color: #71717a !important;
-  box-shadow: 0 0 0 1px #71717a !important;
-}
-
 /* Print Styles for Proof of Work Receipt */
 @media print {
   body {
@@ -243,9 +203,7 @@
     color: #000000 !important;
   }
   
-  .sidebar,
-  .mobile-nav,
-  .no-print {
+  .mobile-nav {
     display: none !important;
   }
 
@@ -263,48 +221,21 @@
   }
 }
 
-/* Persian Currency Typography Optimization */
-.toman-unit {
-  font-size: 0.72em;
-  font-weight: 500;
-  opacity: 0.85;
-  margin-right: 0.15rem;
-  letter-spacing: normal;
-  display: inline-block;
-  vertical-align: baseline;
-}
-
 /* Desktop Window Dragging */
 [data-tauri-drag-region] {
   app-region: drag;
   -webkit-app-region: drag;
 }
 
-button, a, input, textarea, select, .no-drag {
+button, a, input, textarea, select, .no-drag, [data-no-drag] {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
 /* Persian (Farsi) & RTL Typography Utilities */
 .font-farsi {
-  font-family: 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: 'IRANYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   letter-spacing: normal !important;
-}
-
-.rtl-text {
-  direction: rtl;
-  text-align: right;
-  font-family: 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  letter-spacing: normal !important;
-  line-height: 1.75;
-  unicode-bidi: isolate;
-}
-
-.rtl-text bdi,
-.rtl-text code,
-.rtl-text .bdi-isolate {
-  unicode-bidi: isolate;
-  direction: ltr;
 }
 
 

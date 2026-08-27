@@ -21,8 +21,6 @@ export const CURRENCIES = {
   },
 };
 
-export const SUPPORTED_CURRENCY_CODES = ['TOMAN', 'GOLD'];
-
 export const GAMES = [
   'World of Warcraft',
   'World of Warcraft Classic',
@@ -39,30 +37,37 @@ export const JOB_SOURCES = [
 
 export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold'];
 
+export const STATUS_LABELS = {
+  Paid: 'پرداخت شده',
+  Pending: 'درحال انتظار',
+  Working: 'درحال انجام',
+  'On Hold': 'توقف موقت',
+};
+
 export const STATUS_CONFIG = {
   Paid: {
-    label: 'Paid',
+    label: 'پرداخت شده',
     color: 'emerald',
     badgeClass: 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 hover:bg-emerald-900/40',
     dotClass: 'bg-emerald-400',
     next: 'Pending',
   },
   Pending: {
-    label: 'Pending',
+    label: 'درحال انتظار',
     color: 'amber',
     badgeClass: 'bg-amber-950/40 text-amber-400 border border-amber-800/40 hover:bg-amber-900/40',
     dotClass: 'bg-amber-400',
     next: 'Working',
   },
   Working: {
-    label: 'Working',
+    label: 'درحال انجام',
     color: 'blue',
     badgeClass: 'bg-blue-950/40 text-blue-400 border border-blue-800/40 hover:bg-blue-900/40',
     dotClass: 'bg-blue-400',
     next: 'On Hold',
   },
   'On Hold': {
-    label: 'On Hold',
+    label: 'توقف موقت',
     color: 'zinc',
     badgeClass: 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800',
     dotClass: 'bg-zinc-500',
@@ -70,38 +75,53 @@ export const STATUS_CONFIG = {
   },
 };
 
+import { toPersianDigits } from './i18n';
+
 /**
  * Extract numeric and unit parts for customized typography styling
  */
-export function formatMoneyParts(amount, currencyCode = 'TOMAN', compact = false) {
+export function formatMoneyParts(amount, currencyCode = 'TOMAN', compact = false, usePersianDigits = false) {
   const code = currencyCode === 'WOW_GOLD' ? 'GOLD' : (currencyCode === 'USD' ? 'TOMAN' : (currencyCode || 'TOMAN'));
   const cur = CURRENCIES[code] || CURRENCIES.TOMAN;
   const num = Number(amount || 0);
 
   let formattedNum = '0';
+  let magnitude = '';
   if (!isNaN(num)) {
     if (compact && Math.abs(num) >= 1000000) {
-      formattedNum = (num / 1000000).toFixed(1) + 'M';
+      formattedNum = (num / 1000000).toFixed(1);
+      magnitude = 'M';
     } else if (compact && Math.abs(num) >= 1000) {
-      formattedNum = (num / 1000).toFixed(1) + 'k';
+      formattedNum = (num / 1000).toFixed(1);
+      magnitude = 'k';
     } else {
       formattedNum = Math.round(num).toLocaleString('en-US');
     }
   }
 
+  // Only convert to Persian digits if requested and NOT Gold (as per rule)
+  if (usePersianDigits && code !== 'GOLD') {
+    formattedNum = toPersianDigits(formattedNum);
+  }
+
   const unit = cur.suffix.trim();
+  const full = code === 'GOLD'
+    ? `\u200E${formattedNum}${magnitude} G\u200E`
+    : (magnitude ? `\u200E${formattedNum}${magnitude}\u200E${cur.suffix}` : `${formattedNum}${cur.suffix}`);
+
   return {
     amount: formattedNum,
+    magnitude,
     unit,
-    full: `${formattedNum}${cur.suffix}`,
+    full,
   };
 }
 
 /**
  * Format numeric currency amount for display
  */
-export function formatMoney(amount, currencyCode = 'TOMAN', compact = false) {
-  return formatMoneyParts(amount, currencyCode, compact).full;
+export function formatMoney(amount, currencyCode = 'TOMAN', compact = false, usePersianDigits = false) {
+  return formatMoneyParts(amount, currencyCode, compact, usePersianDigits).full;
 }
 
 /**
@@ -154,25 +174,6 @@ export function convertEntryCurrency(entry, targetCurrency, defaultRates = {}) {
   const defaultRate = isClassic ? 7000 : (Number(defaultRates?.goldRateTOMAN) || 3200);
   const entryRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
   return convertCurrency(inc, cur, targetCurrency, defaultRates, entryRate, isClassic);
-}
-
-/**
- * Format converted secondary string (e.g. "≈ 320,000 تومان" or "≈ 100,000 G")
- */
-export function formatConvertedSecondary(amount, fromCurrency, targetCurrency, rates = {}, customRate = null, isPerOneGold = false) {
-  const normalize = (c) => {
-    if (c === 'WOW_GOLD') return 'GOLD';
-    if (c === 'USD') return 'TOMAN';
-    return c || 'TOMAN';
-  };
-
-  const from = normalize(fromCurrency);
-  const to = normalize(targetCurrency);
-
-  if (from === to) return null;
-
-  const converted = convertCurrency(amount, from, to, rates, customRate, isPerOneGold);
-  return `≈ ${formatMoney(converted, to)}`;
 }
 
 

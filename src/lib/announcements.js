@@ -61,11 +61,27 @@ export function sanitizeAnnouncement(item) {
   const lang = typeof item.lang === 'string' ? item.lang.trim().toLowerCase() : null;
   const computedDir = explicitDir || (lang === 'fa' || lang === 'per' || lang === 'ar' || isRTL(title) || isRTL(message) ? 'rtl' : 'ltr');
 
+  let safeItems = null;
+  if (Array.isArray(item.items)) {
+    safeItems = item.items
+      .filter((it) => it && (typeof it === 'string' || typeof it === 'object'))
+      .map((it) => {
+        if (typeof it === 'string') return { text: it.trim() };
+        return {
+          text: typeof it.text === 'string' ? it.text.trim() : '',
+          tag: typeof it.tag === 'string' ? it.tag.trim() : null,
+          version: typeof it.version === 'string' ? it.version.trim() : null,
+        };
+      })
+      .filter((it) => it.text);
+  }
+
   return {
     id,
     type: ['info', 'warning', 'critical', 'success'].includes(item.type) ? item.type : 'info',
     title,
     message,
+    items: safeItems,
     publishedAt: item.published_at || item.publishedAt || new Date().toISOString(),
     expiresAt: item.expires_at || item.expiresAt || null,
     dismissible: item.dismissible !== false,

@@ -3,41 +3,45 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '
 import { Button } from './ui/Button';
 import { Kbd } from './ui/Tooltip';
 import { Keyboard } from 'lucide-react';
+import { useLanguage } from '../lib/i18n';
+import { cn } from '../lib/utils';
 
 export function ShortcutsModal({ isOpen, onClose }) {
+  const { t, language, isRtl } = useLanguage();
+
   const shortcutGroups = [
     {
-      group: 'Actions & Entry',
+      group: language === 'fa' ? 'عملیات و ثبت' : 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: 'Add work record (Full)' },
-        { keys: ['Q'], desc: 'Quick add work record' },
-        { keys: ['Ctrl', 'V'], desc: 'Paste screenshot proof into modal' },
-        { keys: ['C'], desc: 'Copy receipt screenshot (in Receipt view)' },
-        { keys: ['Esc'], desc: 'Close dialogs, cancel confirmation, or clear selection' },
+        { keys: ['N'], desc: language === 'fa' ? 'افزودن کار (کامل)' : 'Add work record (Full)' },
+        { keys: ['Q'], desc: language === 'fa' ? 'ثبت سریع کار' : 'Quick add work record' },
+        { keys: ['Ctrl', 'V'], desc: language === 'fa' ? 'چسباندن اسکرین‌شات از کلیپ‌بورد' : 'Paste screenshot proof into modal' },
+        { keys: ['C'], desc: language === 'fa' ? 'کپی اسکرین‌شات رسید (در پنجره رسید)' : 'Copy receipt screenshot (in Receipt view)' },
+        { keys: ['Esc'], desc: language === 'fa' ? 'بستن پنجره‌ها یا لغو انتخاب' : 'Close dialogs, cancel confirmation, or clear selection' },
       ],
     },
     {
-      group: 'Multi-Select & Bulk Actions',
+      group: language === 'fa' ? 'انتخاب چندگانه و عملیات دسته‌ای' : 'Multi-Select & Bulk Actions',
       items: [
-        { keys: ['S'], desc: 'Toggle multi-selection mode' },
-        { keys: ['Shift', 'Click'], desc: 'Select range between jobs' },
-        { keys: ['Ctrl', 'A'], desc: 'Select all jobs on current page (in select mode)' },
+        { keys: ['S'], desc: language === 'fa' ? 'فعال/غیرفعال کردن حالت انتخاب چندگانه' : 'Toggle multi-selection mode' },
+        { keys: ['Shift', 'Click'], desc: language === 'fa' ? 'انتخاب بازه‌ای از کارها' : 'Select range between jobs' },
+        { keys: ['Ctrl', 'A'], desc: language === 'fa' ? 'انتخاب همه کارهای صفحه' : 'Select all jobs on current page (in select mode)' },
       ],
     },
     {
-      group: 'Navigation & Views',
+      group: language === 'fa' ? 'پیمایش و صفحات' : 'Navigation & Views',
       items: [
-        { keys: ['1'], desc: 'Jump to Ledger tab' },
-        { keys: ['2'], desc: 'Jump to Analytics tab' },
-        { keys: ['/'], desc: 'Focus search bar' },
-        { keys: ['?'], desc: 'Open shortcuts cheat sheet' },
+        { keys: ['1'], desc: language === 'fa' ? 'رفتن به تب دفتر (Ledger)' : 'Jump to Ledger tab' },
+        { keys: ['2'], desc: language === 'fa' ? 'رفتن به تب آمار (Analytics)' : 'Jump to Analytics tab' },
+        { keys: ['/'], desc: language === 'fa' ? 'فوکوس روی نوار جستجو' : 'Focus search bar' },
+        { keys: ['?'], desc: language === 'fa' ? 'نمایش کلیدهای میانبر' : 'Open shortcuts cheat sheet' },
       ],
     },
     {
-      group: 'Data & Portability',
+      group: language === 'fa' ? 'داده و بکاپ' : 'Data & Portability',
       items: [
-        { keys: ['Alt', 'E'], desc: 'Export ledger to CSV' },
-        { keys: ['Alt', 'B'], desc: 'Backup database to JSON' },
+        { keys: ['Alt', 'E'], desc: language === 'fa' ? 'خروجی اکسل / CSV' : 'Export ledger to CSV' },
+        { keys: ['Alt', 'B'], desc: language === 'fa' ? 'پشتیبان‌گیری کامل JSON' : 'Backup database to JSON' },
       ],
     },
   ];
@@ -47,14 +51,14 @@ export function ShortcutsModal({ isOpen, onClose }) {
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
           <Keyboard className="w-4 h-4 text-zinc-400" />
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('settings.shortcuts')}</DialogTitle>
         </div>
       </DialogHeader>
 
       <DialogContent className="space-y-4">
         {shortcutGroups.map((grp) => (
           <div key={grp.group} className="space-y-2">
-            <h4 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            <h4 className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {grp.group}
             </h4>
             <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg divide-y divide-zinc-800/60 overflow-hidden">
@@ -63,8 +67,8 @@ export function ShortcutsModal({ isOpen, onClose }) {
                   key={idx}
                   className="flex items-center justify-between px-3 py-2 text-xs"
                 >
-                  <span className="text-zinc-300 font-medium">{item.desc}</span>
-                  <div className="flex items-center gap-1">
+                  <span className={cn('text-zinc-300 font-medium', isRtl && 'font-farsi')}>{item.desc}</span>
+                  <div className="flex items-center gap-1" dir="ltr">
                     {item.keys.map((k, kIdx) => (
                       <React.Fragment key={k}>
                         <Kbd>{k}</Kbd>
@@ -82,8 +86,8 @@ export function ShortcutsModal({ isOpen, onClose }) {
       </DialogContent>
 
       <DialogFooter>
-        <Button variant="primary" size="sm" onClick={onClose}>
-          Done
+        <Button variant="primary" size="sm" onClick={onClose} className={cn(isRtl && 'font-farsi')}>
+          {t('common.done')}
         </Button>
       </DialogFooter>
     </Dialog>

@@ -375,9 +375,19 @@ export async function openExternalUrl(url) {
   if (!url || typeof url !== 'string') return;
   const cleanUrl = url.trim();
 
-  // Enforce protocol safety (HTTPS, mailto, or local development)
-  if (!cleanUrl.startsWith('https://') && !cleanUrl.startsWith('http://localhost') && !cleanUrl.startsWith('mailto:')) {
-    console.warn('[Desktop] Refusing to open insecure or unapproved protocol URL:', cleanUrl);
+  // Enforce protocol safety via standard URL parsing (reject javascript:, file:, data:, etc.)
+  try {
+    const parsed = new URL(cleanUrl);
+    const isHttps = parsed.protocol === 'https:';
+    const isMailto = parsed.protocol === 'mailto:';
+    const isLocalHttp = parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
+
+    if (!isHttps && !isMailto && !isLocalHttp) {
+      console.warn('[Desktop] Refusing to open unapproved protocol URL:', cleanUrl);
+      return;
+    }
+  } catch (e) {
+    console.warn('[Desktop] Invalid URL format:', cleanUrl);
     return;
   }
 
@@ -393,6 +403,21 @@ export async function openExternalUrl(url) {
 
   if (typeof window !== 'undefined') {
     window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
+/**
+ * Open local directory or file in OS file explorer
+ */
+export async function openPathNative(path) {
+  if (!path || !isTauri()) return false;
+  try {
+    const { openPath } = await import('@tauri-apps/plugin-opener');
+    await openPath(path);
+    return true;
+  } catch (err) {
+    console.warn('[Desktop] Native openPath failed:', err);
+    return false;
   }
 }
 

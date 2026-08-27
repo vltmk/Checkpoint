@@ -20,6 +20,8 @@ import { Button } from './ui/Button';
 import { DiscordIcon } from './ui/Icons';
 import { openExternalUrl } from '../lib/desktop';
 import { isNotificationRTL, isRTL } from '../lib/utils';
+import { useLanguage, formatShamsiDateTime } from '../lib/i18n';
+import { cn } from '../lib/utils';
 
 export function NotificationCenter({
   isOpen,
@@ -29,9 +31,8 @@ export function NotificationCenter({
   onMarkAllAsRead,
   onOpenUpdateModal,
 }) {
+  const { t, language, isRtl, formatNumber } = useLanguage();
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread' | 'releases' | 'announcements'
-
-  if (!isOpen) return null;
 
   const unreadList = notifications.filter((item) => !item.read);
   const releaseList = notifications.filter((item) => item.source === 'updater' || item.source === 'system');
@@ -71,6 +72,28 @@ export function NotificationCenter({
     }
   };
 
+  const getTagBadge = (tag) => {
+    switch (tag) {
+      case 'new':
+        return {
+          label: t('notifications.tagNew', 'NEW'),
+          style: 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80',
+        };
+      case 'improved':
+        return {
+          label: t('notifications.tagImproved', 'IMPROVED'),
+          style: 'bg-indigo-950/60 text-indigo-300 border-indigo-800/80',
+        };
+      case 'fix':
+        return {
+          label: t('notifications.tagFix', 'FIX'),
+          style: 'bg-zinc-800 text-zinc-300 border-zinc-700/80',
+        };
+      default:
+        return null;
+    }
+  };
+
   const getBadgeStyle = (item) => {
     if (item.source === 'updater') {
       return 'bg-emerald-950/50 text-emerald-300 border-emerald-800/60';
@@ -95,6 +118,14 @@ export function NotificationCenter({
     if (!isoString) return '';
     try {
       const d = new Date(isoString);
+      if (language === 'fa') {
+        return formatShamsiDateTime(d, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
       return d.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -108,7 +139,8 @@ export function NotificationCenter({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex justify-end select-none">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end select-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -122,26 +154,29 @@ export function NotificationCenter({
 
         {/* Slide-over Drawer Frame */}
         <motion.div
-          initial={{ x: '100%' }}
+          initial={{ x: isRtl ? '-100%' : '100%' }}
           animate={{ x: 0 }}
-          exit={{ x: '100%' }}
+          exit={{ x: isRtl ? '-100%' : '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-          className="relative w-full max-w-md bg-zinc-950 border-l border-zinc-800/90 h-full flex flex-col shadow-2xl z-10 text-zinc-100"
+          className={cn(
+            'relative w-full max-w-md bg-zinc-950 border-l border-zinc-800/90 h-full flex flex-col shadow-2xl z-10 text-zinc-100',
+            isRtl && 'border-l-0 border-r'
+          )}
           data-no-drag
         >
           {/* Header */}
-          <div className="px-4 py-3.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur shrink-0 space-y-2.5">
+          <div dir="ltr" className="px-4 py-3.5 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur shrink-0 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
                   <Bell className="w-3.5 h-3.5 text-zinc-300" />
                 </div>
                 <div>
-                  <h2 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
-                    Notifications & Feed
+                  <h2 className={cn('text-xs font-bold text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                    {t('notifications.title')}
                   </h2>
                   <p className="text-[10px] text-zinc-500 font-mono">
-                    {notifications.length} {notifications.length === 1 ? 'record' : 'records'}
+                    {formatNumber(notifications.length)} {notifications.length === 1 ? 'record' : 'records'}
                   </p>
                 </div>
               </div>
@@ -152,10 +187,10 @@ export function NotificationCenter({
                     type="button"
                     onClick={() => onMarkAllAsRead?.()}
                     title="Mark all as read"
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors"
+                    className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-colors', isRtl && 'font-farsi')}
                   >
                     <CheckCheck className="w-3 h-3 text-zinc-400" />
-                    <span>Read all</span>
+                    <span>{t('notifications.readAll')}</span>
                   </button>
                 )}
 
@@ -175,46 +210,46 @@ export function NotificationCenter({
               <button
                 type="button"
                 onClick={() => setFilterMode('all')}
-                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'all'
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200'
-                }`}
+                }`, isRtl && 'font-farsi')}
               >
-                All ({notifications.length})
+                {t('notifications.all')} ({formatNumber(notifications.length)})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterMode('unread')}
-                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'unread'
                     ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200'
-                }`}
+                }`, isRtl && 'font-farsi')}
               >
-                Unread ({unreadList.length})
+                {t('notifications.unread')} ({formatNumber(unreadList.length)})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterMode('releases')}
-                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'releases'
                     ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200'
-                }`}
+                }`, isRtl && 'font-farsi')}
               >
-                Releases ({releaseList.length})
+                {t('notifications.releases')} ({formatNumber(releaseList.length)})
               </button>
               <button
                 type="button"
                 onClick={() => setFilterMode('announcements')}
-                className={`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
+                className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'announcements'
                     ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200'
-                }`}
+                }`, isRtl && 'font-farsi')}
               >
-                Feed ({announcementList.length})
+                {t('notifications.announcements')} ({formatNumber(announcementList.length)})
               </button>
             </div>
           </div>
@@ -224,13 +259,13 @@ export function NotificationCenter({
             {displayedNotifications.length === 0 ? (
               <div className="h-48 flex flex-col items-center justify-center text-center text-zinc-500 space-y-2">
                 <Bell className="w-6 h-6 text-zinc-700 stroke-[1.5]" />
-                <p className="text-xs font-medium text-zinc-400">
-                  {filterMode === 'unread' ? 'No unread notifications' : 'No notifications'}
+                <p className={cn('text-xs font-medium text-zinc-400', isRtl && 'font-farsi')}>
+                  {filterMode === 'unread' ? t('notifications.noUnread') : t('notifications.empty')}
                 </p>
-                <p className="text-[11px] text-zinc-600 max-w-xs">
+                <p className={cn('text-[11px] text-zinc-600 max-w-xs', isRtl && 'font-farsi')}>
                   {filterMode === 'unread'
-                    ? 'All announcements and release notes have been read.'
-                    : 'No active announcements or updates at this time.'}
+                    ? t('notifications.noUnreadDesc')
+                    : t('notifications.emptyDesc')}
                 </p>
               </div>
             ) : (
@@ -257,7 +292,7 @@ export function NotificationCenter({
                         </div>
                         <span
                           dir="ltr"
-                          className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.2 rounded border ${getBadgeStyle(
+                          className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded border ${getBadgeStyle(
                             item
                           )}`}
                         >
@@ -295,6 +330,58 @@ export function NotificationCenter({
                           {item.message}
                         </p>
                       )}
+
+                      {/* Structured Change Items (Categorized Badges & Bullets) */}
+                      {Array.isArray(item.items) && item.items.length > 0 && (
+                        <ul className="space-y-1.5 pt-1.5 border-t border-zinc-800/60 mt-2">
+                          {item.items.map((it, idx) => {
+                            const tagInfo = it.tag ? getTagBadge(it.tag) : null;
+                            const text = it.text || String(it);
+                            const itemRtl = isRTL(text);
+
+                            return (
+                              <li
+                                key={idx}
+                                dir={itemRtl ? 'rtl' : 'ltr'}
+                                className="flex items-start gap-1.5 text-[11px] text-zinc-300 leading-relaxed"
+                              >
+                                {tagInfo ? (
+                                  <span
+                                    dir="ltr"
+                                    className={cn(
+                                      'text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                      tagInfo.style,
+                                      language === 'fa' && 'font-farsi text-[8.5px]'
+                                    )}
+                                  >
+                                    {tagInfo.label}
+                                  </span>
+                                ) : (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                                )}
+
+                                {it.version && (
+                                  <span
+                                    dir="ltr"
+                                    className="text-[9px] font-mono text-zinc-500 bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                                  >
+                                    v{it.version}
+                                  </span>
+                                )}
+
+                                <span
+                                  className={cn(
+                                    'break-words min-w-0 flex-1',
+                                    itemRtl && 'text-right font-farsi'
+                                  )}
+                                >
+                                  {text}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </div>
 
                     {/* Actions (if configured) */}
@@ -313,7 +400,7 @@ export function NotificationCenter({
                               className="gap-1.5 text-[11px] h-6 px-2.5 font-semibold"
                             >
                               <Download className="w-3 h-3" />
-                              <span>Update Checkpoint</span>
+                              <span>{t('update.installNow')}</span>
                             </Button>
                             {item.action.url && (
                               <Button
@@ -326,7 +413,7 @@ export function NotificationCenter({
                                 className="gap-1 text-[11px] h-6 px-2 text-zinc-400"
                               >
                                 <ExternalLink className="w-3 h-3" />
-                                <span>Release Notes</span>
+                                <span>{t('update.releaseNotes')}</span>
                               </Button>
                             )}
                           </>
@@ -344,7 +431,7 @@ export function NotificationCenter({
                               isActionRTL ? 'font-farsi tracking-normal' : ''
                             }`}
                           >
-                            <span>{item.action.label || 'Open Link'}</span>
+                            <span>{item.action.label || t('common.open')}</span>
                             <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
                           </Button>
                         )}
@@ -357,7 +444,7 @@ export function NotificationCenter({
           </div>
 
           {/* Footer: Official Discord Community */}
-          <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/90 flex items-center justify-between gap-2 shrink-0">
+          <div dir="ltr" className="p-3 border-t border-zinc-800/80 bg-zinc-950/90 flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 text-zinc-400">
                 <DiscordIcon className="w-3.5 h-3.5" />
@@ -383,7 +470,8 @@ export function NotificationCenter({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    )}
+  </AnimatePresence>
   );
 }
 

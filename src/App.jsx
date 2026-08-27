@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG } from './lib/currencies';
-import { toLocalISOString } from './components/ui/DateTimePicker';
 import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
 import { SplashScreen } from './components/ui/SplashScreen';
@@ -17,7 +16,6 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { UpdateModal } from './components/UpdateModal';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
-import { Toast } from './components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, getAppVersion } from './lib/updater';
@@ -48,7 +46,10 @@ import {
 } from './lib/desktop';
 import { initTelemetry, incrementLocalWorkCount, flushDailyTelemetry } from './lib/telemetry';
 
+import { useLanguage } from './lib/i18n';
+
 export default function App() {
+  const { language, t, isRtl } = useLanguage();
   const isDesktop = isTauri();
   const [appVersion, setAppVersion] = useState('');
   const [entries, setEntries] = useState([]);
@@ -148,46 +149,7 @@ export default function App() {
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const hasNotifiedUpdateThisSession = useRef(false);
-
-  // Toast Notification
-  const [toast, setToast] = useState(null);
-  const toastTimeoutRef = useRef(null);
   const searchInputRef = useRef(null);
-
-  const showToast = useCallback((msg, options = {}) => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-
-    let toastObj = {};
-    if (typeof msg === 'string') {
-      let variant = options.variant || 'success';
-      if (
-        msg.toLowerCase().includes('failed') ||
-        msg.toLowerCase().includes('error') ||
-        msg.toLowerCase().includes('required')
-      ) {
-        variant = 'destructive';
-      }
-
-      toastObj = {
-        id: Date.now(),
-        title: options.title || msg,
-        description: options.description || null,
-        variant,
-      };
-    } else if (typeof msg === 'object' && msg !== null) {
-      toastObj = {
-        id: Date.now(),
-        title: msg.title || 'Notification',
-        description: msg.description || msg.text || null,
-        variant: msg.variant || 'success',
-      };
-    }
-
-    setToast(toastObj);
-    toastTimeoutRef.current = setTimeout(() => {
-      setToast(null);
-    }, 3800);
-  }, []);
 
   // Data Loading
   const loadData = useCallback(async () => {
@@ -200,18 +162,22 @@ export default function App() {
           try {
             const lastKnown = await trackerDB.getSetting('checkpoint_last_known_version', null);
             if (lastKnown && compareSemver(v, lastKnown) > 0) {
-              // App was just upgraded! Post welcome notification
+              // App was just upgraded! Post rich What's New notification
               const stored = await getStoredNotifications();
               const updated = mergeNotificationsIntoHistory(stored, {
                 currentVersion: v,
                 postUpdateInfo: {
                   version: v,
+                  fromVersion: lastKnown,
+                  language,
                   releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/v${v}`,
                 },
               });
               setNotifications(updated);
               await saveStoredNotifications(updated);
-              showToast(`🎉 Checkpoint updated to v${v}!`);
+
+              // Spotlight What's New by opening Notification Center drawer on first launch after upgrade
+              setIsNotificationCenterOpen(true);
             }
             await trackerDB.setSetting('checkpoint_last_known_version', v);
             localStorage.setItem('checkpoint_last_known_version', v);
@@ -270,7 +236,7 @@ export default function App() {
         setIsLoading(false);
       }, remaining);
     }
-  }, [showToast]);
+  }, []);
 
   // Lightweight entry reload without full app re-hydration
   const reloadEntries = useCallback(async () => {
@@ -320,29 +286,12 @@ export default function App() {
           await saveStoredNotifications(currentMerged);
 
           // Alert user on discovery
-          if (!opts.silent) {
-            showToast(`Update available: v${res.version}`);
-          } else if (!hasNotifiedUpdateThisSession.current) {
+          if (opts.silent && !hasNotifiedUpdateThisSession.current) {
             hasNotifiedUpdateThisSession.current = true;
-            showToast({
-              title: `Checkpoint v${res.version} Available`,
-              description: 'A new release was published on GitHub. Check notifications or top bar to update.',
-              variant: 'info',
-            });
             sendDesktopNotification({
               title: 'CHECKPOINT Update Available',
               body: `Version v${res.version} is published on GitHub and ready to download.`,
             });
-          }
-        } else if (!opts.silent) {
-          if (res?.isNotFound) {
-            showToast(`Checkpoint is up to date (v${res?.currentVersion || appVersion})`);
-          } else if (res?.isOffline) {
-            showToast('Unable to check for updates (offline)', { variant: 'destructive' });
-          } else if (res?.error) {
-            showToast('Unable to connect to update server', { variant: 'destructive' });
-          } else {
-            showToast(`Checkpoint is up to date${res?.currentVersion ? ` (v${res.currentVersion})` : ''}`);
           }
         }
       }
@@ -351,7 +300,7 @@ export default function App() {
     } finally {
       if (!opts.silent) setIsCheckingUpdates(false);
     }
-  }, [isDesktop, showToast, appVersion]);
+  }, [isDesktop, appVersion]);
 
   // Execute scheduled automated backups (if enabled)
   const runScheduledAutoBackup = useCallback(async (opts = {}) => {
@@ -370,8 +319,8 @@ export default function App() {
       }
 
       if (isManual || now - lastRun >= intervalMs) {
-        const fullEntries = await trackerDB.getAllEntriesFull();
-        const currentFingerprint = generateLedgerFingerprint(fullEntries, globalCurrency, goldRateTOMAN);
+        const entries = await trackerDB.getAllEntries();
+        const currentFingerprint = generateLedgerFingerprint(entries, globalCurrency, goldRateTOMAN);
         const lastFingerprint = await trackerDB.getSetting('checkpoint_last_auto_backup_hash', '');
 
         // Smart Change Detection: Skip export if no financial/entry data changed and not a manual trigger
@@ -380,6 +329,7 @@ export default function App() {
           return;
         }
 
+        const fullEntries = await trackerDB.getAllEntriesFull();
         const backupData = {
           app: 'CHECKPOINT',
           version: appVersion || '0.0.0',
@@ -408,18 +358,14 @@ export default function App() {
             maxFiles: autoBackupRetention,
           });
         }
-
-        if (isManual) {
-          showToast('Backup snapshot saved to folder');
-        }
       }
     } catch (err) {
       console.warn('[AutoBackup] Backup execution failed:', err);
       if (opts.force) {
-        showToast('Backup failed: check folder permissions', 'error');
+        throw err;
       }
     }
-  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN, showToast]);
+  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN]);
 
   const syncFeedsRef = useRef(syncFeeds);
   useEffect(() => {
@@ -508,7 +454,6 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_close_to_tray', String(val));
     } catch (e) {}
-    showToast(val ? 'Closing window will minimize to System Tray' : 'Closing window will quit application');
   };
 
   const handleMinimizeToTrayChange = async (val) => {
@@ -517,7 +462,6 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
     } catch (e) {}
-    showToast(val ? 'Minimize button will hide to System Tray' : 'Minimize button will minimize to Taskbar');
   };
 
   const handleAutoBackupEnabledChange = async (val) => {
@@ -526,7 +470,6 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_enabled', String(val));
     } catch (e) {}
-    showToast(val ? 'Scheduled folder backup enabled' : 'Scheduled folder backup disabled');
   };
 
   const handleAutoBackupPathChange = async (val) => {
@@ -543,7 +486,6 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_frequency', val);
     } catch (e) {}
-    showToast(`Backup frequency set to: ${val}`);
   };
 
   const handleAutoBackupRetentionChange = async (val) => {
@@ -553,11 +495,10 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_retention', String(num));
     } catch (e) {}
-    showToast(num > 0 ? `Backup retention: keep last ${num}` : 'Backup retention: Unlimited');
   };
 
   const handleManualAutoBackup = () => {
-    runScheduledAutoBackup({ force: true });
+    return runScheduledAutoBackup({ force: true });
   };
 
   // Manual Check for Updates
@@ -571,16 +512,7 @@ export default function App() {
       const updated = mergeNotificationsIntoHistory(stored, { updateInfo: res });
       setNotifications(updated);
       await saveStoredNotifications(updated);
-      showToast(`Update available: v${res.version}`);
       setIsUpdateModalOpen(true);
-    } else if (res?.isNotFound) {
-      showToast(`Checkpoint is up to date (v${res?.currentVersion || appVersion})`);
-    } else if (res?.isOffline) {
-      showToast('Unable to check for updates (offline)', { variant: 'destructive' });
-    } else if (res?.error) {
-      showToast('Unable to connect to update server', { variant: 'destructive' });
-    } else {
-      showToast(`Checkpoint is up to date${(res?.currentVersion || appVersion) ? ` (v${res?.currentVersion || appVersion})` : ''}`);
     }
   };
 
@@ -593,7 +525,6 @@ export default function App() {
   const handleMarkAllNotificationsAsRead = async () => {
     const updated = await markAllNotificationsAsRead(notifications);
     setNotifications(updated);
-    showToast('All notifications marked as read');
   };
 
   const handleDismissNotification = async (id) => {
@@ -604,7 +535,6 @@ export default function App() {
   const handleClearAllNotifications = async () => {
     const updated = await clearAllNotificationHistory(notifications);
     setNotifications(updated);
-    showToast('Notification history cleared');
   };
 
   const handleResetAnnouncements = async () => {
@@ -645,7 +575,6 @@ export default function App() {
       handleTabChange('ledger');
       incrementLocalWorkCount();
     }
-    showToast(isNew ? 'Work record saved' : 'Work record updated');
   };
 
   // Quick Add Save Entry
@@ -655,7 +584,6 @@ export default function App() {
     await reloadEntries();
     handleTabChange('ledger');
     incrementLocalWorkCount();
-    showToast('⚡ Quick record added');
   };
 
   // Delete Single Entry (Called after in-line confirmation)
@@ -663,7 +591,6 @@ export default function App() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
     await trackerDB.deleteEntry(id);
     await reloadEntries();
-    showToast('🗑️ Work record deleted');
   };
 
   // Bulk Delete Entries
@@ -673,7 +600,6 @@ export default function App() {
     setEntries((prev) => prev.filter((e) => !idSet.has(e.id)));
     await trackerDB.bulkDeleteEntries(ids);
     await reloadEntries();
-    showToast(`🗑️ Deleted ${ids.length} ${ids.length === 1 ? 'record' : 'records'}`);
   };
 
   // Bulk Update Status
@@ -685,14 +611,12 @@ export default function App() {
     );
     await trackerDB.bulkUpdateStatus(ids, nextStatus);
     await reloadEntries();
-    showToast(`⚡ Updated ${ids.length} ${ids.length === 1 ? 'record' : 'records'} to ${nextStatus}`);
   };
 
   // Bulk Export CSV
   const handleBulkExportCsv = useCallback(async (selectedIds) => {
     const listToExport = entries.filter((e) => selectedIds.includes(e.id));
     if (listToExport.length === 0) {
-      showToast('No records to export');
       return;
     }
 
@@ -736,7 +660,6 @@ export default function App() {
         content: csvContent,
       });
       if (res && res.success) {
-        showToast(`📄 Exported ${listToExport.length} records to CSV`);
         return;
       }
       if (res && res.cancelled) {
@@ -753,14 +676,12 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast(`📄 Exported ${listToExport.length} records to CSV`);
-  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
+  }, [entries, globalCurrency, goldRateTOMAN]);
 
   // Purge / Clear All Data
   const handleClearAllData = async (purgeSnapshots = false) => {
     await trackerDB.clearAll(purgeSnapshots);
     await loadData();
-    showToast('Database wiped successfully');
   };
 
   // Duplicate Entry
@@ -779,7 +700,6 @@ export default function App() {
 
     await trackerDB.saveEntry(copy);
     await reloadEntries();
-    showToast('⚡ Record duplicated');
   };
 
   // Status Change / Flip
@@ -846,7 +766,6 @@ export default function App() {
   // Export CSV
   const handleExportCsv = useCallback(async () => {
     if (entries.length === 0) {
-      showToast('No records to export');
       return;
     }
 
@@ -890,7 +809,6 @@ export default function App() {
         content: csvContent,
       });
       if (res && res.success) {
-        showToast('CSV export saved successfully');
         return;
       }
       if (res && res.cancelled) {
@@ -907,13 +825,11 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('CSV export downloaded');
-  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
+  }, [entries, globalCurrency, goldRateTOMAN]);
 
   // Export JSON Backup
   const handleExportJson = useCallback(async () => {
     if (entries.length === 0) {
-      showToast('No records to export');
       return;
     }
 
@@ -939,7 +855,6 @@ export default function App() {
         content: backupData,
       });
       if (res && res.success) {
-        showToast('Full JSON backup saved successfully');
         return;
       }
       if (res && res.cancelled) {
@@ -960,8 +875,7 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast('Full JSON backup downloaded');
-  }, [entries, globalCurrency, goldRateTOMAN, showToast]);
+  }, [entries, globalCurrency, goldRateTOMAN, appVersion]);
 
   // Import JSON Restore
   const handleImportJson = async (fileOrRaw) => {
@@ -974,13 +888,11 @@ export default function App() {
         });
         if (!res || res.cancelled) return;
         if (!res.success || !res.content) {
-          showToast('Failed to open backup file', { variant: 'destructive' });
           return;
         }
         try {
           json = JSON.parse(res.content);
         } catch (e) {
-          showToast('Selected file is not valid JSON', { variant: 'destructive' });
           return;
         }
       } else if (fileOrRaw instanceof File) {
@@ -1001,114 +913,142 @@ export default function App() {
         importedList = json.entries;
         if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
       } else {
-        showToast('Invalid backup JSON format', { variant: 'destructive' });
         return;
       }
 
       await trackerDB.bulkImport(importedList);
       await loadData();
-      showToast(`Successfully restored ${importedList.length} records`);
     } catch (err) {
       console.error('Failed to import JSON backup:', err);
-      showToast('Error restoring backup file', { variant: 'destructive' });
     }
   };
 
 
   // Keyboard Shortcuts Listener
+  const appModalsRef = useRef({});
+  appModalsRef.current = {
+    lightboxData,
+    isNotificationCenterOpen,
+    isUpdateModalOpen,
+    exportConfirm,
+    isWorkModalOpen,
+    isQuickAddOpen,
+    isReceiptModalOpen,
+    isSettingsOpen,
+    isShortcutsOpen,
+    handleOpenWorkModal,
+    handleTabChange,
+    searchInputRef,
+  };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const state = appModalsRef.current;
+
       // Escape closes open modals / lightbox
       if (e.key === 'Escape') {
-        if (lightboxData.isOpen) {
+        if (state.lightboxData?.isOpen) {
           setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
         }
-        if (isNotificationCenterOpen) {
+        if (state.isNotificationCenterOpen) {
           setIsNotificationCenterOpen(false);
           return;
         }
-        if (isUpdateModalOpen) {
+        if (state.isUpdateModalOpen) {
           setIsUpdateModalOpen(false);
           return;
         }
-        if (exportConfirm) {
+        if (state.exportConfirm) {
           setExportConfirm(null);
           return;
         }
-        if (isWorkModalOpen) {
+        if (state.isWorkModalOpen) {
           setIsWorkModalOpen(false);
           setEditingEntry(null);
           return;
         }
-        if (isQuickAddOpen) {
+        if (state.isQuickAddOpen) {
           setIsQuickAddOpen(false);
           return;
         }
-        if (isReceiptModalOpen) {
+        if (state.isReceiptModalOpen) {
           setIsReceiptModalOpen(false);
           setReceiptEntry(null);
           return;
         }
-        if (isSettingsOpen) {
+        if (state.isSettingsOpen) {
           setIsSettingsOpen(false);
           return;
         }
-        if (isShortcutsOpen) {
+        if (state.isShortcutsOpen) {
           setIsShortcutsOpen(false);
           return;
         }
       }
 
       // Ctrl + F (Focus Search in Ledger)
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyF' || e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
-        handleTabChange('ledger');
+        state.handleTabChange?.('ledger');
         setTimeout(() => {
-          searchInputRef.current?.focus();
+          state.searchInputRef?.current?.focus();
         }, 100);
         return;
       }
 
+      const isAnyModalOpen =
+        state.isWorkModalOpen ||
+        state.isQuickAddOpen ||
+        state.isReceiptModalOpen ||
+        state.isSettingsOpen ||
+        state.isShortcutsOpen ||
+        state.isNotificationCenterOpen ||
+        state.isUpdateModalOpen ||
+        state.lightboxData?.isOpen ||
+        Boolean(state.exportConfirm);
+
+      if (isAnyModalOpen) return;
+
       // Don't trigger standard navigation hotkeys if typing in inputs/textareas
-      const tag = e.target.tagName.toLowerCase();
+      const tag = e.target.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
         return;
       }
 
       // Alt + E (Export CSV)
-      if (e.altKey && (e.key === 'e' || e.key === 'E')) {
+      if (e.altKey && (e.code === 'KeyE' || e.key === 'e' || e.key === 'E')) {
         e.preventDefault();
         setExportConfirm('csv');
         return;
       }
 
       // Alt + B (Backup JSON)
-      if (e.altKey && (e.key === 'b' || e.key === 'B')) {
+      if (e.altKey && (e.code === 'KeyB' || e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
         setExportConfirm('json');
         return;
       }
 
-      if (e.key === 'q' || e.key === 'Q') {
+      if (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
         setIsQuickAddOpen(true);
-      } else if (e.key === 'n' || e.key === 'N') {
+      } else if (e.code === 'KeyN' || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
-        handleOpenWorkModal();
-      } else if (e.key === '1') {
+        state.handleOpenWorkModal?.();
+      } else if (e.code === 'Digit1' || e.key === '1') {
         e.preventDefault();
-        handleTabChange('ledger');
-      } else if (e.key === '2') {
+        state.handleTabChange?.('ledger');
+      } else if (e.code === 'Digit2' || e.key === '2') {
         e.preventDefault();
-        handleTabChange('analytics');
-      } else if (e.key === '/') {
+        state.handleTabChange?.('analytics');
+      } else if (e.code === 'Slash' || e.key === '/') {
         e.preventDefault();
-        handleTabChange('ledger');
+        state.handleTabChange?.('ledger');
         setTimeout(() => {
-          searchInputRef.current?.focus();
+          state.searchInputRef?.current?.focus();
         }, 100);
-      } else if (e.key === '?') {
+      } else if (e.key === '?' || (e.shiftKey && e.code === 'Slash')) {
         e.preventDefault();
         setIsShortcutsOpen(true);
       }
@@ -1116,7 +1056,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExportCsv, handleExportJson, isWorkModalOpen, isQuickAddOpen, isReceiptModalOpen, isSettingsOpen, isShortcutsOpen, isNotificationCenterOpen, isUpdateModalOpen, lightboxData, exportConfirm]);
+  }, []);
 
   return (
     <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
@@ -1161,19 +1101,6 @@ export default function App() {
 
       {/* 3. Main Centered Mini-App Workspace */}
       <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
-        {/* Top-Center Toast Notification */}
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm sm:max-w-md pointer-events-none flex justify-center">
-          <AnimatePresence>
-            {toast && (
-              <Toast
-                key={toast.id || 'toast'}
-                toast={toast}
-                onClose={() => setToast(null)}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-
         {/* Centered Tablet-Width Mini-App Frame */}
         <div className="max-w-4xl mx-auto w-full">
           {isLoading ? (
@@ -1207,7 +1134,6 @@ export default function App() {
                     searchInputRef={searchInputRef}
                     externalTeammateFilter={externalTeammateFilter}
                     onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
-                    onToast={showToast}
                   />
                 )}
 
@@ -1246,7 +1172,6 @@ export default function App() {
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
-        onToast={showToast}
       />
 
       <QuickAddModal
@@ -1255,7 +1180,6 @@ export default function App() {
         onSave={handleSaveQuickEntry}
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
-        onToast={showToast}
       />
 
       <ReceiptModal
@@ -1267,13 +1191,11 @@ export default function App() {
         entry={receiptEntry}
         globalCurrency={globalCurrency}
         onOpenLightbox={handleOpenLightbox}
-        onToast={showToast}
         onFilterTeammate={(name) => {
           setIsReceiptModalOpen(false);
           setReceiptEntry(null);
           setActiveTab('ledger');
           setExternalTeammateFilter(name);
-          showToast(`Filtered for teammate: ${name}`);
         }}
       />
 
@@ -1290,7 +1212,6 @@ export default function App() {
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onClearAllData={handleClearAllData}
-        onToast={showToast}
         entriesCount={entries.length}
         appVersion={appVersion}
         updateInfo={updateInfo}
@@ -1324,7 +1245,6 @@ export default function App() {
         isOpen={isUpdateModalOpen}
         onClose={() => setIsUpdateModalOpen(false)}
         updateInfo={updateInfo}
-        onToast={showToast}
       />
 
       <ShortcutsModal
