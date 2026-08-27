@@ -7,18 +7,17 @@ import {
   CheckCheck,
   ExternalLink,
   Download,
-  Info,
+  Copy,
+  Share2,
   AlertTriangle,
   AlertCircle,
   Sparkles,
   ArrowUpCircle,
   Megaphone,
-  Layers,
-  Trash2,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { DiscordIcon } from './ui/Icons';
-import { openExternalUrl } from '../lib/desktop';
+import { openExternalUrl, copyTextNative } from '../lib/desktop';
 import { isNotificationRTL, isRTL } from '../lib/utils';
 import { useLanguage, formatShamsiDateTime } from '../lib/i18n';
 import { cn } from '../lib/utils';
@@ -33,6 +32,9 @@ export function NotificationCenter({
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread' | 'releases' | 'announcements'
+  const [copiedActionKey, setCopiedActionKey] = useState(null);
+
+  if (!isOpen) return null;
 
   const unreadList = notifications.filter((item) => !item.read);
   const releaseList = notifications.filter((item) => item.source === 'updater' || item.source === 'system');
@@ -139,8 +141,7 @@ export function NotificationCenter({
 
   return (
     <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end select-none">
+      <div className="fixed inset-0 z-50 flex justify-end select-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -271,7 +272,6 @@ export function NotificationCenter({
             ) : (
               displayedNotifications.map((item) => {
                 const isRTLItem = isNotificationRTL(item);
-                const isActionRTL = item.action?.label ? isRTL(item.action.label) : isRTLItem;
 
                 return (
                   <div
@@ -385,8 +385,8 @@ export function NotificationCenter({
                     </div>
 
                     {/* Actions (if configured) */}
-                    {item.action && (
-                      <div className="pt-1 flex items-center gap-2">
+                    {(item.actions?.length > 0 || item.action) && (
+                      <div className="pt-1 flex items-center flex-wrap gap-2">
                         {item.source === 'updater' ? (
                           <>
                             <Button
@@ -402,7 +402,7 @@ export function NotificationCenter({
                               <Download className="w-3 h-3" />
                               <span>{t('update.installNow')}</span>
                             </Button>
-                            {item.action.url && (
+                            {item.action?.url && (
                               <Button
                                 variant="secondary"
                                 size="xs"
@@ -418,22 +418,61 @@ export function NotificationCenter({
                             )}
                           </>
                         ) : (
-                          <Button
-                            variant="secondary"
-                            size="xs"
-                            onClick={(e) => {
+                          (item.actions && item.actions.length > 0 ? item.actions : [item.action]).map((act, actIdx) => {
+                            if (!act) return null;
+                            const actionKey = `${item.id}-action-${actIdx}`;
+                            const isCopied = copiedActionKey === actionKey;
+                            const isActionRTLItem = act.label ? isRTL(act.label) : isRTLItem;
+
+                            const handleAction = async (e) => {
                               e.stopPropagation();
-                              if (item.action.url) {
-                                openExternalUrl(item.action.url);
+                              if (act.type === 'copy_link' || act.type === 'copy_text') {
+                                await copyTextNative(act.url || act.text || '');
+                                setCopiedActionKey(actionKey);
+                                setTimeout(() => setCopiedActionKey((prev) => (prev === actionKey ? null : prev)), 2000);
+                                return;
                               }
-                            }}
-                            className={`gap-1.5 text-[11px] h-6 px-2.5 text-zinc-200 ${
-                              isActionRTL ? 'font-farsi tracking-normal' : ''
-                            }`}
-                          >
-                            <span>{item.action.label || t('common.open')}</span>
-                            <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
-                          </Button>
+                              if (act.url) {
+                                openExternalUrl(act.url);
+                              }
+                            };
+
+                            return (
+                              <Button
+                                key={actIdx}
+                                variant={act.variant || (act.type === 'download' ? 'primary' : 'secondary')}
+                                size="xs"
+                                onClick={handleAction}
+                                className={cn(
+                                  'gap-1.5 text-[11px] h-6 px-2.5',
+                                  act.variant === 'primary' ? 'font-semibold' : 'text-zinc-200',
+                                  isActionRTLItem && 'font-farsi tracking-normal'
+                                )}
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                                    <span>{language === 'fa' ? 'کپی شد!' : 'Copied!'}</span>
+                                  </>
+                                ) : act.type === 'copy_link' || act.type === 'copy_text' ? (
+                                  <>
+                                    <Share2 className="w-3 h-3 text-zinc-400 shrink-0" />
+                                    <span>{act.label || (language === 'fa' ? 'کپی لینک' : 'Copy Link')}</span>
+                                  </>
+                                ) : act.type === 'download' || act.url?.endsWith('.exe') ? (
+                                  <>
+                                    <Download className="w-3 h-3 shrink-0" />
+                                    <span>{act.label || (language === 'fa' ? 'دانلود فایل' : 'Download')}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>{act.label || t('common.open')}</span>
+                                    <ExternalLink className="w-3 h-3 text-zinc-400 shrink-0" />
+                                  </>
+                                )}
+                              </Button>
+                            );
+                          })
                         )}
                       </div>
                     )}
@@ -470,8 +509,7 @@ export function NotificationCenter({
           </div>
         </motion.div>
       </div>
-    )}
-  </AnimatePresence>
+    </AnimatePresence>
   );
 }
 

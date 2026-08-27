@@ -1,18 +1,44 @@
 {
   "version": "1.0",
-  "updated_at": "2026-08-25T07:35:00Z",
+  "updated_at": "2026-08-27T18:50:00Z",
   "announcements": [
     {
-      "id": "2026-08-25-checkpoint-backups-fa",
-      "type": "info",
-      "title": "پشتیبان‌گیری محلی و بازیابی اطلاعات",
-      "message": "چک‌پوینت تمامی داده‌های حساب و لجر شما را به صورت امن و محلی روی سیستم ذخیره می‌کند. در هر زمان می‌توانید از بخش تنظیمات (Settings) یک بکاپ کامل JSON دریافت کرده یا اطلاعات قبلی را بازیابی کنید.",
-      "published_at": "2026-08-25T07:35:00Z",
+      "id": "2026-08-27-checkpoint-free-opensource-fa",
+      "type": "success",
+      "title": "چک‌پوینت کاملاً رایگان و ۱۰۰٪ متن‌باز برای همه",
+      "message": "نرم‌افزار Checkpoint یک ابزار مالی و دفتر کل مستقل، محلی و امن برای تمامی فریلنسرها، گیمرها و فعالان دیجیتال است. استفاده از چک‌پوینت کاملاً رایگان و متن‌باز (Open Source) است و تمامی داده‌ها روی سیستم خودتان ذخیره می‌شوند.\n\nمی‌توانید چک‌پوینت را با دوستان و همکاران خود به اشتراک بگذارید یا مستقیماً آخرین نسخه نصبی ویندوز را دریافت کنید.",
+      "items": [
+        {
+          "tag": "new",
+          "text": "رایگان، بدون تبلیغات و بدون هزینه اشتراک برای همیشه"
+        },
+        {
+          "tag": "new",
+          "text": "متن‌باز و شفاف با امکان بررسی سورس‌کدها در گیت‌هاب"
+        },
+        {
+          "tag": "improved",
+          "text": "عملکرد کاملاً آفلاین و محلی برای حفظ حداکثری حریم خصوصی"
+        }
+      ],
+      "published_at": "2026-08-27T18:50:00Z",
       "expires_at": null,
       "dismissible": true,
-      "pinned": false,
-      "action": null
+      "pinned": true,
+      "actions": [
+        {
+          "label": "دانلود مستقیم نسخه ویندوز (exe)",
+          "url": "https://github.com/vltmk/Checkpoint/releases/download/v2.4.1/CHECKPOINT_2.4.1_x64-setup.exe",
+          "type": "download",
+          "variant": "primary"
+        },
+        {
+          "label": "کپی لینک گیت‌هاب جهت اشتراک",
+          "url": "https://github.com/vltmk/Checkpoint",
+          "type": "copy_link",
+          "variant": "secondary"
+        }
+      ]
     }
   ]
 }
-

@@ -26,6 +26,87 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '2.4.1': {
+    date: '2026-08-27',
+    title: {
+      en: "What's New in Checkpoint v2.4.1",
+      fa: 'امکانات و تغییرات نسخه ۲.۴.۱',
+    },
+    summary: {
+      en: 'Multi-action announcements with direct downloads, full Persian & RTL support, Shamsi calendar, and automated backups.',
+      fa: 'پشتیبانی از اعلان‌های چنددکمه‌ای و دانلود مستقیم، زبان فارسی و راست‌چین، تقویم شمسی و پشتیبان‌گیری خودکار.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Interactive multi-action announcement feed with one-click GitHub link sharing and direct .exe installer download.',
+        },
+        {
+          tag: 'new',
+          text: 'Full Persian (Farsi) & RTL layout support with native IRANYekan typography and instant language switcher in Settings.',
+        },
+        {
+          tag: 'new',
+          text: 'Interactive Solar Hijri (Shamsi / Jalali) calendar picker with quick presets (Now, Today, Yesterday) and localized formatting.',
+        },
+        {
+          tag: 'new',
+          text: 'Automated local folder backups with custom directory selector, retention rotation (keep 5 to 20), and smart change detection.',
+        },
+        {
+          tag: 'new',
+          text: "Version-specific 'What's New' release notes with categorized badges (NEW, IMPROVED, FIX) directly in the Notification Center.",
+        },
+        {
+          tag: 'improved',
+          text: 'Pre-update download dialog now parses and displays structured changelogs before downloading new releases.',
+        },
+        {
+          tag: 'improved',
+          text: 'Optimized 4K screenshot proof compression for instant proof attachments and lighter SQLite storage.',
+        },
+        {
+          tag: 'fix',
+          text: 'Preserved unread/read notification flags and dismissed states across desktop application restarts.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'پشتیبانی از اعلان‌های تعاملی با قابلیت کپی سریع لینک گیت‌هاب و دکمه اختصاصی دانلود فایل نصبی ویندوز.',
+        },
+        {
+          tag: 'new',
+          text: 'پشتیبانی کامل از زبان فارسی و چینش راست‌چین (RTL) با فونت رسمی ایران‌یکان و سوییچر سریع در تنظیمات.',
+        },
+        {
+          tag: 'new',
+          text: 'تقویم و انتخاب‌گر اختصاصی تاریخ شمسی (خورشیدی) به همراه میانبرهای زمانی (اکنون، امروز، دیروز).',
+        },
+        {
+          tag: 'new',
+          text: 'پشتیبان‌گیری خودکار زمان‌بندی‌شده در پوشه دلخواه با مدیریت چرخش نسخه‌ها (۵ تا ۲۰ نسخه) و فینگرپرینت هوشمند تغییرات.',
+        },
+        {
+          tag: 'new',
+          text: 'سیستم نمایش تغییرات هر نسخه با برچسب‌های تفکیک‌شده (جدید، بهبود، رفع باگ) در مرکز اعلان‌ها.',
+        },
+        {
+          tag: 'improved',
+          text: 'فرمت‌بندی و نمایش ساختاریافته یادداشت‌های انتشار قبل از تایید دانلود در پنجره به‌روزرسانی.',
+        },
+        {
+          tag: 'improved',
+          text: 'فشرده‌سازی خودکار و بهینه‌سازی تصاویر فاکتور و اسکرین‌شات‌های 4K جهت افزایش چشمگیر سرعت برنامه و سبکی دیتابیس.',
+        },
+        {
+          tag: 'fix',
+          text: 'حفظ دقیق وضعیت پیام‌های خوانده‌شده و ردشده در مرکز اعلان‌ها پس از راه‌اندازی مجدد برنامه.',
+        },
+      ],
+    },
+  },
   '2.4.0': {
     date: '2026-08-27',
     title: {

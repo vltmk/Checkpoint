@@ -44,17 +44,29 @@ export function sanitizeAnnouncement(item) {
 
   if (!id || !title || !message) return null;
 
-  let safeAction = null;
-  if (item.action && typeof item.action === 'object') {
-    const url = typeof item.action.url === 'string' ? item.action.url.trim() : '';
-    const label = typeof item.action.label === 'string' ? item.action.label.trim() : 'View Details';
+  const parseAction = (act) => {
+    if (!act || typeof act !== 'object') return null;
+    const url = typeof act.url === 'string' ? act.url.trim() : '';
+    const label = typeof act.label === 'string' ? act.label.trim() : 'View Details';
+    const type = act.type || (url.endsWith('.exe') ? 'download' : 'external_link');
+    const variant = act.variant === 'primary' ? 'primary' : 'secondary';
     if (url && isSafeActionUrl(url)) {
-      safeAction = {
+      return {
         label,
         url,
-        type: item.action.type || 'external_link',
+        type,
+        variant,
       };
     }
+    return null;
+  };
+
+  let safeActions = [];
+  if (Array.isArray(item.actions)) {
+    safeActions = item.actions.map(parseAction).filter(Boolean);
+  } else if (item.action) {
+    const single = parseAction(item.action);
+    if (single) safeActions.push(single);
   }
 
   const explicitDir = item.dir === 'rtl' || item.dir === 'ltr' ? item.dir : null;
@@ -86,7 +98,8 @@ export function sanitizeAnnouncement(item) {
     expiresAt: item.expires_at || item.expiresAt || null,
     dismissible: item.dismissible !== false,
     pinned: Boolean(item.pinned),
-    action: safeAction,
+    action: safeActions[0] || null,
+    actions: safeActions,
     dir: computedDir,
     lang: lang || (computedDir === 'rtl' ? 'fa' : 'en'),
   };

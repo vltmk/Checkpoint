@@ -188,6 +188,7 @@ export function mergeNotificationsIntoHistory(
         type: ann.type || 'info',
         title: ann.title,
         message: ann.message,
+        items: ann.items || null,
         publishedAt: ann.publishedAt || new Date().toISOString(),
         expiresAt: ann.expiresAt || null,
         dismissible: ann.dismissible !== false,
@@ -195,6 +196,7 @@ export function mergeNotificationsIntoHistory(
         read: previous ? Boolean(previous.read) : false,
         dismissed: false,
         action: ann.action || null,
+        actions: ann.actions || (ann.action ? [ann.action] : []),
         dir: ann.dir || null,
         lang: ann.lang || null,
       });
