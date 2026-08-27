@@ -116,38 +116,44 @@ export function Navbar({
   };
 
   const handleMinimize = async (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     if (minimizeToTray) {
       await hideWindow();
       sendTrayNotification(false);
     } else {
-      minimizeWindow();
+      await minimizeWindow();
     }
   };
 
   const handleToggleMaximize = async (e) => {
-    if (e.target.closest('button, input, select, textarea, [data-no-drag]')) {
-      return;
-    }
-    e.stopPropagation();
+    e?.stopPropagation();
     await toggleMaximizeWindow();
     const max = await isWindowMaximized();
     setIsMaximized(max);
   };
 
-  const handleClose = async (e) => {
+  const handleHeaderDoubleClick = async (e) => {
+    // Only maximize/restore if double clicking empty titlebar space (not buttons/interactive controls)
+    if (e.target.closest('button, a, input, select, textarea, [data-no-drag]')) {
+      return;
+    }
     e.stopPropagation();
+    await handleToggleMaximize();
+  };
+
+  const handleClose = async (e) => {
+    e?.stopPropagation();
     if (closeToTray) {
       await hideWindow();
       sendTrayNotification(false);
     } else {
-      closeWindow();
+      await closeWindow();
     }
   };
 
   const handleHeaderMouseDown = (e) => {
     // Only initiate window drag if left button and not clicking an interactive control
-    if (e.button === 0 && !e.target.closest('button, input, select, textarea, [data-no-drag]')) {
+    if (e.button === 0 && !e.target.closest('button, a, input, select, textarea, [data-no-drag]')) {
       startDraggingWindow();
     }
   };
@@ -171,11 +177,11 @@ export function Navbar({
       dir="ltr"
       data-tauri-drag-region
       onMouseDown={handleHeaderMouseDown}
-      onDoubleClick={handleToggleMaximize}
+      onDoubleClick={handleHeaderDoubleClick}
       className="hidden md:flex h-12 w-full bg-black/95 border-b border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
     >
       {/* 1. Left: Brand Identity (Link to GitHub) & Add Work Button */}
-      <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-2.5 shrink-0 z-10">
+      <div data-no-drag className="flex items-center gap-2.5 shrink-0 z-10">
         <button
           type="button"
           data-no-drag
@@ -298,7 +304,7 @@ export function Navbar({
       </div>
 
       {/* 3. Right: Gold Ratio Dropdown, Settings, Window Controls */}
-      <div data-tauri-drag-region onMouseDown={handleHeaderMouseDown} className="flex items-center gap-1.5 shrink-0 z-10">
+      <div data-no-drag className="flex items-center gap-1.5 shrink-0 z-10">
         {/* Dedicated Gold Ratio Dropdown */}
         <div className="relative" ref={ratesDropdownRef} data-no-drag>
           <div className="relative rounded-md">
@@ -510,11 +516,16 @@ export function Navbar({
 
         {/* Desktop Window Controls */}
         {isDesktop && (
-          <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
+          <div
+            className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80"
+            data-no-drag
+            onMouseDown={(e) => e.stopPropagation()}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               onClick={handleMinimize}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
               title="Minimize"
               aria-label="Minimize Window"
             >
@@ -523,7 +534,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleToggleMaximize}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
               title={isMaximized ? 'Restore' : 'Maximize'}
               aria-label={isMaximized ? 'Restore Window' : 'Maximize Window'}
             >
@@ -536,7 +547,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleClose}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-red-600/90 transition-colors focus:outline-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-red-600/90 transition-colors focus:outline-none cursor-pointer select-none"
               title="Close"
               aria-label="Close Window"
             >

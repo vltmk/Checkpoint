@@ -425,13 +425,13 @@ export default function App() {
           onSettings: () => setIsSettingsOpen(true),
         });
 
-        const { getCurrentWindow } = await import('@tauri-apps/api/window');
-        const win = getCurrentWindow();
-        unlistenClose = await win.onCloseRequested(async (event) => {
+        const { listen } = await import('@tauri-apps/api/event');
+        unlistenClose = await listen('tauri://close-requested', async () => {
           if (closeToTrayRef.current) {
-            event.preventDefault();
             await hideWindow();
             sendTrayNotification(false);
+          } else {
+            await closeWindow();
           }
         });
       } catch (e) {

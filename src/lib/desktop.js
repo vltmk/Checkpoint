@@ -45,10 +45,23 @@ export async function isWindowMaximized() {
 export async function closeWindow() {
   if (!isTauri()) return;
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().close();
+    const { exit } = await import('@tauri-apps/plugin-process');
+    await exit(0);
+    return;
   } catch (err) {
-    console.error('Failed to close window:', err);
+    // fallback if process exit is not available
+  }
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    await getCurrentWindow().destroy();
+    return;
+  } catch (err) {
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().close();
+    } catch (e) {
+      console.error('Failed to close window:', e);
+    }
   }
 }
 
@@ -58,7 +71,12 @@ export async function hideWindow() {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     await getCurrentWindow().hide();
   } catch (err) {
-    console.error('Failed to hide window:', err);
+    try {
+      const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      await getCurrentWebviewWindow().hide();
+    } catch (e) {
+      console.error('Failed to hide window:', e);
+    }
   }
 }
 
@@ -117,27 +135,26 @@ export async function sendTrayNotification(force = false) {
       isPermissionGranted,
       requestPermission,
       sendNotification,
-      onAction,
     } = await import('@tauri-apps/plugin-notification');
 
-    let permissionGranted = await isPermissionGranted();
-    if (!permissionGranted) {
-      const permission = await requestPermission();
-      permissionGranted = permission === 'granted';
+    let permissionGranted = false;
+    try {
+      permissionGranted = await isPermissionGranted();
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === 'granted';
+      }
+    } catch (e) {
+      permissionGranted = true;
     }
 
     if (permissionGranted) {
-      // Register click listener to restore window
       try {
-        await onAction((action) => {
-          showWindow();
+        sendNotification({
+          title: 'CHECKPOINT',
+          body: 'App is minimized to the system tray. Click the tray icon to reopen.',
         });
-      } catch (e) {}
-
-      sendNotification({
-        title: 'CHECKPOINT',
-        body: 'App is minimized to the system tray. Click the tray icon to reopen.',
-      });
+      } catch (sendErr) {}
 
       if (!force) {
         await setTrayNotificationSent();
@@ -145,7 +162,7 @@ export async function sendTrayNotification(force = false) {
       return true;
     }
   } catch (err) {
-    console.error('Failed to dispatch native notification:', err);
+    console.warn('Failed to dispatch native notification:', err);
   }
   return false;
 }
