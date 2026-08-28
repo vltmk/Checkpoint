@@ -40,6 +40,7 @@ ChartJS.register(
 );
 
 import { useLanguage, formatShamsiDate } from '../../lib/i18n';
+import { trackerDB } from '../../lib/db';
 
 // Configure Chart.js global defaults to prioritize IRANYekanRd for Persian text (تومان)
 ChartJS.defaults.font.family = "'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -51,8 +52,22 @@ export function AnalyticsView({
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [timeframe, setTimeframe] = useState(() => {
-    return localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe') || 'monthly';
+    const saved = localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe');
+    if (saved && ['daily', 'weekly', 'monthly', 'all'].includes(saved)) return saved;
+    return 'monthly';
   });
+
+  // Hydrate timeframe from SQLite trackerDB
+  useEffect(() => {
+    trackerDB.getSetting('checkpoint_analytics_timeframe', null).then((saved) => {
+      if (saved && ['daily', 'weekly', 'monthly', 'all'].includes(saved) && saved !== timeframe) {
+        setTimeframe(saved);
+        try {
+          localStorage.setItem('checkpoint_analytics_timeframe', saved);
+        } catch (e) {}
+      }
+    }).catch(() => {});
+  }, []);
 
   const TIMEFRAMES = [
     { id: 'daily', label: t('analytics.daily'), windowText: t('analytics.last14Days') },
@@ -62,9 +77,11 @@ export function AnalyticsView({
   ];
 
   const handleTimeframeChange = (tf) => {
-    setTimeframe(tf);
+    const validTf = ['daily', 'weekly', 'monthly', 'all'].includes(tf) ? tf : 'monthly';
+    setTimeframe(validTf);
     try {
-      localStorage.setItem('checkpoint_analytics_timeframe', tf);
+      localStorage.setItem('checkpoint_analytics_timeframe', validTf);
+      trackerDB.setSetting('checkpoint_analytics_timeframe', validTf).catch(() => {});
     } catch (e) {
       // Ignore quota errors
     }

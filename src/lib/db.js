@@ -647,8 +647,13 @@ export class StorageDB {
       checkpoint_quick_last_source: 'vault_quick_last_source',
       checkpoint_quick_last_currency: 'vault_quick_last_currency',
       checkpoint_work_draft: 'vault_work_draft',
+      checkpoint_user_saved_sources_v2: 'vault_user_saved_sources_v2',
       checkpoint_user_saved_sources: 'vault_user_saved_sources_v2',
+      checkpoint_saved_teammates_v1: 'vault_saved_teammates_v1',
       checkpoint_analytics_timeframe: 'vault_analytics_timeframe',
+      checkpoint_close_to_tray: 'nodrapay_close_to_tray',
+      checkpoint_minimize_to_tray: 'nodrapay_minimize_to_tray',
+      checkpoint_language: 'nodrapay_language',
       checkpoint_v2_seeded: 'nodrapay_v2_seeded',
     };
 

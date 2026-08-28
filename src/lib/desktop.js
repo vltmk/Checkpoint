@@ -98,7 +98,7 @@ export async function isTrayNotificationSent() {
   if (local === 'true') return true;
   try {
     const dbVal = await trackerDB.getSetting('checkpoint_tray_notified', null);
-    if (dbVal === 'true') {
+    if (dbVal === 'true' || dbVal === true) {
       localStorage.setItem('checkpoint_tray_notified', 'true');
       return true;
     }

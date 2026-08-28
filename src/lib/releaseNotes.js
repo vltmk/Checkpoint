@@ -26,6 +26,47 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '2.4.3': {
+    date: '2026-08-28',
+    title: {
+      en: "What's New in Checkpoint v2.4.3",
+      fa: 'امکانات و تغییرات نسخه ۲.۴.۳',
+    },
+    summary: {
+      en: 'Fixed settings persistence across application restarts, unified dual-tier storage (localStorage + SQLite), and enhanced JSON backup portability.',
+      fa: 'رفع مشکل ماندگاری تنظیمات پس از راه‌اندازی مجدد برنامه، یکپارچه‌سازی حافظه محلی و دیتابیس SQLite، و ارتقای خروجی پشتیبان JSON.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'fix',
+          text: 'Fixed Close to Tray, Minimize to Tray, and Scheduled Backups resetting to defaults upon application restart.',
+        },
+        {
+          tag: 'improved',
+          text: 'Unified all user settings (language, currency, analytics timeframe, bookmarks, and teammates) across synchronous localStorage and durable SQLite storage.',
+        },
+        {
+          tag: 'improved',
+          text: 'Enhanced full JSON backup and restore to include custom sources, teammates crew, and preferences with 100% backward compatibility.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'fix',
+          text: 'رفع مشکل بازنشانی گزینه‌های بستن به سیستم‌تری، مینیمایز، و پشتیبان‌گیری خودکار زمان‌بندی‌شده پس از بستن و باز کردن برنامه.',
+        },
+        {
+          tag: 'improved',
+          text: 'یکپارچه‌سازی ذخیره‌سازی تمام تنظیمات (زبان، ارز پیش‌فرض، بازه زمانی نمودارها، سورس‌ها و هم‌تیمی‌ها) در دیتابیس پایدار SQLite.',
+        },
+        {
+          tag: 'improved',
+          text: 'افزودن سورس‌ها، هم‌تیمی‌ها و تنظیمات شخصی‌سازی به فایل پشتیبان JSON با حفظ کامل سازگاری با نسخه‌های پیشین.',
+        },
+      ],
+    },
+  },
   '2.4.1': {
     date: '2026-08-27',
     title: {

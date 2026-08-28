@@ -48,6 +48,28 @@ import { initTelemetry, incrementLocalWorkCount, flushDailyTelemetry } from './l
 
 import { useLanguage } from './lib/i18n';
 
+// Defensive Settings Parsing Utilities
+const parseBooleanSetting = (val, fallback = false) => {
+  if (val === true || val === 'true') return true;
+  if (val === false || val === 'false') return false;
+  return fallback;
+};
+
+const parseNumberSetting = (val, fallback = 0, min = null, max = null) => {
+  if (val === null || val === undefined || val === '') return fallback;
+  const num = Number(val);
+  if (isNaN(num)) return fallback;
+  if (min !== null && num < min) return min;
+  if (max !== null && num > max) return max;
+  return num;
+};
+
+const parseStringSetting = (val, fallback = '', allowedList = null) => {
+  if (typeof val !== 'string' || !val) return fallback;
+  if (allowedList && !allowedList.includes(val)) return fallback;
+  return val;
+};
+
 export default function App() {
   const { language, t, isRtl } = useLanguage();
   const isDesktop = isTauri();
@@ -57,14 +79,10 @@ export default function App() {
 
   // Desktop Tray & Window Preferences
   const [closeToTray, setCloseToTray] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_close_to_tray');
-    if (saved !== null) return saved === 'true';
-    return true; // Default ON
+    return parseBooleanSetting(localStorage.getItem('checkpoint_close_to_tray'), true);
   });
   const [minimizeToTray, setMinimizeToTray] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_minimize_to_tray');
-    if (saved !== null) return saved === 'true';
-    return false; // Default OFF
+    return parseBooleanSetting(localStorage.getItem('checkpoint_minimize_to_tray'), false);
   });
 
   const closeToTrayRef = useRef(closeToTray);
@@ -79,18 +97,16 @@ export default function App() {
 
   // Automated Scheduled Backups to Custom Directory (Disabled by default)
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_auto_backup_enabled');
-    return saved === 'true';
+    return parseBooleanSetting(localStorage.getItem('checkpoint_auto_backup_enabled'), false);
   });
   const [autoBackupPath, setAutoBackupPath] = useState(() => {
-    return localStorage.getItem('checkpoint_auto_backup_path') || '';
+    return parseStringSetting(localStorage.getItem('checkpoint_auto_backup_path'), '');
   });
   const [autoBackupFrequency, setAutoBackupFrequency] = useState(() => {
-    return localStorage.getItem('checkpoint_auto_backup_frequency') || 'daily';
+    return parseStringSetting(localStorage.getItem('checkpoint_auto_backup_frequency'), 'daily', ['daily', 'weekly', 'on_start']);
   });
   const [autoBackupRetention, setAutoBackupRetention] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_auto_backup_retention');
-    return saved !== null ? Number(saved) : 5;
+    return parseNumberSetting(localStorage.getItem('checkpoint_auto_backup_retention'), 5, 0);
   });
 
   // Active View Tab ('ledger' | 'analytics')
@@ -103,19 +119,14 @@ export default function App() {
   // User Currency Preferences (TOMAN | GOLD)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
     const saved = localStorage.getItem('checkpoint_currency') || localStorage.getItem('nodrapay_currency');
-    if (saved === 'WOW_GOLD') return 'GOLD';
-    if (saved === 'GOLD') return 'GOLD';
+    if (saved === 'WOW_GOLD' || saved === 'GOLD') return 'GOLD';
     return 'TOMAN';
   });
 
   // Gold Exchange Rate in Toman (default 3,200 Toman per 1,000 Gold)
   const [goldRateTOMAN, setGoldRateTOMAN] = useState(() => {
     const saved = localStorage.getItem('checkpoint_gold_rate_toman') || localStorage.getItem('nodrapay_gold_rate_toman');
-    if (saved !== null) {
-      const parsed = parseFloat(saved);
-      return !isNaN(parsed) && parsed > 0 ? parsed : 3200;
-    }
-    return 3200;
+    return parseNumberSetting(saved, 3200, 1);
   });
 
   // Modals State
@@ -192,40 +203,52 @@ export default function App() {
       const savedCur = await trackerDB.getSetting('checkpoint_currency', null);
       if (savedCur && ['TOMAN', 'GOLD'].includes(savedCur)) {
         setGlobalCurrency(savedCur);
+        localStorage.setItem('checkpoint_currency', savedCur);
       }
       const savedRate = await trackerDB.getSetting('checkpoint_gold_rate_toman', null);
-      if (savedRate && Number(savedRate) > 0) {
-        setGoldRateTOMAN(Number(savedRate));
+      if (savedRate !== null) {
+        const parsedRate = parseNumberSetting(savedRate, 3200, 1);
+        setGoldRateTOMAN(parsedRate);
+        localStorage.setItem('checkpoint_gold_rate_toman', String(parsedRate));
       }
       const savedCloseToTray = await trackerDB.getSetting('checkpoint_close_to_tray', null);
       if (savedCloseToTray !== null) {
-        setCloseToTray(savedCloseToTray === 'true');
-        localStorage.setItem('checkpoint_close_to_tray', savedCloseToTray);
+        const val = parseBooleanSetting(savedCloseToTray, true);
+        setCloseToTray(val);
+        localStorage.setItem('checkpoint_close_to_tray', String(val));
       }
       const savedMinToTray = await trackerDB.getSetting('checkpoint_minimize_to_tray', null);
       if (savedMinToTray !== null) {
-        setMinimizeToTray(savedMinToTray === 'true');
-        localStorage.setItem('checkpoint_minimize_to_tray', savedMinToTray);
+        const val = parseBooleanSetting(savedMinToTray, false);
+        setMinimizeToTray(val);
+        localStorage.setItem('checkpoint_minimize_to_tray', String(val));
       }
       const savedAutoBackupEnabled = await trackerDB.getSetting('checkpoint_auto_backup_enabled', null);
       if (savedAutoBackupEnabled !== null) {
-        setAutoBackupEnabled(savedAutoBackupEnabled === 'true');
-        localStorage.setItem('checkpoint_auto_backup_enabled', savedAutoBackupEnabled);
+        const val = parseBooleanSetting(savedAutoBackupEnabled, false);
+        setAutoBackupEnabled(val);
+        localStorage.setItem('checkpoint_auto_backup_enabled', String(val));
       }
       const savedAutoBackupPath = await trackerDB.getSetting('checkpoint_auto_backup_path', null);
-      if (savedAutoBackupPath) {
+      if (savedAutoBackupPath && typeof savedAutoBackupPath === 'string') {
         setAutoBackupPath(savedAutoBackupPath);
         localStorage.setItem('checkpoint_auto_backup_path', savedAutoBackupPath);
       }
       const savedAutoBackupFreq = await trackerDB.getSetting('checkpoint_auto_backup_frequency', null);
-      if (savedAutoBackupFreq) {
+      if (savedAutoBackupFreq && ['on_start', 'daily', 'weekly'].includes(savedAutoBackupFreq)) {
         setAutoBackupFrequency(savedAutoBackupFreq);
         localStorage.setItem('checkpoint_auto_backup_frequency', savedAutoBackupFreq);
       }
       const savedAutoBackupRetention = await trackerDB.getSetting('checkpoint_auto_backup_retention', null);
       if (savedAutoBackupRetention !== null) {
-        setAutoBackupRetention(Number(savedAutoBackupRetention));
-        localStorage.setItem('checkpoint_auto_backup_retention', savedAutoBackupRetention);
+        const parsedRet = parseNumberSetting(savedAutoBackupRetention, 5, 0);
+        setAutoBackupRetention(parsedRet);
+        localStorage.setItem('checkpoint_auto_backup_retention', String(parsedRet));
+      }
+      const savedTab = await trackerDB.getSetting('checkpoint_tab', null);
+      if (savedTab === 'ledger' || savedTab === 'analytics') {
+        setActiveTab(savedTab);
+        localStorage.setItem('checkpoint_tab', savedTab);
       }
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
@@ -449,47 +472,52 @@ export default function App() {
 
   // Tray Setting Handlers
   const handleCloseToTrayChange = async (val) => {
-    setCloseToTray(val);
-    localStorage.setItem('checkpoint_close_to_tray', String(val));
+    const boolVal = parseBooleanSetting(val, true);
+    setCloseToTray(boolVal);
+    localStorage.setItem('checkpoint_close_to_tray', String(boolVal));
     try {
-      await trackerDB.setSetting('checkpoint_close_to_tray', String(val));
+      await trackerDB.setSetting('checkpoint_close_to_tray', String(boolVal));
     } catch (e) {}
   };
 
   const handleMinimizeToTrayChange = async (val) => {
-    setMinimizeToTray(val);
-    localStorage.setItem('checkpoint_minimize_to_tray', String(val));
+    const boolVal = parseBooleanSetting(val, false);
+    setMinimizeToTray(boolVal);
+    localStorage.setItem('checkpoint_minimize_to_tray', String(boolVal));
     try {
-      await trackerDB.setSetting('checkpoint_minimize_to_tray', String(val));
+      await trackerDB.setSetting('checkpoint_minimize_to_tray', String(boolVal));
     } catch (e) {}
   };
 
   const handleAutoBackupEnabledChange = async (val) => {
-    setAutoBackupEnabled(val);
-    localStorage.setItem('checkpoint_auto_backup_enabled', String(val));
+    const boolVal = parseBooleanSetting(val, false);
+    setAutoBackupEnabled(boolVal);
+    localStorage.setItem('checkpoint_auto_backup_enabled', String(boolVal));
     try {
-      await trackerDB.setSetting('checkpoint_auto_backup_enabled', String(val));
+      await trackerDB.setSetting('checkpoint_auto_backup_enabled', String(boolVal));
     } catch (e) {}
   };
 
   const handleAutoBackupPathChange = async (val) => {
-    setAutoBackupPath(val);
-    localStorage.setItem('checkpoint_auto_backup_path', val);
+    const pathStr = typeof val === 'string' ? val : '';
+    setAutoBackupPath(pathStr);
+    localStorage.setItem('checkpoint_auto_backup_path', pathStr);
     try {
-      await trackerDB.setSetting('checkpoint_auto_backup_path', val);
+      await trackerDB.setSetting('checkpoint_auto_backup_path', pathStr);
     } catch (e) {}
   };
 
   const handleAutoBackupFrequencyChange = async (val) => {
-    setAutoBackupFrequency(val);
-    localStorage.setItem('checkpoint_auto_backup_frequency', val);
+    const freqStr = parseStringSetting(val, 'daily', ['daily', 'weekly', 'on_start']);
+    setAutoBackupFrequency(freqStr);
+    localStorage.setItem('checkpoint_auto_backup_frequency', freqStr);
     try {
-      await trackerDB.setSetting('checkpoint_auto_backup_frequency', val);
+      await trackerDB.setSetting('checkpoint_auto_backup_frequency', freqStr);
     } catch (e) {}
   };
 
   const handleAutoBackupRetentionChange = async (val) => {
-    const num = Number(val);
+    const num = parseNumberSetting(val, 5, 0);
     setAutoBackupRetention(num);
     localStorage.setItem('checkpoint_auto_backup_retention', String(num));
     try {
@@ -836,12 +864,30 @@ export default function App() {
     // Retrieve all records with complete full-res screenshot proofs
     const fullEntries = await trackerDB.getAllEntriesFull();
 
+    let savedSources = [];
+    let savedTeammates = [];
+    try {
+      savedSources = await trackerDB.getSetting('checkpoint_user_saved_sources_v2', []);
+      savedTeammates = await trackerDB.getSetting('checkpoint_saved_teammates_v1', []);
+    } catch (e) {}
+
     const backupData = {
       app: 'CHECKPOINT',
       version: appVersion || '0.0.0',
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
       goldRateTOMAN,
+      preferences: {
+        language,
+        closeToTray,
+        minimizeToTray,
+        autoBackupEnabled,
+        autoBackupPath,
+        autoBackupFrequency,
+        autoBackupRetention,
+        savedSources: Array.isArray(savedSources) ? savedSources : [],
+        savedTeammates: Array.isArray(savedTeammates) ? savedTeammates : [],
+      },
       entriesCount: fullEntries.length,
       entries: fullEntries,
     };
@@ -875,7 +921,19 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [entries, globalCurrency, goldRateTOMAN, appVersion]);
+  }, [
+    entries,
+    globalCurrency,
+    goldRateTOMAN,
+    appVersion,
+    language,
+    closeToTray,
+    minimizeToTray,
+    autoBackupEnabled,
+    autoBackupPath,
+    autoBackupFrequency,
+    autoBackupRetention,
+  ]);
 
   // Import JSON Restore
   const handleImportJson = async (fileOrRaw) => {
@@ -912,6 +970,22 @@ export default function App() {
       } else if (json.entries && Array.isArray(json.entries)) {
         importedList = json.entries;
         if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
+        if (json.currency) handleCurrencyChange(json.currency);
+        if (json.preferences && typeof json.preferences === 'object') {
+          const pref = json.preferences;
+          if (Array.isArray(pref.savedSources) && pref.savedSources.length > 0) {
+            await trackerDB.setSetting('checkpoint_user_saved_sources_v2', pref.savedSources);
+            try {
+              localStorage.setItem('checkpoint_user_saved_sources_v2', JSON.stringify(pref.savedSources));
+            } catch (e) {}
+          }
+          if (Array.isArray(pref.savedTeammates) && pref.savedTeammates.length > 0) {
+            await trackerDB.setSetting('checkpoint_saved_teammates_v1', pref.savedTeammates);
+            try {
+              localStorage.setItem('checkpoint_saved_teammates_v1', JSON.stringify(pref.savedTeammates));
+            } catch (e) {}
+          }
+        }
       } else {
         return;
       }

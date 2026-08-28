@@ -204,6 +204,7 @@ export function WorkModal({
       if (!editingEntry) {
         try {
           localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+          trackerDB.setSetting(DRAFT_KEY, next).catch(() => {});
         } catch (e) {}
       }
       return next;
@@ -213,6 +214,7 @@ export function WorkModal({
   const handleClearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(LEGACY_DRAFT_KEY);
+    trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
     setIsDraftRestored(false);
     setFieldErrors({ title: false, game: false, dateTime: false });
     setFormData({
@@ -540,6 +542,7 @@ export function WorkModal({
 
     localStorage.removeItem(DRAFT_KEY);
     localStorage.removeItem(LEGACY_DRAFT_KEY);
+    trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
     onSave(entryToSave);
   };
 

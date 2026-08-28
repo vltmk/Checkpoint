@@ -62,6 +62,10 @@ export function Navbar({
   const [tempRateTOMAN, setTempRateTOMAN] = useState(goldRateTOMAN);
   const ratesDropdownRef = useRef(null);
 
+  useEffect(() => {
+    setTempRateTOMAN(goldRateTOMAN);
+  }, [goldRateTOMAN]);
+
   // Plays monochromatic border pulse after each reload until user interacts with the button
   const [hasInteractedThisSession, setHasInteractedThisSession] = useState(false);
   const isRateUpdateNeeded = !hasInteractedThisSession;

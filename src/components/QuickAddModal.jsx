@@ -10,6 +10,7 @@ import { Zap, Banknote, Coins, ArrowRightLeft } from 'lucide-react';
 import { toLocalISOString } from './ui/DateTimePicker';
 import { convertCurrency, formatMoney } from '../lib/currencies';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
+import { trackerDB } from '../lib/db';
 import { cn } from '../lib/utils';
 
 const LAST_GAME_KEY = 'checkpoint_quick_last_game';
@@ -63,31 +64,49 @@ export function QuickAddModal({
       const savedSource = localStorage.getItem(LAST_SOURCE_KEY) || localStorage.getItem(LEGACY_LAST_SOURCE_KEY);
       const savedCurrency = localStorage.getItem(LAST_CURRENCY_KEY) || localStorage.getItem(LEGACY_LAST_CURRENCY_KEY);
 
-      if (savedGame) {
-        if (savedGame === '__custom__') {
-          setGame('__custom__');
-          setIsCustomGame(true);
-          setCustomGameText(savedCustomGame || '');
+      const applySticky = (g, cg, s, c) => {
+        if (g) {
+          if (g === '__custom__') {
+            setGame('__custom__');
+            setIsCustomGame(true);
+            setCustomGameText(cg || '');
+          } else {
+            setGame(g);
+            setIsCustomGame(false);
+            setCustomGameText('');
+          }
         } else {
-          setGame(savedGame);
+          setGame('World of Warcraft');
           setIsCustomGame(false);
           setCustomGameText('');
         }
-      } else {
-        setGame('World of Warcraft');
-        setIsCustomGame(false);
-        setCustomGameText('');
-      }
 
-      if (savedSource) {
-        setSource(savedSource);
-      }
+        if (s) {
+          setSource(s);
+        }
 
-      if (savedCurrency && ['TOMAN', 'GOLD'].includes(savedCurrency)) {
-        setCurrency(savedCurrency);
-      } else {
-        setCurrency(globalCurrency || 'TOMAN');
-      }
+        if (c && ['TOMAN', 'GOLD'].includes(c)) {
+          setCurrency(c);
+        } else {
+          setCurrency(globalCurrency || 'TOMAN');
+        }
+      };
+
+      applySticky(savedGame, savedCustomGame, savedSource, savedCurrency);
+
+      // Also hydrate missing values from SQLite trackerDB
+      Promise.all([
+        trackerDB.getSetting(LAST_GAME_KEY, null),
+        trackerDB.getSetting(LAST_CUSTOM_GAME_KEY, null),
+        trackerDB.getSetting(LAST_SOURCE_KEY, null),
+        trackerDB.getSetting(LAST_CURRENCY_KEY, null),
+      ]).then(([dbGame, dbCustomGame, dbSource, dbCurrency]) => {
+        const finalGame = savedGame || dbGame;
+        const finalCustomGame = savedCustomGame || dbCustomGame;
+        const finalSource = savedSource || dbSource;
+        const finalCurrency = savedCurrency || dbCurrency;
+        applySticky(finalGame, finalCustomGame, finalSource, finalCurrency);
+      }).catch(() => {});
     } catch (e) {
       setGame('World of Warcraft');
       setIsCustomGame(false);
@@ -155,13 +174,17 @@ export function QuickAddModal({
     // Save sticky preferences
     try {
       localStorage.setItem(LAST_GAME_KEY, game);
+      trackerDB.setSetting(LAST_GAME_KEY, game).catch(() => {});
       if (isCustomGame) {
         localStorage.setItem(LAST_CUSTOM_GAME_KEY, customGameText);
+        trackerDB.setSetting(LAST_CUSTOM_GAME_KEY, customGameText).catch(() => {});
       }
       if (source.trim()) {
         localStorage.setItem(LAST_SOURCE_KEY, source.trim());
+        trackerDB.setSetting(LAST_SOURCE_KEY, source.trim()).catch(() => {});
       }
       localStorage.setItem(LAST_CURRENCY_KEY, currency);
+      trackerDB.setSetting(LAST_CURRENCY_KEY, currency).catch(() => {});
     } catch (err) {}
 
     const entryToSave = {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, X, Bookmark, Check, Users, UserPlus } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
+import { trackerDB } from '../../lib/db';
 
 const SAVED_TEAMMATES_KEY = 'checkpoint_saved_teammates_v1';
 
@@ -26,12 +27,29 @@ export function TeammatesCombobox({
     return ['ShadowPriest', 'TankGod', 'AuraHealer', 'FrostMage'];
   });
 
+  // Hydrate saved teammates from SQLite trackerDB
+  useEffect(() => {
+    trackerDB.getSetting(SAVED_TEAMMATES_KEY, null).then((saved) => {
+      if (saved) {
+        const parsed = Array.isArray(saved) ? saved : (typeof saved === 'string' ? JSON.parse(saved) : []);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const clean = parsed.filter((t) => typeof t === 'string');
+          setSavedTeammates(clean);
+          try {
+            localStorage.setItem(SAVED_TEAMMATES_KEY, JSON.stringify(clean));
+          } catch (e) {}
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
   const saveToStorage = (list) => {
     try {
       localStorage.setItem(SAVED_TEAMMATES_KEY, JSON.stringify(list));
+      trackerDB.setSetting(SAVED_TEAMMATES_KEY, list).catch(() => {});
     } catch (e) {}
   };
 

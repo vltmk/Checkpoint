@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Plus, X, Bookmark, Check, Store } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
+import { trackerDB } from '../../lib/db';
 
 const LEGACY_PRESETS = new Set([
   'direct client',
@@ -33,12 +34,29 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
     return [];
   });
 
+  // Hydrate saved sources from SQLite trackerDB
+  useEffect(() => {
+    trackerDB.getSetting(SAVED_SOURCES_KEY, null).then((saved) => {
+      if (saved) {
+        const parsed = Array.isArray(saved) ? saved : (typeof saved === 'string' ? JSON.parse(saved) : []);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const clean = parsed.filter((s) => typeof s === 'string' && !LEGACY_PRESETS.has(s.toLowerCase().trim()));
+          setSavedSources(clean);
+          try {
+            localStorage.setItem(SAVED_SOURCES_KEY, JSON.stringify(clean));
+          } catch (e) {}
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
   const saveToStorage = (sourcesList) => {
     try {
       localStorage.setItem(SAVED_SOURCES_KEY, JSON.stringify(sourcesList));
+      trackerDB.setSetting(SAVED_SOURCES_KEY, sourcesList).catch(() => {});
     } catch (e) {}
   };
 

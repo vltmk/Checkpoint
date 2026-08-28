@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { trackerDB } from './db';
 
 /**
  * Digit Conversion Helpers
@@ -705,17 +706,32 @@ const LanguageContext = createContext({
 export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
     try {
-      return localStorage.getItem('checkpoint_language') || 'fa';
+      const saved = localStorage.getItem('checkpoint_language');
+      if (saved === 'en' || saved === 'fa') return saved;
+      return 'fa';
     } catch (e) {
       return 'fa';
     }
   });
+
+  // Hydrate language preference from SQLite trackerDB on launch
+  useEffect(() => {
+    trackerDB.getSetting('checkpoint_language', null).then((saved) => {
+      if (saved && (saved === 'en' || saved === 'fa') && saved !== language) {
+        setLanguageState(saved);
+        try {
+          localStorage.setItem('checkpoint_language', saved);
+        } catch (e) {}
+      }
+    }).catch(() => {});
+  }, []);
 
   const setLanguage = useCallback((newLang) => {
     const validLang = newLang === 'en' ? 'en' : 'fa';
     setLanguageState(validLang);
     try {
       localStorage.setItem('checkpoint_language', validLang);
+      trackerDB.setSetting('checkpoint_language', validLang).catch(() => {});
     } catch (e) {}
   }, []);
 
