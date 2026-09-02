@@ -6,11 +6,12 @@ import { Select } from './ui/Select';
 import { SourceCombobox } from './ui/SourceCombobox';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { Zap, Banknote, Coins, ArrowRightLeft } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Banknote, Check, Coins, Copy, Zap } from 'lucide-react';
 import { toLocalISOString } from './ui/DateTimePicker';
 import { convertCurrency, formatMoney } from '../lib/currencies';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { trackerDB } from '../lib/db';
+import { copyTextNative } from '../lib/desktop';
 import { cn } from '../lib/utils';
 
 const LAST_GAME_KEY = 'checkpoint_quick_last_game';
@@ -41,14 +42,20 @@ export function QuickAddModal({
   ];
   const [title, setTitle] = useState('');
   const [hasTitleError, setHasTitleError] = useState(false);
+  const [hasGameError, setHasGameError] = useState(false);
+  const [hasPriceError, setHasPriceError] = useState(false);
   const [game, setGame] = useState('World of Warcraft');
   const [isCustomGame, setIsCustomGame] = useState(false);
   const [customGameText, setCustomGameText] = useState('');
   const [source, setSource] = useState('');
   const [currency, setCurrency] = useState(globalCurrency);
   const [price, setPrice] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
   
   const titleInputRef = useRef(null);
+  const entryIdRef = useRef(null);
 
   // Initialize and load sticky memory when opened
   useEffect(() => {
@@ -57,6 +64,12 @@ export function QuickAddModal({
     setTitle('');
     setPrice('');
     setHasTitleError(false);
+    setHasGameError(false);
+    setHasPriceError(false);
+    setIsSaving(false);
+    setSaveError(null);
+    setDiagnosticsCopied(false);
+    entryIdRef.current = null;
 
     try {
       const savedGame = localStorage.getItem(LAST_GAME_KEY) || localStorage.getItem(LEGACY_LAST_GAME_KEY);
@@ -130,6 +143,8 @@ export function QuickAddModal({
   const rateNum = isClassic ? 7000 : (Number(goldRateTOMAN) || 3200);
 
   const handleGameSelect = (val) => {
+    setHasGameError(false);
+    if (saveError) setSaveError(null);
     if (val === '__custom__') {
       setGame('__custom__');
       setIsCustomGame(true);
@@ -158,16 +173,36 @@ export function QuickAddModal({
       )
     : 0;
 
-  const handleSubmit = (e) => {
+  const handleCopyDiagnostics = async () => {
+    try {
+      const report = await trackerDB.getStorageDiagnostics();
+      const copied = await copyTextNative(report);
+      setDiagnosticsCopied(Boolean(copied));
+    } catch (err) {
+      setDiagnosticsCopied(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
+    if (isSaving) return;
 
     const selectedGame = isCustomGame
       ? customGameText.trim() || 'Custom Game'
       : game;
 
-    if (!title.trim()) {
-      setHasTitleError(true);
-      titleInputRef.current?.focus();
+    const titleMissing = !title.trim();
+    const gameMissing = isCustomGame && !customGameText.trim();
+    const priceNumber = Number(price);
+    const priceMissing = !price.trim() || !Number.isFinite(priceNumber) || priceNumber < 0;
+
+    if (titleMissing || gameMissing || priceMissing) {
+      setHasTitleError(titleMissing);
+      setHasGameError(gameMissing);
+      setHasPriceError(priceMissing);
+      if (titleMissing) {
+        titleInputRef.current?.focus();
+      }
       return;
     }
 
@@ -187,8 +222,9 @@ export function QuickAddModal({
       trackerDB.setSetting(LAST_CURRENCY_KEY, currency).catch(() => {});
     } catch (err) {}
 
+    entryIdRef.current ||= 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
     const entryToSave = {
-      id: 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: entryIdRef.current,
       title: title.trim(),
       dateTime: toLocalISOString(new Date()),
       game: selectedGame,
@@ -205,7 +241,24 @@ export function QuickAddModal({
       updatedAt: new Date().toISOString(),
     };
 
-    onSave(entryToSave);
+    setIsSaving(true);
+    setSaveError(null);
+    setDiagnosticsCopied(false);
+    try {
+      await onSave(entryToSave);
+    } catch (err) {
+      setSaveError({
+        message: err?.userMessage || 'CHECKPOINT could not save this record. Your form has been kept intact.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRetrySave = async () => {
+    if (isSaving) return;
+    await trackerDB.retryStorage();
+    await handleSubmit();
   };
 
   const handleKeyDown = (e) => {
@@ -219,8 +272,8 @@ export function QuickAddModal({
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-md">
-      <DialogHeader onClose={onClose}>
+    <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-md">
+      <DialogHeader onClose={isSaving ? undefined : onClose}>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
             <Zap className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.75} />
@@ -232,8 +285,31 @@ export function QuickAddModal({
         </div>
       </DialogHeader>
 
-      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} noValidate>
         <DialogContent className="p-5 space-y-4">
+          {saveError && (
+            <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className={cn('font-semibold text-rose-200', isRtl && 'font-farsi')}>
+                  {language === 'fa' ? 'ذخیره رکورد انجام نشد' : 'Record was not saved'}
+                </p>
+                <p className={cn('text-[11px] leading-5 text-rose-200/80', isRtl && 'font-farsi')}>{saveError.message}</p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button type="button" variant="outline" size="xs" onClick={handleRetrySave} disabled={isSaving}>
+                    {language === 'fa' ? 'تلاش مجدد' : 'Retry'}
+                  </Button>
+                  <Button type="button" variant="ghost" size="xs" onClick={handleCopyDiagnostics} disabled={isSaving}>
+                    {diagnosticsCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {diagnosticsCopied
+                      ? (language === 'fa' ? 'کپی شد' : 'Copied')
+                      : (language === 'fa' ? 'کپی گزارش' : 'Copy diagnostics')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 1. Boost Title (Autofocused) */}
           <div>
             <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
@@ -251,6 +327,7 @@ export function QuickAddModal({
               onChange={(e) => {
                 setTitle(e.target.value);
                 if (hasTitleError) setHasTitleError(false);
+                if (saveError) setSaveError(null);
               }}
               placeholder={t('work.titlePlaceholder')}
               className={cn(
@@ -276,10 +353,18 @@ export function QuickAddModal({
                 <Input
                   required
                   value={customGameText}
-                  onChange={(e) => setCustomGameText(e.target.value)}
+                  onChange={(e) => {
+                    setCustomGameText(e.target.value);
+                    if (hasGameError) setHasGameError(false);
+                    if (saveError) setSaveError(null);
+                  }}
                   placeholder={t('work.customGamePlaceholder')}
-                  className="bg-zinc-900/80 border-zinc-700/80 text-zinc-100"
+                  className={cn(
+                    'bg-zinc-900/80 border-zinc-700/80 text-zinc-100',
+                    hasGameError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+                  )}
                 />
+                {hasGameError && <p className="mt-1 text-[10px] font-mono text-rose-400">Required</p>}
               </div>
             )}
           </div>
@@ -292,7 +377,10 @@ export function QuickAddModal({
             </label>
             <SourceCombobox
               value={source}
-              onChange={(val) => setSource(val)}
+              onChange={(val) => {
+                setSource(val);
+                if (saveError) setSaveError(null);
+              }}
               placeholder="e.g. Enter seller, broker, or client..."
             />
           </div>
@@ -350,15 +438,22 @@ export function QuickAddModal({
                     const parts = val.split('.');
                     if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
                     setPrice(val);
+                    if (hasPriceError) setHasPriceError(false);
+                    if (saveError) setSaveError(null);
                   }}
                   placeholder="0"
-                  className="font-mono text-sm bg-zinc-900/80 border-zinc-700/80 text-zinc-100 pr-12"
+                  className={cn(
+                    'font-mono text-sm bg-zinc-900/80 border-zinc-700/80 text-zinc-100 pr-12',
+                    hasPriceError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+                  )}
                   required
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 pointer-events-none">
                   {currency === 'TOMAN' ? 'تومان' : 'G'}
                 </div>
               </div>
+
+              {hasPriceError && <p className="text-[10px] font-mono text-rose-400">Required</p>}
 
               {/* Real-time Dual-Currency Conversion Pill */}
               {numericPrice > 0 && (
@@ -399,6 +494,7 @@ export function QuickAddModal({
             variant="ghost"
             size="sm"
             onClick={onClose}
+            disabled={isSaving}
             className={cn('text-zinc-400 hover:text-zinc-200', isRtl && 'font-farsi')}
           >
             {t('common.cancel')}
@@ -408,10 +504,11 @@ export function QuickAddModal({
             type="submit"
             variant="primary"
             size="sm"
+            disabled={isSaving}
             className={cn('gap-1.5 font-semibold bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98] shadow-sm', isRtl && 'font-farsi')}
           >
             <Zap className="w-3.5 h-3.5" strokeWidth={1.75} />
-            <span>{t('quickAdd.addRecord')}</span>
+            <span>{isSaving ? (language === 'fa' ? 'در حال ذخیره...' : 'Saving...') : t('quickAdd.addRecord')}</span>
           </Button>
         </DialogFooter>
       </form>

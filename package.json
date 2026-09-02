@@ -1,7 +1,7 @@
 {
   "name": "checkpoint",
   "license": "MIT",
-  "version": "2.4.5",
+  "version": "2.4.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
+    "test": "node --test test/*.test.mjs",
     "version": "node scripts/version.mjs",
     "version:check": "node scripts/version.mjs check",
     "version:patch": "node scripts/version.mjs patch",

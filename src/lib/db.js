@@ -6,6 +6,7 @@
 
 import { isTauri } from './desktop';
 import { getAppVersion } from './updater';
+import { buildStorageDiagnosticReport, toStorageError } from './storageDiagnostics';
 
 const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
@@ -13,30 +14,163 @@ const STORE_ENTRIES = 'work_entries';
 const STORE_SETTINGS = 'app_settings';
 const STORE_SNAPSHOTS = 'db_snapshots';
 
+const REQUIRED_WORK_ENTRY_COLUMNS = [
+  'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
+  'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes',
+];
+
+const WORK_ENTRY_COLUMN_MIGRATIONS = {
+  source: "ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';",
+  teamMode: 'ALTER TABLE work_entries ADD COLUMN teamMode INTEGER DEFAULT 0;',
+  teammates: "ALTER TABLE work_entries ADD COLUMN teammates TEXT DEFAULT '[]';",
+  exchangeRate: 'ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;',
+  rateUnit: "ALTER TABLE work_entries ADD COLUMN rateUnit TEXT DEFAULT '1k';",
+};
+
 export class StorageDB {
   constructor() {
     this.sqliteDb = null;
     this.idb = null;
     this.isDesktop = isTauri();
+    this.storageStatus = {
+      driver: this.isDesktop ? 'sqlite' : 'indexeddb',
+      state: 'initializing',
+      schema: 'unknown',
+      writable: 'unknown',
+      integrity: 'unknown',
+      lastOperation: null,
+      lastError: null,
+    };
     this.initPromise = this.init();
   }
 
   async init() {
     if (this.isDesktop) {
-      try {
-        const Database = (await import('@tauri-apps/plugin-sql')).default;
-        this.sqliteDb = await Database.load('sqlite:checkpoint.db');
-        await this.initSqliteSchema();
-        await this.migrateLegacySqliteData(Database);
-        return this.sqliteDb;
-      } catch (err) {
-        console.warn('Failed to initialize Tauri SQLite, falling back to IndexedDB:', err);
-        this.isDesktop = false;
-        return this.initIndexedDB();
-      }
-    } else {
-      return this.initIndexedDB();
+      return this.initDesktopStorage();
     }
+
+    try {
+      const db = await this.initIndexedDB();
+      this.storageStatus = {
+        ...this.storageStatus,
+        driver: 'indexeddb',
+        state: db ? 'ready' : 'unavailable',
+        schema: db ? 'ready' : 'unknown',
+        writable: db ? 'unknown' : 'unavailable',
+      };
+      return db;
+    } catch (err) {
+      this.recordStorageError(err, 'initialize_indexeddb');
+      return null;
+    }
+  }
+
+  async initDesktopStorage() {
+    try {
+      const Database = (await import('@tauri-apps/plugin-sql')).default;
+      this.sqliteDb = await Database.load('sqlite:checkpoint.db');
+      await this.initSqliteSchema();
+      await this.migrateLegacySqliteData(Database);
+      await this.verifySqliteHealth();
+      this.storageStatus = {
+        ...this.storageStatus,
+        driver: 'sqlite',
+        state: 'ready',
+        lastOperation: 'initialize',
+        lastError: null,
+      };
+      return this.sqliteDb;
+    } catch (err) {
+      const storageError = this.recordStorageError(err, 'initialize');
+      console.warn('Failed to initialize Tauri SQLite:', storageError.safeMessage);
+      if (this.sqliteDb) {
+        try {
+          await this.sqliteDb.close();
+        } catch (closeErr) {}
+      }
+      this.sqliteDb = null;
+      return null;
+    }
+  }
+
+  recordStorageError(error, operation) {
+    const storageError = toStorageError(error, operation);
+    this.storageStatus = {
+      ...this.storageStatus,
+      state: 'error',
+      lastOperation: operation,
+      lastError: {
+        kind: storageError.kind,
+        operation: storageError.operation,
+        message: storageError.safeMessage,
+      },
+    };
+    return storageError;
+  }
+
+  createUnavailableStorageError(operation) {
+    return this.recordStorageError(
+      new Error('Local database connection is unavailable.'),
+      operation
+    );
+  }
+
+  getStorageStatus() {
+    return {
+      ...this.storageStatus,
+      lastError: this.storageStatus.lastError ? { ...this.storageStatus.lastError } : null,
+    };
+  }
+
+  async retryStorage() {
+    if (!this.isDesktop) {
+      await this.initPromise;
+      return this.getStorageStatus();
+    }
+
+    if (this.sqliteDb) {
+      try {
+        await this.verifySqliteHealth();
+        this.storageStatus = {
+          ...this.storageStatus,
+          state: 'ready',
+          lastOperation: 'retry_health_check',
+          lastError: null,
+        };
+      } catch (err) {
+        this.recordStorageError(err, 'retry_health_check');
+      }
+      return this.getStorageStatus();
+    }
+
+    this.storageStatus = {
+      ...this.storageStatus,
+      state: 'initializing',
+      lastOperation: 'retry_initialize',
+    };
+    this.initPromise = this.initDesktopStorage();
+    await this.initPromise;
+    return this.getStorageStatus();
+  }
+
+  async getStorageDiagnostics() {
+    await this.initPromise;
+    let checks = {};
+
+    if (this.isDesktop && this.sqliteDb) {
+      checks = await this.collectSqliteDiagnosticChecks();
+    }
+
+    let appVersion = 'unknown';
+    try {
+      appVersion = await getAppVersion();
+    } catch (err) {}
+
+    return buildStorageDiagnosticReport({
+      appVersion,
+      status: this.getStorageStatus(),
+      checks,
+    });
   }
 
   /* =========================================================================
@@ -44,14 +178,13 @@ export class StorageDB {
    * ========================================================================= */
 
   async initSqliteSchema() {
-    if (!this.sqliteDb) return;
+    if (!this.sqliteDb) {
+      throw new Error('Local database connection is unavailable.');
+    }
 
-    // Enable WAL mode & foreign keys
-    try {
-      await this.sqliteDb.execute('PRAGMA journal_mode = WAL;');
-      await this.sqliteDb.execute('PRAGMA synchronous = NORMAL;');
-      await this.sqliteDb.execute('PRAGMA foreign_keys = ON;');
-    } catch (e) {}
+    await this.sqliteDb.execute('PRAGMA journal_mode = WAL;');
+    await this.sqliteDb.execute('PRAGMA synchronous = NORMAL;');
+    await this.sqliteDb.execute('PRAGMA foreign_keys = ON;');
 
     // 1. Main work entries table (lightweight, rapid indexing)
     await this.sqliteDb.execute(`
@@ -75,22 +208,7 @@ export class StorageDB {
       );
     `);
 
-    // Run safe migrations for existing tables
-    try {
-      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';`);
-    } catch (e) {}
-    try {
-      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN teamMode INTEGER DEFAULT 0;`);
-    } catch (e) {}
-    try {
-      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN teammates TEXT DEFAULT '[]';`);
-    } catch (e) {}
-    try {
-      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;`);
-    } catch (e) {}
-    try {
-      await this.sqliteDb.execute(`ALTER TABLE work_entries ADD COLUMN rateUnit TEXT DEFAULT '1k';`);
-    } catch (e) {}
+    await this.ensureWorkEntryColumns();
 
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_datetime ON work_entries(dateTime DESC);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_status ON work_entries(status);`);
@@ -120,6 +238,14 @@ export class StorageDB {
       );
     `);
 
+    // This single internal marker lets us prove that SQLite can still accept
+    // writes without touching a user's ledger, settings, proofs, or snapshots.
+    await this.sqliteDb.execute(`
+      CREATE TABLE IF NOT EXISTS checkpoint_storage_health (
+        id INTEGER PRIMARY KEY CHECK (id = 1)
+      );
+    `);
+
     // 4. Rolling snapshots archive table
     await this.sqliteDb.execute(`
       CREATE TABLE IF NOT EXISTS db_snapshots (
@@ -130,86 +256,153 @@ export class StorageDB {
         created_at TEXT NOT NULL
       );
     `);
+
+    await this.ensureWorkEntryColumns();
+    this.storageStatus = {
+      ...this.storageStatus,
+      schema: 'ready',
+    };
+  }
+
+  async ensureWorkEntryColumns() {
+    const rows = await this.sqliteDb.select('PRAGMA table_info(work_entries);');
+    const existingColumns = new Set((rows || []).map((column) => column.name));
+
+    for (const [column, sql] of Object.entries(WORK_ENTRY_COLUMN_MIGRATIONS)) {
+      if (!existingColumns.has(column)) {
+        await this.sqliteDb.execute(sql);
+        existingColumns.add(column);
+      }
+    }
+
+    const missingColumns = REQUIRED_WORK_ENTRY_COLUMNS.filter((column) => !existingColumns.has(column));
+    if (missingColumns.length > 0) {
+      throw new Error(`work_entries schema is missing required columns: ${missingColumns.join(', ')}`);
+    }
+  }
+
+  async verifySqliteHealth() {
+    if (!this.sqliteDb) {
+      throw new Error('Local database connection is unavailable.');
+    }
+
+    const integrityRows = await this.sqliteDb.select('PRAGMA integrity_check;');
+    const integrityValue = String(Object.values(integrityRows?.[0] || {})[0] || '').toLowerCase();
+    if (integrityValue !== 'ok') {
+      throw new Error(`SQLite integrity check failed: ${integrityValue || 'no result'}`);
+    }
+
+    // tauri-plugin-sql exposes a connection pool, so a BEGIN / ROLLBACK pair
+    // can land on different SQLite connections. A fixed internal marker is a
+    // reliable write probe and never changes user-owned data.
+    await this.sqliteDb.execute('INSERT OR REPLACE INTO checkpoint_storage_health (id) VALUES (1);');
+
+    this.storageStatus = {
+      ...this.storageStatus,
+      schema: 'ready',
+      integrity: 'ok',
+      writable: 'yes',
+    };
+  }
+
+  async collectSqliteDiagnosticChecks() {
+    const checks = { integrity: 'unknown', writable: 'unknown' };
+    if (!this.sqliteDb) return checks;
+
+    try {
+      const integrityRows = await this.sqliteDb.select('PRAGMA integrity_check;');
+      const integrityValue = String(Object.values(integrityRows?.[0] || {})[0] || '').toLowerCase();
+      checks.integrity = integrityValue === 'ok' ? 'ok' : 'failed';
+    } catch (err) {
+      checks.integrity = 'failed';
+    }
+
+    try {
+      await this.sqliteDb.execute('INSERT OR REPLACE INTO checkpoint_storage_health (id) VALUES (1);');
+      checks.writable = 'yes';
+    } catch (err) {
+      checks.writable = 'no';
+    }
+
+    return checks;
   }
 
   async migrateLegacySqliteData(Database) {
     if (!this.sqliteDb) return;
+
+    const countRows = await this.sqliteDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+    const hasEntries = countRows && countRows[0] && countRows[0].cnt > 0;
+    if (hasEntries) return;
+
+    let legacyDb = null;
     try {
-      // Check if checkpoint.db already has entries
-      const countRows = await this.sqliteDb.select('SELECT COUNT(*) as cnt FROM work_entries');
-      const hasEntries = countRows && countRows[0] && countRows[0].cnt > 0;
-      if (hasEntries) return;
+      legacyDb = await Database.load('sqlite:nodra_vault.db');
+      if (!(await this.tableExists(legacyDb, 'work_entries'))) return;
 
-      // Check if legacy nodra_vault.db exists and has data to migrate
-      let legacyDb = null;
-      try {
-        legacyDb = await Database.load('sqlite:nodra_vault.db');
-        const legacyCount = await legacyDb.select('SELECT COUNT(*) as cnt FROM work_entries');
-        if (legacyCount && legacyCount[0] && legacyCount[0].cnt > 0) {
-          // Migrate work_entries
-          const oldEntries = await legacyDb.select('SELECT * FROM work_entries');
-          for (const row of oldEntries) {
-            await this.sqliteDb.execute(
-              `INSERT OR IGNORE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                row.id, row.title, row.game, row.source || 'Direct Client',
-                row.teamMode || 0, row.teammates || '[]', row.income || 0,
-                row.currency || 'TOMAN', row.exchangeRate || 3200, row.rateUnit || '1k',
-                row.status || 'Working', row.dateTime, row.hours || 0,
-                row.notes || '', row.created_at || Math.floor(Date.now() / 1000), row.updated_at || Math.floor(Date.now() / 1000)
-              ]
-            );
-          }
+      const legacyCount = await legacyDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+      if (!legacyCount?.[0]?.cnt) return;
 
-          // Migrate proof_attachments
-          try {
-            const oldProofs = await legacyDb.select('SELECT * FROM proof_attachments');
-            for (const p of oldProofs) {
-              await this.sqliteDb.execute(
-                `INSERT OR IGNORE INTO proof_attachments (id, entry_id, name, data_blob, size, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [p.id, p.entry_id, p.name, p.data_blob, p.size || 0, p.created_at]
-              );
-            }
-          } catch (e) {}
+      const oldEntries = await legacyDb.select('SELECT * FROM work_entries');
+      for (const row of oldEntries) {
+        await this.sqliteDb.execute(
+          `INSERT OR IGNORE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            row.id, row.title, row.game, row.source || 'Direct Client',
+            row.teamMode || 0, row.teammates || '[]', row.income || 0,
+            row.currency || 'TOMAN', row.exchangeRate || 3200, row.rateUnit || '1k',
+            row.status || 'Working', row.dateTime, row.hours || 0,
+            row.notes || '', row.created_at || Math.floor(Date.now() / 1000), row.updated_at || Math.floor(Date.now() / 1000),
+          ]
+        );
+      }
 
-          // Migrate app_settings
-          try {
-            const oldSettings = await legacyDb.select('SELECT * FROM app_settings');
-            for (const s of oldSettings) {
-              await this.sqliteDb.execute(
-                `INSERT OR IGNORE INTO app_settings (key, value, updated_at)
-                 VALUES (?, ?, ?)`,
-                [s.key, s.value, s.updated_at || Math.floor(Date.now() / 1000)]
-              );
-            }
-          } catch (e) {}
-
-          // Migrate db_snapshots
-          try {
-            const oldSnapshots = await legacyDb.select('SELECT * FROM db_snapshots');
-            for (const snap of oldSnapshots) {
-              await this.sqliteDb.execute(
-                `INSERT OR IGNORE INTO db_snapshots (id, name, snapshot_json, entries_count, created_at)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [snap.id, snap.name, snap.snapshot_json, snap.entries_count || 0, snap.created_at]
-              );
-            }
-          } catch (e) {}
-        }
-      } catch (err) {
-        // No legacy database or migration not needed
-      } finally {
-        if (legacyDb) {
-          try {
-            await legacyDb.close();
-          } catch (e) {}
+      if (await this.tableExists(legacyDb, 'proof_attachments')) {
+        const oldProofs = await legacyDb.select('SELECT * FROM proof_attachments');
+        for (const p of oldProofs) {
+          await this.sqliteDb.execute(
+            `INSERT OR IGNORE INTO proof_attachments (id, entry_id, name, data_blob, size, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [p.id, p.entry_id, p.name, p.data_blob, p.size || 0, p.created_at]
+          );
         }
       }
-    } catch (e) {
-      console.warn('Legacy migration check skipped:', e);
+
+      if (await this.tableExists(legacyDb, 'app_settings')) {
+        const oldSettings = await legacyDb.select('SELECT * FROM app_settings');
+        for (const setting of oldSettings) {
+          await this.sqliteDb.execute(
+            `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`,
+            [setting.key, setting.value, setting.updated_at || Math.floor(Date.now() / 1000)]
+          );
+        }
+      }
+
+      if (await this.tableExists(legacyDb, 'db_snapshots')) {
+        const oldSnapshots = await legacyDb.select('SELECT * FROM db_snapshots');
+        for (const snapshot of oldSnapshots) {
+          await this.sqliteDb.execute(
+            `INSERT OR IGNORE INTO db_snapshots (id, name, snapshot_json, entries_count, created_at)
+             VALUES (?, ?, ?, ?, ?)`,
+            [snapshot.id, snapshot.name, snapshot.snapshot_json, snapshot.entries_count || 0, snapshot.created_at]
+          );
+        }
+      }
+    } finally {
+      if (legacyDb) {
+        try {
+          await legacyDb.close();
+        } catch (err) {}
+      }
     }
+  }
+
+  async tableExists(db, tableName) {
+    const rows = await db.select(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+      [tableName]
+    );
+    return Array.isArray(rows) && rows.length > 0;
   }
 
   /* =========================================================================
@@ -420,7 +613,11 @@ export class StorageDB {
     cleanEntry.rateUnit = finalUnit;
     cleanEntry.source = finalSource;
 
-    if (this.isDesktop && this.sqliteDb) {
+    if (this.isDesktop) {
+      if (!this.sqliteDb) {
+        throw this.createUnavailableStorageError('save_entry');
+      }
+
       try {
         await this.sqliteDb.execute(
           `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, updated_at)
@@ -463,10 +660,18 @@ export class StorageDB {
             }
           }
         }
+        this.storageStatus = {
+          ...this.storageStatus,
+          state: 'ready',
+          writable: 'yes',
+          lastOperation: 'save_entry',
+          lastError: null,
+        };
         return cleanEntry;
       } catch (err) {
-        console.error('SQLite saveEntry error:', err);
-        throw err;
+        const storageError = this.recordStorageError(err, 'save_entry');
+        console.error('SQLite saveEntry error:', storageError.safeMessage);
+        throw storageError;
       }
     }
 

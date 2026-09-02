@@ -10,9 +10,9 @@ import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
+import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
 import { trackerDB } from '../lib/db';
-import { optimizeImageProof } from '../lib/desktop';
+import { copyTextNative, optimizeImageProof } from '../lib/desktop';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
@@ -29,7 +29,7 @@ export function WorkModal({
   onOpenLightbox,
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
-  const [fieldErrors, setFieldErrors] = useState({ title: false, game: false, dateTime: false });
+  const [fieldErrors, setFieldErrors] = useState({ title: false, game: false, dateTime: false, income: false });
   const [proofPasted, setProofPasted] = useState(false);
 
   const GAME_OPTIONS = [
@@ -83,11 +83,20 @@ export function WorkModal({
   const [proofs, setProofs] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDraftRestored, setIsDraftRestored] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
   const fileInputRef = useRef(null);
   const titleInputRef = useRef(null);
+  const entryIdRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
+
+    setIsSaving(false);
+    setSaveError(null);
+    setDiagnosticsCopied(false);
+    entryIdRef.current = editingEntry?.id || null;
 
     if (editingEntry) {
       setIsDraftRestored(false);
@@ -192,13 +201,15 @@ export function WorkModal({
         setIsDraftRestored(false);
       }
     }
-    setFieldErrors({ title: false, game: false, dateTime: false });
+    setFieldErrors({ title: false, game: false, dateTime: false, income: false });
   }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN]);
 
   const updateFormData = (patch) => {
+    if (saveError) setSaveError(null);
     if (patch.title) setFieldErrors((prev) => ({ ...prev, title: false }));
     if (patch.game || patch.customGameText) setFieldErrors((prev) => ({ ...prev, game: false }));
     if (patch.dateTime) setFieldErrors((prev) => ({ ...prev, dateTime: false }));
+    if (patch.income !== undefined || patch.pot !== undefined) setFieldErrors((prev) => ({ ...prev, income: false }));
     setFormData((prev) => {
       const next = { ...prev, ...patch };
       if (!editingEntry) {
@@ -211,12 +222,18 @@ export function WorkModal({
     });
   };
 
-  const handleClearDraft = () => {
-    localStorage.removeItem(DRAFT_KEY);
-    localStorage.removeItem(LEGACY_DRAFT_KEY);
+  const clearPersistedDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
+    } catch (err) {}
     trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
+  };
+
+  const handleClearDraft = () => {
+    clearPersistedDraft();
     setIsDraftRestored(false);
-    setFieldErrors({ title: false, game: false, dateTime: false });
+    setFieldErrors({ title: false, game: false, dateTime: false, income: false });
     setFormData({
       title: '',
       dateTime: toLocalISOString(new Date()),
@@ -414,7 +431,7 @@ export function WorkModal({
       window.removeEventListener('paste', handlePaste);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, formData, proofs, editingEntry]);
+  }, [isOpen, formData, proofs, editingEntry, isSaving]);
 
   const readImageBlob = async (blob, fileName) => {
     try {
@@ -489,8 +506,19 @@ export function WorkModal({
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleCopyDiagnostics = async () => {
+    try {
+      const report = await trackerDB.getStorageDiagnostics();
+      const copied = await copyTextNative(report);
+      setDiagnosticsCopied(Boolean(copied));
+    } catch (err) {
+      setDiagnosticsCopied(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    if (isSaving) return;
 
     const selectedGame = formData.isCustomGame
       ? formData.customGameText.trim() || 'Custom Game'
@@ -499,12 +527,18 @@ export function WorkModal({
     const titleMissing = !formData.title.trim();
     const gameMissing = !selectedGame.trim();
     const dateMissing = !formData.dateTime;
+    const activeAmount = formData.teamMode && formData.teamInputMode === 'pot'
+      ? formData.pot
+      : formData.income;
+    const amountNumber = Number(activeAmount);
+    const incomeMissing = String(activeAmount ?? '').trim() === '' || !Number.isFinite(amountNumber) || amountNumber < 0;
 
-    if (titleMissing || gameMissing || dateMissing) {
+    if (titleMissing || gameMissing || dateMissing || incomeMissing) {
       setFieldErrors({
         title: titleMissing,
         game: gameMissing,
         dateTime: dateMissing,
+        income: incomeMissing,
       });
       if (titleMissing) {
         titleInputRef.current?.focus();
@@ -518,10 +552,9 @@ export function WorkModal({
       ? parseFloat(formData.pot) || (userIncomeNum * totalTeamMembers)
       : null;
 
+    entryIdRef.current ||= editingEntry?.id || 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
     const entryToSave = {
-      id:
-        editingEntry?.id ||
-        'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: entryIdRef.current,
       title: formData.title.trim(),
       dateTime: formData.dateTime,
       game: selectedGame,
@@ -540,15 +573,33 @@ export function WorkModal({
       updatedAt: new Date().toISOString(),
     };
 
-    localStorage.removeItem(DRAFT_KEY);
-    localStorage.removeItem(LEGACY_DRAFT_KEY);
-    trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
-    onSave(entryToSave);
+    setIsSaving(true);
+    setSaveError(null);
+    setDiagnosticsCopied(false);
+    try {
+      await onSave(entryToSave);
+      if (!editingEntry) {
+        clearPersistedDraft();
+        setIsDraftRestored(false);
+      }
+    } catch (err) {
+      setSaveError({
+        message: err?.userMessage || 'CHECKPOINT could not save this record. Your form has been kept intact.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRetrySave = async () => {
+    if (isSaving) return;
+    await trackerDB.retryStorage();
+    await handleSubmit();
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-xl">
-      <DialogHeader onClose={onClose}>
+    <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-xl">
+      <DialogHeader onClose={isSaving ? undefined : onClose}>
         <div className="flex items-center gap-2">
           <DialogTitle className={cn(isRtl && 'font-farsi')}>
             {editingEntry ? t('work.editTitle') : t('work.addTitle')}
@@ -577,6 +628,29 @@ export function WorkModal({
 
       <form onSubmit={handleSubmit} noValidate>
         <DialogContent className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {saveError && (
+            <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className={cn('font-semibold text-rose-200', isRtl && 'font-farsi')}>
+                  {language === 'fa' ? 'ذخیره رکورد انجام نشد' : 'Record was not saved'}
+                </p>
+                <p className={cn('text-[11px] leading-5 text-rose-200/80', isRtl && 'font-farsi')}>{saveError.message}</p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button type="button" variant="outline" size="xs" onClick={handleRetrySave} disabled={isSaving}>
+                    {language === 'fa' ? 'تلاش مجدد' : 'Retry'}
+                  </Button>
+                  <Button type="button" variant="ghost" size="xs" onClick={handleCopyDiagnostics} disabled={isSaving}>
+                    {diagnosticsCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    {diagnosticsCopied
+                      ? (language === 'fa' ? 'کپی شد' : 'Copied')
+                      : (language === 'fa' ? 'کپی گزارش' : 'Copy diagnostics')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Row 1: Game & Seller Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -759,6 +833,9 @@ export function WorkModal({
                       : (language === 'fa' ? 'سهم من *' : 'My Cut *')
                     : `${t('work.incomeCurrency')} *`}
                 </span>
+                {fieldErrors.income && (
+                  <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                )}
                 {formData.teamMode && (
                   <span className="text-[9px] font-mono text-zinc-400">
                     {formData.teamInputMode === 'pot' ? `÷ ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'سهم' : 'cuts'}` : `× ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'عضو' : 'members'}`}
@@ -1050,12 +1127,12 @@ export function WorkModal({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose} type="button" className={cn(isRtl && 'font-farsi')}>
+            <Button variant="ghost" size="sm" onClick={onClose} type="button" disabled={isSaving} className={cn(isRtl && 'font-farsi')}>
               {t('common.cancel')}
             </Button>
-            <Button variant="primary" size="sm" type="submit" className={cn(isRtl && 'font-farsi')}>
+            <Button variant="primary" size="sm" type="submit" disabled={isSaving} className={cn(isRtl && 'font-farsi')}>
               <Check className="w-3.5 h-3.5" />
-              <span>{editingEntry ? t('work.updateRecord') : t('work.saveRecord')}</span>
+              <span>{isSaving ? (language === 'fa' ? 'در حال ذخیره...' : 'Saving...') : (editingEntry ? t('work.updateRecord') : t('work.saveRecord'))}</span>
             </Button>
           </div>
         </DialogFooter>
