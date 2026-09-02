@@ -57,7 +57,7 @@ export function classifyStorageError(error) {
     return STORAGE_ERROR_KINDS.SCHEMA;
   }
 
-  if (/not initialized|unavailable|failed to initialize|database connection/.test(message)) {
+  if (/not initialized|unavailable|failed to initialize|database connection|closed pool|pool is closed|database not loaded/.test(message)) {
     return STORAGE_ERROR_KINDS.UNAVAILABLE;
   }
 
@@ -104,6 +104,7 @@ export function buildStorageDiagnosticReport({ appVersion = 'unknown', status = 
     `Schema: ${status.schema || 'unknown'}`,
     `Writable: ${checks.writable || status.writable || 'unknown'}`,
     `Integrity: ${checks.integrity || status.integrity || 'unknown'}`,
+    `Initialization operation: ${initializationError.operation || 'none'}`,
     `Initialization error class: ${initializationError.kind || 'none'}`,
   ];
 
