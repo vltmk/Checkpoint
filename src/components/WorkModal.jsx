@@ -575,7 +575,7 @@ export function WorkModal({
         )}
       </DialogHeader>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <DialogContent className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Row 1: Game & Seller Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
