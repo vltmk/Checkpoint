@@ -9,6 +9,15 @@ export const STORAGE_ERROR_KINDS = Object.freeze({
   UNKNOWN: 'unknown',
 });
 
+export const STORAGE_INITIALIZATION_STAGES = Object.freeze({
+  LOAD: 'load',
+  SCHEMA: 'schema',
+  LEGACY_MIGRATION: 'legacy_migration',
+  INTEGRITY_CHECK: 'integrity_check',
+  WRITABILITY_CHECK: 'writability_check',
+  READY: 'ready',
+});
+
 const USER_MESSAGES = Object.freeze({
   [STORAGE_ERROR_KINDS.LOCKED]: 'Your local ledger is busy. Close any other CHECKPOINT windows or backup/sync tools, then try again.',
   [STORAGE_ERROR_KINDS.ACCESS]: 'CHECKPOINT cannot write to its local data folder. Check available disk space and Windows folder permissions, then try again.',
@@ -56,42 +65,62 @@ export function classifyStorageError(error) {
 }
 
 export class StorageError extends Error {
-  constructor({ operation = 'unknown', cause, kind } = {}) {
+  constructor({ operation = 'unknown', stage = null, cause, kind } = {}) {
     const safeMessage = sanitizeStorageMessage(cause);
     super(safeMessage);
     this.name = 'StorageError';
     this.operation = operation;
+    this.stage = stage;
     this.kind = kind || classifyStorageError(cause);
     this.safeMessage = safeMessage;
     this.userMessage = USER_MESSAGES[this.kind] || USER_MESSAGES[STORAGE_ERROR_KINDS.UNKNOWN];
   }
 }
 
-export function toStorageError(error, operation) {
-  if (error instanceof StorageError) return error;
-  return new StorageError({ operation, cause: error });
+export function toStorageError(error, operation, stage = null) {
+  if (error instanceof StorageError && (!operation || error.operation === operation) && (!stage || error.stage === stage)) {
+    return error;
+  }
+
+  return new StorageError({
+    operation: operation || error?.operation || 'unknown',
+    stage: stage || error?.stage || null,
+    cause: error,
+    kind: error instanceof StorageError ? error.kind : undefined,
+  });
 }
 
 export function buildStorageDiagnosticReport({ appVersion = 'unknown', status = {}, checks = {} } = {}) {
-  const error = status.lastError || {};
+  const initializationError = status.initializationError || {};
+  const lastError = status.lastError || {};
   const lines = [
     'CHECKPOINT Storage Diagnostics',
     `Generated: ${new Date().toISOString()}`,
     `App version: ${appVersion}`,
     `Driver: ${status.driver || 'unknown'}`,
     `State: ${status.state || 'unknown'}`,
+    `Initialization state: ${status.initializationState || 'unknown'}`,
+    `Initialization stage: ${status.initializationStage || 'unknown'}`,
     `Schema: ${status.schema || 'unknown'}`,
     `Writable: ${checks.writable || status.writable || 'unknown'}`,
     `Integrity: ${checks.integrity || status.integrity || 'unknown'}`,
-    `Last operation: ${error.operation || status.lastOperation || 'none'}`,
-    `Error class: ${error.kind || 'none'}`,
+    `Initialization error class: ${initializationError.kind || 'none'}`,
   ];
 
-  if (error.message) {
-    lines.push(`Error detail: ${sanitizeStorageMessage(error.message)}`);
+  if (initializationError.message) {
+    lines.push(`Initialization error detail: ${sanitizeStorageMessage(initializationError.message)}`);
+  }
+
+  lines.push(
+    `Last operation: ${lastError.operation || status.lastOperation || 'none'}`,
+    `Last error stage: ${lastError.stage || 'none'}`,
+    `Last error class: ${lastError.kind || 'none'}`,
+  );
+
+  if (lastError.message) {
+    lines.push(`Last error detail: ${sanitizeStorageMessage(lastError.message)}`);
   }
 
   lines.push('Record values, proof attachments, and local file paths are intentionally excluded.');
   return lines.join('\n');
 }
-

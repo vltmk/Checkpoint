@@ -6,7 +6,11 @@
 
 import { isTauri } from './desktop';
 import { getAppVersion } from './updater';
-import { buildStorageDiagnosticReport, toStorageError } from './storageDiagnostics';
+import {
+  buildStorageDiagnosticReport,
+  STORAGE_INITIALIZATION_STAGES,
+  toStorageError,
+} from './storageDiagnostics';
 
 const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
@@ -35,6 +39,9 @@ export class StorageDB {
     this.storageStatus = {
       driver: this.isDesktop ? 'sqlite' : 'indexeddb',
       state: 'initializing',
+      initializationState: 'initializing',
+      initializationStage: STORAGE_INITIALIZATION_STAGES.LOAD,
+      initializationError: null,
       schema: 'unknown',
       writable: 'unknown',
       integrity: 'unknown',
@@ -55,6 +62,9 @@ export class StorageDB {
         ...this.storageStatus,
         driver: 'indexeddb',
         state: db ? 'ready' : 'unavailable',
+        initializationState: db ? 'ready' : 'error',
+        initializationStage: db ? STORAGE_INITIALIZATION_STAGES.READY : STORAGE_INITIALIZATION_STAGES.LOAD,
+        initializationError: null,
         schema: db ? 'ready' : 'unknown',
         writable: db ? 'unknown' : 'unavailable',
       };
@@ -66,22 +76,42 @@ export class StorageDB {
   }
 
   async initDesktopStorage() {
+    let stage = STORAGE_INITIALIZATION_STAGES.LOAD;
+    this.setInitializationStage(stage);
+
     try {
       const Database = (await import('@tauri-apps/plugin-sql')).default;
       this.sqliteDb = await Database.load('sqlite:checkpoint.db');
+
+      stage = STORAGE_INITIALIZATION_STAGES.SCHEMA;
+      this.setInitializationStage(stage);
       await this.initSqliteSchema();
+
+      stage = STORAGE_INITIALIZATION_STAGES.LEGACY_MIGRATION;
+      this.setInitializationStage(stage);
       await this.migrateLegacySqliteData(Database);
-      await this.verifySqliteHealth();
+
+      stage = STORAGE_INITIALIZATION_STAGES.INTEGRITY_CHECK;
+      this.setInitializationStage(stage);
+      await this.verifySqliteIntegrity();
+
+      stage = STORAGE_INITIALIZATION_STAGES.WRITABILITY_CHECK;
+      this.setInitializationStage(stage);
+      await this.verifySqliteWritability();
+
       this.storageStatus = {
         ...this.storageStatus,
         driver: 'sqlite',
         state: 'ready',
+        initializationState: 'ready',
+        initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
+        initializationError: null,
         lastOperation: 'initialize',
         lastError: null,
       };
       return this.sqliteDb;
     } catch (err) {
-      const storageError = this.recordStorageError(err, 'initialize');
+      const storageError = this.recordStorageError(err, 'initialize', stage);
       console.warn('Failed to initialize Tauri SQLite:', storageError.safeMessage);
       if (this.sqliteDb) {
         try {
@@ -93,17 +123,36 @@ export class StorageDB {
     }
   }
 
-  recordStorageError(error, operation) {
-    const storageError = toStorageError(error, operation);
+  setInitializationStage(stage) {
+    this.storageStatus = {
+      ...this.storageStatus,
+      initializationState: 'initializing',
+      initializationStage: stage,
+    };
+  }
+
+  recordStorageError(error, operation, stage = null) {
+    const storageError = toStorageError(error, operation, stage);
+    const errorSnapshot = {
+      kind: storageError.kind,
+      operation: storageError.operation,
+      stage: storageError.stage || stage || null,
+      message: storageError.safeMessage,
+    };
+    const isInitialization = operation === 'initialize' || operation === 'initialize_indexeddb';
+
     this.storageStatus = {
       ...this.storageStatus,
       state: 'error',
       lastOperation: operation,
-      lastError: {
-        kind: storageError.kind,
-        operation: storageError.operation,
-        message: storageError.safeMessage,
-      },
+      lastError: errorSnapshot,
+      ...(isInitialization
+        ? {
+            initializationState: 'error',
+            initializationStage: stage || storageError.stage || STORAGE_INITIALIZATION_STAGES.LOAD,
+            initializationError: errorSnapshot,
+          }
+        : {}),
     };
     return storageError;
   }
@@ -119,6 +168,9 @@ export class StorageDB {
     return {
       ...this.storageStatus,
       lastError: this.storageStatus.lastError ? { ...this.storageStatus.lastError } : null,
+      initializationError: this.storageStatus.initializationError
+        ? { ...this.storageStatus.initializationError }
+        : null,
     };
   }
 
@@ -129,16 +181,22 @@ export class StorageDB {
     }
 
     if (this.sqliteDb) {
+      let stage = STORAGE_INITIALIZATION_STAGES.INTEGRITY_CHECK;
       try {
-        await this.verifySqliteHealth();
+        await this.verifySqliteIntegrity();
+        stage = STORAGE_INITIALIZATION_STAGES.WRITABILITY_CHECK;
+        await this.verifySqliteWritability();
         this.storageStatus = {
           ...this.storageStatus,
           state: 'ready',
+          initializationState: 'ready',
+          initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
+          initializationError: null,
           lastOperation: 'retry_health_check',
           lastError: null,
         };
       } catch (err) {
-        this.recordStorageError(err, 'retry_health_check');
+        this.recordStorageError(err, 'retry_health_check', stage);
       }
       return this.getStorageStatus();
     }
@@ -146,6 +204,8 @@ export class StorageDB {
     this.storageStatus = {
       ...this.storageStatus,
       state: 'initializing',
+      initializationState: 'initializing',
+      initializationStage: STORAGE_INITIALIZATION_STAGES.LOAD,
       lastOperation: 'retry_initialize',
     };
     this.initPromise = this.initDesktopStorage();
@@ -281,27 +341,60 @@ export class StorageDB {
     }
   }
 
-  async verifySqliteHealth() {
+  async verifySqliteIntegrity() {
     if (!this.sqliteDb) {
       throw new Error('Local database connection is unavailable.');
     }
 
-    const integrityRows = await this.sqliteDb.select('PRAGMA integrity_check;');
-    const integrityValue = String(Object.values(integrityRows?.[0] || {})[0] || '').toLowerCase();
-    if (integrityValue !== 'ok') {
-      throw new Error(`SQLite integrity check failed: ${integrityValue || 'no result'}`);
+    try {
+      const integrityRows = await this.sqliteDb.select('PRAGMA integrity_check;');
+      const integrityValue = String(Object.values(integrityRows?.[0] || {})[0] || '').toLowerCase();
+      if (integrityValue !== 'ok') {
+        throw new Error(`SQLite integrity check failed: ${integrityValue || 'no result'}`);
+      }
+
+      this.storageStatus = {
+        ...this.storageStatus,
+        integrity: 'ok',
+      };
+    } catch (err) {
+      this.storageStatus = {
+        ...this.storageStatus,
+        integrity: 'failed',
+      };
+      throw err;
+    }
+  }
+
+  async verifySqliteWritability() {
+    if (!this.sqliteDb) {
+      throw new Error('Local database connection is unavailable.');
     }
 
     // tauri-plugin-sql exposes a connection pool, so a BEGIN / ROLLBACK pair
     // can land on different SQLite connections. A fixed internal marker is a
     // reliable write probe and never changes user-owned data.
-    await this.sqliteDb.execute('INSERT OR REPLACE INTO checkpoint_storage_health (id) VALUES (1);');
+    try {
+      await this.sqliteDb.execute('INSERT OR REPLACE INTO checkpoint_storage_health (id) VALUES (1);');
+      this.storageStatus = {
+        ...this.storageStatus,
+        writable: 'yes',
+      };
+    } catch (err) {
+      this.storageStatus = {
+        ...this.storageStatus,
+        writable: 'no',
+      };
+      throw err;
+    }
+  }
 
+  async verifySqliteHealth() {
+    await this.verifySqliteIntegrity();
+    await this.verifySqliteWritability();
     this.storageStatus = {
       ...this.storageStatus,
       schema: 'ready',
-      integrity: 'ok',
-      writable: 'yes',
     };
   }
 
