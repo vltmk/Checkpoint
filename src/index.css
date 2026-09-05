@@ -256,6 +256,18 @@ button, a, input, textarea, select, .no-drag, [data-no-drag] {
   letter-spacing: normal !important;
 }
 
+/* Optical vertical centering for Persian text (IRANYekan) inside buttons and interactive triggers */
+button .font-farsi,
+button.font-farsi > span,
+.btn-farsi {
+  position: relative;
+  top: -1px;
+}
+
+button .font-farsi .font-farsi {
+  top: 0;
+}
+
 /* Accessibility: Reduced Motion (AUDIT.md:82-96) */
 @media (prefers-reduced-motion: reduce) {
   *,

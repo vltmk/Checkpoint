@@ -47,7 +47,7 @@ export function Button({
       className={cn(baseStyles, variantClass, sizeClass, className)}
       {...props}
     >
-      {children}
+      {typeof children === 'string' ? <span>{children}</span> : children}
     </button>
   );
 }

@@ -215,7 +215,7 @@ export function Navbar({
               title={`${t('nav.addWork')} (N)`}
               className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
               <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
             </button>
 
@@ -229,7 +229,7 @@ export function Navbar({
               title={`${t('nav.quickAdd')} (Q)`}
               className="flex items-center justify-center h-6 px-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none gap-1"
             >
-              <span className={cn('text-xs font-semibold leading-none', isRtl && 'font-farsi')}>
+              <span className={cn('text-xs font-semibold', isRtl ? 'font-farsi' : 'leading-none')}>
                 {t('nav.quickAdd')}
               </span>
             </button>
@@ -388,7 +388,7 @@ export function Navbar({
                       isRtl && 'font-farsi'
                     )}
                   >
-                    <span className={cn('inline-flex items-center justify-center leading-none', isRtl && '-translate-y-[0.5px]')}>
+                    <span className="inline-flex items-center justify-center leading-none">
                       {language === 'fa' ? 'متوجه شدم' : 'Got it'}
                     </span>
                   </Button>

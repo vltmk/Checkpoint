@@ -1468,11 +1468,10 @@ export function LedgerView({
                                           onClick={(e) => e.stopPropagation()}
                                           dir={isRtl ? 'rtl' : 'ltr'}
                                           className={cn(
-                                            'absolute w-max min-w-[160px] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs whitespace-nowrap',
-                                            isRtl ? 'left-0' : 'right-0',
+                                            'absolute w-max min-w-[160px] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs whitespace-nowrap right-0',
                                             isNearBottom
-                                              ? (isRtl ? 'bottom-full mb-1 origin-bottom-left' : 'bottom-full mb-1 origin-bottom-right')
-                                              : (isRtl ? 'top-full mt-1 origin-top-left' : 'top-full mt-1 origin-top-right')
+                                              ? 'bottom-full mb-1 origin-bottom-right'
+                                              : 'top-full mt-1 origin-top-right'
                                           )}
                                         >
                                           <button
