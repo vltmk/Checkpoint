@@ -31,10 +31,13 @@ import {
   Mail,
   ExternalLink,
   Loader2,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative, openPathNative } from '../lib/desktop';
 import { DiscordIcon, TelegramIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
+import { useTheme } from 'next-themes';
 import { Input } from './ui/Input';
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
@@ -68,6 +71,9 @@ export function SettingsModal({
   autoBackupRetention = 5,
   onAutoBackupRetentionChange,
   onManualAutoBackup,
+  theme = 'dark',
+  onThemeChange,
+  handleThemeChange,
 }) {
   const { language, setLanguage, t, isRtl, formatNumber } = useLanguage();
   const fileInputRef = useRef(null);
@@ -131,9 +137,80 @@ export function SettingsModal({
     }
   };
 
+  const { theme: activeTheme, setTheme } = useTheme();
+  const currentTheme = activeTheme || theme || 'dark';
+
+  const toggleTheme = (e) => {
+    e?.stopPropagation?.();
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    const handler = handleThemeChange || onThemeChange;
+    if (handler) {
+      handler(nextTheme);
+    } else {
+      setTheme(nextTheme);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-md">
-      <DialogHeader onClose={onClose}>
+      <DialogHeader
+        onClose={onClose}
+        actions={
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={toggleTheme}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleTheme(e);
+              }
+            }}
+            title={currentTheme === 'light' ? t('settings.themeDark', 'Dark mode') : t('settings.themeLight', 'Light mode')}
+            aria-label="Toggle theme"
+            className="relative flex items-center p-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 shadow-inner select-none cursor-pointer group active:scale-[0.96] transition-transform duration-150"
+            dir="ltr"
+          >
+            {/* Light Option */}
+            <div
+              className={cn(
+                'relative flex items-center justify-center w-6 h-6 rounded-full transition-colors pointer-events-none',
+                currentTheme === 'light'
+                  ? 'text-amber-600 dark:text-amber-400 font-bold'
+                  : 'text-zinc-500 dark:text-zinc-400'
+              )}
+            >
+              {currentTheme === 'light' && (
+                <motion.div
+                  layoutId="settingsThemePill"
+                  className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-full shadow-sm border border-zinc-300 dark:border-zinc-700"
+                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                />
+              )}
+              <Sun className={cn('w-3.5 h-3.5 relative z-10 transition-transform duration-200 stroke-[2.2]', currentTheme === 'light' ? 'scale-105 rotate-12' : 'scale-90 opacity-70')} />
+            </div>
+
+            {/* Dark Option */}
+            <div
+              className={cn(
+                'relative flex items-center justify-center w-6 h-6 rounded-full transition-colors pointer-events-none',
+                currentTheme === 'dark'
+                  ? 'text-zinc-900 dark:text-zinc-100 font-bold'
+                  : 'text-zinc-500 dark:text-zinc-400'
+              )}
+            >
+              {currentTheme === 'dark' && (
+                <motion.div
+                  layoutId="settingsThemePill"
+                  className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-full shadow-sm border border-zinc-300 dark:border-zinc-700"
+                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                />
+              )}
+              <Moon className={cn('w-3.5 h-3.5 relative z-10 transition-transform duration-200 stroke-[2.2]', currentTheme === 'dark' ? 'scale-105 -rotate-12' : 'scale-90 opacity-70')} />
+            </div>
+          </div>
+        }
+      >
         <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('settings.title')}</DialogTitle>
       </DialogHeader>
 
@@ -225,12 +302,12 @@ export function SettingsModal({
                   aria-checked={closeToTray}
                   onClick={() => onCloseToTrayChange?.(!closeToTray)}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    closeToTray ? 'bg-zinc-100' : 'bg-zinc-800'
+                    closeToTray ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
                   }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      closeToTray ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      closeToTray ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
                     }`}
                   />
                 </button>
@@ -253,12 +330,12 @@ export function SettingsModal({
                   aria-checked={minimizeToTray}
                   onClick={() => onMinimizeToTrayChange?.(!minimizeToTray)}
                   className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    minimizeToTray ? 'bg-zinc-100' : 'bg-zinc-800'
+                    minimizeToTray ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
                   }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      minimizeToTray ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      minimizeToTray ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
                     }`}
                   />
                 </button>
@@ -312,12 +389,12 @@ export function SettingsModal({
                   }
                 }}
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  autoBackupEnabled ? 'bg-zinc-100' : 'bg-zinc-800'
+                  autoBackupEnabled ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    autoBackupEnabled ? 'translate-x-4 bg-zinc-950' : 'translate-x-0 bg-zinc-400'
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    autoBackupEnabled ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
                   }`}
                 />
               </button>

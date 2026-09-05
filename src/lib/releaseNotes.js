@@ -26,6 +26,63 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '2.5.0': {
+    date: '2026-09-05',
+    title: {
+      en: "What's New in Checkpoint v2.5.0",
+      fa: 'امکانات و تغییرات نسخه ۲.۵.۰',
+    },
+    summary: {
+      en: 'Added Light mode support, improved application performance and smoothness, improved animations, upgraded UI & UX, and added link support for Works.',
+      fa: 'پشتیبانی از حالت روشن (Light Mode)، بهبود کارایی و روان بودن برنامه، انیمیشن‌های نرم‌تر، ارتقای رابط و تجربه کاربری (UI & UX)، و افزودن پشتیبانی از لینک برای کارها.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Added Light mode support with automatic next-themes integration, high-contrast monochrome typography, and instant theme toggling.',
+        },
+        {
+          tag: 'new',
+          text: 'Added link support for Works with quick external link buttons and URL validation.',
+        },
+        {
+          tag: 'improved',
+          text: 'Improved application performance and smoothness across all views, modals, and local SQLite database queries.',
+        },
+        {
+          tag: 'improved',
+          text: 'Improved animations and spring motion transitions across modals, dialogs, drawers, and tabs.',
+        },
+        {
+          tag: 'improved',
+          text: 'Upgraded UI & UX with refined spacing, responsive mobile navigation, and polished light/dark theme contrast.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'پشتیبانی کامل از حالت روشن (Light Mode) با هماهنگی آنی و کنتراست مونوکروماتیک دقیق در تمام صفحات.',
+        },
+        {
+          tag: 'new',
+          text: 'افزودن قابلیت ثبت لینک برای کارها و دسترسی سریع با یک کلیک.',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود چشمگیر عملکرد و روان بودن اجرای برنامه در تمامی نماها و پرس‌وجوهای دیتابیس محلی SQLite.',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود انیمیشن‌ها و نرم‌تر شدن ترنزیشن‌های حرکتی در پنجره‌ها، کشوها و تب‌های ناوبری.',
+        },
+        {
+          tag: 'improved',
+          text: 'ارتقای ظاهر و تجربه کاربری (UI & UX) با فاصله‌گذاری‌های استاندارد، ناوبری ریسپانسیو و کنتراست بهینه.',
+        },
+      ],
+    },
+  },
   '2.4.3': {
     date: '2026-08-28',
     title: {

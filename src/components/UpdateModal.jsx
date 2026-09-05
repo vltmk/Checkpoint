@@ -38,17 +38,17 @@ export function UpdateModal({
       case 'new':
         return {
           label: t('notifications.tagNew', 'NEW'),
-          style: 'bg-emerald-950/60 text-emerald-300 border-emerald-800/80',
+          style: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/80',
         };
       case 'improved':
         return {
           label: t('notifications.tagImproved', 'IMPROVED'),
-          style: 'bg-indigo-950/60 text-indigo-300 border-indigo-800/80',
+          style: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800/80',
         };
       case 'fix':
         return {
           label: t('notifications.tagFix', 'FIX'),
-          style: 'bg-zinc-800 text-zinc-300 border-zinc-700/80',
+          style: 'bg-zinc-100 text-zinc-800 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700/80',
         };
       default:
         return null;
@@ -97,7 +97,7 @@ export function UpdateModal({
     <Dialog open={Boolean(isOpen && updateInfo)} onClose={onClose} maxWidth="max-w-md">
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-emerald-950/60 border border-emerald-800/80 flex items-center justify-center text-emerald-400">
+          <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800/80 dark:text-emerald-400 flex items-center justify-center">
             <ArrowUpCircle className="w-3.5 h-3.5" />
           </div>
           <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('update.title')}</DialogTitle>
@@ -106,24 +106,24 @@ export function UpdateModal({
 
       <DialogContent className="space-y-4">
         {/* Version Comparison Card */}
-        <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="space-y-0.5">
             <span className={cn('text-[10px] text-zinc-500 font-mono uppercase tracking-wider block', isRtl && 'font-farsi')}>
               {t('update.currentVersion')}
             </span>
-            <span className="text-xs font-mono font-medium text-zinc-400">
+            <span className="text-xs font-mono font-medium text-zinc-600 dark:text-zinc-400">
               v{currentVersion}
             </span>
           </div>
 
-          <div className="h-6 w-px bg-zinc-800" />
+          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
 
           <div className="space-y-0.5 text-right">
-            <span className={cn('text-[10px] text-emerald-400 font-mono uppercase tracking-wider block font-semibold', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 font-mono uppercase tracking-wider block font-semibold', isRtl && 'font-farsi')}>
               {t('update.newVersion')}
             </span>
-            <span className="text-xs font-mono font-bold text-white flex items-center justify-end gap-1">
-              <Sparkles className="w-3 h-3 text-emerald-400" />
+            <span className="text-xs font-mono font-bold text-zinc-950 dark:text-white flex items-center justify-end gap-1">
+              <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
               <span>v{newVersion}</span>
             </span>
           </div>
@@ -137,21 +137,21 @@ export function UpdateModal({
 
           return (
             <div className="space-y-1.5">
-              <label className={cn('text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+              <label className={cn('text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
                 {t('update.releaseNotes')}
               </label>
               <div
                 dir={isBodyRTL ? 'rtl' : 'ltr'}
-                className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/90 text-xs text-zinc-300 max-h-48 overflow-y-auto space-y-2 select-text"
+                className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/90 text-xs text-zinc-700 dark:text-zinc-300 max-h-48 overflow-y-auto space-y-2 select-text"
               >
                 {notes.summary && (
-                  <p className={cn('text-zinc-300 text-[11px] leading-relaxed', isBodyRTL && 'font-farsi text-right')}>
+                  <p className={cn('text-zinc-700 dark:text-zinc-300 text-[11px] leading-relaxed', isBodyRTL && 'font-farsi text-right')}>
                     {notes.summary}
                   </p>
                 )}
 
                 {hasItems ? (
-                  <ul className="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <ul className="space-y-1.5 pt-1 border-t border-zinc-200 dark:border-zinc-800/60">
                     {notes.items.map((it, idx) => {
                       const tagInfo = it.tag ? getTagBadge(it.tag) : null;
                       const text = it.text || String(it);
@@ -161,7 +161,7 @@ export function UpdateModal({
                         <li
                           key={idx}
                           dir={itemRtl ? 'rtl' : 'ltr'}
-                          className="flex items-start gap-1.5 text-[11px] text-zinc-300 leading-relaxed"
+                          className="flex items-start gap-1.5 text-[11px] text-zinc-700 dark:text-zinc-300 leading-relaxed"
                         >
                           {tagInfo ? (
                             <span
@@ -175,7 +175,7 @@ export function UpdateModal({
                               {tagInfo.label}
                             </span>
                           ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 mt-1.5 shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600 mt-1.5 shrink-0" />
                           )}
 
                           <span className={cn('break-words min-w-0 flex-1', itemRtl && 'text-right font-farsi')}>
@@ -203,19 +203,19 @@ export function UpdateModal({
 
         {/* Download Progress State */}
         {installState === 'downloading' && (
-          <div className="space-y-2 p-3 rounded-xl bg-zinc-900/60 border border-zinc-800">
+          <div className="space-y-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className={cn('text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-                <RotateCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+              <span className={cn('text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+                <RotateCw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 animate-spin" />
                 <span>{t('update.downloading')}</span>
               </span>
-              <span className="font-semibold text-white">{formatNumber(progress.percent)}%</span>
+              <span className="font-semibold text-zinc-950 dark:text-white">{formatNumber(progress.percent)}%</span>
             </div>
 
             {/* Monochromatic Progress Bar */}
-            <div dir="ltr" className="w-full h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div dir="ltr" className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
-                className="h-full bg-zinc-100 transition-all duration-150"
+                className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-150"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
@@ -229,11 +229,11 @@ export function UpdateModal({
 
         {/* Ready to Restart State */}
         {installState === 'ready_to_restart' && (
-          <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900/60 flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <div className={cn('text-xs text-emerald-200', isRtl && 'font-farsi')}>
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div className={cn('text-xs text-emerald-900 dark:text-emerald-200', isRtl && 'font-farsi')}>
               <p className="font-semibold">{t('update.readyRestart')}</p>
-              <p className="text-[11px] text-emerald-300/80">
+              <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
                 {language === 'fa' ? `برنامه را مجدداً راه‌اندازی کنید تا نسخه ${newVersion} اعمال شود.` : `Restart Checkpoint now to apply version ${newVersion}.`}
               </p>
             </div>
@@ -242,11 +242,11 @@ export function UpdateModal({
 
         {/* Error State */}
         {installState === 'error' && (
-          <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/60 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-            <div className={cn('text-xs text-rose-200', isRtl && 'font-farsi')}>
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+            <div className={cn('text-xs text-rose-900 dark:text-rose-200', isRtl && 'font-farsi')}>
               <p className="font-semibold">{language === 'fa' ? 'خطا در به‌روزرسانی' : 'Update failed'}</p>
-              <p className="text-[11px] text-rose-300/80">{errorMessage}</p>
+              <p className="text-[11px] text-rose-700 dark:text-rose-300/80">{errorMessage}</p>
             </div>
           </div>
         )}

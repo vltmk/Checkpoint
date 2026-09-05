@@ -127,6 +127,19 @@
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
+  html.light,
+  html:not(.dark) {
+    --background: #ffffff;
+    --foreground: #09090b;
+    --card: #ffffff;
+    --card-foreground: #09090b;
+    --border: #e4e4e7;
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+    --primary: #09090b;
+    --primary-foreground: #ffffff;
+  }
+
   * {
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
@@ -260,5 +273,195 @@ button, a, input, textarea, select, .no-drag, [data-no-drag] {
   }
 }
 
+/* ==========================================================================
+   Monochromatic Paper-White Light Theme (Shadcn aesthetic)
+   ========================================================================== */
+
+html.light,
+html.light body {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+}
+
+html.light ::selection {
+  background: rgba(0, 0, 0, 0.12) !important;
+  color: #000000 !important;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #d4d4d8 !important;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa !important;
+}
+
+/* Surface backgrounds */
+html.light .bg-black,
+html.light .bg-black\/95,
+html.light .bg-black\/90,
+html.light .bg-black\/80 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-zinc-950,
+html.light .bg-zinc-950\/95,
+html.light .bg-zinc-950\/90,
+html.light .bg-zinc-950\/80 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-zinc-900,
+html.light .bg-zinc-900\/90,
+html.light .bg-zinc-900\/80,
+html.light .bg-zinc-900\/60,
+html.light .bg-zinc-900\/50,
+html.light .bg-zinc-900\/40 {
+  background-color: #f4f4f5 !important;
+}
+
+html.light .bg-zinc-800,
+html.light .bg-zinc-800\/90,
+html.light .bg-zinc-800\/80,
+html.light .bg-zinc-800\/60,
+html.light .bg-zinc-800\/40 {
+  background-color: #f4f4f5 !important;
+}
+
+/* Inverted contrast items (Primary action buttons keep white text in light mode) */
+html.light .bg-zinc-900.text-white,
+html.light .bg-zinc-900 .text-white,
+html.light button.bg-zinc-900,
+html.light button.bg-red-600,
+html.light [class*="bg-red-600"] {
+  color: #ffffff !important;
+}
+
+/* Border overrides */
+html.light .border-zinc-900,
+html.light .border-zinc-900\/90,
+html.light .border-zinc-900\/80,
+html.light .border-zinc-800,
+html.light .border-zinc-800\/90,
+html.light .border-zinc-800\/80,
+html.light .border-zinc-800\/70,
+html.light .border-zinc-800\/60,
+html.light .border-zinc-700,
+html.light .border-zinc-700\/80 {
+  border-color: #e4e4e7 !important;
+}
+
+/* Text overrides */
+html.light .text-white,
+html.light .text-zinc-100,
+html.light .text-zinc-200 {
+  color: #09090b !important;
+}
+
+html.light .text-zinc-300 {
+  color: #18181b !important;
+}
+
+html.light .text-zinc-400 {
+  color: #52525b !important;
+}
+
+html.light .text-zinc-500 {
+  color: #71717a !important;
+}
+
+html.light .text-zinc-600 {
+  color: #a1a1aa !important;
+}
 
 
+/* Hover overrides - subtle dark zinc on white mode surfaces */
+html.light .hover\:bg-zinc-900:hover,
+html.light .hover\:bg-zinc-900\/90:hover,
+html.light .hover\:bg-zinc-900\/80:hover,
+html.light .hover\:bg-zinc-900\/60:hover,
+html.light .hover\:bg-zinc-900\/50:hover,
+html.light .hover\:bg-zinc-800:hover,
+html.light .hover\:bg-zinc-800\/90:hover,
+html.light .hover\:bg-zinc-800\/80:hover,
+html.light .hover\:bg-zinc-800\/60:hover {
+  background-color: #e4e4e7 !important;
+}
+
+html.light .hover\:text-white:hover,
+html.light .hover\:text-zinc-100:hover,
+html.light .hover\:text-zinc-200:hover {
+  color: #09090b !important;
+}
+
+html.light .hover\:text-zinc-300:hover {
+  color: #18181b !important;
+}
+
+/* Form controls */
+html.light input,
+html.light textarea,
+html.light select {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+  border-color: #e4e4e7 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #a1a1aa !important;
+}
+
+html.light input:focus,
+html.light textarea:focus,
+html.light select:focus {
+  border-color: #71717a !important;
+}
+
+/* Modal and dialog backdrops */
+html.light .bg-black\/60,
+html.light .bg-black\/70,
+html.light .bg-black\/80,
+html.light .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Keyboard badge utilities */
+html.light kbd,
+html.light [class*="Kbd"] {
+  background-color: #f4f4f5 !important;
+  border-color: #e4e4e7 !important;
+  color: #71717a !important;
+}
+
+html.light .bg-zinc-100 kbd {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* GPU-Accelerated Breathing Animation for TOTAL INCOME dot pattern */
+@keyframes dot-pattern-breathe {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.58;
+  }
+}
+
+.animate-dot-breathe {
+  animation: dot-pattern-breathe 3.5s ease-in-out infinite;
+  will-change: opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dot-breathe {
+    animation: none !important;
+    opacity: 0.40 !important;
+  }
+}

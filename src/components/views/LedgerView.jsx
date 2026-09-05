@@ -12,10 +12,9 @@ import {
   Trash2,
   ExternalLink,
   ChevronDown,
-  UploadCloud,
   X,
-  CheckCircle2,
   Check,
+  CheckCircle2,
   TrendingUp,
   Clock,
   Coins,
@@ -32,10 +31,11 @@ import { Select } from '../ui/Select';
 import { StatusBadge } from '../ui/Badge';
 import { GameIcon } from '../ui/GameIcon';
 import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
-import { Kbd } from '../ui/Tooltip';
+import { Tooltip, Kbd } from '../ui/Tooltip';
 import { cn } from '../../lib/utils';
+import { openExternalUrl } from '../../lib/desktop';
 import { motion, AnimatePresence } from 'motion/react';
-import { useLanguage, formatShamsiDate, normalizeDigits } from '../../lib/i18n';
+import { useLanguage, formatShamsiDate, normalizeDigits, toPersianDigits } from '../../lib/i18n';
 import {
   formatMoney,
   convertCurrency,
@@ -75,8 +75,9 @@ export function LedgerView({
   const [teammateFilter, setTeammateFilter] = useState('');
   const [sortOption, setSortOption] = useState('date_desc');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [isFiltersPopoverOpen, setIsFiltersPopoverOpen] = useState(false);
+  const filtersPopoverRef = useRef(null);
   const [activeActionMenuId, setActiveActionMenuId] = useState(null);
-  const [promptProofEntryId, setPromptProofEntryId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDayKeys, setSelectedDayKeys] = useState(new Set());
   const [isSumCopied, setIsSumCopied] = useState(false);
@@ -93,6 +94,81 @@ export function LedgerView({
     () => ({ goldRateTOMAN }),
     [goldRateTOMAN]
   );
+
+  // Extract game categories with job counts
+  const gameCategories = useMemo(() => {
+    const counts = new Map();
+    GAMES.forEach((g) => counts.set(g, 0));
+
+    entries.forEach((e) => {
+      const g = e.game || 'World of Warcraft';
+      counts.set(g, (counts.get(g) || 0) + 1);
+    });
+
+    const categories = [
+      { id: '', label: t('ledger.allGames'), count: entries.length },
+    ];
+
+    counts.forEach((count, game) => {
+      if (count > 0 || GAMES.includes(game)) {
+        categories.push({ id: game, label: game, count });
+      }
+    });
+
+    return categories;
+  }, [entries, t]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const counts = { Paid: 0, Pending: 0, Working: 0, 'On Hold': 0 };
+    entries.forEach((e) => {
+      if (counts[e.status] !== undefined) {
+        counts[e.status]++;
+      }
+    });
+    return counts;
+  }, [entries]);
+
+  // Secondary filters count badge
+  const activeSecondaryFiltersCount = useMemo(() => {
+    let count = 0;
+    if (currencyFilter) count++;
+    if (hasProofFilter) count++;
+    if (teammateFilter) count++;
+    if (sortOption !== 'date_desc') count++;
+    return count;
+  }, [currencyFilter, hasProofFilter, teammateFilter, sortOption]);
+
+  const formatRowTime = (dateTimeStr) => {
+    if (!dateTimeStr) return '';
+    const d = new Date(dateTimeStr);
+    if (isNaN(d.getTime())) return '';
+    try {
+      return new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).format(d);
+    } catch (e) {
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+  };
+
+  const handleOpenExternalLink = (url) => {
+    if (!url || typeof url !== 'string') return;
+    const trimmed = url.trim();
+    const lower = trimmed.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
+      if (lower.startsWith('www.') || lower.includes('.')) {
+        openExternalUrl('https://' + trimmed);
+        return;
+      }
+      return;
+    }
+    openExternalUrl(trimmed);
+  };
 
   // Sync external teammate filter from receipt or other views
   useEffect(() => {
@@ -114,9 +190,12 @@ export function LedgerView({
 
   // Close action menus & status dropdown on outside click
   useEffect(() => {
-    const handleOutsideClick = () => {
+    const handleOutsideClick = (e) => {
       if (activeActionMenuId) setActiveActionMenuId(null);
       if (isStatusDropdownOpen) setIsStatusDropdownOpen(false);
+      if (filtersPopoverRef.current && !filtersPopoverRef.current.contains(e.target)) {
+        setIsFiltersPopoverOpen(false);
+      }
     };
     window.addEventListener('click', handleOutsideClick);
     return () => window.removeEventListener('click', handleOutsideClick);
@@ -256,10 +335,10 @@ export function LedgerView({
     return { totalSum, paid, pending, working, cancelled };
   }, [selectedEntriesList, globalCurrency, rates]);
 
-  // Keyboard Shortcuts Listener (Esc to clear, S to toggle select mode, Ctrl+A in select mode)
+  // Keyboard Shortcuts Listener (Esc to clear, S to toggle select mode, Ctrl+A in select mode, / for search)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Escape key clears active confirmations and selections
+      // Escape key clears active confirmations, popovers, and selections
       if (e.key === 'Escape') {
         if (confirmDeleteEntryId) {
           setConfirmDeleteEntryId(null);
@@ -273,6 +352,18 @@ export function LedgerView({
           setIsStatusDropdownOpen(false);
           return;
         }
+        if (isFiltersPopoverOpen) {
+          setIsFiltersPopoverOpen(false);
+          return;
+        }
+        if (document.activeElement === searchInputRef?.current) {
+          if (searchQuery) {
+            setSearchQuery('');
+          } else {
+            searchInputRef?.current?.blur();
+          }
+          return;
+        }
         if (selectedEntryIds.size > 0 || isSelectMode) {
           setSelectedEntryIds(new Set());
           setIsSelectMode(false);
@@ -281,6 +372,25 @@ export function LedgerView({
         }
         if (activeActionMenuId) {
           setActiveActionMenuId(null);
+          return;
+        }
+      }
+
+      // Hotkey: '/' or 'Ctrl+F' to focus search
+      if ((e.code === 'Slash' || e.key === '/') && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const tag = e.target.tagName?.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && !e.target.isContentEditable) {
+          e.preventDefault();
+          searchInputRef?.current?.focus();
+          return;
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyF' || e.key === 'f' || e.key === 'F')) {
+        const tag = e.target.tagName?.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select' && !e.target.isContentEditable) {
+          e.preventDefault();
+          searchInputRef?.current?.focus();
           return;
         }
       }
@@ -329,12 +439,15 @@ export function LedgerView({
     confirmDeleteEntryId,
     isBulkDeleting,
     isStatusDropdownOpen,
+    isFiltersPopoverOpen,
+    searchQuery,
     selectedEntryIds,
     isSelectMode,
     activeActionMenuId,
     paginatedEntries,
     globalCurrency,
     onCurrencyChange,
+    searchInputRef,
   ]);
 
   // Shift + Click Range Selection & Direct Toggle Handler
@@ -480,6 +593,7 @@ export function LedgerView({
     setTeammateFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
+    setIsFiltersPopoverOpen(false);
     setSelectedDayKeys(new Set());
     setSelectedEntryIds(new Set());
     setConfirmDeleteEntryId(null);
@@ -490,43 +604,56 @@ export function LedgerView({
 
   const handleStatusSelect = (entry, nextStatus) => {
     onFlipStatus?.(entry.id, entry.status, nextStatus);
-    if (nextStatus === 'Paid' && (!entry.proofs || entry.proofs.length === 0)) {
-      setPromptProofEntryId(entry.id);
-    } else if (promptProofEntryId === entry.id) {
-      setPromptProofEntryId(null);
-    }
   };
 
   return (
     <div className="space-y-5 pb-20 md:pb-6 relative">
       {/* 1. Compact Total Earned Summary Card (Transparent & Dark Palette) */}
-      <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="relative overflow-hidden rounded-xl bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
+        {/* Minimal rectangular dots radial pattern anchored at bottom-left */}
+        <div
+          className="absolute inset-0 pointer-events-none select-none z-0 animate-dot-breathe"
+          style={{
+            maskImage: 'radial-gradient(ellipse at bottom left, black 15%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at bottom left, black 15%, transparent 75%)',
+          }}
+        >
+          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="totalEarnedDots" width="10" height="10" patternUnits="userSpaceOnUse">
+                <rect width="2.5" height="2.5" rx="0.5" fill="currentColor" className="text-emerald-500/50 dark:text-emerald-400/60" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#totalEarnedDots)" />
+          </svg>
+        </div>
+
+        <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
               {t('ledger.totalEarned')}
             </span>
 
             {/* Minimal Currency Switcher Pill Right in Front of Label */}
-            <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 shadow-inner">
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-950 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner">
               <button
                 type="button"
                 onClick={() => onCurrencyChange?.('TOMAN')}
                 title="Display in Toman (Press T to toggle)"
                 className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
                   globalCurrency === 'TOMAN'
-                    ? 'text-zinc-100 font-semibold'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
                 }`}
               >
                 {globalCurrency === 'TOMAN' && (
                   <motion.div
                     layoutId="totalEarnedCurrencyPill"
-                    className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                    className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   />
                 )}
-                <Banknote className="w-3 h-3 text-emerald-400" />
+                <Banknote className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
                 <span className="font-farsi font-medium">تومان</span>
               </button>
               <button
@@ -535,18 +662,18 @@ export function LedgerView({
                 title="Display in Gold (Press T to toggle)"
                 className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
                   globalCurrency === 'GOLD'
-                    ? 'text-zinc-100 font-semibold'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
                 }`}
               >
                 {globalCurrency === 'GOLD' && (
                   <motion.div
                     layoutId="totalEarnedCurrencyPill"
-                    className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700/80"
+                    className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   />
                 )}
-                <Coins className="w-3 h-3 text-amber-400" />
+                <Coins className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                 <span>Gold</span>
               </button>
             </div>
@@ -556,7 +683,7 @@ export function LedgerView({
                 type="button"
                 onClick={handleClearFilters}
                 title={t('ledger.clearFilters')}
-                className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80 transition-colors"
+                className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors"
               >
                 <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
                 <X className="w-2.5 h-2.5 text-zinc-500" />
@@ -571,7 +698,7 @@ export function LedgerView({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
             <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
           </div>
           {globalCurrency !== 'GOLD' && (
@@ -586,7 +713,7 @@ export function LedgerView({
 
         {/* Enhanced High-Density Segmented Progress Bar with Accent Colors */}
         <div className="space-y-2 pt-0.5">
-          <div className="h-2.5 w-full bg-zinc-950/80 rounded-full p-0.5 border border-zinc-800/80 shadow-inner flex overflow-hidden">
+          <div className="h-2.5 w-full bg-zinc-100/80 dark:bg-zinc-950/80 rounded-full p-0.5 border border-zinc-200 dark:border-zinc-800/80 shadow-inner flex overflow-hidden">
             <div
               className="bg-emerald-500 h-full rounded-l-full transition-all duration-300 relative group"
               style={{
@@ -605,25 +732,25 @@ export function LedgerView({
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
             {/* Paid Accent Badge */}
-            <div className="flex items-center gap-1.5 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-800/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className={cn('text-emerald-400/90 font-medium', isRtl && 'font-farsi')}>{t('status.Paid')} ({formatNumber(metrics.paidCount)}):</span>
-              <strong className="text-emerald-200 font-semibold font-mono text-xs">
+            <div className="flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/50 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800/80 ring-1 ring-inset ring-emerald-600/15 dark:ring-emerald-500/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0" />
+              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>{t('status.Paid')} ({formatNumber(metrics.paidCount)}):</span>
+              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
-              <span className="text-emerald-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-zinc-500 dark:text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
                 {formatNumber(metrics.completionRate)}%
               </span>
             </div>
 
             {/* Pending Accent Badge */}
-            <div className="flex items-center gap-1.5 bg-amber-950/30 px-2.5 py-1 rounded-md border border-amber-800/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-              <span className={cn('text-amber-400/90 font-medium', isRtl && 'font-farsi')}>{t('status.Pending')} ({formatNumber(metrics.pendingCount)}):</span>
-              <strong className="text-amber-200 font-semibold font-mono text-xs">
+            <div className="flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/50 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800/80 ring-1 ring-inset ring-amber-600/15 dark:ring-amber-500/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 shrink-0" />
+              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>{t('status.Pending')} ({formatNumber(metrics.pendingCount)}):</span>
+              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold font-mono text-xs">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
-              <span className="text-amber-400/80 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-zinc-500 dark:text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
                 {formatNumber(metrics.totalValue > 0 ? 100 - metrics.completionRate : 0)}%
               </span>
             </div>
@@ -667,222 +794,284 @@ export function LedgerView({
       {/* Subtle Gradient Fade Separator Line */}
       <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700/60 to-transparent" />
 
-      {/* 3. Compact / Collapsible Search & Filter Bar (Dimmed & Low-Contrast) */}
+      {/* 3. Game Categories & Minimalist Unified Filter Bar */}
       <div className="relative z-30 space-y-2.5">
-        {/* Quick Filter Bar (Status Chips + Currency Chips + Team Chip + Expanding Search Drawer Toggle) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-          {/* Filter Chips group */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1">
-            {/* Status Chips */}
-            <div className="flex items-center gap-1">
+        {/* Top Tier: Game Categories Horizontal Segmented Track */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-0.5 select-none">
+          {gameCategories.map((cat) => {
+            const isSelected = gameFilter === cat.id;
+            return (
               <button
+                key={cat.id || '__all__'}
                 type="button"
-                onClick={() => setStatusFilter('')}
-                className={`h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center transition-colors whitespace-nowrap leading-none ${
-                  statusFilter === ''
-                    ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
-                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-                }`}
+                onClick={() => setGameFilter(isSelected && cat.id !== '' ? '' : cat.id)}
+                className={cn(
+                  'h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shrink-0 border active:scale-[0.97]',
+                  isSelected
+                    ? 'bg-zinc-100 text-zinc-950 border-zinc-100 shadow-sm font-semibold'
+                    : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/60'
+                )}
               >
-                <span className={cn(isRtl && 'font-farsi')}>{t('status.all')} ({formatNumber(entries.length)})</span>
+                {cat.id && (
+                  <GameIcon game={cat.id} className="w-3.5 h-3.5 object-contain shrink-0" />
+                )}
+                <span className={cn(isRtl && 'font-farsi')}>{cat.label}</span>
+                <span
+                  className={cn(
+                    'text-[10px] font-mono px-1 rounded leading-tight',
+                    isSelected
+                      ? 'bg-zinc-950/10 text-zinc-900 font-bold'
+                      : 'bg-zinc-900 text-zinc-500'
+                  )}
+                >
+                  {formatNumber(cat.count)}
+                </span>
               </button>
+            );
+          })}
+        </div>
 
-              {STATUSES.map((st) => (
+        {/* Bottom Tier: Minimal Unified Desktop Toolbar */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          {/* Left: Always-Accessible Search Input */}
+          <div className="relative flex-1 min-w-[140px] sm:min-w-[180px] max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder={t('ledger.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={cn(
+                'pl-8 pr-8 h-8 text-xs bg-zinc-950 border-zinc-800/80 text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700',
+                isRtl && 'font-farsi placeholder:font-farsi text-right'
+              )}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef?.current?.focus();
+                  }}
+                  className="w-4 h-4 rounded flex items-center justify-center text-xs text-zinc-500 hover:text-zinc-300 active:scale-95"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              ) : (
+                <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 px-1 py-0 select-none">
+                  /
+                </Kbd>
+              )}
+            </div>
+          </div>
+
+          {/* Center: Primary Status Segmented Pills */}
+          <div className="flex items-center gap-1 bg-zinc-950 p-0.5 rounded-lg border border-zinc-800/80 shrink-0 overflow-x-auto no-scrollbar max-w-full">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('')}
+              className={cn(
+                'h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0 active:scale-[0.97]',
+                statusFilter === ''
+                  ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              )}
+            >
+              <span className={cn(isRtl && 'font-farsi')}>{t('status.all')}</span>
+            </button>
+
+            {STATUSES.map((st) => {
+              const isCurrent = statusFilter === st;
+              const count = statusCounts[st] || 0;
+              return (
                 <button
                   key={st}
                   type="button"
-                  onClick={() => setStatusFilter(statusFilter === st ? '' : st)}
-                  className={`h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center transition-colors whitespace-nowrap leading-none ${
-                    isRtl ? 'font-farsi' : ''
-                  } ${
-                    statusFilter === st
-                      ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
-                      : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-                  }`}
+                  onClick={() => setStatusFilter(isCurrent ? '' : st)}
+                  className={cn(
+                    'h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0 flex items-center gap-1.5 active:scale-[0.97]',
+                    isCurrent
+                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  )}
                 >
-                  {t('status.' + st, STATUS_LABELS[st] || st)}
+                  <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
+                  {count > 0 && (
+                    <span className={cn('text-[10px] font-mono', isCurrent ? 'text-zinc-300' : 'text-zinc-600')}>
+                      {formatNumber(count)}
+                    </span>
+                  )}
                 </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => setHasProofFilter((prev) => !prev)}
-                className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap leading-none ${
-                  hasProofFilter
-                    ? 'bg-emerald-950/25 text-emerald-400/90 border border-emerald-800/60 font-medium'
-                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-                }`}
-              >
-                <FileImage className="w-3 h-3 text-zinc-500" />
-                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.proof')}</span>
-              </button>
-            </div>
-
-            <div className="h-4 w-px bg-zinc-800/80 shrink-0 hidden sm:block" />
-
-            {/* Currency Payment Type Chips */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCurrencyFilter(currencyFilter === 'GOLD' ? '' : 'GOLD')}
-                className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap leading-none ${
-                  currencyFilter === 'GOLD'
-                    ? 'bg-amber-950/25 text-amber-400/90 border border-amber-800/60 font-medium shadow-sm'
-                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-                }`}
-              >
-                <Coins className="w-3 h-3 text-amber-400/80" />
-                <span>Gold</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCurrencyFilter(currencyFilter === 'TOMAN' ? '' : 'TOMAN')}
-                className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center justify-center gap-1 transition-colors whitespace-nowrap leading-none ${
-                  currencyFilter === 'TOMAN'
-                    ? 'bg-zinc-900 text-zinc-200 border border-zinc-700/80 font-medium shadow-sm'
-                    : 'bg-transparent text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-                }`}
-              >
-                <Banknote className="w-3 h-3 text-zinc-500" />
-                <span className="font-farsi font-medium">تومان</span>
-              </button>
-            </div>
-
-            {/* Active Team Filter Chip */}
-            {teammateFilter && (
-              <button
-                type="button"
-                onClick={() => setTeammateFilter('')}
-                className="h-7 px-2 rounded-md text-[11px] font-medium bg-zinc-900 text-zinc-300 border border-zinc-700/80 flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm leading-none"
-              >
-                <Users className="w-3 h-3 text-zinc-500" />
-                <span>Team: {teammateFilter}</span>
-                <X className="w-3 h-3 text-zinc-500 hover:text-zinc-200" />
-              </button>
-            )}
+              );
+            })}
           </div>
 
-          {/* Right Action Buttons: Select Mode Toggle & Search Drawer Toggle */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto ml-auto shrink-0 justify-end">
-            {/* Dedicated Multi-Select Mode Toggle Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSelectMode((prev) => {
-                  const next = !prev;
-                  if (!next) {
-                    setSelectedEntryIds(new Set());
-                    setIsBulkDeleting(false);
-                    setLastSelectedId(null);
-                  }
-                  return next;
-                });
-              }}
-              title="Toggle Selection Mode (Press S, Ctrl+A on page)"
-              className={`h-7 px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center gap-1.5 border transition-colors shrink-0 leading-none ${
-                isSelectMode || selectedEntryIds.size > 0
-                  ? 'bg-zinc-900 text-zinc-100 border-zinc-700/90 font-medium shadow-sm'
-                  : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-              }`}
-            >
-              <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.select')}</span>
-              {selectedEntryIds.size > 0 ? (
-                <span className="inline-flex items-center justify-center min-w-[17px] h-4 px-1 rounded-full bg-zinc-100 text-zinc-950 font-semibold font-mono text-[10px] leading-none shrink-0 shadow-sm">
-                  {formatNumber(selectedEntryIds.size)}
-                </span>
-              ) : (
-                <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 hidden sm:inline-flex shrink-0">S</Kbd>
-              )}
-            </button>
+          {/* Right: Secondary Filters Popover + Multi-Select Mode */}
+          <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+            {/* Secondary Filters Popover Trigger */}
+            <div className="relative" ref={filtersPopoverRef}>
+              <button
+                type="button"
+                onClick={() => setIsFiltersPopoverOpen((prev) => !prev)}
+                title={t('ledger.filters')}
+                className={cn(
+                  'h-8 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-all active:scale-[0.97]',
+                  isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
+                    ? 'bg-zinc-900 text-zinc-100 border-zinc-700 font-semibold shadow-xs'
+                    : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 hover:border-zinc-700'
+                )}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filters')}</span>
+                {activeSecondaryFiltersCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-zinc-100 text-zinc-950 font-mono text-[10px] font-bold flex items-center justify-center leading-none">
+                    {activeSecondaryFiltersCount}
+                  </span>
+                )}
+              </button>
 
-            {/* Toggle Search & Advanced Filters Drawer */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSearchExpanded((prev) => !prev);
-                if (!isSearchExpanded) {
-                  setTimeout(() => searchInputRef?.current?.focus(), 80);
-                }
-              }}
-              title="Toggle Search, Games & Sort (Press / to search)"
-              className={`h-7 px-2 lg:px-2.5 rounded-md text-[11px] font-medium flex items-center justify-center gap-1.5 lg:gap-2 border transition-colors shrink-0 ${
-                isSearchExpanded || hasAdvancedFilters
-                  ? 'bg-zinc-900 text-zinc-200 border-zinc-700/80 font-medium shadow-sm'
-                  : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/70 hover:border-zinc-700/70'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                <span className={cn('hidden lg:inline whitespace-nowrap', isRtl && 'font-farsi')}>{t('ledger.searchAndFilters')}</span>
-              </div>
-              <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 px-1 py-0 hidden lg:inline-flex shrink-0">/</Kbd>
-              {hasAdvancedFilters && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/80 shrink-0" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Search, Game & Sort Drawer */}
-        <AnimatePresence>
-          {(isSearchExpanded || hasAdvancedFilters) && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeInOut' }}
-              className="space-y-2"
-            >
-              <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800/80 shadow-2xl space-y-2">
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
-                    <Input
-                      ref={searchInputRef}
-                      type="text"
-                      placeholder={t('ledger.searchPlaceholder')}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className={cn(
-                        'pl-8 pr-7 h-8 text-xs bg-black border-zinc-800/80 text-zinc-300 placeholder:text-zinc-600',
-                        isRtl && 'font-farsi placeholder:font-farsi text-right'
+              {/* Origin-aware Popover Dropdown */}
+              <AnimatePresence>
+                {isFiltersPopoverOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                    transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                    className={cn(
+                      'absolute top-full mt-1.5 w-64 p-3 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 rounded-xl shadow-2xl z-50 space-y-3 text-xs',
+                      isRtl ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
+                    )}
+                  >
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                      <span className={cn('font-semibold text-zinc-200 text-xs', isRtl && 'font-farsi')}>
+                        {t('ledger.filters')}
+                      </span>
+                      {activeSecondaryFiltersCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCurrencyFilter('');
+                            setHasProofFilter(false);
+                            setTeammateFilter('');
+                            setSortOption('date_desc');
+                          }}
+                          className="text-[10px] text-zinc-400 hover:text-zinc-200 underline"
+                        >
+                          Reset
+                        </button>
                       )}
-                    />
-                    {searchQuery && (
+                    </div>
+
+                    {/* Currency Filter */}
+                    <div className="space-y-1.5">
+                      <label className={cn('text-[10px] uppercase font-semibold text-zinc-400 block', isRtl && 'font-farsi')}>
+                        {t('ledger.filterCurrency', 'Currency')}
+                      </label>
+                      <div className="grid grid-cols-3 gap-1 bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-800">
+                        <button
+                          type="button"
+                          onClick={() => setCurrencyFilter('')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95',
+                            currencyFilter === '' ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                          )}
+                        >
+                          {t('status.all')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCurrencyFilter('GOLD')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center flex items-center justify-center gap-1 active:scale-95',
+                            currencyFilter === 'GOLD' ? 'bg-amber-950/50 text-amber-300 border border-amber-800/50 font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                          )}
+                        >
+                          <Coins className="w-3 h-3 text-amber-400" />
+                          <span>Gold</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCurrencyFilter('TOMAN')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center flex items-center justify-center gap-1 active:scale-95',
+                            currencyFilter === 'TOMAN' ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                          )}
+                        >
+                          <Banknote className="w-3 h-3 text-zinc-400" />
+                          <span className="font-farsi">تومان</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Screenshot Proof Toggle */}
+                    <div className="space-y-1.5">
+                      <label className={cn('text-[10px] uppercase font-semibold text-zinc-400 block', isRtl && 'font-farsi')}>
+                        {t('ledger.filterProof', 'Proof Attachment')}
+                      </label>
                       <button
                         type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300"
+                        onClick={() => setHasProofFilter((prev) => !prev)}
+                        className={cn(
+                          'w-full h-8 px-2.5 rounded-lg text-xs font-medium flex items-center justify-between border transition-all active:scale-[0.98]',
+                          hasProofFilter
+                            ? 'bg-emerald-950/30 text-emerald-300 border-emerald-800/60 font-semibold'
+                            : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:border-zinc-700 hover:text-zinc-200'
+                        )}
                       >
-                        ✕
+                        <div className="flex items-center gap-2">
+                          <FileImage className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.withProof', 'With proof only')}</span>
+                        </div>
+                        {hasProofFilter && <Check className="w-3.5 h-3.5 text-emerald-400" />}
                       </button>
+                    </div>
+
+                    {/* Teammate Filter (if active) */}
+                    {teammateFilter && (
+                      <div className="space-y-1.5">
+                        <label className={cn('text-[10px] uppercase font-semibold text-zinc-400 block', isRtl && 'font-farsi')}>
+                          {t('ledger.team')}
+                        </label>
+                        <div className="flex items-center justify-between p-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-300">
+                          <div className="flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>{teammateFilter}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTeammateFilter('')}
+                            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800"
+                            title="Clear team filter"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     )}
-                  </div>
 
-                  <div className="w-full sm:w-36">
-                    <Select
-                      value={gameFilter}
-                      onChange={setGameFilter}
-                      options={gameOptions}
-                      className="h-8 text-xs bg-black border-zinc-800/80 text-zinc-400"
-                    />
-                  </div>
-
-                  <div className="w-full sm:w-36">
-                    <Select
-                      value={sortOption}
-                      onChange={setSortOption}
-                      options={sortOptions}
-                      className="h-8 text-xs bg-black border-zinc-800/80 text-zinc-400"
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                    {/* Sort Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className={cn('text-[10px] uppercase font-semibold text-zinc-400 block', isRtl && 'font-farsi')}>
+                        {t('ledger.sortBy')}
+                      </label>
+                      <Select
+                        value={sortOption}
+                        onChange={setSortOption}
+                        options={sortOptions}
+                        className="h-8 text-xs bg-zinc-900/60 border-zinc-800 text-zinc-300"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 4. Grouped Job Feed */}
@@ -944,7 +1133,6 @@ export function LedgerView({
                   <AnimatePresence initial={false}>
                     {groupItems.map((entry, idx) => {
                       const isActionOpen = activeActionMenuId === entry.id;
-                      const isProofPrompting = promptProofEntryId === entry.id;
                       const isConfirmDeleting = confirmDeleteEntryId === entry.id;
                       const isSelected = selectedEntryIds.has(entry.id);
                       const isNearBottom = idx >= groupItems.length - 2 && groupItems.length > 3;
@@ -952,134 +1140,150 @@ export function LedgerView({
                       return (
                         <motion.div
                           key={entry.id}
-                          initial={{ opacity: 0, height: 0, scale: 0.98 }}
-                          animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                          exit={{ opacity: 0, height: 0, scale: 0.96, transition: { duration: 0.2, ease: 'easeInOut' } }}
+                          initial={{ opacity: 0, y: 4, scale: 0.99 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12, ease: 'easeOut' } }}
+                          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
                           className={cn('space-y-1 relative job-row-item', isActionOpen && 'z-40')}
                         >
                           {/* 1. In-Line Morphing Delete Confirmation Strip */}
-                          {isConfirmDeleting ? (
-                            <motion.div
-                              layout
-                              initial={{ opacity: 0, scale: 0.98 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.98 }}
-                              className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-8 h-8 rounded-lg bg-rose-950/80 border border-rose-800/60 flex items-center justify-center text-rose-400 shrink-0">
-                                  <Trash2 className="w-4 h-4" />
+                          <AnimatePresence mode="wait">
+                            {isConfirmDeleting ? (
+                              <motion.div
+                                key="confirm-delete"
+                                layout
+                                initial={{ opacity: 0, scale: 0.98, y: -2 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.98, y: 2 }}
+                                transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+                                dir={isRtl ? 'rtl' : 'ltr'}
+                                className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg bg-rose-950/80 border border-rose-800/60 flex items-center justify-center text-rose-400 shrink-0">
+                                    <Trash2 className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0 space-y-0.5">
+                                    <p className={cn('text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
+                                      {language === 'fa' ? (
+                                        <>حذف <span className="text-white font-semibold">«{entry.title}»</span>؟</>
+                                      ) : (
+                                        <>Delete <span className="text-white font-semibold">"{entry.title}"</span>?</>
+                                      )}
+                                    </p>
+                                    <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
+                                      {t('ledger.deleteRecordWarning', 'This work record and any attached screenshot proof will be permanently removed.')}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="min-w-0 space-y-0.5">
-                                  <p className="text-zinc-200 font-medium truncate">
-                                    Delete <span className="text-white font-semibold">"{entry.title}"</span>?
-                                  </p>
-                                  <p className="text-[10px] text-zinc-400">
-                                    This work record and any attached screenshot proof will be permanently removed.
-                                  </p>
-                                </div>
-                              </div>
 
-                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                                <Button
-                                  variant="ghost"
-                                  size="xs"
-                                  onClick={() => setConfirmDeleteEntryId(null)}
-                                  className="h-7 text-xs text-zinc-400 hover:text-zinc-200"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  variant="danger"
-                                  size="xs"
-                                  onClick={() => {
-                                    onDeleteEntry?.(entry.id);
-                                    setConfirmDeleteEntryId(null);
-                                    setSelectedEntryIds((prev) => {
-                                      const next = new Set(prev);
-                                      next.delete(entry.id);
-                                      return next;
-                                    });
-                                  }}
-                                  className="h-7 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm gap-1"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                  <span>Delete Record</span>
-                                </Button>
-                              </div>
-                            </motion.div>
-                          ) : (
-                            /* 2. Standard Work Record Card */
-                            <div
-                              dir="ltr"
-                              onClick={(e) => {
-                                if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
-                                  return;
-                                }
-                                if (isSelectMode || e.shiftKey) {
-                                  handleToggleEntrySelection(entry.id, e);
-                                } else {
-                                  onOpenReceipt?.(entry);
-                                }
-                              }}
-                              className={cn(
-                                'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-[background-color,border-color] duration-150 cursor-pointer border',
-                                isSelected
-                                  ? 'bg-zinc-900/60 border-zinc-500/70 shadow-sm'
-                                  : 'bg-zinc-950 hover:bg-zinc-900/50 border-zinc-800/60'
-                              )}
-                            >
-                              {/* Multi-Selection Square Checkbox Hovering Over Top-Left Border Corner */}
-                              <button
-                                type="button"
-                                data-no-row-click="true"
+                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => setConfirmDeleteEntryId(null)}
+                                    className={cn('h-7 text-xs text-zinc-400 hover:text-zinc-200', isRtl && 'font-farsi')}
+                                  >
+                                    {t('common.cancel', 'Cancel')}
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="xs"
+                                    onClick={() => {
+                                      onDeleteEntry?.(entry.id);
+                                      setConfirmDeleteEntryId(null);
+                                      setSelectedEntryIds((prev) => {
+                                        const next = new Set(prev);
+                                        next.delete(entry.id);
+                                        return next;
+                                      });
+                                    }}
+                                    className={cn('h-7 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm gap-1', isRtl && 'font-farsi')}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>{t('ledger.deleteRecordBtn', 'Delete Record')}</span>
+                                  </Button>
+                                </div>
+                              </motion.div>
+                            ) : (
+                              /* 2. Standard Work Record Card */
+                              <div
+                                dir="ltr"
                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleEntrySelection(entry.id, e);
+                                  if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
+                                    return;
+                                  }
+                                  if (isSelectMode || e.shiftKey) {
+                                    handleToggleEntrySelection(entry.id, e);
+                                  } else {
+                                    onOpenReceipt?.(entry);
+                                  }
                                 }}
-                                title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
                                 className={cn(
-                                  'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
+                                  'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-[background-color,border-color] duration-150 cursor-pointer border',
                                   isSelected
-                                    ? 'bg-zinc-100 border-zinc-100 text-zinc-950 scale-100 opacity-100'
-                                    : isSelectMode
-                                    ? 'bg-zinc-950 border-zinc-700 text-transparent opacity-100 hover:border-zinc-400 hover:scale-105'
-                                    : 'bg-zinc-950 border-zinc-700/80 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105'
+                                    ? 'bg-zinc-900/60 border-zinc-500/70 shadow-sm'
+                                    : 'bg-zinc-950 hover:bg-zinc-900/50 border-zinc-800/60'
                                 )}
                               >
-                                <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-950' : 'opacity-0 hover:opacity-50 text-zinc-400')} />
-                              </button>
+                                {/* Multi-Selection Square Checkbox Hovering Over Top-Left Border Corner */}
+                                <button
+                                  type="button"
+                                  data-no-row-click="true"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleEntrySelection(entry.id, e);
+                                  }}
+                                  title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
+                                  className={cn(
+                                    'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
+                                    isSelected
+                                      ? 'bg-zinc-100 border-zinc-100 text-zinc-950 scale-100 opacity-100'
+                                      : isSelectMode
+                                      ? 'bg-zinc-950 border-zinc-700 text-transparent opacity-100 hover:border-zinc-400 hover:scale-105'
+                                      : 'bg-zinc-950 border-zinc-700/80 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105'
+                                  )}
+                                >
+                                  <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-950' : 'opacity-0 hover:opacity-50 text-zinc-400')} />
+                                </button>
 
-                              {/* Left: Thumbnail / Emblem & Details (Full Space Restored) */}
-                              <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                                {entry.proofs && entry.proofs.length > 0 ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => onOpenLightbox?.(entry.proofs[0].data, entry.title)}
-                                    title="View screenshot proof"
-                                    className="w-9 h-9 rounded-lg bg-transparent border border-zinc-800/80 flex items-center justify-center text-emerald-400/80 hover:text-white shrink-0 group relative overflow-hidden mt-0.5 sm:mt-0"
-                                  >
-                                    <img
-                                      src={entry.proofs[0].data}
-                                      alt="Proof"
-                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                                    />
-                                  </button>
-                                ) : (
+                                {/* Left: Game Emblem & Details (Always keep GameIcon on far left) */}
+                                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                                   <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                                     <GameIcon game={entry.game} className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity" />
                                   </div>
-                                )}
 
-                                <div className="min-w-0 flex-1 space-y-0.5">
-                                  {/* Line 1: Title & Transparent Seller Badge */}
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs font-medium text-zinc-300 truncate">
-                                      {entry.title}
-                                    </span>
+                                  <div className="min-w-0 flex-1 space-y-0.5">
+                                    {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-medium text-zinc-900 dark:text-zinc-300 truncate">
+                                        {entry.title}
+                                      </span>
+                                      {entry.proofs && entry.proofs.length > 0 && (
+                                        <Tooltip content={t('ledger.viewScreenshotProof', 'View screenshot proof')} side="top">
+                                          <button
+                                            type="button"
+                                            data-no-row-click="true"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onOpenLightbox?.(entry.proofs[0].data, entry.title);
+                                            }}
+                                            className="p-1 rounded text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
+                                            title={t('ledger.viewScreenshotProof', 'View screenshot proof')}
+                                          >
+                                            <FileImage className="w-3.5 h-3.5" />
+                                          </button>
+                                        </Tooltip>
+                                      )}
                                     {entry.source && (
-                                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-transparent text-zinc-500 border border-zinc-800/80">
+                                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-transparent text-zinc-500 border border-zinc-200 dark:border-zinc-800/80">
                                         {entry.source}
+                                      </span>
+                                    )}
+                                    {entry.dateTime && formatRowTime(entry.dateTime) && (
+                                      <span className="text-[10px] font-mono text-zinc-500 flex items-center gap-1 select-none">
+                                        <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
+                                        <span>{formatRowTime(entry.dateTime)}</span>
                                       </span>
                                     )}
                                   </div>
@@ -1106,7 +1310,7 @@ export function LedgerView({
                                       </span>
 
                                       {entry.pot && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-900/90 text-amber-300/90 border border-amber-800/40 inline-flex items-baseline gap-1">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 dark:bg-zinc-900/90 text-amber-700 dark:text-amber-300/90 border border-amber-600/30 dark:border-amber-800/40 ring-1 ring-inset ring-amber-600/20 backdrop-blur-md inline-flex items-baseline gap-1">
                                           <span>Pot:</span>
                                           <MoneyDisplay amount={entry.pot} currency={entry.currency} />
                                           <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
@@ -1125,15 +1329,15 @@ export function LedgerView({
                                               setTeammateFilter(isMatch ? '' : tm);
                                             }}
                                             title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
-                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 ${
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
                                               isMatch
-                                                ? 'bg-zinc-900 text-zinc-300 border-zinc-700/80 shadow-sm'
-                                                : 'bg-transparent hover:bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800/80'
+                                                ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 dark:border-zinc-300 shadow-sm'
+                                                : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
                                             }`}
                                           >
                                             <span>{tm}</span>
                                             {customCut && (
-                                              <span className="font-mono text-[9px] text-zinc-400 inline-flex items-baseline">
+                                              <span className="font-mono text-[9px] text-zinc-500 dark:text-zinc-400 inline-flex items-baseline">
                                                 (<MoneyDisplay amount={customCut} currency={entry.currency} />)
                                               </span>
                                             )}
@@ -1145,15 +1349,15 @@ export function LedgerView({
                                 </div>
                               </div>
 
-                              {/* Right: Income (Your Cut), Status, Menu */}
+                              {/* Right: Income (Your Cut), External Link, Status, Menu */}
                               <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
                                 <div className="text-left sm:text-right">
                                   {entry.teamMode && (
-                                    <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">
-                                      Your Share
+                                    <div className={cn('text-[9px] font-mono text-zinc-500 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                                      {t('ledger.yourShare', 'Your Share')}
                                     </div>
                                   )}
-                                  <div className="text-xs font-medium text-zinc-300">
+                                  <div className="text-xs font-medium text-zinc-900 dark:text-zinc-300">
                                     <MoneyDisplay amount={entry.income} currency={entry.currency} />
                                   </div>
                                   {entry.currency !== globalCurrency && (
@@ -1169,14 +1373,32 @@ export function LedgerView({
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  {/* Icon-only external link button */}
+                                  {entry.link && (
+                                    <Tooltip content={entry.link} side="top">
+                                      <button
+                                        type="button"
+                                        data-no-row-click="true"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenExternalLink(entry.link);
+                                        }}
+                                        title={t('ledger.openLink', 'Open Link')}
+                                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
+                                      >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                      </button>
+                                    </Tooltip>
+                                  )}
+
                                   <StatusBadge
                                     status={entry.status}
                                     interactive={true}
                                     onSelectStatus={(st) => handleStatusSelect(entry, st)}
                                   />
 
-                                  {/* 3-Dot Action Menu */}
+                                  {/* 3-Dot Action Menu with origin-aware animation */}
                                   <div className="relative flex items-center">
                                     <button
                                       type="button"
@@ -1184,121 +1406,96 @@ export function LedgerView({
                                         e.stopPropagation();
                                         setActiveActionMenuId(isActionOpen ? null : entry.id);
                                       }}
-                                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors shrink-0"
+                                      className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800 active:scale-[0.95] transition-all shrink-0"
                                     >
                                       <MoreVertical className="w-3.5 h-3.5 shrink-0" />
                                     </button>
 
-                                    {isActionOpen && (
-                                      <div
-                                        onClick={(e) => e.stopPropagation()}
-                                        dir={isRtl ? 'rtl' : 'ltr'}
-                                        className={cn(
-                                          'absolute w-36 bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs right-0',
-                                          isNearBottom ? 'bottom-full mb-1' : 'top-full mt-1'
-                                        )}
-                                      >
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            onOpenReceipt?.(entry);
-                                            setActiveActionMenuId(null);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
+                                    <AnimatePresence>
+                                      {isActionOpen && (
+                                        <motion.div
+                                          initial={{ opacity: 0, scale: 0.95 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          exit={{ opacity: 0, scale: 0.95 }}
+                                          transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          dir={isRtl ? 'rtl' : 'ltr'}
+                                          className={cn(
+                                            'absolute w-36 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs right-0',
+                                            isNearBottom ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'
+                                          )}
                                         >
-                                          <Receipt className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.clientReceipt')}</span>
-                                        </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              onOpenReceipt?.(entry);
+                                              setActiveActionMenuId(null);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                          >
+                                            <Receipt className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                                            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.clientReceipt')}</span>
+                                          </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            onOpenWorkModal?.(entry);
-                                            setActiveActionMenuId(null);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
-                                        >
-                                          <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.edit')}</span>
-                                        </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              onOpenWorkModal?.(entry);
+                                              setActiveActionMenuId(null);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                          >
+                                            <FileImage className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                                            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.addScreenshot', 'Add Screenshot')}</span>
+                                          </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            onDuplicateEntry?.(entry.id);
-                                            setActiveActionMenuId(null);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900/80 hover:text-white"
-                                        >
-                                          <Copy className="w-3.5 h-3.5 text-zinc-400" />
-                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.duplicate')}</span>
-                                        </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              onOpenWorkModal?.(entry);
+                                              setActiveActionMenuId(null);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                          >
+                                            <Edit2 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                                            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.edit')}</span>
+                                          </button>
 
-                                        <div className="border-t border-zinc-800 my-0.5" />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              onDuplicateEntry?.(entry.id);
+                                              setActiveActionMenuId(null);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                          >
+                                            <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                                            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.duplicate')}</span>
+                                          </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveActionMenuId(null);
-                                            setConfirmDeleteEntryId(entry.id);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/40 hover:text-rose-300"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                          <span className={cn(isRtl && 'font-farsi')}>{t('ledger.delete')}</span>
-                                        </button>
-                                      </div>
-                                    )}
+                                          <div className="border-t border-zinc-200 dark:border-zinc-800 my-0.5" />
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveActionMenuId(null);
+                                              setConfirmDeleteEntryId(entry.id);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:text-rose-300 transition-colors"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.delete')}</span>
+                                          </button>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
                                   </div>
                                 </div>
                               </div>
                             </div>
                           )}
-
-                          {/* In-Row Animated Proof Prompt Overlay */}
-                          <AnimatePresence>
-                            {isProofPrompting && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                                transition={{ duration: 0.15 }}
-                                dir={isRtl ? 'rtl' : 'ltr'}
-                                className="p-2.5 rounded-xl bg-zinc-950/90 backdrop-blur-md border border-emerald-900/60 shadow-xl flex items-center justify-between gap-3 text-xs"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                  <span className={cn('text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
-                                    {t('ledger.attachProofPrompt')}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
-                                  <Button
-                                    variant="primary"
-                                    size="xs"
-                                    onClick={() => {
-                                      onOpenWorkModal?.(entry);
-                                      setPromptProofEntryId(null);
-                                    }}
-                                    className={cn('h-7 text-xs gap-1', isRtl && 'font-farsi')}
-                                  >
-                                    <UploadCloud className="w-3 h-3" />
-                                    <span>{t('ledger.attachProof')}</span>
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    onClick={() => setPromptProofEntryId(null)}
-                                    className={cn('h-7 text-xs text-zinc-400 hover:text-zinc-200', isRtl && 'font-farsi')}
-                                  >
-                                    <span>{t('ledger.dismiss')}</span>
-                                  </Button>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
+                        </AnimatePresence>
+                      </motion.div>
                       );
                     })}
                   </AnimatePresence>
@@ -1309,7 +1506,7 @@ export function LedgerView({
 
           {/* 5. Numbered Pagination Toolbar */}
           {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-800/80 text-xs text-zinc-400">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 text-xs text-zinc-600 dark:text-zinc-400">
               <span className={cn('text-zinc-500 font-mono text-[11px]', isRtl && 'font-farsi')}>
                 {language === 'fa'
                   ? `نمایش ${formatNumber((currentPage - 1) * ITEMS_PER_PAGE + 1)} تا ${formatNumber(Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length))} از ${formatNumber(filteredEntries.length)} کار`
@@ -1321,7 +1518,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors', isRtl && 'font-farsi')}
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white transition-colors', isRtl && 'font-farsi')}
                 >
                   {t('ledger.previous')}
                 </button>
@@ -1335,7 +1532,7 @@ export function LedgerView({
                   ) {
                     if (pageNum === 2 || pageNum === totalPages - 1) {
                       return (
-                        <span key={pageNum} className="px-1 text-zinc-600 font-mono">
+                        <span key={pageNum} className="px-1 text-zinc-400 dark:text-zinc-600 font-mono">
                           ...
                         </span>
                       );
@@ -1350,8 +1547,8 @@ export function LedgerView({
                       onClick={() => handlePageChange(pageNum)}
                       className={cn(`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
                         currentPage === pageNum
-                          ? 'bg-zinc-100 text-zinc-950 font-semibold border-zinc-200 shadow-sm'
-                          : 'bg-transparent hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                          ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 dark:border-zinc-200 shadow-sm font-semibold'
+                          : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800'
                       }`, isRtl && 'font-farsi')}
                     >
                       {formatNumber(pageNum)}
@@ -1363,7 +1560,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-800 text-zinc-300 hover:text-white transition-colors', isRtl && 'font-farsi')}
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white transition-colors', isRtl && 'font-farsi')}
                 >
                   {t('ledger.next')}
                 </button>

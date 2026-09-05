@@ -35,9 +35,6 @@ export function QuickAddModal({
   const GAME_OPTIONS = [
     { value: 'World of Warcraft', label: 'World of Warcraft' },
     { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
-    { value: 'Diablo IV', label: 'Diablo IV' },
-    { value: 'Path of Exile', label: 'Path of Exile' },
-    { value: 'League of Legends', label: 'League of Legends' },
     { value: '__custom__', label: `+ ${t('work.customGameOption', 'Custom Game / Realm')}` },
   ];
   const [title, setTitle] = useState('');
@@ -443,7 +440,7 @@ export function QuickAddModal({
                   }}
                   placeholder="0"
                   className={cn(
-                    'font-mono text-sm bg-zinc-900/80 border-zinc-700/80 text-zinc-100 pr-12',
+                    'font-mono text-sm bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-900 dark:text-zinc-100 pr-12',
                     hasPriceError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
                   )}
                   required
@@ -457,17 +454,17 @@ export function QuickAddModal({
 
               {/* Real-time Dual-Currency Conversion Pill */}
               {numericPrice > 0 && (
-                <div className="flex items-center justify-between bg-zinc-900/60 border border-zinc-800/80 px-2.5 py-1.5 rounded-md text-[11px] text-zinc-400">
+                <div className="flex items-center justify-between bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 px-2.5 py-1.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-400">
                   <div className="flex items-center gap-1.5">
                     <span className="text-zinc-500">{t('quickAdd.liveEquivalent')}:</span>
-                    <span className="font-mono font-semibold text-zinc-200">
+                    <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-200">
                       ≈ {formatMoney(convertedPrice, altCurrency, false, language === 'fa')}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleToggleCurrency}
-                    className="flex items-center gap-1 text-[10px] font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-[10px] font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
                     title="Swap primary currency"
                   >
                     <ArrowRightLeft className="w-3 h-3" />
@@ -479,7 +476,7 @@ export function QuickAddModal({
           </div>
 
           {/* Quick Context Footer Hint */}
-          <div className="pt-1 flex items-center justify-between text-[10px] text-zinc-500 border-t border-zinc-800/60">
+          <div className="pt-1 flex items-center justify-between text-[10px] text-zinc-500 border-t border-zinc-200 dark:border-zinc-800/60">
             <span className={cn('text-[11px]', isRtl && 'font-farsi')}>{t('quickAdd.statusHint')}</span>
             <div className="flex items-center gap-1">
               <span>{t('quickAdd.submitWithEnter')}</span>
@@ -488,14 +485,14 @@ export function QuickAddModal({
           </div>
         </DialogContent>
 
-        <DialogFooter className="flex items-center justify-between sm:justify-between px-5 py-3 border-t border-zinc-800/80 bg-zinc-950/60">
+        <DialogFooter className="flex items-center justify-between sm:justify-between px-5 py-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/90 dark:bg-zinc-950/60">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={onClose}
             disabled={isSaving}
-            className={cn('text-zinc-400 hover:text-zinc-200', isRtl && 'font-farsi')}
+            className={cn('text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200', isRtl && 'font-farsi')}
           >
             {t('common.cancel')}
           </Button>
@@ -505,7 +502,7 @@ export function QuickAddModal({
             variant="primary"
             size="sm"
             disabled={isSaving}
-            className={cn('gap-1.5 font-semibold bg-zinc-100 text-zinc-950 hover:bg-white active:scale-[0.98] shadow-sm', isRtl && 'font-farsi')}
+            className={cn('gap-1.5 font-semibold active:scale-[0.98] shadow-sm', isRtl && 'font-farsi')}
           >
             <Zap className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>{isSaving ? (language === 'fa' ? 'در حال ذخیره...' : 'Saving...') : t('quickAdd.addRecord')}</span>

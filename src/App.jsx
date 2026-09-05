@@ -16,7 +16,9 @@ import { NotificationCenter } from './components/NotificationCenter';
 import { UpdateModal } from './components/UpdateModal';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, getAppVersion } from './lib/updater';
 import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
@@ -115,6 +117,10 @@ export default function App() {
     if (saved === 'analytics') return 'analytics';
     return 'ledger';
   });
+
+  // Interface Theme ('dark' | 'light') via next-themes
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const currentTheme = resolvedTheme || theme || 'dark';
 
   // User Currency Preferences (TOMAN | GOLD)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
@@ -249,6 +255,11 @@ export default function App() {
       if (savedTab === 'ledger' || savedTab === 'analytics') {
         setActiveTab(savedTab);
         localStorage.setItem('checkpoint_tab', savedTab);
+      }
+      const savedTheme = await trackerDB.getSetting('checkpoint_theme', null);
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        setTheme(savedTheme);
+        localStorage.setItem('checkpoint_theme', savedTheme);
       }
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
@@ -522,6 +533,15 @@ export default function App() {
     localStorage.setItem('checkpoint_auto_backup_retention', String(num));
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_retention', String(num));
+    } catch (e) {}
+  };
+
+  const handleThemeChange = async (newTheme) => {
+    const validTheme = newTheme === 'light' ? 'light' : 'dark';
+    setTheme(validTheme);
+    localStorage.setItem('checkpoint_theme', validTheme);
+    try {
+      await trackerDB.setSetting('checkpoint_theme', validTheme);
     } catch (e) {}
   };
 
@@ -1104,6 +1124,23 @@ export default function App() {
         return;
       }
 
+      // '?' Hotkey opens Shortcuts dialog (Must check BEFORE '/' since '?' is Shift + '/')
+      if (e.key === '?' || (e.shiftKey && (e.code === 'Slash' || e.key === '/'))) {
+        e.preventDefault();
+        setIsShortcutsOpen(true);
+        return;
+      }
+
+      // '/' Hotkey focuses Ledger Search (Only when no modifiers are active)
+      if ((e.code === 'Slash' || e.key === '/') && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        state.handleTabChange?.('ledger');
+        setTimeout(() => {
+          state.searchInputRef?.current?.focus();
+        }, 50);
+        return;
+      }
+
       if (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q') {
         e.preventDefault();
         setIsQuickAddOpen(true);
@@ -1116,15 +1153,6 @@ export default function App() {
       } else if (e.code === 'Digit2' || e.key === '2') {
         e.preventDefault();
         state.handleTabChange?.('analytics');
-      } else if (e.code === 'Slash' || e.key === '/') {
-        e.preventDefault();
-        state.handleTabChange?.('ledger');
-        setTimeout(() => {
-          state.searchInputRef?.current?.focus();
-        }, 100);
-      } else if (e.key === '?' || (e.shiftKey && e.code === 'Slash')) {
-        e.preventDefault();
-        setIsShortcutsOpen(true);
       }
     };
 
@@ -1190,34 +1218,36 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.08, ease: [0.23, 1, 0.32, 1] }}
               >
-                {activeTab === 'ledger' && (
-                  <LedgerView
-                    entries={entries}
-                    globalCurrency={globalCurrency}
-                    onCurrencyChange={handleCurrencyChange}
-                    goldRateTOMAN={goldRateTOMAN}
-                    onOpenWorkModal={handleOpenWorkModal}
-                    onOpenReceipt={handleOpenReceipt}
-                    onOpenLightbox={handleOpenLightbox}
-                    onFlipStatus={handleFlipStatus}
-                    onDuplicateEntry={handleDuplicateEntry}
-                    onDeleteEntry={handleDeleteEntry}
-                    onBulkDelete={handleBulkDelete}
-                    onBulkUpdateStatus={handleBulkUpdateStatus}
-                    onBulkExportCsv={handleBulkExportCsv}
-                    searchInputRef={searchInputRef}
-                    externalTeammateFilter={externalTeammateFilter}
-                    onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
-                  />
-                )}
+                <ErrorBoundary>
+                  {activeTab === 'ledger' && (
+                    <LedgerView
+                      entries={entries}
+                      globalCurrency={globalCurrency}
+                      onCurrencyChange={handleCurrencyChange}
+                      goldRateTOMAN={goldRateTOMAN}
+                      onOpenWorkModal={handleOpenWorkModal}
+                      onOpenReceipt={handleOpenReceipt}
+                      onOpenLightbox={handleOpenLightbox}
+                      onFlipStatus={handleFlipStatus}
+                      onDuplicateEntry={handleDuplicateEntry}
+                      onDeleteEntry={handleDeleteEntry}
+                      onBulkDelete={handleBulkDelete}
+                      onBulkUpdateStatus={handleBulkUpdateStatus}
+                      onBulkExportCsv={handleBulkExportCsv}
+                      searchInputRef={searchInputRef}
+                      externalTeammateFilter={externalTeammateFilter}
+                      onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
+                    />
+                  )}
 
-                {activeTab === 'analytics' && (
-                  <AnalyticsView
-                    entries={entries}
-                    globalCurrency={globalCurrency}
-                    goldRateTOMAN={goldRateTOMAN}
-                  />
-                )}
+                  {activeTab === 'analytics' && (
+                    <AnalyticsView
+                      entries={entries}
+                      globalCurrency={globalCurrency}
+                      goldRateTOMAN={goldRateTOMAN}
+                    />
+                  )}
+                </ErrorBoundary>
               </motion.div>
             </AnimatePresence>
           )}
@@ -1302,6 +1332,9 @@ export default function App() {
         autoBackupRetention={autoBackupRetention}
         onAutoBackupRetentionChange={handleAutoBackupRetentionChange}
         onManualAutoBackup={handleManualAutoBackup}
+        theme={currentTheme}
+        onThemeChange={handleThemeChange}
+        handleThemeChange={handleThemeChange}
       />
 
       <NotificationCenter

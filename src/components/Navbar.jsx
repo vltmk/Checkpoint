@@ -4,7 +4,6 @@ import {
   Layers,
   BarChart3,
   Plus,
-  Zap,
   Settings,
   Banknote,
   Coins,
@@ -20,6 +19,7 @@ import {
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
+import { CheckpointLogo } from './ui/Icons';
 import checkpointLogo from '../assets/checkpoint.svg';
 import {
   minimizeWindow,
@@ -182,7 +182,7 @@ export function Navbar({
       data-tauri-drag-region
       onMouseDown={handleHeaderMouseDown}
       onDoubleClick={handleHeaderDoubleClick}
-      className="hidden md:flex h-12 w-full bg-black/95 border-b border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-300 relative cursor-default gap-2"
+      className="hidden md:flex h-12 w-full bg-white/95 dark:bg-black/95 border-b border-zinc-200 dark:border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-700 dark:text-zinc-300 relative cursor-default gap-2"
     >
       {/* 1. Left: Brand Identity (Link to GitHub) & Add Work Button */}
       <div data-no-drag className="flex items-center gap-2.5 shrink-0 z-10">
@@ -191,55 +191,47 @@ export function Navbar({
           data-no-drag
           onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint')}
           title="Open Checkpoint repository on GitHub"
-          className="flex items-center gap-2 select-none cursor-pointer group p-1 -m-1 rounded-md hover:bg-zinc-900/80 transition-colors"
+          className="flex items-center gap-2 select-none cursor-pointer group p-1 -m-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900/80 transition-colors"
         >
-          <img
-            src={checkpointLogo}
-            alt="CHECKPOINT"
-            className="w-5 h-5 object-contain group-hover:scale-105 transition-transform"
-          />
-          <span className="text-xs font-black tracking-wider text-white uppercase group-hover:text-zinc-200">
+          <CheckpointLogo className="w-5 h-5 text-zinc-950 dark:text-white group-hover:scale-105 transition-transform shrink-0" />
+          <span className="hidden lg:inline text-xs font-black tracking-wider text-zinc-950 dark:text-white uppercase group-hover:text-zinc-700 dark:group-hover:text-zinc-200">
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800/80 group-hover:border-zinc-700 transition-colors">
+            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors">
               v{appVersion}
             </span>
           )}
         </button>
 
-        <div className="h-4 w-px bg-zinc-800/80 pointer-events-none" />
+        <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800/80 pointer-events-none" />
 
         <div data-no-drag className="flex items-center">
-          <div className="inline-flex items-center rounded-lg bg-zinc-100 p-0.5 shadow-sm border border-zinc-200/20">
+          <div className="inline-flex items-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 p-0.5 shadow-sm border border-zinc-800 dark:border-zinc-200/20">
             {/* Primary Add Work (Left Side) */}
             <button
               type="button"
               onClick={() => onOpenWorkModal?.()}
               title={`${t('nav.addWork')} (N)`}
-              className="flex items-center gap-1.5 h-6 px-2 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
+              className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-semibold text-white dark:text-zinc-950 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-white dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
             >
               <Plus className="w-3.5 h-3.5" />
               <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 ml-0.5 font-mono">
-                N
-              </Kbd>
             </button>
 
             {/* Subtle vertical hairline divider */}
-            <div className="h-3.5 w-px bg-zinc-300/80 my-auto mx-0.5" />
+            <div className="h-3.5 w-px bg-zinc-700 dark:bg-zinc-300/80 my-auto mx-0.5" />
 
             {/* Quick Add Lightning (Right Side) */}
             <button
               type="button"
               onClick={() => onOpenQuickAdd?.()}
               title={`${t('nav.quickAdd')} (Q)`}
-              className="flex items-center justify-center h-6 px-1.5 text-xs font-semibold text-zinc-950 hover:bg-white active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
+              className="flex items-center justify-center h-6 px-2 text-xs font-semibold text-white dark:text-zinc-950 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-white dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
             >
-              <Zap className="w-3.5 h-3.5 text-zinc-950" strokeWidth={1.5} />
-              <Kbd className="bg-zinc-900 text-zinc-300 border-zinc-700 text-[9px] px-1 font-mono">
-                Q
-              </Kbd>
+              <span className={cn('text-xs font-semibold leading-none', isRtl && 'font-farsi')}>
+                {t('nav.quickAdd')}
+              </span>
             </button>
           </div>
         </div>
@@ -251,32 +243,32 @@ export function Navbar({
         onMouseDown={handleHeaderMouseDown}
         className="flex-1 flex items-center justify-center min-w-0 px-1 h-full cursor-default z-10"
       >
-        <div data-no-drag className="bg-zinc-950 border border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
+        <div data-no-drag className="bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
           {/* Tab 1: Ledger */}
           <button
             type="button"
             onClick={() => onTabChange?.('ledger')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'ledger'
-                ? 'text-white font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200 font-medium'
+                ? 'text-zinc-950 dark:text-white font-semibold'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'ledger' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700"
+                className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200/90 dark:border-zinc-700"
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-white' : 'text-zinc-500'}`} />
+            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}`} />
             <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
             {entriesCount > 0 && (
               <span
                 className={`text-[10px] font-mono px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
                   activeTab === 'ledger'
-                    ? 'bg-zinc-900 text-zinc-100 border-zinc-700 font-semibold'
-                    : 'bg-zinc-900/80 text-zinc-400 border-zinc-800/80'
+                    ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 font-semibold'
+                    : 'bg-zinc-200/50 text-zinc-600 border-zinc-300/60 dark:bg-zinc-900/80 dark:text-zinc-400 dark:border-zinc-800/80'
                 }`}
               >
                 {formatNumber(entriesCount)}
@@ -290,18 +282,18 @@ export function Navbar({
             onClick={() => onTabChange?.('analytics')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'analytics'
-                ? 'text-white font-semibold'
-                : 'text-zinc-400 hover:text-zinc-200 font-medium'
+                ? 'text-zinc-950 dark:text-white font-semibold'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'analytics' && (
               <motion.div
                 layoutId="activeNavTabPill"
-                className="absolute inset-0 bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-700"
+                className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200/90 dark:border-zinc-700"
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-white' : 'text-zinc-500'}`} />
+            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}`} />
             <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
           </button>
         </div>
@@ -497,16 +489,16 @@ export function Navbar({
         )}
 
         {/* Notifications & Settings Buttons */}
-        <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80" data-no-drag>
+        <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-200 dark:border-zinc-800/80" data-no-drag>
           <button
             type="button"
             onClick={onOpenNotifications}
             title="Notifications & Feed"
-            className="relative p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+            className="relative p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-colors"
           >
             <Bell className="w-3.5 h-3.5" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-black" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white dark:ring-black" />
             )}
           </button>
 
@@ -514,7 +506,7 @@ export function Navbar({
             type="button"
             onClick={onOpenSettings}
             title="Open Settings"
-            className="p-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-900 transition-colors"
           >
             <Settings className="w-3.5 h-3.5" />
           </button>
@@ -523,7 +515,7 @@ export function Navbar({
         {/* Desktop Window Controls */}
         {isDesktop && (
           <div
-            className="flex items-center gap-0.5 pl-1 border-l border-zinc-800/80"
+            className="flex items-center gap-0.5 pl-1 border-l border-zinc-200 dark:border-zinc-800/80"
             data-no-drag
             onMouseDown={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
@@ -531,7 +523,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleMinimize}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
               title="Minimize"
               aria-label="Minimize Window"
             >
@@ -540,7 +532,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleToggleMaximize}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none cursor-pointer select-none"
               title={isMaximized ? 'Restore' : 'Maximize'}
               aria-label={isMaximized ? 'Restore Window' : 'Maximize Window'}
             >
@@ -553,7 +545,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleClose}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-400 hover:text-white hover:bg-red-600/90 transition-colors focus:outline-none cursor-pointer select-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-500 dark:text-zinc-400 hover:text-white hover:bg-red-600 transition-colors focus:outline-none cursor-pointer select-none"
               title="Close"
               aria-label="Close Window"
             >

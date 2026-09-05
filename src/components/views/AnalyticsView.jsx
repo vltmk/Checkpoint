@@ -41,6 +41,7 @@ ChartJS.register(
 
 import { useLanguage, formatShamsiDate } from '../../lib/i18n';
 import { trackerDB } from '../../lib/db';
+import { useTheme } from 'next-themes';
 
 // Configure Chart.js global defaults to prioritize IRANYekanRd for Persian text (تومان)
 ChartJS.defaults.font.family = "'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -51,6 +52,9 @@ export function AnalyticsView({
   goldRateTOMAN = 3200,
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
+  const { resolvedTheme } = useTheme();
+  const isLight = resolvedTheme === 'light';
+
   const [timeframe, setTimeframe] = useState(() => {
     const saved = localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe');
     if (saved && ['daily', 'weekly', 'monthly', 'all'].includes(saved)) return saved;
@@ -285,28 +289,23 @@ export function AnalyticsView({
         {
           label: `${t('analytics.totalEarned')} (${globalCurrency})`,
           data: velocityChartData.data,
-          backgroundColor: '#fafafa',
-          hoverBackgroundColor: '#e4e4e7',
+          backgroundColor: isLight ? '#18181b' : '#fafafa',
+          hoverBackgroundColor: isLight ? '#27272a' : '#e4e4e7',
           borderRadius: 4,
           maxBarThickness: 32,
         },
       ],
     };
-  }, [velocityChartData, globalCurrency, t]);
+  }, [velocityChartData, globalCurrency, t, isLight]);
 
   // Game Distribution Donut Data
   const donutChartData = useMemo(() => {
     const labels = stats.sortedGames.map((g) => g.game);
     const data = stats.sortedGames.map((g) => g.revenue);
 
-    const monochromaticPalette = [
-      '#ffffff',
-      '#d4d4d8',
-      '#a1a1aa',
-      '#71717a',
-      '#3f3f46',
-      '#27272a',
-    ];
+    const monochromaticPalette = isLight
+      ? ['#18181b', '#3f3f46', '#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7']
+      : ['#ffffff', '#d4d4d8', '#a1a1aa', '#71717a', '#3f3f46', '#27272a'];
 
     return {
       labels,
@@ -314,23 +313,23 @@ export function AnalyticsView({
         {
           data,
           backgroundColor: monochromaticPalette.slice(0, Math.max(labels.length, 1)),
-          borderColor: '#000000',
+          borderColor: isLight ? '#ffffff' : '#000000',
           borderWidth: 2,
         },
       ],
     };
-  }, [stats.sortedGames]);
+  }, [stats.sortedGames, isLight]);
 
-  const barChartOptions = {
+  const barChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#09090b',
-        titleColor: '#fafafa',
-        bodyColor: '#a1a1aa',
-        borderColor: '#27272a',
+        backgroundColor: isLight ? '#ffffff' : '#09090b',
+        titleColor: isLight ? '#09090b' : '#fafafa',
+        bodyColor: isLight ? '#71717a' : '#a1a1aa',
+        borderColor: isLight ? '#e4e4e7' : '#27272a',
         borderWidth: 1,
         padding: 8,
         cornerRadius: 6,
@@ -358,7 +357,7 @@ export function AnalyticsView({
         border: { display: false },
       },
       y: {
-        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+        grid: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)' },
         ticks: {
           color: '#71717a',
           font: { size: 10, family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace" },
@@ -367,18 +366,18 @@ export function AnalyticsView({
         border: { display: false },
       },
     },
-  };
+  }), [isLight, globalCurrency, language]);
 
-  const donutOptions = {
+  const donutOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#09090b',
-        titleColor: '#fafafa',
-        bodyColor: '#a1a1aa',
-        borderColor: '#27272a',
+        backgroundColor: isLight ? '#ffffff' : '#09090b',
+        titleColor: isLight ? '#09090b' : '#fafafa',
+        bodyColor: isLight ? '#71717a' : '#a1a1aa',
+        borderColor: isLight ? '#e4e4e7' : '#27272a',
         borderWidth: 1,
         padding: 8,
         cornerRadius: 6,
@@ -396,17 +395,17 @@ export function AnalyticsView({
         },
       },
     },
-  };
+  }), [isLight, globalCurrency, language]);
 
   const currentTfObj = TIMEFRAMES.find((tf) => tf.id === timeframe) || TIMEFRAMES[2];
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Header Row: Title & Segmented Timeframe Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-200 dark:border-zinc-800/80">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-zinc-300" />
+          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.title')}</span>
           </h2>
           <p className={cn('text-xs text-zinc-500 mt-0.5', isRtl && 'font-farsi')}>
@@ -415,7 +414,7 @@ export function AnalyticsView({
         </div>
 
         {/* Monochromatic Segmented Pill Control */}
-        <div className="inline-flex items-center p-1 rounded-xl bg-transparent border border-zinc-800/80 text-xs self-start sm:self-auto">
+        <div className="inline-flex items-center p-1 rounded-xl bg-zinc-100 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 text-xs self-start sm:self-auto">
           {TIMEFRAMES.map((tf) => {
             const isSelected = timeframe === tf.id;
             return (
@@ -427,8 +426,8 @@ export function AnalyticsView({
                   'px-3 py-1 rounded-lg text-xs font-medium transition-all select-none',
                   isRtl && 'font-farsi',
                   isSelected
-                    ? 'bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700/60 font-semibold'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                    ? 'bg-white text-zinc-950 shadow-sm border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700/60 font-semibold'
+                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/40'
                 )}
               >
                 {tf.label}
@@ -440,52 +439,52 @@ export function AnalyticsView({
 
       {/* 1. KPIs Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
+        <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Coins className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-200 truncate">
+          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
+        <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Trophy className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-200 truncate">
+          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
           </div>
         </div>
 
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
+        <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-200">
-            {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-600 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200">
+            {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
 
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3.5 space-y-1">
+        <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-200">
+          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200">
             {formatNumber(stats.completionRate)}%
           </div>
         </div>
       </div>
 
       {/* 2. Velocity Bar Chart */}
-      <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
+      <div className="rounded-2xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-zinc-400" />
+          <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{velocityChartData.title}</span>
           </h3>
           <span className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -500,10 +499,10 @@ export function AnalyticsView({
       {/* 3. Game Distribution & Ranking */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Donut Chart */}
-        <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-4">
+        <div className="rounded-2xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-              <PieChart className="w-4 h-4 text-zinc-400" />
+            <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
               <span className={cn(isRtl && 'font-farsi')}>{t('analytics.revenueByGame')}</span>
             </h3>
             <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -521,9 +520,9 @@ export function AnalyticsView({
         </div>
 
         {/* Breakdown Ranking List */}
-        <div className="rounded-2xl bg-transparent border border-zinc-800/80 p-5 space-y-3">
+        <div className="rounded-2xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className={cn('text-xs font-medium uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+            <h3 className={cn('text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-400', isRtl && 'font-farsi')}>
               {t('analytics.topGamesBreakdown')}
             </h3>
             <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>{t('analytics.periodShare')}</span>
@@ -534,17 +533,17 @@ export function AnalyticsView({
               stats.sortedGames.map((item) => (
                 <div key={item.game} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300 font-medium truncate flex items-center gap-1.5">
+                    <span className="text-zinc-800 dark:text-zinc-300 font-medium truncate flex items-center gap-1.5">
                       <GameIcon game={item.game} className="w-3.5 h-3.5" />
                       <span>{item.game}</span>
                     </span>
-                    <span className="text-zinc-300 font-medium">
+                    <span className="text-zinc-800 dark:text-zinc-300 font-medium">
                       <MoneyDisplay amount={item.revenue} currency={globalCurrency} />
                     </span>
                   </div>
-                  <div dir="ltr" className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                  <div dir="ltr" className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-zinc-100 rounded-full transition-all duration-300"
+                      className="h-full bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-300"
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>

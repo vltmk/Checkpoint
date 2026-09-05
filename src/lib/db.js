@@ -26,7 +26,7 @@ const STORE_SNAPSHOTS = 'db_snapshots';
 
 const REQUIRED_WORK_ENTRY_COLUMNS = [
   'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
-  'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes',
+  'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes', 'link',
 ];
 
 const WORK_ENTRY_COLUMN_MIGRATIONS = {
@@ -35,6 +35,7 @@ const WORK_ENTRY_COLUMN_MIGRATIONS = {
   teammates: "ALTER TABLE work_entries ADD COLUMN teammates TEXT DEFAULT '[]';",
   exchangeRate: 'ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;',
   rateUnit: "ALTER TABLE work_entries ADD COLUMN rateUnit TEXT DEFAULT '1k';",
+  link: "ALTER TABLE work_entries ADD COLUMN link TEXT DEFAULT '';",
 };
 
 export class StorageDB {
@@ -299,6 +300,7 @@ export class StorageDB {
         dateTime TEXT NOT NULL,
         hours REAL DEFAULT 0,
         notes TEXT DEFAULT '',
+        link TEXT DEFAULT '',
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
@@ -523,7 +525,7 @@ export class StorageDB {
         // Fast lightweight query with proof metadata
         const rows = await this.sqliteDb.select(`
           SELECT 
-            w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes,
+            w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -552,6 +554,7 @@ export class StorageDB {
             currency: cur,
             exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
             rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
+            link: r.link || '',
             proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
           };
         });
@@ -584,6 +587,7 @@ export class StorageDB {
             currency: cur,
             exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate,
             rateUnit: entry.rateUnit || (isClassic ? '1' : '1k'),
+            link: entry.link || '',
           };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
@@ -611,6 +615,7 @@ export class StorageDB {
         entry.source = entry.source || 'Direct Client';
         entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
         entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
+        entry.link = entry.link || '';
 
         try {
           if (typeof entry.teammates === 'string') entry.teammates = JSON.parse(entry.teammates);
@@ -652,6 +657,7 @@ export class StorageDB {
           entry.teammates = Array.isArray(entry.teammates) ? entry.teammates : [];
           entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
           entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
+          entry.link = entry.link || '';
         }
         resolve(entry);
       };
@@ -672,12 +678,14 @@ export class StorageDB {
     const finalRate = Number(cleanEntry.exchangeRate) > 0 ? Number(cleanEntry.exchangeRate) : defaultRate;
     const finalUnit = cleanEntry.rateUnit || (isClassic ? '1' : '1k');
     const finalSource = cleanEntry.source || 'Direct Client';
+    const finalLink = typeof cleanEntry.link === 'string' ? cleanEntry.link.trim() : '';
     const teammatesJson = JSON.stringify(cleanEntry.teammates || []);
     const teamModeInt = cleanEntry.teamMode ? 1 : 0;
 
     cleanEntry.exchangeRate = finalRate;
     cleanEntry.rateUnit = finalUnit;
     cleanEntry.source = finalSource;
+    cleanEntry.link = finalLink;
 
     if (this.isDesktop) {
       if (!this.sqliteDb) {
@@ -686,8 +694,8 @@ export class StorageDB {
 
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -703,6 +711,7 @@ export class StorageDB {
             cleanEntry.dateTime || new Date().toISOString(),
             Number(cleanEntry.hours) || 0,
             cleanEntry.notes || '',
+            finalLink,
           ]
         );
 

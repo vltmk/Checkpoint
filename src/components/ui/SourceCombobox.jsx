@@ -122,7 +122,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           }}
           placeholder={placeholder}
           className={cn(
-            'w-full h-9 pl-3 pr-16 rounded-lg bg-zinc-900/60 border border-zinc-800 text-zinc-100 text-xs placeholder:text-zinc-500 hover:border-zinc-700 focus:outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500 transition-all duration-150',
+            'w-full h-9 pl-3 pr-16 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
             isRtl && 'font-farsi'
           )}
         />
@@ -133,7 +133,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
             <button
               type="button"
               onClick={() => handleSaveCurrentSource(trimmedValue)}
-              className="p-1 rounded text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 transition-colors"
+              className="p-1 rounded text-zinc-400 hover:text-amber-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               title={language === 'fa' ? `ذخیره "${trimmedValue}" در سورس‌ها` : `Save "${trimmedValue}" to your saved sources`}
             >
               <Bookmark className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           <button
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
-            className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             title={language === 'fa' ? 'نمایش سورس‌های ذخیره‌شده' : 'Show saved sources'}
           >
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-150', isOpen && 'rotate-180')} />
@@ -155,24 +155,24 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
       {isOpen && (
         <div
           dir={isRtl ? 'rtl' : 'ltr'}
-          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-zinc-950/90 backdrop-blur-md border border-zinc-800 shadow-2xl p-1.5 space-y-1"
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-white/95 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl p-1.5 space-y-1"
         >
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
             <button
               type="button"
               onClick={() => handleSaveCurrentSource(trimmedValue)}
-              className={cn('w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 text-xs text-left border border-zinc-700/60 transition-colors group', isRtl && 'font-farsi text-right')}
+              className={cn('w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs text-left border border-zinc-200 dark:border-zinc-700/60 transition-colors group', isRtl && 'font-farsi text-right')}
             >
               <span className="flex items-center gap-1.5 truncate">
-                <Plus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-100 font-semibold">"{trimmedValue}"</strong></span>
+                <Plus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">"{trimmedValue}"</strong></span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
             </button>
           )}
 
-          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
+          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
             <span>{language === 'fa' ? `سورس‌های ذخیره (${formatNumber(savedSources.length)})` : `Saved Sources (${savedSources.length})`}</span>
           </div>
 
@@ -190,21 +190,21 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
                   className={cn(
                     'group flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs transition-colors',
                     isSelected
-                      ? 'bg-zinc-800/90 text-zinc-100 font-medium'
-                      : 'text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100'
+                      ? 'bg-zinc-100 text-zinc-900 font-medium dark:bg-zinc-800/90 dark:text-zinc-100'
+                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
                   )}
                 >
                   <span className="flex items-center gap-2 truncate">
-                    <Store className="w-3 h-3 text-zinc-500 group-hover:text-zinc-400 shrink-0" />
+                    <Store className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 shrink-0" />
                     <span className="truncate">{src}</span>
                   </span>
 
                   <div className="flex items-center gap-1 shrink-0 ml-2" dir="ltr">
-                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />}
                     <button
                       type="button"
                       onClick={(e) => handleDeleteSource(e, src)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-400 hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all"
                       title={language === 'fa' ? `حذف "${src}"` : `Remove "${src}" from saved sources`}
                     >
                       <X className="w-3 h-3" />

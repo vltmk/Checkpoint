@@ -62,7 +62,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
             className={cn(
-              'relative z-10 w-full bg-zinc-950/95 backdrop-blur-xl border-t sm:border border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
+              'relative z-10 w-full bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t sm:border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
               maxWidth,
               className
             )}
@@ -75,32 +75,35 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
   );
 }
 
-export function DialogHeader({ children, className, onClose }) {
+export function DialogHeader({ children, className, onClose, actions }) {
   return (
     <div
       dir="ltr"
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md',
         className
       )}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">{children}</div>
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
+      <div className="flex items-center gap-2 shrink-0">
+        {actions}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 export function DialogTitle({ children, className }) {
   return (
-    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-100 flex items-center gap-2', className)}>
+    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2', className)}>
       {children}
     </h3>
   );
@@ -115,7 +118,7 @@ export function DialogFooter({ children, className }) {
     <div
       dir="ltr"
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-800 shrink-0 bg-zinc-950/90 backdrop-blur-md',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md',
         className
       )}
     >

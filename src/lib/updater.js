@@ -82,6 +82,14 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
   }
 
   // 2. Fallback / Dev / Redundancy: query GitHub Releases latest metadata
+  // In non-Tauri browser environments, skip desktop update checks to avoid browser CORS errors
+  if (!isTauri()) {
+    return {
+      available: false,
+      currentVersion,
+    };
+  }
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);

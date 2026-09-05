@@ -10,7 +10,7 @@ import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users } from 'lucide-react';
+import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2 } from 'lucide-react';
 import { trackerDB } from '../lib/db';
 import { copyTextNative, optimizeImageProof } from '../lib/desktop';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
@@ -35,9 +35,6 @@ export function WorkModal({
   const GAME_OPTIONS = [
     { value: 'World of Warcraft', label: 'World of Warcraft' },
     { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
-    { value: 'Diablo IV', label: 'Diablo IV' },
-    { value: 'Path of Exile', label: 'Path of Exile' },
-    { value: 'League of Legends', label: 'League of Legends' },
     { value: '__custom__', label: `+ ${t('work.customGameOption', 'Custom Game / Realm')}` },
   ];
 
@@ -77,6 +74,7 @@ export function WorkModal({
     exchangeRate: String(goldRateTOMAN || 3200),
     status: 'Pending',
     notes: '',
+    link: '',
   });
 
   const [isCustomCutsOpen, setIsCustomCutsOpen] = useState(false);
@@ -119,14 +117,12 @@ export function WorkModal({
       const initialCuts =
         editingEntry.teammateCuts && typeof editingEntry.teammateCuts === 'object'
           ? { ...editingEntry.teammateCuts }
-          : Object.fromEntries(
-              entryTeammates.map((tm) => [tm, editingEntry.income ? String(editingEntry.income) : ''])
-            );
+          : {};
 
       setFormData({
         title: editingEntry.title || '',
         dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
-        game: isStandardGame ? editingEntry.game : '__custom__',
+        game: editingEntry.game || 'World of Warcraft',
         isCustomGame: !isStandardGame && Boolean(editingEntry.game),
         customGameText: isStandardGame ? '' : editingEntry.game || '',
         source: editingEntry.source || '',
@@ -140,6 +136,7 @@ export function WorkModal({
         exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
         status: editingEntry.status || 'Pending',
         notes: editingEntry.notes || '',
+        link: editingEntry.link || '',
       });
       setProofs(editingEntry.proofs && editingEntry.proofs.length > 0 && editingEntry.proofs[0]?.data ? [...editingEntry.proofs] : []);
       
@@ -173,8 +170,9 @@ export function WorkModal({
             exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
             notes: parsed.notes || '',
+            link: parsed.link || '',
           });
-          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.pot || parsed.notes || parsed.source || draftTeammates.length > 0));
+          setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.pot || parsed.notes || parsed.source || parsed.link || draftTeammates.length > 0));
         } else {
           setIsDraftRestored(false);
           setFormData({
@@ -194,6 +192,7 @@ export function WorkModal({
             exchangeRate: String(goldRateTOMAN || 3200),
             status: 'Pending',
             notes: '',
+            link: '',
           });
           setProofs([]);
         }
@@ -251,6 +250,7 @@ export function WorkModal({
       exchangeRate: String(goldRateTOMAN || 3200),
       status: 'Pending',
       notes: '',
+      link: '',
     });
     setProofs([]);
   };
@@ -569,6 +569,7 @@ export function WorkModal({
       rateUnit: isClassic ? '1' : '1k',
       status: formData.status,
       notes: formData.notes.trim(),
+      link: formData.link ? formData.link.trim() : '',
       proofs,
       updatedAt: new Date().toISOString(),
     };
@@ -774,7 +775,7 @@ export function WorkModal({
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
                   exit={{ opacity: 0, transform: 'translateY(-4px)' }}
                   transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-30 overflow-hidden"
+                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-40"
                 >
                   <div>
                     <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
@@ -792,14 +793,14 @@ export function WorkModal({
                     <span className={cn('text-[10px] uppercase font-semibold text-zinc-400', isRtl && 'font-farsi')}>
                       {language === 'fa' ? 'مبنای محاسبه:' : 'Calculation Target:'}
                     </span>
-                    <div className="flex items-center bg-zinc-900 p-0.5 rounded-md border border-zinc-800 text-[10px]" dir="ltr">
+                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
                       <button
                         type="button"
                         onClick={() => updateFormData({ teamInputMode: 'pot' })}
                         className={`px-2 py-0.5 rounded font-medium transition-colors ${
                           formData.teamInputMode === 'pot'
-                            ? 'bg-zinc-800 text-amber-300 font-semibold shadow-xs'
-                            : 'text-zinc-400 hover:text-zinc-200'
+                            ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                         }`}
                       >
                         {language === 'fa' ? 'پات کل' : 'Pot'}
@@ -809,8 +810,8 @@ export function WorkModal({
                         onClick={() => updateFormData({ teamInputMode: 'income' })}
                         className={`px-2 py-0.5 rounded font-medium transition-colors ${
                           formData.teamInputMode === 'income'
-                            ? 'bg-zinc-800 text-emerald-300 font-semibold shadow-xs'
-                            : 'text-zinc-400 hover:text-zinc-200'
+                            ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                         }`}
                       >
                         {language === 'fa' ? 'سهم من' : 'My Cut'}
@@ -1010,7 +1011,28 @@ export function WorkModal({
             />
           </div>
 
-          {/* Row 7: Proof Upload & Screenshot Paste */}
+          {/* Row 7: Reference Link / URL */}
+          <div>
+            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <span className="flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5 text-zinc-500" />
+                <span>{t('work.link')}</span>
+              </span>
+              <span className="text-[9px] font-mono text-zinc-500 lowercase">
+                Optional
+              </span>
+            </label>
+            <Input
+              type="url"
+              value={formData.link}
+              onChange={(e) => updateFormData({ link: e.target.value })}
+              placeholder={t('work.linkPlaceholder')}
+              className={cn('text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-300', isRtl && 'text-left')}
+              dir="ltr"
+            />
+          </div>
+
+          {/* Row 8: Proof Upload & Screenshot Paste */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
@@ -1109,9 +1131,9 @@ export function WorkModal({
         </DialogContent>
 
         {/* Footer with Anchored Status Selector on Left */}
-        <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
+        <DialogFooter dir="ltr" className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
           {/* Left: Desaturated Muted Status Selector */}
-          <div className="flex items-center gap-2">
+          <div className={cn('flex items-center gap-2', isRtl && 'flex-row-reverse')}>
             <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {t('work.status')}:
             </span>

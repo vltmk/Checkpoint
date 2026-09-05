@@ -85,7 +85,9 @@ export async function showWindow() {
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const win = getCurrentWindow();
-    await win.unminimize();
+    try {
+      await win.unminimize();
+    } catch (_) {}
     await win.show();
     await win.setFocus();
   } catch (err) {

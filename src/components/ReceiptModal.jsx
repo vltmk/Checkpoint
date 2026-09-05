@@ -15,7 +15,7 @@ import {
   MessageSquare,
   Users,
 } from 'lucide-react';
-import checkpointLogo from '../assets/checkpoint.svg';
+import { CheckpointLogo } from './ui/Icons';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../lib/desktop';
 import { toBlob } from 'html-to-image';
 import { incrementLocalReceiptCount } from '../lib/telemetry';
@@ -284,21 +284,21 @@ Notes      = ${safeEntry.notes || 'None'}
         <div className="flex items-center justify-between w-full pr-6">
           <div className="flex items-center gap-2">
             <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('receipt.title')}</DialogTitle>
-            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 flex items-center gap-1">
+            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/40 flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> VERIFIED
             </span>
           </div>
 
           {/* Receipt Language Switcher */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 p-0.5 rounded-md text-[10px]">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-md text-[10px]">
             <button
               type="button"
               onClick={() => setReceiptLang('fa')}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'fa'
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white text-zinc-950 dark:bg-zinc-800 dark:text-zinc-100 font-semibold shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
               فارسی
@@ -309,8 +309,8 @@ Notes      = ${safeEntry.notes || 'None'}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'en'
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-white text-zinc-950 dark:bg-zinc-800 dark:text-zinc-100 font-semibold shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
               EN
@@ -325,20 +325,16 @@ Notes      = ${safeEntry.notes || 'None'}
           ref={receiptCardRef}
           dir={isReceiptFa ? 'rtl' : 'ltr'}
           className={cn(
-            'print-receipt-container rounded-xl bg-zinc-900/40 border border-zinc-800/80 p-5 sm:p-6 space-y-5 relative',
+            'print-receipt-container rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 p-5 sm:p-6 space-y-5 relative',
             isReceiptFa && 'font-farsi'
           )}
         >
           {/* Header */}
-          <div className="flex items-start justify-between border-b border-zinc-800 pb-4">
+          <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
             <div className="flex items-center gap-3">
-              <img
-                src={checkpointLogo}
-                alt="CHECKPOINT"
-                className="w-7 h-7 object-contain"
-              />
+              <CheckpointLogo className="w-7 h-7 text-zinc-950 dark:text-zinc-100 shrink-0" />
               <div>
-                <h4 className="text-sm font-bold tracking-wider text-zinc-100 uppercase">
+                <h4 className="text-sm font-bold tracking-wider text-zinc-950 dark:text-zinc-100 uppercase">
                   CHECKPOINT
                 </h4>
                 <p className="text-[10px] text-zinc-500 font-mono">
@@ -348,7 +344,7 @@ Notes      = ${safeEntry.notes || 'None'}
             </div>
             <div className={cn(isReceiptFa ? 'text-left' : 'text-right')}>
               <div className="text-[10px] font-mono text-zinc-500">ID: {receiptId}</div>
-              <div className="text-[11px] text-zinc-400 font-medium">{dateStr}</div>
+              <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">{dateStr}</div>
             </div>
           </div>
 
@@ -358,7 +354,7 @@ Notes      = ${safeEntry.notes || 'None'}
               <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-1">
                 {isReceiptFa ? 'عنوان کار' : 'Work Title'}
               </span>
-              <span className="text-sm font-semibold text-zinc-100 block">
+              <span className="text-sm font-semibold text-zinc-950 dark:text-zinc-100 block">
                 {safeEntry.title || (isReceiptFa ? 'بدون عنوان' : 'Untitled Work')}
               </span>
             </div>
@@ -368,7 +364,7 @@ Notes      = ${safeEntry.notes || 'None'}
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'بازی / پلتفرم' : 'Game / Platform'}
                 </span>
-                <span className="text-zinc-200 flex items-center gap-1.5 mt-0.5 font-medium">
+                <span className="text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 mt-0.5 font-medium">
                   <GameIcon game={safeEntry.game} className="w-3.5 h-3.5" />
                   <span>{safeEntry.game || 'World of Warcraft'}</span>
                 </span>
@@ -378,7 +374,7 @@ Notes      = ${safeEntry.notes || 'None'}
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'سورس / سفارش‌دهنده' : 'Job Source / Seller'}
                 </span>
-                <span className="text-zinc-300 font-mono mt-0.5 block">
+                <span className="text-zinc-700 dark:text-zinc-300 font-mono mt-0.5 block">
                   {safeEntry.source || (isReceiptFa ? 'مشتری مستقیم' : 'Direct Client')}
                 </span>
               </div>
@@ -396,34 +392,34 @@ Notes      = ${safeEntry.notes || 'None'}
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
                   {isTeamWork ? (isReceiptFa ? 'سهم شما' : 'Your Share') : (isReceiptFa ? 'مبلغ درآمد' : 'Amount Earned')}
                 </span>
-                <div className="text-sm font-bold text-zinc-100 font-mono mt-0.5">
+                <div className="text-sm font-bold text-zinc-950 dark:text-zinc-100 font-mono mt-0.5">
                   <MoneyDisplay amount={safeEntry.income || 0} currency={entryCurrency} />
                 </div>
               </div>
 
               {isTeamWork && (
-                <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+                <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between text-xs">
                   <span className="text-[10px] uppercase font-semibold text-zinc-500">
                     {isReceiptFa ? `پات تیمی (${formatNumber(totalShares)} سهم)` : `Pot (${totalShares} Shares)`}
                   </span>
-                  <strong className="font-mono text-amber-300 font-bold">
+                  <strong className="font-mono text-amber-600 dark:text-amber-300 font-bold">
                     <MoneyDisplay amount={totalPot} currency={entryCurrency} />
                   </strong>
                 </div>
               )}
 
-              <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 flex items-center justify-between text-xs">
+              <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between text-xs">
                 <span className="text-[10px] uppercase font-semibold text-zinc-500">
                   {isReceiptFa ? 'نرخ تبدیل' : 'Conversion Rate'}
                 </span>
-                <span className="text-zinc-300 font-medium">
+                <span className="text-zinc-700 dark:text-zinc-300 font-medium">
                   {formatMoney(effectiveRate, 'TOMAN', false, isReceiptFa)} / {rateUnitText}
                 </span>
               </div>
 
               {/* Interactive Teammate Badges with Individual Cuts */}
               {hasTeammates && (
-                <div className="col-span-2 pt-2.5 border-t border-zinc-800/70 space-y-1.5">
+                <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-semibold text-zinc-500">
                       {isReceiptFa ? 'هم‌تیمی‌ها و سهم' : 'Teammates & Cuts'}
@@ -444,11 +440,11 @@ Notes      = ${safeEntry.notes || 'None'}
                             onClose?.();
                           }}
                           title={`Filter ledger for ${tm} (Cut: ${formatMoney(cut, entryCurrency, false, isReceiptFa)})`}
-                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
                         >
-                          <Users className="w-3 h-3 text-zinc-400" />
+                          <Users className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                           <span>{tm}</span>
-                          <span className="text-zinc-400 text-[10px] inline-flex items-baseline">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
+                          <span className="text-zinc-500 dark:text-zinc-400 text-[10px] inline-flex items-baseline">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
                         </button>
                       );
                     })}
@@ -458,11 +454,11 @@ Notes      = ${safeEntry.notes || 'None'}
             </div>
 
             {safeEntry.notes && (
-              <div className="pt-2.5 border-t border-zinc-800/80">
+              <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80">
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'یادداشت' : 'Client Notes'}
                 </span>
-                <p className="text-xs text-zinc-300 italic">
+                <p className="text-xs text-zinc-700 dark:text-zinc-300 italic">
                   "{safeEntry.notes}"
                 </p>
               </div>
@@ -471,7 +467,7 @@ Notes      = ${safeEntry.notes || 'None'}
 
           {/* Proof Screenshot Preview */}
           {safeEntry.proofs && safeEntry.proofs.length > 0 && (
-            <div className="pt-3.5 border-t border-zinc-800 space-y-2">
+            <div className="pt-3.5 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
               <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
                 {isReceiptFa ? `مدارک پیوست شده (${formatNumber(safeEntry.proofs.length)})` : `Attached Proofs (${safeEntry.proofs.length})`}
               </span>
@@ -482,7 +478,7 @@ Notes      = ${safeEntry.notes || 'None'}
                     src={p.data}
                     alt="Proof"
                     onClick={() => onOpenLightbox?.(p.data, `Proof for ${safeEntry.title}`)}
-                    className="h-16 w-24 rounded-lg object-cover border border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="h-16 w-24 rounded-lg object-cover border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
                   />
                 ))}
               </div>
@@ -490,7 +486,7 @@ Notes      = ${safeEntry.notes || 'None'}
           )}
 
           {/* Discrete Verification Footer in Screenshot */}
-          <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between text-[9px] font-mono text-zinc-500">
+          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between text-[9px] font-mono text-zinc-500">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 inline-block" />
               <span>CHECKPOINT PROOF OF WORK</span>
@@ -509,7 +505,7 @@ Notes      = ${safeEntry.notes || 'None'}
             onClick={handleScreenshotCopy}
             disabled={isCapturing}
             title={t('receipt.screenshotTitle', 'Copy receipt screenshot to clipboard (Press C or S)')}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-lg transition-colors"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 rounded-lg transition-colors"
           >
             {isCapturing ? (
               <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />

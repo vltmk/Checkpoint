@@ -1,7 +1,47 @@
 {
   "version": "1.0",
-  "updated_at": "2026-08-27T18:50:00Z",
+  "updated_at": "2026-09-05T08:20:00Z",
   "announcements": [
+    {
+      "id": "2026-09-05-checkpoint-v2-5-0",
+      "type": "success",
+      "title": "نسخه جدید ۲.۵.۰ منتشر شد / Checkpoint v2.5.0 Released",
+      "message": "نسخه ۲.۵.۰ چک‌پوینت با پشتیبانی کامل از تم روشن (Light Mode)، بهبود کارایی و انیمیشن‌ها و امکان ثبت لینک خارجی برای کارها منتشر شد.\n\nCheckpoint v2.5.0 is now live with full Light Mode support, improved performance & smoothness, enhanced animations, upgraded UI & UX, and link support for works.",
+      "items": [
+        {
+          "tag": "new",
+          "text": "پشتیبانی از حالت روشن (Light Mode)"
+        },
+        {
+          "tag": "new",
+          "text": "افزودن قابلیت ثبت لینک برای کارها (Works link support)"
+        },
+        {
+          "tag": "improved",
+          "text": "بهبود چشمگیر عملکرد و روانی اجرای برنامه"
+        },
+        {
+          "tag": "improved",
+          "text": "بهبود انیمیشن‌ها و ترنزیشن‌های نرم‌تر"
+        },
+        {
+          "tag": "improved",
+          "text": "ارتقای جامع رابط و تجربه کاربری (UI & UX)"
+        }
+      ],
+      "published_at": "2026-09-05T08:20:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": true,
+      "actions": [
+        {
+          "label": "مشاهده ریلیز در گیت‌هاب / GitHub Release",
+          "url": "https://github.com/vltmk/Checkpoint/releases/tag/v2.5.0",
+          "type": "external_link",
+          "variant": "primary"
+        }
+      ]
+    },
     {
       "id": "2026-08-27-checkpoint-free-opensource-fa",
       "type": "success",

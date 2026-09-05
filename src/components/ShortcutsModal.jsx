@@ -61,19 +61,19 @@ export function ShortcutsModal({ isOpen, onClose }) {
             <h4 className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {grp.group}
             </h4>
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-lg divide-y divide-zinc-800/60 overflow-hidden">
+            <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800/60 overflow-hidden">
               {grp.items.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between px-3 py-2 text-xs"
                 >
-                  <span className={cn('text-zinc-300 font-medium', isRtl && 'font-farsi')}>{item.desc}</span>
+                  <span className={cn('text-zinc-700 dark:text-zinc-300 font-medium', isRtl && 'font-farsi')}>{item.desc}</span>
                   <div className="flex items-center gap-1" dir="ltr">
                     {item.keys.map((k, kIdx) => (
                       <React.Fragment key={k}>
                         <Kbd>{k}</Kbd>
                         {kIdx < item.keys.length - 1 && (
-                          <span className="text-zinc-500 text-[10px]">+</span>
+                          <span className="text-zinc-400 dark:text-zinc-500 text-[10px]">+</span>
                         )}
                       </React.Fragment>
                     ))}

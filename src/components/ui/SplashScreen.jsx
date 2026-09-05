@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import checkpointLogo from '../../assets/checkpoint.svg';
+import { CheckpointLogo } from './Icons';
 
 export function SplashScreen() {
   return (
@@ -15,11 +15,7 @@ export function SplashScreen() {
       <div className="flex flex-col items-center space-y-6" dir="ltr">
         {/* Crisp Unboxed Geometric Logo */}
         <div className="w-14 h-14 flex items-center justify-center">
-          <img
-            src={checkpointLogo}
-            alt="CHECKPOINT"
-            className="w-full h-full object-contain"
-          />
+          <CheckpointLogo className="w-full h-full text-white" />
         </div>
 
         {/* Brand Title and Subtitle */}
