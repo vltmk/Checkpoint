@@ -12,10 +12,10 @@ export default {
     extend: {
       colors: {
         background: "#09090b",
-        foreground: "#fafafa",
+        foreground: "#e4e4e7",
         card: {
           DEFAULT: "#121215",
-          foreground: "#fafafa"
+          foreground: "#e4e4e7"
         },
         muted: {
           DEFAULT: "#18181b",

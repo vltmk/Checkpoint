@@ -124,8 +124,8 @@ export function Select({
         className={cn(
           'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors text-left select-none',
           isSelected
-            ? 'bg-zinc-100 text-zinc-950 font-medium dark:bg-zinc-800 dark:text-zinc-100'
-            : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-white'
+            ? 'bg-zinc-100 text-zinc-800 font-medium dark:bg-zinc-800 dark:text-zinc-200'
+            : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
         )}
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
@@ -136,7 +136,7 @@ export function Select({
             <span className="text-[10px] text-zinc-500 truncate">({renderScaledText(option.subtext)})</span>
           )}
         </div>
-        {isSelected && <Check className="w-3.5 h-3.5 text-zinc-950 dark:text-zinc-100 shrink-0 ml-1.5" />}
+        {isSelected && <Check className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0 ml-1.5" />}
       </button>
     );
   };
@@ -149,7 +149,7 @@ export function Select({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
           isOpen && 'border-zinc-400 dark:border-zinc-500 ring-1 ring-zinc-400 dark:ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className
@@ -160,7 +160,7 @@ export function Select({
             <>
               {selectedOption.flag && <span className="text-sm">{selectedOption.flag}</span>}
               {selectedOption.icon && <span className="shrink-0 text-zinc-400 flex items-center justify-center">{selectedOption.icon}</span>}
-              <span className="truncate text-zinc-900 dark:text-zinc-100">{renderScaledText(selectedOption.label)}</span>
+              <span className="truncate text-zinc-800 dark:text-zinc-200">{renderScaledText(selectedOption.label)}</span>
             </>
           ) : (
             <span className="text-zinc-400 truncate">{placeholder}</span>

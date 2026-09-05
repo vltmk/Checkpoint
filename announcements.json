@@ -1,7 +1,43 @@
 {
   "version": "1.0",
-  "updated_at": "2026-09-05T08:20:00Z",
+  "updated_at": "2026-09-05T21:05:00Z",
   "announcements": [
+    {
+      "id": "2026-09-05-checkpoint-v2-5-1",
+      "type": "success",
+      "title": "نسخه ۲.۵.۱ منتشر شد / Checkpoint v2.5.1 Released",
+      "message": "نسخه جدید ۲.۵.۱ با پشتیبانی از لینک‌های هوشمند دسکتاپ (دیسکورد، تلگرام، استیم)، کالیبراسیون کنتراست مونوکروماتیک و چرخش محیطی کاکپیت منتشر شد.\n\nCheckpoint v2.5.1 is live with app-aware deep linking (Discord, Telegram, Steam), refined monochromatic aesthetics, and cockpit ambient visual updates.",
+      "items": [
+        {
+          "tag": "new",
+          "text": "تشخیص هوشمند و باز کردن لینک‌های دیسکورد، تلگرام و استیم در اپلیکیشن دسکتاپ (App-aware deep linking)"
+        },
+        {
+          "tag": "new",
+          "text": "آیکون‌ها و نشان‌های وکتور اختصاصی برای گوگل شیت، گیت‌هاب، دیسکورد و استیم"
+        },
+        {
+          "tag": "improved",
+          "text": "کالیبراسیون کنتراست رنگ‌های زینک در تم تاریک و روشن (Soft Monochromatic)"
+        },
+        {
+          "tag": "improved",
+          "text": "گرادیان محیطی مونوکروم با چرخش نرم و بدون افت فریم بر روی مجموع درآمد کاکپیت"
+        }
+      ],
+      "published_at": "2026-09-05T21:05:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": true,
+      "actions": [
+        {
+          "label": "مشاهده ریلیز در گیت‌هاب / GitHub Release",
+          "url": "https://github.com/vltmk/Checkpoint/releases/tag/v2.5.1",
+          "type": "external_link",
+          "variant": "primary"
+        }
+      ]
+    },
     {
       "id": "2026-09-05-checkpoint-v2-5-0",
       "type": "success",
@@ -32,7 +68,7 @@
       "published_at": "2026-09-05T08:20:00Z",
       "expires_at": null,
       "dismissible": true,
-      "pinned": true,
+      "pinned": false,
       "actions": [
         {
           "label": "مشاهده ریلیز در گیت‌هاب / GitHub Release",

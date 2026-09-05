@@ -122,7 +122,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           }}
           placeholder={placeholder}
           className={cn(
-            'w-full h-9 pl-3 pr-16 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
+            'w-full h-9 pl-3 pr-16 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
             isRtl && 'font-farsi'
           )}
         />
@@ -143,7 +143,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           <button
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
-            className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             title={language === 'fa' ? 'نمایش سورس‌های ذخیره‌شده' : 'Show saved sources'}
           >
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-150', isOpen && 'rotate-180')} />
@@ -166,7 +166,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
             >
               <span className="flex items-center gap-1.5 truncate">
                 <Plus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">"{trimmedValue}"</strong></span>
+                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">"{trimmedValue}"</strong></span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
             </button>
@@ -190,8 +190,8 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
                   className={cn(
                     'group flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs transition-colors',
                     isSelected
-                      ? 'bg-zinc-100 text-zinc-900 font-medium dark:bg-zinc-800/90 dark:text-zinc-100'
-                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+                      ? 'bg-zinc-100 text-zinc-800 font-medium dark:bg-zinc-800/90 dark:text-zinc-200'
+                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-200'
                   )}
                 >
                   <span className="flex items-center gap-2 truncate">

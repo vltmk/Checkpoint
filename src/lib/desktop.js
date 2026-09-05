@@ -4,6 +4,7 @@
  */
 
 import { trackerDB } from './db';
+import { detectAppLink } from './appLinks';
 
 export const isTauri = () => {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);
@@ -388,7 +389,7 @@ export function downloadImageBlob(blob, filename = 'checkpoint_receipt.png') {
 }
 
 /**
- * Open external URL safely in default system browser
+ * Open external URL safely in default system browser or approved protocol handler
  */
 export async function openExternalUrl(url) {
   if (!url || typeof url !== 'string') return;
@@ -400,8 +401,9 @@ export async function openExternalUrl(url) {
     const isHttps = parsed.protocol === 'https:';
     const isMailto = parsed.protocol === 'mailto:';
     const isLocalHttp = parsed.protocol === 'http:' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1');
+    const isApprovedAppProtocol = ['discord:', 'tg:', 'steam:'].includes(parsed.protocol);
 
-    if (!isHttps && !isMailto && !isLocalHttp) {
+    if (!isHttps && !isMailto && !isLocalHttp && !isApprovedAppProtocol) {
       console.warn('[Desktop] Refusing to open unapproved protocol URL:', cleanUrl);
       return;
     }
@@ -423,6 +425,43 @@ export async function openExternalUrl(url) {
   if (typeof window !== 'undefined') {
     window.open(cleanUrl, '_blank', 'noopener,noreferrer');
   }
+}
+
+/**
+ * Open URL in an app-aware manner.
+ * If running on desktop (Tauri) and the URL corresponds to a supported native desktop
+ * application (Discord, Telegram, Steam), launches the application via its OS deep link.
+ * Automatically falls back to the default web browser if native launching fails or in web mode.
+ *
+ * @param {string} url
+ */
+export async function openAppAwareUrl(url) {
+  if (!url || typeof url !== 'string') return;
+  const trimmed = url.trim();
+  if (!trimmed) return;
+
+  const appInfo = detectAppLink(trimmed);
+  if (!appInfo) {
+    await openExternalUrl(trimmed);
+    return;
+  }
+
+  // If in desktop environment and platform supports native app launch
+  if (isTauri() && appInfo.appLaunchable && appInfo.deepLinkUrl) {
+    try {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      await openUrl(appInfo.deepLinkUrl);
+      return;
+    } catch (err) {
+      console.warn(
+        `[Desktop] Failed to launch native ${appInfo.label} protocol (${appInfo.deepLinkUrl}), falling back to web browser:`,
+        err
+      );
+    }
+  }
+
+  // Fallback to standard web browser with canonical URL
+  await openExternalUrl(appInfo.canonicalUrl || trimmed);
 }
 
 /**

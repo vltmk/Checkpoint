@@ -305,7 +305,7 @@ export function AnalyticsView({
 
     const monochromaticPalette = isLight
       ? ['#18181b', '#3f3f46', '#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7']
-      : ['#ffffff', '#d4d4d8', '#a1a1aa', '#71717a', '#3f3f46', '#27272a'];
+      : ['#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#3f3f46', '#27272a'];
 
     return {
       labels,
@@ -313,7 +313,7 @@ export function AnalyticsView({
         {
           data,
           backgroundColor: monochromaticPalette.slice(0, Math.max(labels.length, 1)),
-          borderColor: isLight ? '#ffffff' : '#000000',
+          borderColor: isLight ? '#f4f4f5' : '#18181b',
           borderWidth: 2,
         },
       ],
@@ -326,9 +326,9 @@ export function AnalyticsView({
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: isLight ? '#ffffff' : '#09090b',
-        titleColor: isLight ? '#09090b' : '#fafafa',
-        bodyColor: isLight ? '#71717a' : '#a1a1aa',
+        backgroundColor: isLight ? '#f4f4f5' : '#18181b',
+        titleColor: isLight ? '#27272a' : '#e4e4e7',
+        bodyColor: isLight ? '#52525b' : '#a1a1aa',
         borderColor: isLight ? '#e4e4e7' : '#27272a',
         borderWidth: 1,
         padding: 8,
@@ -357,7 +357,7 @@ export function AnalyticsView({
         border: { display: false },
       },
       y: {
-        grid: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)' },
+        grid: { color: isLight ? 'rgba(39, 39, 42, 0.06)' : 'rgba(228, 228, 231, 0.05)' },
         ticks: {
           color: '#71717a',
           font: { size: 10, family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace" },
@@ -374,9 +374,9 @@ export function AnalyticsView({
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: isLight ? '#ffffff' : '#09090b',
-        titleColor: isLight ? '#09090b' : '#fafafa',
-        bodyColor: isLight ? '#71717a' : '#a1a1aa',
+        backgroundColor: isLight ? '#f4f4f5' : '#18181b',
+        titleColor: isLight ? '#27272a' : '#e4e4e7',
+        bodyColor: isLight ? '#52525b' : '#a1a1aa',
         borderColor: isLight ? '#e4e4e7' : '#27272a',
         borderWidth: 1,
         padding: 8,
@@ -404,7 +404,7 @@ export function AnalyticsView({
       {/* Header Row: Title & Segmented Timeframe Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-200 dark:border-zinc-800/80">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+          <h2 className="text-base font-semibold tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.title')}</span>
           </h2>
@@ -426,8 +426,8 @@ export function AnalyticsView({
                   'px-3 py-1 rounded-lg text-xs font-medium transition-all select-none',
                   isRtl && 'font-farsi',
                   isSelected
-                    ? 'bg-white text-zinc-950 shadow-sm border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700/60 font-semibold'
-                    : 'text-zinc-600 hover:text-zinc-950 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/40'
+                    ? 'bg-white text-zinc-800 shadow-sm border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700/60 font-semibold'
+                    : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/40'
                 )}
               >
                 {tf.label}
@@ -444,7 +444,7 @@ export function AnalyticsView({
             <Coins className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200 truncate">
+          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -454,7 +454,7 @@ export function AnalyticsView({
             <Trophy className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200 truncate">
+          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -464,7 +464,7 @@ export function AnalyticsView({
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200">
+          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200">
             {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
@@ -474,7 +474,7 @@ export function AnalyticsView({
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
           </div>
-          <div className="text-xl font-bold text-zinc-900 dark:text-zinc-200">
+          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200">
             {formatNumber(stats.completionRate)}%
           </div>
         </div>
@@ -537,13 +537,13 @@ export function AnalyticsView({
                       <GameIcon game={item.game} className="w-3.5 h-3.5" />
                       <span>{item.game}</span>
                     </span>
-                    <span className="text-zinc-800 dark:text-zinc-300 font-medium">
+                    <span className="text-zinc-800 dark:text-zinc-300 font-medium font-mono">
                       <MoneyDisplay amount={item.revenue} currency={globalCurrency} />
                     </span>
                   </div>
                   <div dir="ltr" className="h-1.5 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-300"
+                      className="h-full bg-zinc-800 dark:bg-zinc-200 rounded-full transition-all duration-300"
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>

@@ -133,15 +133,15 @@ export function StatusBadge({
                   className={cn(
                     'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11px] transition-colors',
                     isCurrent
-                      ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-semibold'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100/80 dark:hover:bg-zinc-900/60'
+                      ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-semibold'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100/80 dark:hover:bg-zinc-900/60'
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stStyle?.dotClass)} />
                     <span className={cn('font-medium leading-normal', isRtl && 'font-farsi')}>{stLabel}</span>
                   </div>
-                  {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-200 shrink-0" />}
+                  {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />}
                 </button>
               );
             })}

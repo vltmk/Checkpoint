@@ -178,7 +178,7 @@ export function NotificationCenter({
                   <Bell className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h2 className={cn('text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                  <h2 className={cn('text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider', isRtl && 'font-farsi')}>
                     {t('notifications.title')}
                   </h2>
                   <p className="text-[10px] text-zinc-500 font-mono">
@@ -203,7 +203,7 @@ export function NotificationCenter({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors ml-1"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors ml-1"
                   aria-label="Close Notification Center"
                 >
                   <X className="w-4 h-4" />
@@ -450,7 +450,7 @@ export function NotificationCenter({
                                 onClick={handleAction}
                                 className={cn(
                                   'gap-1.5 text-[11px] h-6 px-2.5',
-                                  act.variant === 'primary' ? 'font-semibold' : 'text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-white',
+                                  act.variant === 'primary' ? 'font-semibold' : 'text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100',
                                   isActionRTLItem && 'font-farsi tracking-normal'
                                 )}
                               >
@@ -506,7 +506,7 @@ export function NotificationCenter({
               variant="secondary"
               size="xs"
               onClick={() => openExternalUrl('https://discord.gg/TYPRXeKPp')}
-              className="gap-1 text-xs h-7 px-2.5 shrink-0 text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-white"
+              className="gap-1 text-xs h-7 px-2.5 shrink-0 text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100"
             >
               <span>Join</span>
               <ExternalLink className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />

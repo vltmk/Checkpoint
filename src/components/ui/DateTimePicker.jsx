@@ -443,7 +443,7 @@ export function DateTimePicker({
               isRtl && 'font-farsi',
               isPulsingNow
                 ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/50 scale-105'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border-zinc-700/50'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 border-zinc-700/50'
             )}
           >
             {isPulsingNow ? (
@@ -540,7 +540,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetToday}
                 className={cn(
-                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
+                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -550,7 +550,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetYesterday}
                 className={cn(
-                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
+                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -560,7 +560,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetOneHourAgo}
                 className={cn(
-                  'px-1 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-[10px] font-medium border border-zinc-800 transition-all active:scale-95 text-center truncate',
+                  'px-1 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[10px] font-medium border border-zinc-800 transition-all active:scale-95 text-center truncate',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -597,7 +597,7 @@ export function DateTimePicker({
                     type="button"
                     onClick={() => setViewMode((prev) => (prev === 'months' ? 'days' : 'months'))}
                     className={cn(
-                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors cursor-pointer',
+                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 text-zinc-200 hover:text-zinc-100 transition-colors cursor-pointer',
                       viewMode === 'months' && 'bg-zinc-800 text-amber-300 font-semibold',
                       calendarType === 'shamsi' && 'font-farsi'
                     )}
@@ -611,7 +611,7 @@ export function DateTimePicker({
                     type="button"
                     onClick={() => setViewMode((prev) => (prev === 'years' ? 'days' : 'years'))}
                     className={cn(
-                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 font-mono text-zinc-200 hover:text-white transition-colors cursor-pointer',
+                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 font-mono text-zinc-200 hover:text-zinc-100 transition-colors cursor-pointer',
                       viewMode === 'years' && 'bg-zinc-800 text-amber-300 font-semibold',
                       calendarType === 'shamsi' && 'font-farsi'
                     )}
@@ -685,10 +685,10 @@ export function DateTimePicker({
                               className={cn(
                                 'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative',
                                 !cell.isCurrentMonth && 'text-zinc-600 hover:text-zinc-400',
-                                cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-white',
+                                cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100',
                                 cell.isWeekend && cell.isCurrentMonth && !isSelected && 'text-rose-300/90',
                                 cell.isToday && !isSelected && 'border border-zinc-600 font-bold',
-                                isSelected && 'bg-zinc-100 text-zinc-950 font-bold shadow-sm ring-1 ring-zinc-100 hover:bg-white'
+                                isSelected && 'bg-zinc-200 text-zinc-900 font-bold shadow-sm ring-1 ring-zinc-200 hover:bg-zinc-100'
                               )}
                             >
                               <span>{toPersianDigits(cell.jd)}</span>
@@ -712,10 +712,10 @@ export function DateTimePicker({
                               className={cn(
                                 'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative font-mono',
                                 !cell.isCurrentMonth && 'text-zinc-600 hover:text-zinc-400',
-                                cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-white',
+                                cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100',
                                 cell.isWeekend && cell.isCurrentMonth && !isSelected && 'text-rose-300/90',
                                 cell.isToday && !isSelected && 'border border-zinc-600 font-bold',
-                                isSelected && 'bg-zinc-100 text-zinc-950 font-bold shadow-sm ring-1 ring-zinc-100 hover:bg-white'
+                                isSelected && 'bg-zinc-200 text-zinc-900 font-bold shadow-sm ring-1 ring-zinc-200 hover:bg-zinc-100'
                               )}
                             >
                               <span>{cell.gd}</span>
@@ -748,8 +748,8 @@ export function DateTimePicker({
                         className={cn(
                           'py-2 px-1 rounded-md text-xs font-medium transition-all text-center cursor-pointer border',
                           isCurrent
-                            ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-100'
-                            : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-800'
+                            ? 'bg-zinc-200 text-zinc-900 font-bold border-zinc-200'
+                            : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800'
                         )}
                       >
                         {mName}
@@ -778,8 +778,8 @@ export function DateTimePicker({
                         className={cn(
                           'py-2 px-1 rounded-md text-xs font-mono font-medium transition-all text-center cursor-pointer border',
                           isCurrent
-                            ? 'bg-zinc-100 text-zinc-950 font-bold border-zinc-100'
-                            : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-800'
+                            ? 'bg-zinc-200 text-zinc-900 font-bold border-zinc-200'
+                            : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800'
                         )}
                       >
                         {calendarType === 'shamsi' ? toPersianDigits(yr) : yr}
@@ -819,7 +819,7 @@ export function DateTimePicker({
                       }
                     }}
                     placeholder="12"
-                    className="w-6 bg-transparent text-center text-xs font-mono font-semibold text-zinc-100 focus:outline-none focus:text-white"
+                    className="w-6 bg-transparent text-center text-xs font-mono font-semibold text-zinc-200 focus:outline-none focus:text-zinc-100"
                   />
                   <div className="flex flex-col ml-0.5">
                     <button
@@ -860,7 +860,7 @@ export function DateTimePicker({
                       }
                     }}
                     placeholder="00"
-                    className="w-6 bg-transparent text-center text-xs font-mono font-semibold text-zinc-100 focus:outline-none focus:text-white"
+                    className="w-6 bg-transparent text-center text-xs font-mono font-semibold text-zinc-200 focus:outline-none focus:text-zinc-100"
                   />
                   <div className="flex flex-col ml-0.5">
                     <button
@@ -916,7 +916,7 @@ export function DateTimePicker({
                   setViewMode('days');
                 }}
                 className={cn(
-                  'inline-flex items-center gap-1 px-3 py-1 rounded-md bg-zinc-100 text-zinc-950 text-[11px] font-semibold hover:bg-white transition-all active:scale-95 cursor-pointer shadow-sm',
+                  'inline-flex items-center gap-1 px-3 py-1 rounded-md bg-zinc-200 text-zinc-900 text-[11px] font-semibold hover:bg-zinc-100 transition-all active:scale-95 cursor-pointer shadow-sm',
                   isRtl && 'font-farsi'
                 )}
               >

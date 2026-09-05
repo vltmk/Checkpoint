@@ -79,7 +79,7 @@ export function ConvertedSecondaryDisplay({
       />
       {showRateLabel && (
         <span
-          className="text-[9px] text-zinc-600 tracking-tight inline-flex items-baseline"
+          className="text-[9px] text-zinc-500 dark:text-zinc-400 tracking-tight inline-flex items-baseline"
           title={
             isPerOneGold
               ? `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1 Gold`

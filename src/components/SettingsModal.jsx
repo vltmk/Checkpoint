@@ -195,7 +195,7 @@ export function SettingsModal({
               className={cn(
                 'relative flex items-center justify-center w-6 h-6 rounded-full transition-colors pointer-events-none',
                 currentTheme === 'dark'
-                  ? 'text-zinc-900 dark:text-zinc-100 font-bold'
+                  ? 'text-zinc-800 dark:text-zinc-200 font-bold'
                   : 'text-zinc-500 dark:text-zinc-400'
               )}
             >
@@ -286,9 +286,9 @@ export function SettingsModal({
 
             <div className="space-y-2 pt-0.5">
               {/* Switch 1: Close to System Tray */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
                 <div className="space-y-0.5 pr-2">
-                  <div className={cn('text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
+                  <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                     {t('settings.closeToTray')}
                   </div>
                   <div className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -301,8 +301,10 @@ export function SettingsModal({
                   dir="ltr"
                   aria-checked={closeToTray}
                   onClick={() => onCloseToTrayChange?.(!closeToTray)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    closeToTray ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
+                    closeToTray
+                      ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
+                      : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
                   }`}
                 >
                   <span
@@ -314,9 +316,9 @@ export function SettingsModal({
               </div>
 
               {/* Switch 2: Minimize to System Tray */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
                 <div className="space-y-0.5 pr-2">
-                  <div className={cn('text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
+                  <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                     {t('settings.minimizeToTray')}
                   </div>
                   <div className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -329,8 +331,10 @@ export function SettingsModal({
                   dir="ltr"
                   aria-checked={minimizeToTray}
                   onClick={() => onMinimizeToTrayChange?.(!minimizeToTray)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    minimizeToTray ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
+                    minimizeToTray
+                      ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
+                      : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
                   }`}
                 >
                   <span
@@ -361,9 +365,9 @@ export function SettingsModal({
             </p>
 
             {/* Toggle Switch */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
               <div className="space-y-0.5 pr-2">
-                <div className={cn('text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
+                <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                   {t('settings.autoBackups')}
                 </div>
                 <div className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -388,8 +392,10 @@ export function SettingsModal({
                     onAutoBackupEnabledChange?.(!autoBackupEnabled);
                   }
                 }}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  autoBackupEnabled ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-800'
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
+                  autoBackupEnabled
+                    ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
+                    : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
                 }`}
               >
                 <span

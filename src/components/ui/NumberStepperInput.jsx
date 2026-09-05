@@ -108,14 +108,14 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-100 placeholder:text-zinc-500 focus:outline-none',
+          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
           inputClassName
         )}
         {...props}
       />
 
       {/* Stacked Incremental Stepper Chevrons */}
-      <div className="absolute right-1 top-1 bottom-1 w-5 flex flex-col items-center justify-between border-l border-zinc-800/80 pl-0.5">
+      <div className="absolute right-1 top-1 bottom-1 w-5 flex flex-col items-center justify-between border-l border-zinc-200 dark:border-zinc-800/80 pl-0.5">
         <button
           type="button"
           tabIndex={-1}
@@ -125,7 +125,7 @@ export function NumberStepperInput({
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-t text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          className="flex-1 w-full flex items-center justify-center rounded-t text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title={`Increment (+${effectiveStep.toLocaleString()})`}
         >
           <ChevronUp className="w-3 h-3 stroke-[2.5]" />
@@ -139,7 +139,7 @@ export function NumberStepperInput({
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(-effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-b text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+          className="flex-1 w-full flex items-center justify-center rounded-b text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title={`Decrement (-${effectiveStep.toLocaleString()})`}
         >
           <ChevronDown className="w-3 h-3 stroke-[2.5]" />

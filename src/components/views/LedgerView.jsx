@@ -32,8 +32,11 @@ import { StatusBadge } from '../ui/Badge';
 import { GameIcon } from '../ui/GameIcon';
 import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Tooltip, Kbd } from '../ui/Tooltip';
+import { CockpitAmbientGradient } from '../ui/CockpitAmbientGradient';
 import { cn } from '../../lib/utils';
-import { openExternalUrl } from '../../lib/desktop';
+import { openExternalUrl, openAppAwareUrl } from '../../lib/desktop';
+import { detectAppLink } from '../../lib/appLinks';
+import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon } from '../ui/Icons';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage, formatShamsiDate, normalizeDigits, toPersianDigits } from '../../lib/i18n';
 import {
@@ -95,28 +98,47 @@ export function LedgerView({
     [goldRateTOMAN]
   );
 
-  // Extract game categories with job counts
+  // Extract game categories with job counts (only games present in entries)
   const gameCategories = useMemo(() => {
     const counts = new Map();
-    GAMES.forEach((g) => counts.set(g, 0));
 
     entries.forEach((e) => {
       const g = e.game || 'World of Warcraft';
       counts.set(g, (counts.get(g) || 0) + 1);
     });
 
-    const categories = [
-      { id: '', label: t('ledger.allGames'), count: entries.length },
-    ];
+    const categories = [];
 
-    counts.forEach((count, game) => {
-      if (count > 0 || GAMES.includes(game)) {
+    // Prioritize standard GAMES order if present, followed by custom games
+    const sortedGames = Array.from(counts.keys()).sort((a, b) => {
+      const idxA = GAMES.indexOf(a);
+      const idxB = GAMES.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    sortedGames.forEach((game) => {
+      const count = counts.get(game) || 0;
+      if (count > 0) {
         categories.push({ id: game, label: game, count });
       }
     });
 
+    if (categories.length > 0) {
+      categories.unshift({ id: '', label: t('ledger.allGames'), count: entries.length });
+    }
+
     return categories;
   }, [entries, t]);
+
+  // Reset game filter if the selected game is no longer present in entries
+  useEffect(() => {
+    if (gameFilter && !entries.some((e) => (e.game || 'World of Warcraft') === gameFilter)) {
+      setGameFilter('');
+    }
+  }, [entries, gameFilter]);
 
   // Status counts
   const statusCounts = useMemo(() => {
@@ -158,16 +180,7 @@ export function LedgerView({
 
   const handleOpenExternalLink = (url) => {
     if (!url || typeof url !== 'string') return;
-    const trimmed = url.trim();
-    const lower = trimmed.toLowerCase();
-    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
-      if (lower.startsWith('www.') || lower.includes('.')) {
-        openExternalUrl('https://' + trimmed);
-        return;
-      }
-      return;
-    }
-    openExternalUrl(trimmed);
+    openAppAwareUrl(url);
   };
 
   // Sync external teammate filter from receipt or other views
@@ -230,7 +243,7 @@ export function LedgerView({
     }
 
     if (gameFilter) {
-      list = list.filter((e) => e.game === gameFilter);
+      list = list.filter((e) => (e.game || 'World of Warcraft') === gameFilter);
     }
 
     if (hasProofFilter) {
@@ -608,27 +621,13 @@ export function LedgerView({
 
   return (
     <div className="space-y-5 pb-20 md:pb-6 relative">
-      {/* 1. Compact Total Earned Summary Card (Transparent & Dark Palette) */}
-      <div className="relative overflow-hidden rounded-xl bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 sm:p-4 space-y-2.5">
-        {/* Minimal rectangular dots radial pattern anchored at bottom-left */}
-        <div
-          className="absolute inset-0 pointer-events-none select-none z-0 animate-dot-breathe"
-          style={{
-            maskImage: 'radial-gradient(ellipse at bottom left, black 15%, transparent 75%)',
-            WebkitMaskImage: 'radial-gradient(ellipse at bottom left, black 15%, transparent 75%)',
-          }}
-        >
-          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="totalEarnedDots" width="10" height="10" patternUnits="userSpaceOnUse">
-                <rect width="2.5" height="2.5" rx="0.5" fill="currentColor" className="text-emerald-500/50 dark:text-emerald-400/60" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#totalEarnedDots)" />
-          </svg>
-        </div>
+      {/* 1. Unified Ledger Cockpit Card (Optical Frosted Glass & Dark Zinc Palette) */}
+      <div className="relative overflow-hidden rounded-xl bg-zinc-50/70 dark:bg-zinc-950/40 backdrop-blur-xs border border-zinc-200 dark:border-zinc-800/80 p-3.5 sm:p-4">
+        {/* Minimal monochromatic ambient radial gradient pulse */}
+        <CockpitAmbientGradient isRtl={isRtl} />
 
-        <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap">
+        <div className="relative z-10 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
               {t('ledger.totalEarned')}
@@ -642,8 +641,8 @@ export function LedgerView({
                 title="Display in Toman (Press T to toggle)"
                 className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
                   globalCurrency === 'TOMAN'
-                    ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                    ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`}
               >
                 {globalCurrency === 'TOMAN' && (
@@ -662,8 +661,8 @@ export function LedgerView({
                 title="Display in Gold (Press T to toggle)"
                 className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
                   globalCurrency === 'GOLD'
-                    ? 'text-zinc-900 dark:text-zinc-100 font-semibold'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                    ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`}
               >
                 {globalCurrency === 'GOLD' && (
@@ -698,7 +697,7 @@ export function LedgerView({
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-800 dark:text-zinc-200 leading-tight">
             <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
           </div>
           {globalCurrency !== 'GOLD' && (
@@ -730,64 +729,69 @@ export function LedgerView({
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
-            {/* Paid Accent Badge */}
-            <div className="flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/50 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800/80 ring-1 ring-inset ring-emerald-600/15 dark:ring-emerald-500/10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[10px]">
+            {/* Paid Flanking Micro-Chip */}
+            <div className="flex items-center gap-1.5 bg-zinc-100/60 dark:bg-zinc-950/40 px-2 py-0.5 rounded font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 shrink-0" />
-              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>{t('status.Paid')} ({formatNumber(metrics.paidCount)}):</span>
-              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold font-mono text-xs">
+              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>
+                {t('status.Paid')} ({formatNumber(metrics.paidCount)}):
+              </span>
+              <strong className="text-zinc-800 dark:text-zinc-200 font-semibold text-[11px]">
                 <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
               </strong>
-              <span className="text-zinc-500 dark:text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-zinc-500 text-[9px] ml-auto sm:ml-0">
                 {formatNumber(metrics.completionRate)}%
               </span>
             </div>
 
-            {/* Pending Accent Badge */}
-            <div className="flex items-center gap-1.5 bg-zinc-100/80 dark:bg-zinc-900/50 px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-800/80 ring-1 ring-inset ring-amber-600/15 dark:ring-amber-500/10">
+            {/* Pending Flanking Micro-Chip */}
+            <div className="flex items-center gap-1.5 bg-zinc-100/60 dark:bg-zinc-950/40 px-2 py-0.5 rounded font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 shrink-0" />
-              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>{t('status.Pending')} ({formatNumber(metrics.pendingCount)}):</span>
-              <strong className="text-zinc-900 dark:text-zinc-100 font-semibold font-mono text-xs">
+              <span className={cn('text-zinc-600 dark:text-zinc-400 font-medium', isRtl && 'font-farsi')}>
+                {t('status.Pending')} ({formatNumber(metrics.pendingCount)}):
+              </span>
+              <strong className="text-zinc-800 dark:text-zinc-200 font-semibold text-[11px]">
                 <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} />
               </strong>
-              <span className="text-zinc-500 dark:text-zinc-500 text-[10px] ml-auto sm:ml-0 font-mono">
+              <span className="text-zinc-500 text-[9px] ml-auto sm:ml-0">
                 {formatNumber(metrics.totalValue > 0 ? 100 - metrics.completionRate : 0)}%
               </span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* 2. Quick Stat Tiles (Transparent Borders & Dimmed Numbers) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
+        {/* Inset Cockpit Metric Tiles with Optical Frosted Glass */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
+          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 transition-colors">
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold tracking-wider">
+              <CheckCircle2 className="w-3 h-3 text-emerald-500/80 shrink-0" />
+              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
+            </div>
+            <div className="text-base sm:text-lg font-bold font-mono text-zinc-800 dark:text-zinc-200">
+              {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+            </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-400">
-            {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-600 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+
+          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 transition-colors">
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold tracking-wider">
+              <Clock className="w-3 h-3 text-amber-500/80 shrink-0" />
+              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
+            </div>
+            <div className="text-base sm:text-lg font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
+              <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 col-span-2 sm:col-span-1 transition-colors">
+            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold tracking-wider">
+              <TrendingUp className="w-3 h-3 text-zinc-400 shrink-0" />
+              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
+            </div>
+            <div className="text-base sm:text-lg font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
+              <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
+            </div>
           </div>
         </div>
-
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-            <Clock className="w-3.5 h-3.5 text-amber-500/80" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
-          </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-400 truncate">
-            <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-transparent border border-zinc-800/80 p-3 space-y-1 col-span-2 sm:col-span-1">
-          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
-          </div>
-          <div className="text-lg sm:text-xl font-bold text-zinc-400 truncate">
-            <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
-          </div>
         </div>
       </div>
 
@@ -797,44 +801,46 @@ export function LedgerView({
       {/* 3. Game Categories & Minimalist Unified Filter Bar */}
       <div className="relative z-30 space-y-2.5">
         {/* Top Tier: Game Categories Horizontal Segmented Track */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-0.5 select-none">
-          {gameCategories.map((cat) => {
-            const isSelected = gameFilter === cat.id;
-            return (
-              <button
-                key={cat.id || '__all__'}
-                type="button"
-                onClick={() => setGameFilter(isSelected && cat.id !== '' ? '' : cat.id)}
-                className={cn(
-                  'h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shrink-0 border active:scale-[0.97]',
-                  isSelected
-                    ? 'bg-zinc-100 text-zinc-950 border-zinc-100 shadow-sm font-semibold'
-                    : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/60'
-                )}
-              >
-                {cat.id && (
-                  <GameIcon game={cat.id} className="w-3.5 h-3.5 object-contain shrink-0" />
-                )}
-                <span className={cn(isRtl && 'font-farsi')}>{cat.label}</span>
-                <span
+        {gameCategories.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-0.5 select-none">
+            {gameCategories.map((cat) => {
+              const isSelected = gameFilter === cat.id;
+              return (
+                <button
+                  key={cat.id || '__all__'}
+                  type="button"
+                  onClick={() => setGameFilter(isSelected && cat.id !== '' ? '' : cat.id)}
                   className={cn(
-                    'text-[10px] font-mono px-1 rounded leading-tight',
+                    'h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shrink-0 border active:scale-[0.97]',
                     isSelected
-                      ? 'bg-zinc-950/10 text-zinc-900 font-bold'
-                      : 'bg-zinc-900 text-zinc-500'
+                      ? 'bg-zinc-200 text-zinc-900 border-zinc-200 shadow-sm font-semibold'
+                      : 'bg-zinc-950 text-zinc-400 hover:text-zinc-200 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/60'
                   )}
                 >
-                  {formatNumber(cat.count)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  {cat.id && (
+                    <GameIcon game={cat.id} className="w-3.5 h-3.5 object-contain shrink-0" />
+                  )}
+                  <span className={cn(isRtl && 'font-farsi')}>{cat.label}</span>
+                  <span
+                    className={cn(
+                      'text-[10px] font-mono px-1 rounded leading-tight',
+                      isSelected
+                        ? 'bg-zinc-950/15 text-zinc-900 font-bold'
+                        : 'bg-zinc-900 text-zinc-400'
+                    )}
+                  >
+                    {formatNumber(cat.count)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Bottom Tier: Minimal Unified Desktop Toolbar */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {/* Left: Always-Accessible Search Input */}
-          <div className="relative flex-1 min-w-[140px] sm:min-w-[180px] max-w-sm">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full">
+          {/* Left: Always-Accessible Search Input (Stretches to fill available width) */}
+          <div className="relative flex-1 min-w-[160px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
             <Input
               ref={searchInputRef}
@@ -843,7 +849,7 @@ export function LedgerView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={cn(
-                'pl-8 pr-8 h-8 text-xs bg-zinc-950 border-zinc-800/80 text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700',
+                'pl-8 pr-8 h-8 text-xs bg-transparent dark:bg-transparent border-zinc-800/80 text-zinc-200 placeholder:text-zinc-600 focus:border-zinc-700',
                 isRtl && 'font-farsi placeholder:font-farsi text-right'
               )}
             />
@@ -861,7 +867,7 @@ export function LedgerView({
                   ✕
                 </button>
               ) : (
-                <Kbd className="text-[9px] bg-black border-zinc-800 text-zinc-500 px-1 py-0 select-none">
+                <Kbd className="text-[9px] bg-transparent border-zinc-800 text-zinc-500 px-1 py-0 select-none">
                   /
                 </Kbd>
               )}
@@ -869,14 +875,14 @@ export function LedgerView({
           </div>
 
           {/* Center: Primary Status Segmented Pills */}
-          <div className="flex items-center gap-1 bg-zinc-950 p-0.5 rounded-lg border border-zinc-800/80 shrink-0 overflow-x-auto no-scrollbar max-w-full">
+          <div className="flex items-center gap-1 bg-transparent p-0.5 rounded-lg border border-zinc-800/80 shrink-0 overflow-x-auto no-scrollbar max-w-full">
             <button
               type="button"
               onClick={() => setStatusFilter('')}
               className={cn(
                 'h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0 active:scale-[0.97]',
                 statusFilter === ''
-                  ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                  ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
                   : 'text-zinc-400 hover:text-zinc-200'
               )}
             >
@@ -894,13 +900,13 @@ export function LedgerView({
                   className={cn(
                     'h-7 px-2.5 rounded-md text-[11px] font-medium transition-all shrink-0 flex items-center gap-1.5 active:scale-[0.97]',
                     isCurrent
-                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                      ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   )}
                 >
                   <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
                   {count > 0 && (
-                    <span className={cn('text-[10px] font-mono', isCurrent ? 'text-zinc-300' : 'text-zinc-600')}>
+                    <span className={cn('text-[10px] font-mono', isCurrent ? 'text-zinc-300' : 'text-zinc-500')}>
                       {formatNumber(count)}
                     </span>
                   )}
@@ -909,8 +915,18 @@ export function LedgerView({
             })}
           </div>
 
-          {/* Right: Secondary Filters Popover + Multi-Select Mode */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+          {/* Right: Quick Sort Selector & Secondary Filters */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Quick Sort Selector (Desktop/Tablet) */}
+            <div className="hidden sm:block shrink-0">
+              <Select
+                value={sortOption}
+                onChange={setSortOption}
+                options={sortOptions}
+                className="h-8 text-xs bg-transparent dark:bg-transparent border-zinc-800/80 text-zinc-300 w-[140px]"
+              />
+            </div>
+
             {/* Secondary Filters Popover Trigger */}
             <div className="relative" ref={filtersPopoverRef}>
               <button
@@ -920,14 +936,14 @@ export function LedgerView({
                 className={cn(
                   'h-8 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-all active:scale-[0.97]',
                   isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
-                    ? 'bg-zinc-900 text-zinc-100 border-zinc-700 font-semibold shadow-xs'
-                    : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 hover:border-zinc-700'
+                    ? 'bg-zinc-800 text-zinc-200 border-zinc-700 font-semibold shadow-xs'
+                    : 'bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-zinc-100 border-zinc-800 hover:border-zinc-700'
                 )}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
                 <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filters')}</span>
                 {activeSecondaryFiltersCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-zinc-100 text-zinc-950 font-mono text-[10px] font-bold flex items-center justify-center leading-none">
+                  <span className="w-4 h-4 rounded-full bg-zinc-200 text-zinc-900 font-mono text-[10px] font-bold flex items-center justify-center leading-none">
                     {activeSecondaryFiltersCount}
                   </span>
                 )}
@@ -978,7 +994,7 @@ export function LedgerView({
                           onClick={() => setCurrencyFilter('')}
                           className={cn(
                             'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95',
-                            currencyFilter === '' ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                            currencyFilter === '' ? 'bg-zinc-800 text-zinc-200 font-semibold' : 'text-zinc-400 hover:text-zinc-200'
                           )}
                         >
                           {t('status.all')}
@@ -999,7 +1015,7 @@ export function LedgerView({
                           onClick={() => setCurrencyFilter('TOMAN')}
                           className={cn(
                             'py-1 rounded text-[11px] font-medium transition-colors text-center flex items-center justify-center gap-1 active:scale-95',
-                            currencyFilter === 'TOMAN' ? 'bg-zinc-800 text-white font-semibold' : 'text-zinc-400 hover:text-zinc-200'
+                            currencyFilter === 'TOMAN' ? 'bg-zinc-800 text-zinc-200 font-semibold' : 'text-zinc-400 hover:text-zinc-200'
                           )}
                         >
                           <Banknote className="w-3 h-3 text-zinc-400" />
@@ -1166,9 +1182,9 @@ export function LedgerView({
                                   <div className="min-w-0 space-y-0.5">
                                     <p className={cn('text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
                                       {language === 'fa' ? (
-                                        <>حذف <span className="text-white font-semibold">«{entry.title}»</span>؟</>
+                                        <>حذف <span className="text-zinc-200 font-semibold">«{entry.title}»</span>؟</>
                                       ) : (
-                                        <>Delete <span className="text-white font-semibold">"{entry.title}"</span>?</>
+                                        <>Delete <span className="text-zinc-200 font-semibold">"{entry.title}"</span>?</>
                                       )}
                                     </p>
                                     <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
@@ -1198,7 +1214,7 @@ export function LedgerView({
                                         return next;
                                       });
                                     }}
-                                    className={cn('h-7 text-xs bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm gap-1', isRtl && 'font-farsi')}
+                                    className={cn('h-7 text-xs bg-rose-600 hover:bg-rose-500 text-zinc-100 font-semibold shadow-sm gap-1', isRtl && 'font-farsi')}
                                   >
                                     <Trash2 className="w-3 h-3" />
                                     <span>{t('ledger.deleteRecordBtn', 'Delete Record')}</span>
@@ -1238,13 +1254,13 @@ export function LedgerView({
                                   className={cn(
                                     'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
                                     isSelected
-                                      ? 'bg-zinc-100 border-zinc-100 text-zinc-950 scale-100 opacity-100'
+                                      ? 'bg-zinc-200 border-zinc-200 text-zinc-900 scale-100 opacity-100'
                                       : isSelectMode
                                       ? 'bg-zinc-950 border-zinc-700 text-transparent opacity-100 hover:border-zinc-400 hover:scale-105'
                                       : 'bg-zinc-950 border-zinc-700/80 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105'
                                   )}
                                 >
-                                  <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-950' : 'opacity-0 hover:opacity-50 text-zinc-400')} />
+                                  <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-900' : 'opacity-0 hover:opacity-50 text-zinc-400')} />
                                 </button>
 
                                 {/* Left: Game Emblem & Details (Always keep GameIcon on far left) */}
@@ -1256,7 +1272,7 @@ export function LedgerView({
                                   <div className="min-w-0 flex-1 space-y-0.5">
                                     {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-xs font-medium text-zinc-900 dark:text-zinc-300 truncate">
+                                      <span className="text-xs font-medium text-zinc-800 dark:text-zinc-300 truncate">
                                         {entry.title}
                                       </span>
                                       {entry.proofs && entry.proofs.length > 0 && (
@@ -1331,13 +1347,16 @@ export function LedgerView({
                                             title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
                                             className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
                                               isMatch
-                                                ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 dark:border-zinc-300 shadow-sm'
+                                                ? 'bg-zinc-200 text-zinc-800 font-semibold border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
                                                 : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
                                             }`}
                                           >
                                             <span>{tm}</span>
                                             {customCut && (
-                                              <span className="font-mono text-[9px] text-zinc-500 dark:text-zinc-400 inline-flex items-baseline">
+                                              <span className={cn(
+                                                'font-mono text-[9px] inline-flex items-baseline',
+                                                isMatch ? 'text-zinc-800 dark:text-zinc-300' : 'text-zinc-500 dark:text-zinc-400'
+                                              )}>
                                                 (<MoneyDisplay amount={customCut} currency={entry.currency} />)
                                               </span>
                                             )}
@@ -1357,7 +1376,7 @@ export function LedgerView({
                                       {t('ledger.yourShare', 'Your Share')}
                                     </div>
                                   )}
-                                  <div className="text-xs font-medium text-zinc-900 dark:text-zinc-300">
+                                  <div className="text-xs font-medium font-mono text-zinc-800 dark:text-zinc-200">
                                     <MoneyDisplay amount={entry.income} currency={entry.currency} />
                                   </div>
                                   {entry.currency !== globalCurrency && (
@@ -1374,23 +1393,51 @@ export function LedgerView({
                                 </div>
 
                                 <div className="flex items-center gap-1.5">
-                                  {/* Icon-only external link button */}
-                                  {entry.link && (
-                                    <Tooltip content={entry.link} side="top">
-                                      <button
-                                        type="button"
-                                        data-no-row-click="true"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenExternalLink(entry.link);
-                                        }}
-                                        title={t('ledger.openLink', 'Open Link')}
-                                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
+                                  {/* App-Aware External Link Button */}
+                                  {entry.link && (() => {
+                                    const linkInfo = detectAppLink(entry.link);
+                                    const platform = linkInfo?.platform;
+                                    const isApp = linkInfo?.appLaunchable;
+
+                                    let IconComponent = ExternalLink;
+                                    if (platform === 'discord') IconComponent = DiscordIcon;
+                                    else if (platform === 'telegram') IconComponent = TelegramIcon;
+                                    else if (platform === 'steam') IconComponent = SteamIcon;
+                                    else if (platform === 'sheets') IconComponent = GoogleSheetsIcon;
+                                    else if (platform === 'github') IconComponent = GithubIcon;
+
+                                    const tooltipLabel = linkInfo
+                                      ? (isApp
+                                          ? (language === 'fa' && linkInfo.labelFa ? `باز کردن در ${linkInfo.labelFa}` : `Open in ${linkInfo.label} App`)
+                                          : (language === 'fa' && linkInfo.labelFa ? `باز کردن ${linkInfo.labelFa}` : `Open ${linkInfo.label}`))
+                                      : t('ledger.openLink', 'Open Link');
+
+                                    return (
+                                      <Tooltip
+                                        content={
+                                          <div className="max-w-[260px] space-y-0.5 text-left rtl:text-right">
+                                            <div className="font-semibold text-zinc-800 dark:text-zinc-200">{tooltipLabel}</div>
+                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">{entry.link}</div>
+                                          </div>
+                                        }
+                                        side="top"
+                                        align="end"
                                       >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                      </button>
-                                    </Tooltip>
-                                  )}
+                                        <button
+                                          type="button"
+                                          data-no-row-click="true"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenExternalLink(entry.link);
+                                          }}
+                                          title={tooltipLabel}
+                                          className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
+                                        >
+                                          <IconComponent className="w-3.5 h-3.5" />
+                                        </button>
+                                      </Tooltip>
+                                    );
+                                  })()}
 
                                   <StatusBadge
                                     status={entry.status}
@@ -1414,15 +1461,18 @@ export function LedgerView({
                                     <AnimatePresence>
                                       {isActionOpen && (
                                         <motion.div
-                                          initial={{ opacity: 0, scale: 0.95 }}
+                                          initial={{ opacity: 0, scale: 0.96 }}
                                           animate={{ opacity: 1, scale: 1 }}
-                                          exit={{ opacity: 0, scale: 0.95 }}
-                                          transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                                          exit={{ opacity: 0, scale: 0.96 }}
+                                          transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
                                           onClick={(e) => e.stopPropagation()}
                                           dir={isRtl ? 'rtl' : 'ltr'}
                                           className={cn(
-                                            'absolute w-36 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs right-0',
-                                            isNearBottom ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'
+                                            'absolute w-max min-w-[160px] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[80] text-xs whitespace-nowrap',
+                                            isRtl ? 'left-0' : 'right-0',
+                                            isNearBottom
+                                              ? (isRtl ? 'bottom-full mb-1 origin-bottom-left' : 'bottom-full mb-1 origin-bottom-right')
+                                              : (isRtl ? 'top-full mt-1 origin-top-left' : 'top-full mt-1 origin-top-right')
                                           )}
                                         >
                                           <button
@@ -1431,7 +1481,7 @@ export function LedgerView({
                                               onOpenReceipt?.(entry);
                                               setActiveActionMenuId(null);
                                             }}
-                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-[0.98] whitespace-nowrap transition-all"
                                           >
                                             <Receipt className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                                             <span className={cn(isRtl && 'font-farsi')}>{t('ledger.clientReceipt')}</span>
@@ -1443,7 +1493,7 @@ export function LedgerView({
                                               onOpenWorkModal?.(entry);
                                               setActiveActionMenuId(null);
                                             }}
-                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-[0.98] whitespace-nowrap transition-all"
                                           >
                                             <FileImage className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                                             <span className={cn(isRtl && 'font-farsi')}>{t('ledger.addScreenshot', 'Add Screenshot')}</span>
@@ -1455,7 +1505,7 @@ export function LedgerView({
                                               onOpenWorkModal?.(entry);
                                               setActiveActionMenuId(null);
                                             }}
-                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-[0.98] whitespace-nowrap transition-all"
                                           >
                                             <Edit2 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                                             <span className={cn(isRtl && 'font-farsi')}>{t('ledger.edit')}</span>
@@ -1467,7 +1517,7 @@ export function LedgerView({
                                               onDuplicateEntry?.(entry.id);
                                               setActiveActionMenuId(null);
                                             }}
-                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-950 dark:hover:text-white transition-colors"
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 hover:text-zinc-900 dark:hover:text-zinc-100 active:scale-[0.98] whitespace-nowrap transition-all"
                                           >
                                             <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                                             <span className={cn(isRtl && 'font-farsi')}>{t('ledger.duplicate')}</span>
@@ -1481,7 +1531,7 @@ export function LedgerView({
                                               setActiveActionMenuId(null);
                                               setConfirmDeleteEntryId(entry.id);
                                             }}
-                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:text-rose-300 transition-colors"
+                                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:text-rose-300 active:scale-[0.98] whitespace-nowrap transition-all"
                                           >
                                             <Trash2 className="w-3.5 h-3.5" />
                                             <span className={cn(isRtl && 'font-farsi')}>{t('ledger.delete')}</span>
@@ -1518,7 +1568,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white transition-colors', isRtl && 'font-farsi')}
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors', isRtl && 'font-farsi')}
                 >
                   {t('ledger.previous')}
                 </button>
@@ -1547,8 +1597,8 @@ export function LedgerView({
                       onClick={() => handlePageChange(pageNum)}
                       className={cn(`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
                         currentPage === pageNum
-                          ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 dark:border-zinc-200 shadow-sm font-semibold'
-                          : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800'
+                          ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-300 shadow-sm font-semibold'
+                          : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800'
                       }`, isRtl && 'font-farsi')}
                     >
                       {formatNumber(pageNum)}
@@ -1560,7 +1610,7 @@ export function LedgerView({
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white transition-colors', isRtl && 'font-farsi')}
+                  className={cn('h-8 px-2.5 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 disabled:opacity-40 disabled:pointer-events-none border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100 transition-colors', isRtl && 'font-farsi')}
                 >
                   {t('ledger.next')}
                 </button>
@@ -1591,7 +1641,7 @@ export function LedgerView({
 
               <div className="flex items-baseline gap-2 min-w-0 shrink-0">
                 <span className={cn('text-zinc-400 text-xs hidden sm:inline', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-100 font-bold text-base sm:text-lg tracking-tight shrink-0">
+                <strong className="text-zinc-200 font-bold text-base sm:text-lg tracking-tight shrink-0">
                   <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
                 </strong>
                 <span className={cn('text-[11px] text-zinc-500 shrink-0', isRtl && 'font-farsi')}>
@@ -1618,7 +1668,7 @@ export function LedgerView({
                   className={cn(`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
                     isSumCopied
                       ? 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80'
-                      : 'text-zinc-300 hover:text-white hover:bg-zinc-800/80 border-transparent hover:border-zinc-700'
+                      : 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 border-transparent hover:border-zinc-700'
                   }`, isRtl && 'font-farsi')}
                 >
                   {isSumCopied ? (
@@ -1675,7 +1725,7 @@ export function LedgerView({
 
               <div className="flex items-baseline gap-1.5 sm:gap-2 min-w-0 shrink-0">
                 <span className={cn('text-zinc-400 text-xs', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-100 font-bold text-xs sm:text-sm tracking-tight shrink-0">
+                <strong className="text-zinc-200 font-bold text-xs sm:text-sm tracking-tight shrink-0">
                   <MoneyDisplay amount={bulkMetrics.totalSum} currency={globalCurrency} />
                 </strong>
                 {globalCurrency !== 'GOLD' ? (
@@ -1718,7 +1768,7 @@ export function LedgerView({
                       setIsStatusDropdownOpen((prev) => !prev);
                     }}
                     title={t('ledger.bulkStatus')}
-                    className={cn('h-7 px-2 text-[11px] gap-1.5 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm shrink-0 flex items-center', isRtl && 'font-farsi')}
+                    className={cn('h-7 px-2 text-[11px] gap-1.5 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm shrink-0 flex items-center', isRtl && 'font-farsi')}
                   >
                     <div className="flex items-center -space-x-1 shrink-0 rtl:space-x-reverse" aria-hidden="true">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-zinc-950" />
@@ -1746,7 +1796,7 @@ export function LedgerView({
                             onBulkUpdateStatus?.(Array.from(selectedEntryIds), st);
                             setIsStatusDropdownOpen(false);
                           }}
-                          className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-white text-start transition-colors"
+                          className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 text-start transition-colors"
                         >
                           <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
                           <span
@@ -1772,7 +1822,7 @@ export function LedgerView({
                   size="xs"
                   onClick={() => onBulkExportCsv?.(Array.from(selectedEntryIds))}
                   title={t('ledger.bulkCsvTooltip', t('ledger.bulkCsv'))}
-                  className={cn('h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm flex items-center shrink-0', isRtl && 'font-farsi')}
+                  className={cn('h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm flex items-center shrink-0', isRtl && 'font-farsi')}
                 >
                   <Download className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                   <span>{t('ledger.bulkCsv')}</span>
@@ -1811,7 +1861,7 @@ export function LedgerView({
                         setIsSelectMode(false);
                         setLastSelectedId(null);
                       }}
-                      className={cn('h-5 px-1.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm flex items-center', isRtl && 'font-farsi')}
+                      className={cn('h-5 px-1.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-zinc-100 font-semibold shadow-sm flex items-center', isRtl && 'font-farsi')}
                     >
                       {t('common.confirm')}
                     </button>

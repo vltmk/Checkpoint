@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
@@ -11,8 +11,10 @@ import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
 import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2 } from 'lucide-react';
+import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
 import { copyTextNative, optimizeImageProof } from '../lib/desktop';
+import { detectAppLink } from '../lib/appLinks';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
@@ -87,6 +89,27 @@ export function WorkModal({
   const fileInputRef = useRef(null);
   const titleInputRef = useRef(null);
   const entryIdRef = useRef(null);
+
+  const detectedLink = useMemo(() => {
+    return detectAppLink(formData.link);
+  }, [formData.link]);
+
+  const renderPlatformIcon = (platform, className = 'w-3.5 h-3.5') => {
+    switch (platform) {
+      case 'discord':
+        return <DiscordIcon className={className} />;
+      case 'telegram':
+        return <TelegramIcon className={className} />;
+      case 'steam':
+        return <SteamIcon className={className} />;
+      case 'sheets':
+        return <GoogleSheetsIcon className={className} />;
+      case 'github':
+        return <GithubIcon className={className} />;
+      default:
+        return <Link2 className={className} />;
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1013,23 +1036,57 @@ export function WorkModal({
 
           {/* Row 7: Reference Link / URL */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-              <span className="flex items-center gap-1.5">
-                <Link2 className="w-3.5 h-3.5 text-zinc-500" />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+                {detectedLink ? (
+                  renderPlatformIcon(detectedLink.platform, 'w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0')
+                ) : (
+                  <Link2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                )}
                 <span>{t('work.link')}</span>
-              </span>
-              <span className="text-[9px] font-mono text-zinc-500 lowercase">
-                Optional
-              </span>
-            </label>
-            <Input
-              type="url"
-              value={formData.link}
-              onChange={(e) => updateFormData({ link: e.target.value })}
-              placeholder={t('work.linkPlaceholder')}
-              className={cn('text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-300', isRtl && 'text-left')}
-              dir="ltr"
-            />
+              </label>
+
+              {detectedLink ? (
+                <div
+                  className="flex items-center gap-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300 shadow-2xs"
+                  dir="ltr"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <span className="font-semibold">
+                    {language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label}
+                  </span>
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    {detectedLink.appLaunchable
+                      ? '• ' + (language === 'fa' ? 'برنامه دسکتاپ' : 'Desktop App')
+                      : '• ' + (language === 'fa' ? 'مرورگر' : 'Browser')}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[9px] font-mono text-zinc-500 lowercase">
+                  Optional
+                </span>
+              )}
+            </div>
+
+            <div className="relative flex items-center">
+              <Input
+                type="text"
+                value={formData.link}
+                onChange={(e) => updateFormData({ link: e.target.value })}
+                placeholder={t('work.linkPlaceholder')}
+                className={cn(
+                  'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-300 transition-colors',
+                  detectedLink && 'border-zinc-300 dark:border-zinc-700/80 pr-8',
+                  isRtl && 'text-left'
+                )}
+                dir="ltr"
+              />
+              {detectedLink && (
+                <div className="absolute right-2.5 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
+                  {renderPlatformIcon(detectedLink.platform, 'w-3.5 h-3.5')}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Row 8: Proof Upload & Screenshot Paste */}
@@ -1118,7 +1175,7 @@ export function WorkModal({
                         e.stopPropagation();
                         handleRemoveProof(idx);
                       }}
-                      className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-white transition-colors"
+                      className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-zinc-100 transition-colors"
                       title="Remove attachment"
                     >
                       <X className="w-3 h-3" />

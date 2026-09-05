@@ -91,7 +91,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -103,7 +103,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
 
 export function DialogTitle({ children, className }) {
   return (
-    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2', className)}>
+    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2', className)}>
       {children}
     </h3>
   );

@@ -66,7 +66,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors"
+                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>

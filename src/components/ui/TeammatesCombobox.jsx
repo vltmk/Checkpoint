@@ -123,7 +123,7 @@ export function TeammatesCombobox({
       {/* Input container with chips */}
       <div
         onClick={() => inputRef.current?.focus()}
-        className="min-h-[38px] w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 flex flex-wrap items-center gap-1.5 transition-all duration-150 cursor-text"
+        className="min-h-[38px] w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 flex flex-wrap items-center gap-1.5 transition-all duration-150 cursor-text"
       >
         {/* Active Teammate Chips */}
         {value.map((name, idx) => (
@@ -159,7 +159,7 @@ export function TeammatesCombobox({
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={value.length === 0 ? placeholder : (language === 'fa' ? 'افزودن نام بیشتر...' : 'Add more...')}
-          className={cn('flex-1 min-w-[120px] bg-transparent border-0 text-zinc-900 dark:text-zinc-100 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none p-1', isRtl && 'font-farsi')}
+          className={cn('flex-1 min-w-[120px] bg-transparent border-0 text-zinc-800 dark:text-zinc-200 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none p-1', isRtl && 'font-farsi')}
         />
 
         {/* Dropdown Toggle / Add Action */}
@@ -168,7 +168,7 @@ export function TeammatesCombobox({
             <button
               type="button"
               onClick={() => handleAddTeammate(inputValue)}
-              className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               title={language === 'fa' ? `افزودن "${inputValue.trim()}"` : `Add "${inputValue.trim()}"`}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -178,7 +178,7 @@ export function TeammatesCombobox({
           <button
             type="button"
             onClick={() => setIsOpen((prev) => !prev)}
-            className="p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
             title={language === 'fa' ? 'هم‌تیمی‌های ذخیره' : 'Saved Teammates'}
           >
             <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-150', isOpen && 'rotate-180')} />
@@ -200,7 +200,7 @@ export function TeammatesCombobox({
             >
               <span className="flex items-center gap-1.5 truncate">
                 <UserPlus className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-300 shrink-0" />
-                <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-900 dark:text-zinc-100 font-semibold">"{inputValue.trim()}"</strong></span>
+                <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">"{inputValue.trim()}"</strong></span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Add'}</span>
             </button>
@@ -224,8 +224,8 @@ export function TeammatesCombobox({
                   className={cn(
                     'group flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs transition-colors',
                     isSelected
-                      ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800/90 dark:text-zinc-100 font-medium'
-                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+                      ? 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800/90 dark:text-zinc-200 font-medium'
+                      : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-200'
                   )}
                 >
                   <span className="flex items-center gap-2 truncate">

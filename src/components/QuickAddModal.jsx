@@ -328,7 +328,7 @@ export function QuickAddModal({
               }}
               placeholder={t('work.titlePlaceholder')}
               className={cn(
-                'bg-zinc-900/80 border-zinc-700/80 text-zinc-100 placeholder:text-zinc-500 font-medium transition-colors',
+                'bg-zinc-900/80 border-zinc-700/80 text-zinc-200 placeholder:text-zinc-500 font-medium transition-colors',
                 hasTitleError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
               )}
             />
@@ -357,7 +357,7 @@ export function QuickAddModal({
                   }}
                   placeholder={t('work.customGamePlaceholder')}
                   className={cn(
-                    'bg-zinc-900/80 border-zinc-700/80 text-zinc-100',
+                    'bg-zinc-900/80 border-zinc-700/80 text-zinc-200',
                     hasGameError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
                   )}
                 />
@@ -401,7 +401,7 @@ export function QuickAddModal({
                   onClick={() => setCurrency('TOMAN')}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                     currency === 'TOMAN'
-                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                      ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -412,7 +412,7 @@ export function QuickAddModal({
                   onClick={() => setCurrency('GOLD')}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                     currency === 'GOLD'
-                      ? 'bg-zinc-800 text-zinc-100 font-semibold shadow-xs'
+                      ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -440,7 +440,7 @@ export function QuickAddModal({
                   }}
                   placeholder="0"
                   className={cn(
-                    'font-mono text-sm bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-900 dark:text-zinc-100 pr-12',
+                    'font-mono text-sm bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-800 dark:text-zinc-200 pr-12',
                     hasPriceError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
                   )}
                   required

@@ -297,8 +297,8 @@ Notes      = ${safeEntry.notes || 'None'}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'fa'
-                  ? 'bg-white text-zinc-950 dark:bg-zinc-800 dark:text-zinc-100 font-semibold shadow-xs'
-                  : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-semibold shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
               فارسی
@@ -309,8 +309,8 @@ Notes      = ${safeEntry.notes || 'None'}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'en'
-                  ? 'bg-white text-zinc-950 dark:bg-zinc-800 dark:text-zinc-100 font-semibold shadow-xs'
-                  : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-semibold shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
               EN
@@ -332,9 +332,9 @@ Notes      = ${safeEntry.notes || 'None'}
           {/* Header */}
           <div className="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
             <div className="flex items-center gap-3">
-              <CheckpointLogo className="w-7 h-7 text-zinc-950 dark:text-zinc-100 shrink-0" />
+              <CheckpointLogo className="w-7 h-7 text-zinc-800 dark:text-zinc-200 shrink-0" />
               <div>
-                <h4 className="text-sm font-bold tracking-wider text-zinc-950 dark:text-zinc-100 uppercase">
+                <h4 className="text-sm font-black tracking-wider text-zinc-800 dark:text-zinc-200 uppercase">
                   CHECKPOINT
                 </h4>
                 <p className="text-[10px] text-zinc-500 font-mono">
@@ -354,7 +354,7 @@ Notes      = ${safeEntry.notes || 'None'}
               <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-1">
                 {isReceiptFa ? 'عنوان کار' : 'Work Title'}
               </span>
-              <span className="text-sm font-semibold text-zinc-950 dark:text-zinc-100 block">
+              <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 block">
                 {safeEntry.title || (isReceiptFa ? 'بدون عنوان' : 'Untitled Work')}
               </span>
             </div>
@@ -392,7 +392,7 @@ Notes      = ${safeEntry.notes || 'None'}
                 <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
                   {isTeamWork ? (isReceiptFa ? 'سهم شما' : 'Your Share') : (isReceiptFa ? 'مبلغ درآمد' : 'Amount Earned')}
                 </span>
-                <div className="text-sm font-bold text-zinc-950 dark:text-zinc-100 font-mono mt-0.5">
+                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200 font-mono mt-0.5">
                   <MoneyDisplay amount={safeEntry.income || 0} currency={entryCurrency} />
                 </div>
               </div>
@@ -440,7 +440,7 @@ Notes      = ${safeEntry.notes || 'None'}
                             onClose?.();
                           }}
                           title={`Filter ledger for ${tm} (Cut: ${formatMoney(cut, entryCurrency, false, isReceiptFa)})`}
-                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
                         >
                           <Users className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                           <span>{tm}</span>
@@ -505,7 +505,7 @@ Notes      = ${safeEntry.notes || 'None'}
             onClick={handleScreenshotCopy}
             disabled={isCapturing}
             title={t('receipt.screenshotTitle', 'Copy receipt screenshot to clipboard (Press C or S)')}
-            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 rounded-lg transition-colors"
+            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 rounded-lg transition-colors"
           >
             {isCapturing ? (
               <Loader2 className="w-4 h-4 animate-spin text-zinc-300" />

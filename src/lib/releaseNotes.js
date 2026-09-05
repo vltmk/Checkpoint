@@ -26,6 +26,63 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '2.5.1': {
+    date: '2026-09-05',
+    title: {
+      en: "What's New in Checkpoint v2.5.1",
+      fa: 'امکانات و تغییرات نسخه ۲.۵.۱',
+    },
+    summary: {
+      en: 'App-aware deep linking for Discord, Telegram, and Steam, refined monochromatic aesthetics, and cockpit ambient visual updates.',
+      fa: 'لینک‌دهی هوشمند درون‌برنامه‌ای برای دیسکورد، تلگرام و استیم، کالیبراسیون کنتراست مونوکروم و انیمیشن محیطی کاکپیت.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Added app-aware deep link detection for Discord, Telegram, and Steam with native desktop application launching and web fallback.',
+        },
+        {
+          tag: 'new',
+          text: 'Added smart platform badges and custom vector icons for Google Sheets, GitHub, Steam, Discord, and Telegram in work items and receipts.',
+        },
+        {
+          tag: 'improved',
+          text: 'Calibrated soft monochromatic palette across light and dark modes, eliminating stark contrasts and improving visual hierarchy.',
+        },
+        {
+          tag: 'improved',
+          text: 'Added GPU-accelerated monochromatic ambient gradient rotation around the cockpit Total Income section.',
+        },
+        {
+          tag: 'improved',
+          text: 'Enhanced tooltip positioning, origin anchoring, and toggle switch styling in paper-white light theme.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'افزودن تشخیص هوشمند لینک‌ها برای دیسکورد، تلگرام و استیم با قابلیت باز شدن مستقیم در اپلیکیشن دسکتاپ و بازگشت خودکار به مرورگر.',
+        },
+        {
+          tag: 'new',
+          text: 'افزودن نشان‌ها و آیکون‌های وکتور اختصاصی برای گوگل شیت، گیت‌هاب، استیم، دیسکورد و تلگرام در کارها و رسیدها.',
+        },
+        {
+          tag: 'improved',
+          text: 'کالیبراسیون کنتراست رنگ‌های زینک در تم تاریک و روشن برای حذف تضادهای تند و ارتقای سلسله‌مراتب بصری.',
+        },
+        {
+          tag: 'improved',
+          text: 'افزودن گرادیان محیطی مونوکروم با چرخش نرم و بدون افت فریم بر روی بخش مجموع درآمد کاکپیت.',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود لنگراندازی و موقعیت تول‌تیپ‌ها و استایل سوئیچ‌های تنظیمات در تم روشن.',
+        },
+      ],
+    },
+  },
   '2.5.0': {
     date: '2026-09-05',
     title: {

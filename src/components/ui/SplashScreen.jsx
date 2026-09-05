@@ -15,12 +15,12 @@ export function SplashScreen() {
       <div className="flex flex-col items-center space-y-6" dir="ltr">
         {/* Crisp Unboxed Geometric Logo */}
         <div className="w-14 h-14 flex items-center justify-center">
-          <CheckpointLogo className="w-full h-full text-white" />
+          <CheckpointLogo className="w-full h-full text-zinc-200" />
         </div>
 
         {/* Brand Title and Subtitle */}
         <div className="flex flex-col items-center space-y-1.5 text-center">
-          <span className="text-base font-black tracking-wider text-white uppercase">
+          <span className="text-base font-black tracking-wider text-zinc-200 uppercase">
             CHECKPOINT
           </span>
 
@@ -30,7 +30,7 @@ export function SplashScreen() {
         </div>
 
         {/* Linear Time-Relative Progress Bar (0% to 100% in exactly 2.2s) - Forced LTR */}
-        <div className="w-44 h-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800" dir="ltr">
+        <div className="w-44 h-1 splash-progress-track bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800" dir="ltr">
           <motion.div
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
@@ -39,7 +39,7 @@ export function SplashScreen() {
               duration: 2.2,
               ease: 'linear',
             }}
-            className="w-full h-full bg-zinc-100 rounded-full"
+            className="w-full h-full splash-progress-filler bg-zinc-100 rounded-full"
           />
         </div>
       </div>

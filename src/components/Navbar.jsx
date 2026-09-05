@@ -193,8 +193,8 @@ export function Navbar({
           title="Open Checkpoint repository on GitHub"
           className="flex items-center gap-2 select-none cursor-pointer group p-1 -m-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900/80 transition-colors"
         >
-          <CheckpointLogo className="w-5 h-5 text-zinc-950 dark:text-white group-hover:scale-105 transition-transform shrink-0" />
-          <span className="hidden lg:inline text-xs font-black tracking-wider text-zinc-950 dark:text-white uppercase group-hover:text-zinc-700 dark:group-hover:text-zinc-200">
+          <CheckpointLogo className="w-5 h-5 text-zinc-800 dark:text-zinc-200 group-hover:scale-105 transition-transform shrink-0" />
+          <span className="hidden lg:inline text-xs font-black tracking-wider text-zinc-800 dark:text-zinc-200 uppercase group-hover:text-zinc-600 dark:group-hover:text-zinc-300">
             CHECKPOINT
           </span>
           {appVersion && (
@@ -207,27 +207,27 @@ export function Navbar({
         <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800/80 pointer-events-none" />
 
         <div data-no-drag className="flex items-center">
-          <div className="inline-flex items-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 p-0.5 shadow-sm border border-zinc-800 dark:border-zinc-200/20">
+          <div className="inline-flex items-center rounded-lg bg-zinc-200/90 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 p-0.5 shadow-sm border border-zinc-300 dark:border-zinc-700">
             {/* Primary Add Work (Left Side) */}
             <button
               type="button"
               onClick={() => onOpenWorkModal?.()}
               title={`${t('nav.addWork')} (N)`}
-              className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-semibold text-white dark:text-zinc-950 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-white dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
+              className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none"
             >
               <Plus className="w-3.5 h-3.5" />
               <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
             </button>
 
             {/* Subtle vertical hairline divider */}
-            <div className="h-3.5 w-px bg-zinc-700 dark:bg-zinc-300/80 my-auto mx-0.5" />
+            <div className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700 my-auto mx-0.5" />
 
             {/* Quick Add Lightning (Right Side) */}
             <button
               type="button"
               onClick={() => onOpenQuickAdd?.()}
               title={`${t('nav.quickAdd')} (Q)`}
-              className="flex items-center justify-center h-6 px-2 text-xs font-semibold text-white dark:text-zinc-950 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-white dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
+              className="flex items-center justify-center h-6 px-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none gap-1"
             >
               <span className={cn('text-xs font-semibold leading-none', isRtl && 'font-farsi')}>
                 {t('nav.quickAdd')}
@@ -250,8 +250,8 @@ export function Navbar({
             onClick={() => onTabChange?.('ledger')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'ledger'
-                ? 'text-zinc-950 dark:text-white font-semibold'
-                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
+                ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'ledger' && (
@@ -261,13 +261,13 @@ export function Navbar({
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}`} />
+            <Layers className={`w-3.5 h-3.5 ${activeTab === 'ledger' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />
             <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
             {entriesCount > 0 && (
               <span
                 className={`text-[10px] font-mono px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
                   activeTab === 'ledger'
-                    ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 font-semibold'
+                    ? 'bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 font-semibold'
                     : 'bg-zinc-200/50 text-zinc-600 border-zinc-300/60 dark:bg-zinc-900/80 dark:text-zinc-400 dark:border-zinc-800/80'
                 }`}
               >
@@ -282,8 +282,8 @@ export function Navbar({
             onClick={() => onTabChange?.('analytics')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'analytics'
-                ? 'text-zinc-950 dark:text-white font-semibold'
-                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
+                ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
             {activeTab === 'analytics' && (
@@ -293,7 +293,7 @@ export function Navbar({
                 transition={{ type: 'spring', stiffness: 480, damping: 35 }}
               />
             )}
-            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-950 dark:text-white' : 'text-zinc-400 dark:text-zinc-500'}`} />
+            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />
             <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
           </button>
         </div>
@@ -322,7 +322,7 @@ export function Navbar({
                 isRatesOpen
                   ? 'bg-zinc-800 text-zinc-100 border border-zinc-700 shadow-sm'
                   : isRateUpdateNeeded
-                  ? 'bg-zinc-950 hover:bg-zinc-900 border border-amber-500/50 text-zinc-200 hover:text-white'
+                  ? 'bg-zinc-950 hover:bg-zinc-900 border border-amber-500/50 text-zinc-200 hover:text-zinc-100'
                   : 'bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100'
               }`}
             >
@@ -384,7 +384,7 @@ export function Navbar({
                     size="xs"
                     onClick={handleDismissTour}
                     className={cn(
-                      'h-7 px-3.5 text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer shadow-sm active:scale-95 leading-none',
+                      'h-7 px-3.5 text-xs font-semibold bg-zinc-200 text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-sm active:scale-95 leading-none',
                       isRtl && 'font-farsi'
                     )}
                   >
@@ -545,7 +545,7 @@ export function Navbar({
             <button
               type="button"
               onClick={handleClose}
-              className="h-6 w-7 flex items-center justify-center rounded text-zinc-500 dark:text-zinc-400 hover:text-white hover:bg-red-600 transition-colors focus:outline-none cursor-pointer select-none"
+              className="h-6 w-7 flex items-center justify-center rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-100 hover:bg-red-600 transition-colors focus:outline-none cursor-pointer select-none"
               title="Close"
               aria-label="Close Window"
             >

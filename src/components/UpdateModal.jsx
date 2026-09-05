@@ -122,7 +122,7 @@ export function UpdateModal({
             <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 font-mono uppercase tracking-wider block font-semibold', isRtl && 'font-farsi')}>
               {t('update.newVersion')}
             </span>
-            <span className="text-xs font-mono font-bold text-zinc-950 dark:text-white flex items-center justify-end gap-1">
+            <span className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-end gap-1">
               <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
               <span>v{newVersion}</span>
             </span>
@@ -209,13 +209,13 @@ export function UpdateModal({
                 <RotateCw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 animate-spin" />
                 <span>{t('update.downloading')}</span>
               </span>
-              <span className="font-semibold text-zinc-950 dark:text-white">{formatNumber(progress.percent)}%</span>
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatNumber(progress.percent)}%</span>
             </div>
 
             {/* Monochromatic Progress Bar */}
             <div dir="ltr" className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
-                className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-150"
+                className="h-full bg-zinc-800 dark:bg-zinc-200 transition-all duration-150"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>

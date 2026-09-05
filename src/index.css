@@ -112,13 +112,13 @@
 @layer base {
   :root {
     --background: #000000;
-    --foreground: #fafafa;
+    --foreground: #e4e4e7;
     --card: #09090b;
-    --card-foreground: #fafafa;
+    --card-foreground: #e4e4e7;
     --border: #27272a;
     --muted: #18181b;
     --muted-foreground: #a1a1aa;
-    --primary: #fafafa;
+    --primary: #e4e4e7;
     --primary-foreground: #18181b;
 
     /* Motion Tokens (AUDIT.md / emil-design-eng) */
@@ -130,14 +130,14 @@
   html.light,
   html:not(.dark) {
     --background: #ffffff;
-    --foreground: #09090b;
+    --foreground: #27272a;
     --card: #ffffff;
-    --card-foreground: #09090b;
+    --card-foreground: #27272a;
     --border: #e4e4e7;
     --muted: #f4f4f5;
     --muted-foreground: #71717a;
-    --primary: #09090b;
-    --primary-foreground: #ffffff;
+    --primary: #27272a;
+    --primary-foreground: #f4f4f5;
   }
 
   * {
@@ -150,7 +150,7 @@
   html,
   body {
     background-color: #000000;
-    color: #fafafa;
+    color: #e4e4e7;
     font-family: 'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
     min-height: 100vh;
@@ -175,8 +175,8 @@
   }
 
   ::selection {
-    background: rgba(255, 255, 255, 0.2);
-    color: #ffffff;
+    background: rgba(228, 228, 231, 0.2);
+    color: #f4f4f5;
   }
 }
 
@@ -218,7 +218,7 @@
 @media print {
   body {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #27272a !important;
   }
   
   .mobile-nav {
@@ -229,7 +229,7 @@
     display: block !important;
     position: static !important;
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #27272a !important;
     box-shadow: none !important;
     border: 1px solid #e2e8f0 !important;
     width: 100% !important;
@@ -280,12 +280,12 @@ button, a, input, textarea, select, .no-drag, [data-no-drag] {
 html.light,
 html.light body {
   background-color: #ffffff !important;
-  color: #09090b !important;
+  color: #27272a !important;
 }
 
 html.light ::selection {
-  background: rgba(0, 0, 0, 0.12) !important;
-  color: #000000 !important;
+  background: rgba(39, 39, 42, 0.12) !important;
+  color: #27272a !important;
 }
 
 html.light ::-webkit-scrollbar-track {
@@ -332,13 +332,34 @@ html.light .bg-zinc-800\/40 {
   background-color: #f4f4f5 !important;
 }
 
-/* Inverted contrast items (Primary action buttons keep white text in light mode) */
+/* Inverted contrast items (Primary action buttons use soft off-white text in light mode) */
 html.light .bg-zinc-900.text-white,
 html.light .bg-zinc-900 .text-white,
 html.light button.bg-zinc-900,
 html.light button.bg-red-600,
 html.light [class*="bg-red-600"] {
-  color: #ffffff !important;
+  color: #f4f4f5 !important;
+}
+
+/* Splash screen progress bar in paper-white light theme */
+html.light .splash-progress-track {
+  background-color: #e4e4e7 !important;
+  border-color: #d4d4d8 !important;
+}
+
+html.light .splash-progress-filler {
+  background-color: #18181b !important;
+}
+
+/* Settings and UI toggle switches in paper-white light theme */
+html.light button[role="switch"][aria-checked="true"] {
+  background-color: #18181b !important;
+  border-color: #18181b !important;
+}
+
+html.light button[role="switch"][aria-checked="false"] {
+  background-color: #e4e4e7 !important;
+  border-color: #d4d4d8 !important;
 }
 
 /* Border overrides */
@@ -355,15 +376,15 @@ html.light .border-zinc-700\/80 {
   border-color: #e4e4e7 !important;
 }
 
-/* Text overrides */
+/* Text overrides - calibrated soft charcoal instead of harsh #09090b / #000000 */
 html.light .text-white,
 html.light .text-zinc-100,
 html.light .text-zinc-200 {
-  color: #09090b !important;
+  color: #27272a !important;
 }
 
 html.light .text-zinc-300 {
-  color: #18181b !important;
+  color: #3f3f46 !important;
 }
 
 html.light .text-zinc-400 {
@@ -395,11 +416,11 @@ html.light .hover\:bg-zinc-800\/60:hover {
 html.light .hover\:text-white:hover,
 html.light .hover\:text-zinc-100:hover,
 html.light .hover\:text-zinc-200:hover {
-  color: #09090b !important;
+  color: #18181b !important;
 }
 
 html.light .hover\:text-zinc-300:hover {
-  color: #18181b !important;
+  color: #27272a !important;
 }
 
 /* Form controls */
@@ -407,7 +428,7 @@ html.light input,
 html.light textarea,
 html.light select {
   background-color: #ffffff !important;
-  color: #09090b !important;
+  color: #27272a !important;
   border-color: #e4e4e7 !important;
 }
 
@@ -440,28 +461,29 @@ html.light [class*="Kbd"] {
 
 html.light .bg-zinc-100 kbd {
   background-color: rgba(255, 255, 255, 0.2) !important;
-  color: #ffffff !important;
+  color: #27272a !important;
   border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
-/* GPU-Accelerated Breathing Animation for TOTAL INCOME dot pattern */
-@keyframes dot-pattern-breathe {
-  0%, 100% {
-    opacity: 0.35;
+/* GPU-Accelerated Monochromatic Ambient Rotation around Cockpit Total Income */
+@keyframes cockpit-ambient-rotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
   }
-  50% {
-    opacity: 0.58;
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 
-.animate-dot-breathe {
-  animation: dot-pattern-breathe 3.5s ease-in-out infinite;
-  will-change: opacity;
+.animate-cockpit-rotate {
+  animation: cockpit-ambient-rotate 30s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-dot-breathe {
+  .animate-cockpit-rotate {
     animation: none !important;
-    opacity: 0.40 !important;
+    transform: translate(-50%, -50%) rotate(0deg) !important;
   }
 }
