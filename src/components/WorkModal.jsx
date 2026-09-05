@@ -770,11 +770,11 @@ export function WorkModal({
             <AnimatePresence>
               {formData.teamMode && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-30"
+                  initial={{ opacity: 0, transform: 'translateY(-4px)' }}
+                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                  exit={{ opacity: 0, transform: 'translateY(-4px)' }}
+                  transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-30 overflow-hidden"
                 >
                   <div>
                     <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
@@ -909,10 +909,11 @@ export function WorkModal({
                   <AnimatePresence>
                     {isCustomCutsOpen && (
                       <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="space-y-1.5 pt-1.5"
+                        initial={{ opacity: 0, transform: 'translateY(-4px)' }}
+                        animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                        exit={{ opacity: 0, transform: 'translateY(-4px)' }}
+                        transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                        className="space-y-1.5 pt-1.5 overflow-hidden"
                       >
                         {/* You (Host) */}
                         <div className="flex items-center justify-between gap-2">

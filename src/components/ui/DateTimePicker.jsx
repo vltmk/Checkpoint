@@ -469,9 +469,10 @@ export function DateTimePicker({
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
+            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
             className={cn(
               'absolute left-0 sm:left-auto right-0 z-50 w-full sm:w-[320px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-xl p-3 space-y-3',
+              dropUp ? 'origin-bottom' : 'origin-top',
               dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
           >

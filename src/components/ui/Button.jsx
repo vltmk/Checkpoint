@@ -12,7 +12,7 @@ export function Button({
   ...props
 }) {
   const baseStyles =
-    'inline-flex items-center justify-center font-medium leading-none transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] select-none';
+    'inline-flex items-center justify-center font-medium leading-none transition-[color,background-color,border-color,opacity,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.97] select-none';
 
   const variants = {
     primary:

@@ -181,10 +181,11 @@ export function Select({
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
-            transition={{ duration: 0.12, ease: 'easeOut' }}
+            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
             dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
               'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto bg-zinc-950/95 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-lg p-1',
+              dropUp ? 'origin-bottom' : 'origin-top',
               // Alignment handling for RTL and LTR
               align === 'left'
                 ? 'left-0 right-auto text-left'

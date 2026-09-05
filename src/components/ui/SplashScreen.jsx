@@ -36,13 +36,14 @@ export function SplashScreen() {
         {/* Linear Time-Relative Progress Bar (0% to 100% in exactly 2.2s) - Forced LTR */}
         <div className="w-44 h-1 bg-zinc-900 rounded-full overflow-hidden relative border border-zinc-800" dir="ltr">
           <motion.div
-            initial={{ width: '0%' }}
-            animate={{ width: '100%' }}
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            style={{ transformOrigin: 'left' }}
             transition={{
               duration: 2.2,
               ease: 'linear',
             }}
-            className="h-full bg-zinc-100 rounded-full"
+            className="w-full h-full bg-zinc-100 rounded-full"
           />
         </div>
       </div>

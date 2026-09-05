@@ -52,7 +52,7 @@ export function MobileHeader({
           type="button"
           onClick={onOpenNotifications}
           title="Notifications & Feed"
-          className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 active:scale-95 transition-all cursor-pointer hover:text-white"
+          className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer hover:text-white"
         >
           <Bell className="w-3.5 h-3.5" />
           {unreadNotificationsCount > 0 && (
@@ -63,7 +63,7 @@ export function MobileHeader({
           type="button"
           onClick={onOpenQuickAdd}
           title="Quick Add Work"
-          className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 active:scale-95 transition-all cursor-pointer hover:text-white hover:border-zinc-700"
+          className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer hover:text-white hover:border-zinc-700"
         >
           <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -71,7 +71,7 @@ export function MobileHeader({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 active:scale-95 transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs font-medium text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
         >
           <span className="font-mono text-[11px]">{globalCurrency}</span>
           <Settings className="w-3 h-3 text-zinc-400" />
@@ -109,7 +109,7 @@ export function MobileBottomNav({
             type="button"
             onClick={onOpenWorkModal}
             title={`${t('nav.addWork')} (N)`}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-95 transition-all border border-zinc-300 hover:bg-white cursor-pointer"
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-100 text-zinc-950 shadow-lg active:scale-[0.97] transition-transform duration-150 ease-out border border-zinc-300 hover:bg-white cursor-pointer"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -117,7 +117,7 @@ export function MobileBottomNav({
             type="button"
             onClick={onOpenQuickAdd}
             title={`${t('nav.quickAdd')} (Q)`}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-900 text-zinc-200 border border-zinc-700 shadow-md active:scale-95 transition-all hover:bg-zinc-800 hover:text-white cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-900 text-zinc-200 border border-zinc-700 shadow-md active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-800 hover:text-white cursor-pointer"
           >
             <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>

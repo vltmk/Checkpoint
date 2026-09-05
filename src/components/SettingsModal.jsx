@@ -417,9 +417,9 @@ export function SettingsModal({
                         {manualBackupState === 'running' ? (
                           <motion.span
                             key="running"
-                            initial={{ scale: 0.6, opacity: 0 }}
+                            initial={{ scale: 0.92, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.6, opacity: 0 }}
+                            exit={{ scale: 0.92, opacity: 0 }}
                             className="flex items-center justify-center"
                           >
                             <RotateCw className="w-3.5 h-3.5 text-zinc-300 animate-spin" />
@@ -427,9 +427,9 @@ export function SettingsModal({
                         ) : manualBackupState === 'success' ? (
                           <motion.span
                             key="success"
-                            initial={{ scale: 0.6, opacity: 0 }}
+                            initial={{ scale: 0.92, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.6, opacity: 0 }}
+                            exit={{ scale: 0.92, opacity: 0 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                             className="flex items-center justify-center"
                           >
@@ -438,9 +438,9 @@ export function SettingsModal({
                         ) : (
                           <motion.span
                             key="idle"
-                            initial={{ scale: 0.6, opacity: 0 }}
+                            initial={{ scale: 0.92, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.6, opacity: 0 }}
+                            exit={{ scale: 0.92, opacity: 0 }}
                             className="flex items-center justify-center"
                           >
                             <RotateCw className="w-3.5 h-3.5 text-zinc-400" />
@@ -548,9 +548,9 @@ export function SettingsModal({
                   {snapshotRestoreState === 'restoring' ? (
                     <motion.span
                       key="restoring"
-                      initial={{ scale: 0.6, opacity: 0 }}
+                      initial={{ scale: 0.92, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.6, opacity: 0 }}
+                      exit={{ scale: 0.92, opacity: 0 }}
                       className="flex items-center justify-center"
                     >
                       <RotateCcw className="w-3.5 h-3.5 text-zinc-300 animate-spin" />
@@ -558,9 +558,9 @@ export function SettingsModal({
                   ) : snapshotRestoreState === 'success' ? (
                     <motion.span
                       key="restored"
-                      initial={{ scale: 0.6, opacity: 0 }}
+                      initial={{ scale: 0.92, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.6, opacity: 0 }}
+                      exit={{ scale: 0.92, opacity: 0 }}
                       transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                       className="flex items-center justify-center"
                     >
@@ -569,9 +569,9 @@ export function SettingsModal({
                   ) : (
                     <motion.span
                       key="idle"
-                      initial={{ scale: 0.6, opacity: 0 }}
+                      initial={{ scale: 0.92, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.6, opacity: 0 }}
+                      exit={{ scale: 0.92, opacity: 0 }}
                       className="flex items-center justify-center"
                     >
                       <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
@@ -720,9 +720,9 @@ export function SettingsModal({
                     {copiedEmail ? (
                       <motion.span
                         key="copied-email"
-                        initial={{ scale: 0.6, opacity: 0 }}
+                        initial={{ scale: 0.92, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.6, opacity: 0 }}
+                        exit={{ scale: 0.92, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                         className="flex items-center justify-center shrink-0"
                       >
@@ -731,9 +731,9 @@ export function SettingsModal({
                     ) : (
                       <motion.span
                         key="default-email"
-                        initial={{ scale: 0.6, opacity: 0 }}
+                        initial={{ scale: 0.92, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.6, opacity: 0 }}
+                        exit={{ scale: 0.92, opacity: 0 }}
                         className="flex items-center justify-center shrink-0"
                       >
                         <Mail className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
@@ -799,9 +799,9 @@ export function SettingsModal({
                 {exportJsonState === 'success' ? (
                   <motion.span
                     key="json-success"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="flex items-center justify-center shrink-0"
                   >
@@ -810,9 +810,9 @@ export function SettingsModal({
                 ) : (
                   <motion.span
                     key="json-default"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     className="flex items-center justify-center shrink-0"
                   >
                     <Upload className="w-4 h-4 text-zinc-400" />
@@ -852,9 +852,9 @@ export function SettingsModal({
                 {exportCsvState === 'success' ? (
                   <motion.span
                     key="csv-success"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="flex items-center justify-center shrink-0"
                   >
@@ -863,9 +863,9 @@ export function SettingsModal({
                 ) : (
                   <motion.span
                     key="csv-default"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     className="flex items-center justify-center shrink-0"
                   >
                     <FileSpreadsheet className="w-4 h-4 text-zinc-400" />

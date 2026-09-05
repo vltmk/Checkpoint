@@ -30,6 +30,7 @@ export function Tooltip({ content, children, side = 'top', className }) {
             transition={{ duration: 0.1 }}
             className={cn(
               'absolute z-50 px-2 py-1 text-[11px] font-medium text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-md shadow-lg whitespace-nowrap pointer-events-none',
+              side === 'top' ? 'origin-bottom' : side === 'bottom' ? 'origin-top' : side === 'left' ? 'origin-right' : 'origin-left',
               sidePositions[side],
               className
             )}

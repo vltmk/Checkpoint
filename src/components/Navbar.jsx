@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Layers,
   BarChart3,
@@ -349,59 +349,61 @@ export function Navbar({
           </div>
 
           {/* Launch One-Step Tour Guide Floating Card */}
-          {showTourGuide && (
-            <motion.div
-              initial={{ opacity: 0, y: -6, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              data-no-drag
-              dir={isRtl ? 'rtl' : 'ltr'}
-              onMouseDown={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => e.stopPropagation()}
-              className="absolute top-full right-0 mt-2.5 w-72 p-3.5 bg-zinc-900/98 backdrop-blur-2xl border border-zinc-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.08)] ring-1 ring-zinc-700/50 rounded-xl space-y-2.5 z-50 text-zinc-200"
-            >
-              {/* Little triangle pointing to the Gold Ratio button */}
-              <div className="absolute -top-1.5 right-6 w-3 h-3 bg-zinc-900 border-t border-l border-zinc-700/80 rotate-45 pointer-events-none" />
+          <AnimatePresence>
+            {showTourGuide && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                data-no-drag
+                dir={isRtl ? 'rtl' : 'ltr'}
+                onMouseDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className="absolute top-full right-0 mt-2.5 w-72 p-3.5 bg-zinc-900/98 backdrop-blur-2xl border border-zinc-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.08)] ring-1 ring-zinc-700/50 rounded-xl space-y-2.5 z-50 text-zinc-200"
+              >
+                {/* Little triangle pointing to the Gold Ratio button */}
+                <div className="absolute -top-1.5 right-6 w-3 h-3 bg-zinc-900 border-t border-l border-zinc-700/80 rotate-45 pointer-events-none" />
 
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-amber-950/70 border border-amber-800/70 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
-                  <Coins className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-amber-950/70 border border-amber-800/70 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                    <Coins className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className={cn('text-xs font-bold text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
+                    </h4>
+                    <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'تبدیل زنده محاسبات دفتر کل' : 'Live ledger conversions'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className={cn('text-xs font-bold text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
-                    {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
-                  </h4>
-                  <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
-                    {language === 'fa' ? 'تبدیل زنده محاسبات دفتر کل' : 'Live ledger conversions'}
-                  </p>
+
+                <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
+                  {language === 'fa'
+                    ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها و محاسبات روزانه تغییر دهید.'
+                    : 'Click this button anytime to adjust your gold conversion rate for all entries and totals.'}
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end pt-1.5 border-t border-zinc-800">
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    onClick={handleDismissTour}
+                    className={cn(
+                      'h-7 px-3.5 text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer shadow-sm active:scale-95 leading-none',
+                      isRtl && 'font-farsi'
+                    )}
+                  >
+                    <span className={cn('inline-flex items-center justify-center leading-none', isRtl && '-translate-y-[0.5px]')}>
+                      {language === 'fa' ? 'متوجه شدم' : 'Got it'}
+                    </span>
+                  </Button>
                 </div>
-              </div>
-
-              <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
-                {language === 'fa'
-                  ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها و محاسبات روزانه تغییر دهید.'
-                  : 'Click this button anytime to adjust your gold conversion rate for all entries and totals.'}
-              </p>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end pt-1.5 border-t border-zinc-800">
-                <Button
-                  variant="primary"
-                  size="xs"
-                  onClick={handleDismissTour}
-                  className={cn(
-                    'h-7 px-3.5 text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white cursor-pointer shadow-sm active:scale-95 leading-none',
-                    isRtl && 'font-farsi'
-                  )}
-                >
-                  <span className={cn('inline-flex items-center justify-center leading-none', isRtl && '-translate-y-[0.5px]')}>
-                    {language === 'fa' ? 'متوجه شدم' : 'Got it'}
-                  </span>
-                </Button>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Dedicated Gold Ratio Popover Menu */}
           {isRatesOpen && (

@@ -55,10 +55,8 @@ export function UpdateModal({
     }
   };
 
-  if (!isOpen || !updateInfo) return null;
-
-  const currentVersion = updateInfo.currentVersion || updateInfo.rawUpdate?.currentVersion || '';
-  const newVersion = updateInfo.version || updateInfo.rawUpdate?.version || '';
+  const currentVersion = updateInfo?.currentVersion || updateInfo?.rawUpdate?.currentVersion || '';
+  const newVersion = updateInfo?.version || updateInfo?.rawUpdate?.version || '';
 
   const handleStartUpdate = async () => {
     if (!updateInfo.rawUpdate) {
@@ -96,7 +94,7 @@ export function UpdateModal({
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-md">
+    <Dialog open={Boolean(isOpen && updateInfo)} onClose={onClose} maxWidth="max-w-md">
       <DialogHeader onClose={onClose}>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-emerald-950/60 border border-emerald-800/80 flex items-center justify-center text-emerald-400">
@@ -133,9 +131,9 @@ export function UpdateModal({
 
         {/* Release Notes Preview */}
         {(() => {
-          const notes = getReleaseNotesForVersion(newVersion, language, updateInfo.body);
+          const notes = getReleaseNotesForVersion(newVersion, language, updateInfo?.body);
           const hasItems = Array.isArray(notes.items) && notes.items.length > 0;
-          const isBodyRTL = isRTL(notes.summary || updateInfo.body);
+          const isBodyRTL = isRTL(notes.summary || updateInfo?.body);
 
           return (
             <div className="space-y-1.5">
@@ -195,7 +193,7 @@ export function UpdateModal({
                         : 'font-sans leading-relaxed'
                     }`}
                   >
-                    {updateInfo.body || 'Performance enhancements, optimizations, and stability improvements.'}
+                    {updateInfo?.body || 'Performance enhancements, optimizations, and stability improvements.'}
                   </div>
                 )}
               </div>
@@ -255,7 +253,7 @@ export function UpdateModal({
       </DialogContent>
 
       <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
-        {updateInfo.releaseUrl ? (
+        {updateInfo?.releaseUrl ? (
           <button
             type="button"
             onClick={() => openExternalUrl(updateInfo.releaseUrl)}

@@ -518,9 +518,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 {copiedState ? (
                   <motion.span
                     key="copied-camera"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="flex items-center justify-center"
                   >
@@ -529,9 +529,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 ) : (
                   <motion.span
                     key="default-camera"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     className="flex items-center justify-center"
                   >
                     <Camera className="w-4 h-4 text-zinc-400 hover:text-zinc-200" />
@@ -553,9 +553,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 {copiedDiscord ? (
                   <motion.span
                     key="copied-discord"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="flex items-center justify-center"
                   >
@@ -564,9 +564,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 ) : (
                   <motion.span
                     key="default-discord"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     className="flex items-center justify-center"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
@@ -586,9 +586,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 {copiedText ? (
                   <motion.span
                     key="copied-text"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 25 }}
                     className="flex items-center justify-center"
                   >
@@ -597,9 +597,9 @@ Notes      = ${safeEntry.notes || 'None'}
                 ) : (
                   <motion.span
                     key="default-text"
-                    initial={{ scale: 0.6, opacity: 0 }}
+                    initial={{ scale: 0.92, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.6, opacity: 0 }}
+                    exit={{ scale: 0.92, opacity: 0 }}
                     className="flex items-center justify-center"
                   >
                     <Copy className="w-3.5 h-3.5" />

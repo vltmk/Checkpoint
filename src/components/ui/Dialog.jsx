@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -20,6 +20,7 @@ function unlockBodyScroll() {
 }
 
 export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl' }) {
+  const shouldReduceMotion = useReducedMotion();
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && open) {
@@ -56,10 +57,10 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
 
           {/* Dialog Container */}
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
             className={cn(
               'relative z-10 w-full bg-zinc-950/95 backdrop-blur-xl border-t sm:border border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
               maxWidth,

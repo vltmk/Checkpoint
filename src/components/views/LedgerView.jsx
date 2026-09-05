@@ -1023,7 +1023,7 @@ export function LedgerView({
                                 }
                               }}
                               className={cn(
-                                'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-all cursor-pointer border',
+                                'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-[background-color,border-color] duration-150 cursor-pointer border',
                                 isSelected
                                   ? 'bg-zinc-900/60 border-zinc-500/70 shadow-sm'
                                   : 'bg-zinc-950 hover:bg-zinc-900/50 border-zinc-800/60'

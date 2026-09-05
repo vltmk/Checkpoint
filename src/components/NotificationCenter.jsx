@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Bell,
   X,
@@ -30,11 +30,10 @@ export function NotificationCenter({
   onMarkAllAsRead,
   onOpenUpdateModal,
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread' | 'releases' | 'announcements'
   const [copiedActionKey, setCopiedActionKey] = useState(null);
-
-  if (!isOpen) return null;
 
   const unreadList = notifications.filter((item) => !item.read);
   const releaseList = notifications.filter((item) => item.source === 'updater' || item.source === 'system');
@@ -141,7 +140,8 @@ export function NotificationCenter({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex justify-end select-none">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end select-none">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -155,10 +155,15 @@ export function NotificationCenter({
 
         {/* Slide-over Drawer Frame */}
         <motion.div
-          initial={{ x: isRtl ? '-100%' : '100%' }}
-          animate={{ x: 0 }}
-          exit={{ x: isRtl ? '-100%' : '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 350 }}
+          key="notification-drawer"
+          initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+          animate={shouldReduceMotion ? { opacity: 1 } : { x: 0 }}
+          exit={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+          transition={
+            shouldReduceMotion
+              ? { duration: 0.15 }
+              : { type: 'spring', damping: 30, stiffness: 350 }
+          }
           className={cn(
             'relative w-full max-w-md bg-zinc-950 border-l border-zinc-800/90 h-full flex flex-col shadow-2xl z-10 text-zinc-100',
             isRtl && 'border-l-0 border-r'
@@ -509,6 +514,7 @@ export function NotificationCenter({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 }

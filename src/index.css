@@ -120,6 +120,11 @@
     --muted-foreground: #a1a1aa;
     --primary: #fafafa;
     --primary-foreground: #18181b;
+
+    /* Motion Tokens (AUDIT.md / emil-design-eng) */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   * {
@@ -237,5 +242,23 @@ button, a, input, textarea, select, .no-drag, [data-no-drag] {
   font-family: 'IRANYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   letter-spacing: normal !important;
 }
+
+/* Accessibility: Reduced Motion (AUDIT.md:82-96) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Neutralize transform and movement transitions while preserving opacity and color feedback */
+  [class*="transition-transform"],
+  [class*="transition-all"] {
+    transition-duration: 0.01ms !important;
+  }
+}
+
 
 

@@ -97,7 +97,7 @@ export function StatusBadge({
           }}
           title={`${displayLabel} (${t('status.all')})`}
           className={cn(
-            'group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[26px] rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-95 hover:ring-1 hover:ring-zinc-600/60 cursor-pointer',
+            'group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[26px] rounded-md text-[11px] font-medium tracking-wide select-none transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.97] hover:ring-1 hover:ring-zinc-600/60 cursor-pointer',
             isRtl && 'font-farsi',
             style.badgeClass,
             className
