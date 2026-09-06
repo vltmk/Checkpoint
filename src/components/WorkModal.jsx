@@ -10,8 +10,9 @@ import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { Kbd } from './ui/Tooltip';
-import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2 } from 'lucide-react';
+import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2, Edit2, Plus } from 'lucide-react';
 import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon } from './ui/Icons';
+import { CategoryModal } from './ui/CategoryModal';
 import { trackerDB } from '../lib/db';
 import { copyTextNative, optimizeImageProof } from '../lib/desktop';
 import { detectAppLink } from '../lib/appLinks';
@@ -29,16 +30,12 @@ export function WorkModal({
   globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
   onOpenLightbox,
+  categories = [],
+  onRefreshCategories,
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [fieldErrors, setFieldErrors] = useState({ title: false, game: false, dateTime: false, income: false });
   const [proofPasted, setProofPasted] = useState(false);
-
-  const GAME_OPTIONS = [
-    { value: 'World of Warcraft', label: 'World of Warcraft' },
-    { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
-    { value: '__custom__', label: `+ ${t('work.customGameOption', 'Custom Game / Realm')}` },
-  ];
 
   const CURRENCY_OPTIONS = [
     {
@@ -58,6 +55,7 @@ export function WorkModal({
     { value: 'Paid', label: t('status.Paid') },
     { value: 'Working', label: t('status.Working') },
     { value: 'On Hold', label: t('status.On Hold') },
+    { value: 'Failed', label: t('status.Failed') },
   ];
   const [formData, setFormData] = useState({
     title: '',
@@ -78,6 +76,46 @@ export function WorkModal({
     notes: '',
     link: '',
   });
+
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+
+  const GAME_OPTIONS = useMemo(() => {
+    const opts = (categories || []).map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      icon: (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <GameIcon game={cat.name} customIcon={cat.icon} className="w-3.5 h-3.5" />
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: cat.color || '#71717A' }}
+          />
+        </div>
+      ),
+    }));
+
+    // If current selected game is not in categories and not custom, include it
+    if (
+      formData.game &&
+      !opts.some((o) => o.value.toLowerCase() === formData.game.toLowerCase()) &&
+      formData.game !== '__custom__'
+    ) {
+      opts.push({
+        value: formData.game,
+        label: formData.game,
+        icon: <GameIcon game={formData.game} className="w-3.5 h-3.5" />,
+      });
+    }
+
+    opts.push({
+      value: '__custom__',
+      label: `+ ${t('categories.newCategoryOption', 'Add / Manage Categories...')}`,
+      icon: <Plus className="w-3.5 h-3.5 text-zinc-400" />,
+    });
+
+    return opts;
+  }, [categories, formData.game, t]);
 
   const [isCustomCutsOpen, setIsCustomCutsOpen] = useState(false);
   const [proofs, setProofs] = useState([]);
@@ -516,7 +554,8 @@ export function WorkModal({
 
   const handleGameSelect = (val) => {
     if (val === '__custom__') {
-      updateFormData({ game: '__custom__', isCustomGame: true });
+      setEditingCategory(null);
+      setIsCategoryModalOpen(true);
     } else {
       const isClassicVal = val === 'World of Warcraft Classic';
       const defaultRate = isClassicVal ? '7000' : String(goldRateTOMAN || 3200);
@@ -622,7 +661,8 @@ export function WorkModal({
   };
 
   return (
-    <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-xl">
+    <>
+      <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-xl">
       <DialogHeader onClose={isSaving ? undefined : onClose}>
         <div className="flex items-center gap-2">
           <DialogTitle className={cn(isRtl && 'font-farsi')}>
@@ -656,7 +696,7 @@ export function WorkModal({
             <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
               <div className="min-w-0 flex-1 space-y-1">
-                <p className={cn('font-semibold text-rose-200', isRtl && 'font-farsi')}>
+                <p className={cn('font-medium text-rose-200', isRtl && 'font-farsi')}>
                   {language === 'fa' ? 'ذخیره رکورد انجام نشد' : 'Record was not saved'}
                 </p>
                 <p className={cn('text-[11px] leading-5 text-rose-200/80', isRtl && 'font-farsi')}>{saveError.message}</p>
@@ -678,20 +718,40 @@ export function WorkModal({
           {/* Row 1: Game & Seller Source */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span className="flex items-center gap-1.5">
-                  <GameIcon game={formData.game} className="w-3.5 h-3.5" />
+                  <GameIcon game={formData.game} categories={categories} className="w-3.5 h-3.5" />
                   <span>{t('work.gamePlatform')} *</span>
                 </span>
                 {fieldErrors.game && (
                   <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
                 )}
               </label>
-              <Select
-                value={formData.game}
-                onChange={handleGameSelect}
-                options={GAME_OPTIONS}
-              />
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 min-w-0">
+                  <Select
+                    value={formData.game}
+                    onChange={handleGameSelect}
+                    options={GAME_OPTIONS}
+                  />
+                </div>
+                {formData.game && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const matched = (categories || []).find(
+                        (c) => c.name.toLowerCase() === formData.game.toLowerCase()
+                      );
+                      setEditingCategory(matched || { name: formData.game });
+                      setIsCategoryModalOpen(true);
+                    }}
+                    title={t('categories.editCategory', 'Edit Category')}
+                    className="h-9 w-9 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 transition-colors shrink-0"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               {formData.isCustomGame && (
                 <div className="mt-2">
                   <Input
@@ -708,7 +768,7 @@ export function WorkModal({
             </div>
 
             <div>
-              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span>{t('work.sellerSource')}</span>
                 <span className="text-[9px] font-mono text-zinc-500">{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
               </label>
@@ -722,7 +782,7 @@ export function WorkModal({
 
           {/* Row 2: Work Title */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.workTitle')} *</span>
               {fieldErrors.title && (
                 <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
@@ -743,7 +803,7 @@ export function WorkModal({
 
           {/* Row 3: Date & Time */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.dateTime')} *</span>
               {fieldErrors.dateTime && (
                 <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
@@ -769,7 +829,7 @@ export function WorkModal({
                 }}
                 className={cn(`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
                   formData.teamMode
-                    ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
+                    ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-medium shadow-sm'
                     : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
                 }`, isRtl && 'font-farsi')}
               >
@@ -801,7 +861,7 @@ export function WorkModal({
                   className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-40"
                 >
                   <div>
-                    <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
+                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
                       {t('work.teammatesCrew')}
                     </label>
                     <TeammatesCombobox
@@ -813,7 +873,7 @@ export function WorkModal({
 
                   {/* Mode Selector: Input Pot vs Input My Cut */}
                   <div className="flex items-center justify-between text-xs">
-                    <span className={cn('text-[10px] uppercase font-semibold text-zinc-400', isRtl && 'font-farsi')}>
+                    <span className={cn('text-[10px] uppercase font-medium text-zinc-400', isRtl && 'font-farsi')}>
                       {language === 'fa' ? 'مبنای محاسبه:' : 'Calculation Target:'}
                     </span>
                     <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
@@ -822,7 +882,7 @@ export function WorkModal({
                         onClick={() => updateFormData({ teamInputMode: 'pot' })}
                         className={`px-2 py-0.5 rounded font-medium transition-colors ${
                           formData.teamInputMode === 'pot'
-                            ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                             : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                         }`}
                       >
@@ -833,7 +893,7 @@ export function WorkModal({
                         onClick={() => updateFormData({ teamInputMode: 'income' })}
                         className={`px-2 py-0.5 rounded font-medium transition-colors ${
                           formData.teamInputMode === 'income'
-                            ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                             : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                         }`}
                       >
@@ -849,7 +909,7 @@ export function WorkModal({
           {/* Row 5: Income / Pot & Currency and Rate */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start pt-1 border-t border-zinc-800/60">
             <div className="sm:col-span-7">
-              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span>
                   {formData.teamMode
                     ? formData.teamInputMode === 'pot'
@@ -897,13 +957,13 @@ export function WorkModal({
                 <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-[11px] space-y-1.5">
                   <div className="flex items-center justify-between text-zinc-300">
                     <span className="text-zinc-500">{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
-                    <strong className="font-mono text-emerald-300 font-semibold">
+                    <strong className="font-mono text-emerald-300 font-medium">
                       {formData.income ? `${Number(formData.income).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
                     <span className="text-zinc-500">{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
-                    <strong className="font-mono text-amber-300 font-semibold">
+                    <strong className="font-mono text-amber-300 font-medium">
                       {formData.pot ? `${Number(formData.pot).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
                     </strong>
                   </div>
@@ -968,7 +1028,7 @@ export function WorkModal({
                         {/* Balance Status Line */}
                         <div className="pt-1 flex items-center justify-between text-[10px] font-mono">
                           <span className="text-zinc-500">{language === 'fa' ? 'تخصیص‌یافته:' : 'Allocated:'} {totalAllocated.toLocaleString()}</span>
-                          <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-semibold'}>
+                          <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-medium'}>
                             {isPotBalanced ? (language === 'fa' ? '✓ تراز شده' : '✓ Balanced') : `${language === 'fa' ? 'باقی‌مانده:' : 'Remaining:'} ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
                           </span>
                         </div>
@@ -980,7 +1040,7 @@ export function WorkModal({
             </div>
 
             <div className="sm:col-span-5">
-              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span className="truncate">
                   {t('work.exchangeRate')}
                 </span>
@@ -1023,7 +1083,7 @@ export function WorkModal({
 
           {/* Row 6: Notes */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5', isRtl && 'font-farsi')}>
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5', isRtl && 'font-farsi')}>
               {t('work.notes')}
             </label>
             <Textarea
@@ -1037,7 +1097,7 @@ export function WorkModal({
           {/* Row 7: Reference Link / URL */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 {detectedLink ? (
                   renderPlatformIcon(detectedLink.platform, 'w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0')
                 ) : (
@@ -1052,7 +1112,7 @@ export function WorkModal({
                   dir="ltr"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="font-semibold">
+                  <span className="font-medium">
                     {language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label}
                   </span>
                   <span className="text-zinc-400 dark:text-zinc-500">
@@ -1093,7 +1153,7 @@ export function WorkModal({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
-                <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
+                <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
                   {t('work.proof')}
                 </label>
                 <AnimatePresence>
@@ -1146,7 +1206,7 @@ export function WorkModal({
               <div className="flex flex-col items-center justify-center gap-1">
                 <UploadCloud className="w-4 h-4 text-zinc-500" />
                 <div className={cn('text-xs text-zinc-300', isRtl && 'font-farsi')}>
-                  <span className="font-semibold text-zinc-100">{t('work.clickUpload')}</span>
+                  <span className="font-medium text-zinc-100">{t('work.clickUpload')}</span>
                 </div>
                 <div className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
                   {language === 'fa' ? 'یا مستقیماً با Ctrl+V از Snipping Tool تصویر را بچسبانید' : <>Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool</>}
@@ -1191,7 +1251,7 @@ export function WorkModal({
         <DialogFooter dir="ltr" className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
           {/* Left: Desaturated Muted Status Selector */}
           <div className={cn('flex items-center gap-2', isRtl && 'flex-row-reverse')}>
-            <span className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {t('work.status')}:
             </span>
             <div className="w-28 sm:w-32">
@@ -1218,6 +1278,25 @@ export function WorkModal({
         </DialogFooter>
       </form>
     </Dialog>
+
+    <CategoryModal
+      isOpen={isCategoryModalOpen}
+      category={editingCategory}
+      onClose={() => setIsCategoryModalOpen(false)}
+      onSave={async (savedCat) => {
+        await onRefreshCategories?.();
+        const isClassicVal = savedCat.name === 'World of Warcraft Classic';
+        const defaultRate = isClassicVal ? '7000' : String(goldRateTOMAN || 3200);
+        updateFormData({
+          game: savedCat.name,
+          isCustomGame: false,
+          customGameText: '',
+          exchangeRate: !editingEntry ? defaultRate : (formData.exchangeRate || defaultRate),
+        });
+        setIsCategoryModalOpen(false);
+      }}
+    />
+  </>
   );
 }
 

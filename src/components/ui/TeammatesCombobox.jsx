@@ -200,13 +200,13 @@ export function TeammatesCombobox({
             >
               <span className="flex items-center gap-1.5 truncate">
                 <UserPlus className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-300 shrink-0" />
-                <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">"{inputValue.trim()}"</strong></span>
+                <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-800 dark:text-zinc-200 font-medium">"{inputValue.trim()}"</strong></span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Add'}</span>
             </button>
           )}
 
-          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
+          <div className={cn('px-2 py-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
             <span>{language === 'fa' ? `هم‌تیمی‌های ذخیره‌شده (${formatNumber(savedTeammates.length)})` : `Saved Team Members (${savedTeammates.length})`}</span>
           </div>
 

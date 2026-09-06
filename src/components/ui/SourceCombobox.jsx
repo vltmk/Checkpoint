@@ -166,13 +166,13 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
             >
               <span className="flex items-center gap-1.5 truncate">
                 <Plus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-800 dark:text-zinc-200 font-semibold">"{trimmedValue}"</strong></span>
+                <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-800 dark:text-zinc-200 font-medium">"{trimmedValue}"</strong></span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
             </button>
           )}
 
-          <div className={cn('px-2 py-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
+          <div className={cn('px-2 py-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between', isRtl && 'font-farsi')}>
             <span>{language === 'fa' ? `سورس‌های ذخیره (${formatNumber(savedSources.length)})` : `Saved Sources (${savedSources.length})`}</span>
           </div>
 

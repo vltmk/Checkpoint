@@ -48,7 +48,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
           >
             {/* Top Bar */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 bg-zinc-950">
-              <div className="text-xs font-semibold text-zinc-200 truncate max-w-md">
+              <div className="text-xs font-medium text-zinc-200 truncate max-w-md">
                 {caption}
               </div>
               <div className="flex items-center gap-2">

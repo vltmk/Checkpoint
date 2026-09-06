@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { ChevronDown, Check } from 'lucide-react';
 import { STATUSES } from '../../lib/currencies';
@@ -24,6 +25,11 @@ export const STATUS_STYLES = {
     label: 'توقف موقت',
     badgeClass: 'bg-zinc-500/10 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-400 border border-zinc-400/30 dark:border-zinc-800 ring-1 ring-inset ring-zinc-400/20 backdrop-blur-md hover:bg-zinc-500/15 dark:hover:bg-zinc-900/60',
     dotClass: 'bg-zinc-600 dark:bg-zinc-500',
+  },
+  Failed: {
+    label: 'ناموفق',
+    badgeClass: 'bg-rose-500/10 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-600/30 dark:border-rose-800/60 ring-1 ring-inset ring-rose-600/20 backdrop-blur-md hover:bg-rose-500/15 dark:hover:bg-rose-950/40',
+    dotClass: 'bg-rose-600 dark:bg-rose-400',
   },
 };
 
@@ -68,7 +74,34 @@ export function StatusBadge({
   const style = STATUS_STYLES[status] || STATUS_STYLES['Paid'];
   const displayLabel = t('status.' + status, style.label);
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
+  const [alignLeft, setAlignLeft] = useState(isRtl);
   const menuRef = useRef(null);
+
+  const calculatePosition = useCallback(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const dropdownHeight = 205;
+    const dropdownWidth = 144;
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const shouldOpenUp = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+    setOpenUpwards(shouldOpenUp);
+
+    if (isRtl) {
+      const wouldClipRight = rect.left + dropdownWidth > window.innerWidth - 8;
+      setAlignLeft(!wouldClipRight);
+    } else {
+      const wouldClipLeft = rect.right - dropdownWidth < 8;
+      setAlignLeft(wouldClipLeft);
+    }
+  }, [isRtl]);
+
+  useLayoutEffect(() => {
+    if (isOpen) {
+      calculatePosition();
+    }
+  }, [isOpen, calculatePosition]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,9 +110,26 @@ export function StatusBadge({
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    const handleReposition = () => {
+      calculatePosition();
+    };
+
     window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
-  }, [isOpen]);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [isOpen, calculatePosition]);
 
   if (interactive) {
     return (
@@ -90,6 +140,9 @@ export function StatusBadge({
           onClick={(e) => {
             e.stopPropagation();
             if (onSelectStatus) {
+              if (!isOpen) {
+                calculatePosition();
+              }
               setIsOpen((prev) => !prev);
             } else {
               onClick?.();
@@ -105,48 +158,63 @@ export function StatusBadge({
         >
           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
           <span className={cn(isRtl ? 'leading-normal font-farsi' : 'leading-none')}>{displayLabel}</span>
-          <ChevronDown className="w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-opacity shrink-0" />
+          <ChevronDown
+            className={cn(
+              'w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-transform duration-150 shrink-0',
+              isOpen && 'rotate-180'
+            )}
+          />
         </button>
 
-        {isOpen && onSelectStatus && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            dir={isRtl ? 'rtl' : 'ltr'}
-            className={cn(
-              'absolute top-full mt-1.5 w-36 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1.5 space-y-1 z-[70] text-xs',
-              'right-0'
-            )}
-          >
-            {STATUSES.map((st) => {
-              const stStyle = STATUS_STYLES[st];
-              const isCurrent = st === status;
-              const stLabel = t('status.' + st, stStyle?.label || st);
-              return (
-                <button
-                  key={st}
-                  type="button"
-                  dir={isRtl ? 'rtl' : 'ltr'}
-                  onClick={() => {
-                    onSelectStatus(st);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11px] transition-colors',
-                    isCurrent
-                      ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-semibold'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100/80 dark:hover:bg-zinc-900/60'
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stStyle?.dotClass)} />
-                    <span className={cn('font-medium leading-normal', isRtl && 'font-farsi')}>{stLabel}</span>
-                  </div>
-                  {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <AnimatePresence>
+          {isOpen && onSelectStatus && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: openUpwards ? 4 : -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: openUpwards ? 4 : -4 }}
+              transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              dir={isRtl ? 'rtl' : 'ltr'}
+              style={{
+                transformOrigin: `${openUpwards ? 'bottom' : 'top'} ${alignLeft ? 'left' : 'right'}`,
+              }}
+              className={cn(
+                'absolute w-36 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1.5 space-y-1 z-[70] text-xs',
+                openUpwards ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
+                alignLeft ? 'left-0' : 'right-0'
+              )}
+            >
+              {STATUSES.map((st) => {
+                const stStyle = STATUS_STYLES[st];
+                const isCurrent = st === status;
+                const stLabel = t('status.' + st, stStyle?.label || st);
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                    onClick={() => {
+                      onSelectStatus(st);
+                      setIsOpen(false);
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-[11px] transition-colors',
+                      isCurrent
+                        ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-medium'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100/80 dark:hover:bg-zinc-900/60'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stStyle?.dotClass)} />
+                      <span className={cn('font-medium leading-normal', isRtl && 'font-farsi')}>{stLabel}</span>
+                    </div>
+                    {isCurrent && <Check className="w-3.5 h-3.5 text-zinc-800 dark:text-zinc-200 shrink-0" />}
+                  </button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }

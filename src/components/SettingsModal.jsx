@@ -9,6 +9,7 @@ import {
 } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
+import { Switch } from './ui/Switch';
 import {
   Download,
   Upload,
@@ -33,6 +34,9 @@ import {
   Loader2,
   Sun,
   Moon,
+  Gamepad2,
+  Plus,
+  Edit2,
 } from 'lucide-react';
 import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative, openPathNative } from '../lib/desktop';
 import { DiscordIcon, TelegramIcon } from './ui/Icons';
@@ -41,12 +45,17 @@ import { useTheme } from 'next-themes';
 import { Input } from './ui/Input';
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
+import { CategoryModal } from './ui/CategoryModal';
+import { deleteCategory } from '../lib/categories';
+import { GameIcon } from './ui/GameIcon';
 
 export function SettingsModal({
   isOpen,
   onClose,
   globalCurrency = 'TOMAN',
   onCurrencyChange,
+  categories = [],
+  onRefreshCategories,
   closeToTray = true,
   onCloseToTrayChange,
   minimizeToTray = false,
@@ -74,6 +83,7 @@ export function SettingsModal({
   theme = 'dark',
   onThemeChange,
   handleThemeChange,
+  initialScrollSection = null,
 }) {
   const { language, setLanguage, t, isRtl, formatNumber } = useLanguage();
   const fileInputRef = useRef(null);
@@ -87,7 +97,37 @@ export function SettingsModal({
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [exportJsonState, setExportJsonState] = useState('idle');
   const [exportCsvState, setExportCsvState] = useState('idle');
+  const [highlightBackup, setHighlightBackup] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
   const isDesktop = isTauri();
+
+  const handleDeleteCategory = async (cat) => {
+    const remaining = categories.filter((c) => (c.id || c.name) !== (cat.id || cat.name));
+    const fallbackName = remaining.length > 0 ? remaining[0].name : 'General';
+    const confirmMessage = language === 'fa'
+      ? `دسته‌بندی «${cat.name}» حذف شود؟ کارهای ثبت‌شده در این دسته به «${fallbackName}» منتقل خواهند شد.`
+      : `Delete category "${cat.name}"? Existing work logs will be moved to "${fallbackName}".`;
+
+    if (window.confirm(confirmMessage)) {
+      await deleteCategory(cat.id || cat.name, fallbackName);
+      await onRefreshCategories?.();
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && initialScrollSection === 'backup') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('settings-backup-section');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightBackup(true);
+          setTimeout(() => setHighlightBackup(false), 2000);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, initialScrollSection]);
 
   useEffect(() => {
     if (isOpen) {
@@ -168,7 +208,7 @@ export function SettingsModal({
             }}
             title={currentTheme === 'light' ? t('settings.themeDark', 'Dark mode') : t('settings.themeLight', 'Light mode')}
             aria-label="Toggle theme"
-            className="relative flex items-center p-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 shadow-inner select-none cursor-pointer group active:scale-[0.96] transition-transform duration-150"
+            className="relative flex items-center p-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 shadow-inner select-none cursor-pointer group active:scale-[0.96] transition-transform duration-150 shrink-0"
             dir="ltr"
           >
             {/* Light Option */}
@@ -176,7 +216,7 @@ export function SettingsModal({
               className={cn(
                 'relative flex items-center justify-center w-6 h-6 rounded-full transition-colors pointer-events-none',
                 currentTheme === 'light'
-                  ? 'text-amber-600 dark:text-amber-400 font-bold'
+                  ? 'text-amber-600 dark:text-amber-400 font-medium'
                   : 'text-zinc-500 dark:text-zinc-400'
               )}
             >
@@ -195,7 +235,7 @@ export function SettingsModal({
               className={cn(
                 'relative flex items-center justify-center w-6 h-6 rounded-full transition-colors pointer-events-none',
                 currentTheme === 'dark'
-                  ? 'text-zinc-800 dark:text-zinc-200 font-bold'
+                  ? 'text-zinc-800 dark:text-zinc-200 font-medium'
                   : 'text-zinc-500 dark:text-zinc-400'
               )}
             >
@@ -227,7 +267,7 @@ export function SettingsModal({
         {/* 0. Language Selector */}
         <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
           <div className="space-y-0.5 min-w-0 pr-1">
-            <label className={cn('block text-xs font-semibold text-zinc-200', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
               {t('settings.language')}
             </label>
             <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
@@ -252,7 +292,7 @@ export function SettingsModal({
         {/* 1. Global Currency Preference */}
         <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
           <div className="space-y-0.5 min-w-0 pr-1">
-            <label className={cn('block text-xs font-semibold text-zinc-200', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
               {t('settings.currency')}
             </label>
             <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
@@ -271,11 +311,102 @@ export function SettingsModal({
           </div>
         </div>
 
+        {/* 1.5. Categories & Games Customization */}
+        <div className="space-y-3 pt-2 border-t border-zinc-800">
+          <div className="flex items-center justify-between">
+            <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <Gamepad2 className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{t('categories.title', 'Categories & Games')}</span>
+            </label>
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={() => {
+                setEditingCategory(null);
+                setIsCategoryModalOpen(true);
+              }}
+              className={cn('h-7 px-2 text-xs gap-1.5', isRtl && 'font-farsi')}
+            >
+              <Plus className="w-3 h-3 text-zinc-400" />
+              <span>{t('categories.addCategory', 'Add Category')}</span>
+            </Button>
+          </div>
+          <p className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
+            {t('categories.desc', 'Custom game icons, colors, and ledger row themes')}
+          </p>
+
+          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-0.5 custom-scrollbar">
+            {categories.map((cat) => (
+              <div
+                key={cat.id}
+                className="flex items-center justify-between gap-2 p-2 rounded-lg bg-zinc-900/40 border border-zinc-800/80 hover:border-zinc-700 transition-colors"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="shrink-0">
+                    <GameIcon
+                      game={cat.name}
+                      customIcon={cat.icon}
+                      categories={categories}
+                      className="w-6 h-6 rounded-md object-cover shadow-sm"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('text-xs font-medium text-zinc-200 truncate', isRtl && 'font-farsi')}>
+                        {cat.name}
+                      </span>
+                      {cat.isDefault && (
+                        <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">
+                          {language === 'fa' ? 'پیش‌فرض' : 'default'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Color swatch badge */}
+                  <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-[10px] font-mono text-zinc-400">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shadow-inner shrink-0"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    <span className="uppercase">{cat.color}</span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCategory(cat);
+                        setIsCategoryModalOpen(true);
+                      }}
+                      className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                      title={t('categories.editCategory', 'Edit Category')}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(cat)}
+                      className="p-1 rounded text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      title={t('common.delete', 'Delete')}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* 2. Desktop Window & System Tray Behavior */}
         {isDesktop && (
           <div className="space-y-3 pt-2 border-t border-zinc-800">
             <div className="flex items-center justify-between">
-              <label className={cn('block text-xs font-semibold text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 <Monitor className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{t('settings.desktopTray')}</span>
               </label>
@@ -286,8 +417,8 @@ export function SettingsModal({
 
             <div className="space-y-2 pt-0.5">
               {/* Switch 1: Close to System Tray */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
-                <div className="space-y-0.5 pr-2">
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+                <div className="space-y-0.5 min-w-0">
                   <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                     {t('settings.closeToTray')}
                   </div>
@@ -295,29 +426,17 @@ export function SettingsModal({
                     {t('settings.closeToTrayDesc')}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  dir="ltr"
-                  aria-checked={closeToTray}
-                  onClick={() => onCloseToTrayChange?.(!closeToTray)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
-                    closeToTray
-                      ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
-                      : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      closeToTray ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={closeToTray}
+                  onChange={(val) => onCloseToTrayChange?.(val)}
+                  aria-label={t('settings.closeToTray')}
+                  className="shrink-0"
+                />
               </div>
 
               {/* Switch 2: Minimize to System Tray */}
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
-                <div className="space-y-0.5 pr-2">
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+                <div className="space-y-0.5 min-w-0">
                   <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                     {t('settings.minimizeToTray')}
                   </div>
@@ -325,24 +444,12 @@ export function SettingsModal({
                     {t('settings.minimizeToTrayDesc')}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  dir="ltr"
-                  aria-checked={minimizeToTray}
-                  onClick={() => onMinimizeToTrayChange?.(!minimizeToTray)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
-                    minimizeToTray
-                      ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
-                      : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      minimizeToTray ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={minimizeToTray}
+                  onChange={(val) => onMinimizeToTrayChange?.(val)}
+                  aria-label={t('settings.minimizeToTray')}
+                  className="shrink-0"
+                />
               </div>
             </div>
           </div>
@@ -352,7 +459,7 @@ export function SettingsModal({
         {isDesktop && (
           <div className="space-y-3 pt-2 border-t border-zinc-800">
             <div className="flex items-center justify-between">
-              <label className={cn('block text-xs font-semibold text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 <FolderArchive className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{t('settings.autoBackups')}</span>
               </label>
@@ -365,8 +472,8 @@ export function SettingsModal({
             </p>
 
             {/* Toggle Switch */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
-              <div className="space-y-0.5 pr-2">
+            <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+              <div className="space-y-0.5 min-w-0">
                 <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
                   {t('settings.autoBackups')}
                 </div>
@@ -376,34 +483,22 @@ export function SettingsModal({
                     : 'Disabled by default'}
                 </div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                dir="ltr"
-                aria-checked={autoBackupEnabled}
-                onClick={async () => {
-                  if (!autoBackupEnabled && !autoBackupPath) {
+              <Switch
+                checked={autoBackupEnabled}
+                onChange={async (val) => {
+                  if (val && !autoBackupPath) {
                     const dir = await selectDirectoryNative({ title: 'Select Automated Backup Folder' });
                     if (dir) {
                       onAutoBackupPathChange?.(dir);
                       onAutoBackupEnabledChange?.(true);
                     }
                   } else {
-                    onAutoBackupEnabledChange?.(!autoBackupEnabled);
+                    onAutoBackupEnabledChange?.(val);
                   }
                 }}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors duration-200 ease-in-out focus:outline-none ${
-                  autoBackupEnabled
-                    ? 'bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-200'
-                    : 'bg-zinc-200 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    autoBackupEnabled ? 'translate-x-4 bg-white dark:bg-zinc-950' : 'translate-x-0 bg-white dark:bg-zinc-400'
-                  }`}
-                />
-              </button>
+                aria-label={t('settings.autoBackups')}
+                className="shrink-0"
+              />
             </div>
 
             {/* Directory & Frequency Configuration when Enabled */}
@@ -412,7 +507,7 @@ export function SettingsModal({
                 {/* Folder Selector - Row 1: Address Bar (Clickable) */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className={cn('text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+                    <span className={cn('text-[10px] font-medium text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
                       {t('settings.backupFolder')}
                     </span>
                     {autoBackupPath && (
@@ -549,7 +644,7 @@ export function SettingsModal({
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {/* Frequency Selector */}
                   <div className="space-y-1">
-                    <span className={cn('text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+                    <span className={cn('text-[10px] font-medium text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
                       {t('settings.frequency')}
                     </span>
                     <Select
@@ -566,7 +661,7 @@ export function SettingsModal({
 
                   {/* Retention Limit Selector */}
                   <div className="space-y-1">
-                    <span className={cn('text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+                    <span className={cn('text-[10px] font-medium text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
                       {t('settings.retention')}
                     </span>
                     <Select
@@ -595,7 +690,7 @@ export function SettingsModal({
         {snapshots.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-zinc-800">
             <div className="flex items-center justify-between">
-              <label className={cn('block text-xs font-semibold text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 <History className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{t('settings.snapshots')}</span>
               </label>
@@ -664,6 +759,7 @@ export function SettingsModal({
                 <span>{t('settings.restore')}</span>
               </Button>
             </div>
+
             {snapshotRestoreState === 'error' && (
               <span className="text-[10px] text-rose-400 font-medium block animate-in fade-in-50 duration-150">
                 Failed to restore snapshot
@@ -675,7 +771,7 @@ export function SettingsModal({
         {/* 5. Software Updates & Announcements Feed */}
         <div className="space-y-3 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
-            <label className={cn('block text-xs font-semibold text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
               <ArrowUpCircle className="w-3.5 h-3.5 text-zinc-400" />
               <span>{t('settings.updates')}</span>
             </label>
@@ -733,7 +829,7 @@ export function SettingsModal({
         {/* 6. Community & Contact Info */}
         <div className="space-y-2.5 pt-2 border-t border-zinc-800">
           <div className="flex items-center justify-between">
-            <label className={cn('block text-xs font-semibold text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
               <DiscordIcon className="w-3.5 h-3.5 text-zinc-400" />
               <span>{t('settings.community')}</span>
             </label>
@@ -753,7 +849,7 @@ export function SettingsModal({
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <DiscordIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
                     Discord
                   </span>
                 </div>
@@ -774,7 +870,7 @@ export function SettingsModal({
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <TelegramIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
                     Telegram
                   </span>
                 </div>
@@ -823,7 +919,7 @@ export function SettingsModal({
                       </motion.span>
                     )}
                   </AnimatePresence>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
                     Email
                   </span>
                 </div>
@@ -852,13 +948,21 @@ export function SettingsModal({
         </div>
 
         {/* 8. Data Backup & Portability */}
-        <div className="space-y-2 pt-2 border-t border-zinc-800">
+        <div
+          id="settings-backup-section"
+          className={cn(
+            'space-y-2 pt-2 border-t rounded-xl p-2.5 -mx-1 transition-all duration-500',
+            highlightBackup
+              ? 'bg-zinc-900/90 ring-1 ring-zinc-400/80 border-zinc-600 shadow-xl shadow-black/50 scale-[1.01]'
+              : 'border-zinc-800'
+          )}
+        >
           <div className="flex items-center justify-between">
-            <label className={cn('block text-xs font-semibold text-zinc-300', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-300', isRtl && 'font-farsi')}>
               {t('settings.dataPortability')}
             </label>
             <span className="text-[10px] font-mono text-zinc-500">
-              {formatNumber(entriesCount)} Records
+              {formatNumber(entriesCount)} Records{categories?.length > 0 ? ` • ${formatNumber(categories.length)} Categories` : ''}
             </span>
           </div>
           <p className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -962,7 +1066,7 @@ export function SettingsModal({
 
         {/* 9. Danger Zone: Clear All Data */}
         <div className="space-y-3 pt-2 border-t border-zinc-800">
-          <label className={cn('block text-xs font-semibold text-rose-400', isRtl && 'font-farsi')}>
+          <label className={cn('block text-xs font-medium text-rose-400', isRtl && 'font-farsi')}>
             {t('settings.dangerZone')}
           </label>
           <p className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
@@ -1021,7 +1125,7 @@ export function SettingsModal({
 
         <DialogContent className="space-y-3.5 py-2">
           <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-900/60 space-y-1.5 text-xs text-rose-200">
-            <p className={cn('font-semibold text-rose-300', isRtl && 'font-farsi')}>
+            <p className={cn('font-medium text-rose-300', isRtl && 'font-farsi')}>
               {t('settings.eraseWarning')}
             </p>
             <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
@@ -1031,7 +1135,7 @@ export function SettingsModal({
 
           <div className="space-y-1.5">
             <label className={cn('block text-[11px] font-medium text-zinc-300', isRtl && 'font-farsi')}>
-              Type <span className="font-mono font-bold text-rose-400">DELETE ALL</span> or <span className="font-mono font-bold text-rose-400">CLEAR</span> to confirm:
+              Type <span className="font-mono font-medium text-rose-400">DELETE ALL</span> or <span className="font-mono font-medium text-rose-400">CLEAR</span> to confirm:
             </label>
             <Input
               type="text"
@@ -1075,13 +1179,26 @@ export function SettingsModal({
               setIsClearConfirmOpen(false);
               onClose();
             }}
-            className={cn('gap-1.5 font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-30 disabled:pointer-events-none', isRtl && 'font-farsi')}
+            className={cn('gap-1.5 font-medium bg-rose-600 hover:bg-rose-500 disabled:opacity-30 disabled:pointer-events-none', isRtl && 'font-farsi')}
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>{t('settings.eraseAllData')}</span>
           </Button>
         </DialogFooter>
       </Dialog>
+
+      {/* Category Add/Edit Modal */}
+      <CategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setEditingCategory(null);
+        }}
+        category={editingCategory}
+        onSave={async () => {
+          await onRefreshCategories?.();
+        }}
+      />
     </Dialog>
   );
 }

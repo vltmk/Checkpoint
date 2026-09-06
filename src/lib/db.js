@@ -878,6 +878,46 @@ export class StorageDB {
     return true;
   }
 
+  async updateGameName(oldName, newName) {
+    await this.initPromise;
+    if (!oldName || !newName || oldName === newName) return false;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        await this.sqliteDb.execute(
+          'UPDATE work_entries SET game = ?, updated_at = strftime("%s", "now") WHERE game = ?',
+          [newName, oldName]
+        );
+        return true;
+      } catch (err) {
+        console.error('SQLite updateGameName error:', err);
+        return false;
+      }
+    }
+
+    if (!this.idb) return false;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const request = store.openCursor();
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const entry = cursor.value;
+          if (entry.game === oldName) {
+            entry.game = newName;
+            cursor.update(entry);
+          }
+          cursor.continue();
+        } else {
+          resolve(true);
+        }
+      };
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
   async clearAll(purgeSnapshots = false) {
     await this.initPromise;
 

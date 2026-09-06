@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trackerDB } from './lib/db';
-import { STATUS_CONFIG } from './lib/currencies';
+import { STATUS_CONFIG, generateDiscordReceiptText } from './lib/currencies';
 import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
 import { SplashScreen } from './components/ui/SplashScreen';
@@ -14,6 +14,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { Lightbox } from './components/Lightbox';
 import { NotificationCenter } from './components/NotificationCenter';
 import { UpdateModal } from './components/UpdateModal';
+import { ContextMenu } from './components/ui/ContextMenu';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -21,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, getAppVersion } from './lib/updater';
+import { loadCategories, importCategories } from './lib/categories';
 import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
 import {
   getStoredNotifications,
@@ -36,6 +38,7 @@ import {
   isTauri,
   saveFileNative,
   openFileNative,
+  copyTextNative,
   enforceMinWindowSize,
   hideWindow,
   showWindow,
@@ -45,6 +48,7 @@ import {
   sendDesktopNotification,
   pruneOldBackupsNative,
   generateLedgerFingerprint,
+  openAppAwareUrl,
 } from './lib/desktop';
 import { initTelemetry, incrementLocalWorkCount, flushDailyTelemetry } from './lib/telemetry';
 
@@ -73,7 +77,7 @@ const parseStringSetting = (val, fallback = '', allowedList = null) => {
 };
 
 export default function App() {
-  const { language, t, isRtl } = useLanguage();
+  const { language, setLanguage, t, isRtl } = useLanguage();
   const isDesktop = isTauri();
   const [appVersion, setAppVersion] = useState('');
   const [entries, setEntries] = useState([]);
@@ -135,6 +139,23 @@ export default function App() {
     return parseNumberSetting(saved, 3200, 1);
   });
 
+  // Categories & Games State
+  const [categories, setCategories] = useState([]);
+
+  const refreshCategories = useCallback(async (reloadEntries = false) => {
+    try {
+      const list = await loadCategories();
+      setCategories(list);
+      if (reloadEntries) {
+        const all = await trackerDB.getAllEntries();
+        setEntries(all);
+      }
+      return list;
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
   // Modals State
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -143,10 +164,26 @@ export default function App() {
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [receiptEntry, setReceiptEntry] = useState(null);
   const [externalTeammateFilter, setExternalTeammateFilter] = useState('');
+  const [externalSourceFilter, setExternalSourceFilter] = useState('');
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialScrollSection, setSettingsInitialScrollSection] = useState(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(null); // null | 'csv' | 'json'
+
+  // Context Menu State
+  const [contextMenuState, setContextMenuState] = useState({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    rect: null,
+    targetEntry: null,
+  });
+
+  // Lifted selection state for context menu & ledger synchronization
+  const [selectedEntryIds, setSelectedEntryIds] = useState(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
 
   const [lightboxData, setLightboxData] = useState({
     isOpen: false,
@@ -204,6 +241,7 @@ export default function App() {
 
       const all = await trackerDB.getAllEntries();
       setEntries(all);
+      refreshCategories().catch(() => {});
 
       // Also hydrate persistent settings from SQLite / DB
       const savedCur = await trackerDB.getSetting('checkpoint_currency', null);
@@ -309,7 +347,7 @@ export default function App() {
       // 2. Check for software updates (if desktop)
       if (isDesktop) {
         if (!opts.silent) setIsCheckingUpdates(true);
-        const res = await checkForUpdate({ timeoutMs: 6500 });
+        const res = await checkForUpdate({ timeoutMs: 12000 });
         if (res && res.available) {
           setUpdateInfo(res);
           currentMerged = mergeNotificationsIntoHistory(currentMerged, {
@@ -364,6 +402,11 @@ export default function App() {
         }
 
         const fullEntries = await trackerDB.getAllEntriesFull();
+        let currentCategories = [];
+        try {
+          currentCategories = await loadCategories();
+        } catch (e) {}
+
         const backupData = {
           app: 'CHECKPOINT',
           version: appVersion || '0.0.0',
@@ -371,6 +414,7 @@ export default function App() {
           type: isManual ? 'manual_auto_backup' : 'scheduled_auto_backup',
           currency: globalCurrency,
           goldRateTOMAN,
+          categories: currentCategories,
           entriesCount: fullEntries.length,
           entries: fullEntries,
         };
@@ -886,9 +930,11 @@ export default function App() {
 
     let savedSources = [];
     let savedTeammates = [];
+    let currentCategories = [];
     try {
       savedSources = await trackerDB.getSetting('checkpoint_user_saved_sources_v2', []);
       savedTeammates = await trackerDB.getSetting('checkpoint_saved_teammates_v1', []);
+      currentCategories = await loadCategories();
     } catch (e) {}
 
     const backupData = {
@@ -897,6 +943,7 @@ export default function App() {
       exportDate: new Date().toISOString(),
       currency: globalCurrency,
       goldRateTOMAN,
+      categories: currentCategories,
       preferences: {
         language,
         closeToTray,
@@ -905,6 +952,7 @@ export default function App() {
         autoBackupPath,
         autoBackupFrequency,
         autoBackupRetention,
+        categories: currentCategories,
         savedSources: Array.isArray(savedSources) ? savedSources : [],
         savedTeammates: Array.isArray(savedTeammates) ? savedTeammates : [],
       },
@@ -1006,21 +1054,175 @@ export default function App() {
             } catch (e) {}
           }
         }
+
+        // Restore and intelligently merge custom categories if present in backup
+        const rawCategories = json.categories || json.preferences?.categories;
+        if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+          try {
+            await importCategories(rawCategories);
+          } catch (e) {
+            console.warn('Failed to merge categories from backup:', e);
+          }
+        }
       } else {
         return;
       }
 
       await trackerDB.bulkImport(importedList);
       await loadData();
+      await refreshCategories();
     } catch (err) {
       console.error('Failed to import JSON backup:', err);
     }
   };
 
 
+  const lastClosedContextTargetRef = useRef(null);
+
+  // Context Menu Handlers
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenuState((prev) => {
+      if (prev.isOpen) {
+        lastClosedContextTargetRef.current = {
+          id: prev.targetEntry?.id,
+          time: Date.now(),
+        };
+      }
+      return { ...prev, isOpen: false, targetEntry: null, rect: null };
+    });
+  }, []);
+
+  const handleOpenEntryContextMenu = useCallback((entry, position) => {
+    // Prevent immediate re-opening if clicking the same trigger button that just closed it
+    if (
+      lastClosedContextTargetRef.current &&
+      lastClosedContextTargetRef.current.id === entry.id &&
+      Date.now() - lastClosedContextTargetRef.current.time < 250
+    ) {
+      lastClosedContextTargetRef.current = null;
+      return;
+    }
+
+    setContextMenuState({
+      isOpen: true,
+      x: position.x,
+      y: position.y,
+      rect: position.rect || null,
+      targetEntry: entry,
+    });
+  }, []);
+
+  const handleContextAddWork = useCallback(() => {
+    if (activeTab !== 'ledger') {
+      setActiveTab('ledger');
+    }
+    handleOpenWorkModal();
+  }, [activeTab]);
+
+  const handleContextQuickAdd = useCallback(() => {
+    setIsQuickAddOpen(true);
+  }, []);
+
+  const handleContextToggleSelectMode = useCallback(() => {
+    if (activeTab !== 'ledger') {
+      setActiveTab('ledger');
+    }
+    setIsSelectMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setSelectedEntryIds(new Set());
+      }
+      return next;
+    });
+  }, [activeTab]);
+
+  const handleContextToggleCurrency = useCallback(() => {
+    handleCurrencyChange(globalCurrency === 'TOMAN' ? 'GOLD' : 'TOMAN');
+  }, [globalCurrency, handleCurrencyChange]);
+
+  const handleContextExport = useCallback(() => {
+    setSettingsInitialScrollSection('backup');
+    setIsSettingsOpen(true);
+  }, []);
+
+  const handleContextReload = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleContextShortcuts = useCallback(() => {
+    setIsShortcutsOpen(true);
+  }, []);
+
+  const handleContextCopyDiscord = useCallback(
+    async (entry) => {
+      if (!entry) return;
+      const text = generateDiscordReceiptText(entry, { language, globalCurrency });
+      await copyTextNative(text);
+    },
+    [language, globalCurrency]
+  );
+
+  const handleContextBulkMarkPaid = useCallback(async () => {
+    if (selectedEntryIds.size === 0) return;
+    await handleBulkUpdateStatus(Array.from(selectedEntryIds), 'Paid');
+    setSelectedEntryIds(new Set());
+    setIsSelectMode(false);
+  }, [selectedEntryIds, handleBulkUpdateStatus]);
+
+  const handleContextBulkExportCsv = useCallback(async () => {
+    if (selectedEntryIds.size === 0) return;
+    await handleBulkExportCsv(Array.from(selectedEntryIds));
+  }, [selectedEntryIds, handleBulkExportCsv]);
+
+  const handleContextBulkDelete = useCallback(async () => {
+    if (selectedEntryIds.size === 0) return;
+    await handleBulkDelete(Array.from(selectedEntryIds));
+    setSelectedEntryIds(new Set());
+    setIsSelectMode(false);
+  }, [selectedEntryIds, handleBulkDelete]);
+
+  // Global Context Menu Listener (with editable input bypass)
+  useEffect(() => {
+    const handleContextMenu = (e) => {
+      const target = e.target;
+      const isEditable =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('input, textarea, [contenteditable="true"]');
+
+      if (isEditable) {
+        // Allow native browser cut/copy/paste inside inputs
+        return;
+      }
+
+      e.preventDefault();
+
+      // Check if user right-clicked on an individual job card
+      const cardEl = target.closest('[data-entry-id]');
+      let foundEntry = null;
+      if (cardEl) {
+        const entryId = cardEl.getAttribute('data-entry-id');
+        foundEntry = entries.find((item) => String(item.id) === String(entryId)) || null;
+      }
+
+      setContextMenuState({
+        isOpen: true,
+        x: e.clientX,
+        y: e.clientY,
+        targetEntry: foundEntry,
+      });
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => window.removeEventListener('contextmenu', handleContextMenu);
+  }, [entries]);
+
   // Keyboard Shortcuts Listener
   const appModalsRef = useRef({});
   appModalsRef.current = {
+    contextMenuState,
+    handleCloseContextMenu,
     lightboxData,
     isNotificationCenterOpen,
     isUpdateModalOpen,
@@ -1039,8 +1241,12 @@ export default function App() {
     const handleKeyDown = (e) => {
       const state = appModalsRef.current;
 
-      // Escape closes open modals / lightbox
+      // Escape closes context menu, open modals, or lightbox
       if (e.key === 'Escape') {
+        if (state.contextMenuState?.isOpen) {
+          state.handleCloseContextMenu?.();
+          return;
+        }
         if (state.lightboxData?.isOpen) {
           setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
@@ -1092,6 +1298,7 @@ export default function App() {
       }
 
       const isAnyModalOpen =
+        state.contextMenuState?.isOpen ||
         state.isWorkModalOpen ||
         state.isQuickAddOpen ||
         state.isReceiptModalOpen ||
@@ -1222,6 +1429,7 @@ export default function App() {
                   {activeTab === 'ledger' && (
                     <LedgerView
                       entries={entries}
+                      categories={categories}
                       globalCurrency={globalCurrency}
                       onCurrencyChange={handleCurrencyChange}
                       goldRateTOMAN={goldRateTOMAN}
@@ -1237,6 +1445,16 @@ export default function App() {
                       searchInputRef={searchInputRef}
                       externalTeammateFilter={externalTeammateFilter}
                       onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
+                      externalSourceFilter={externalSourceFilter}
+                      onClearExternalSourceFilter={() => setExternalSourceFilter('')}
+                      isSelectMode={isSelectMode}
+                      onToggleSelectMode={setIsSelectMode}
+                      selectedEntryIds={selectedEntryIds}
+                      onSelectionChange={setSelectedEntryIds}
+                      contextMenuTargetId={contextMenuState.isOpen ? contextMenuState.targetEntry?.id : null}
+                      confirmDeleteEntryId={confirmDeleteEntryId}
+                      onConfirmDeleteChange={setConfirmDeleteEntryId}
+                      onOpenEntryContextMenu={handleOpenEntryContextMenu}
                     />
                   )}
 
@@ -1276,6 +1494,8 @@ export default function App() {
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
+        categories={categories}
+        onRefreshCategories={refreshCategories}
       />
 
       <QuickAddModal
@@ -1284,6 +1504,8 @@ export default function App() {
         onSave={handleSaveQuickEntry}
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
+        categories={categories}
+        onRefreshCategories={refreshCategories}
       />
 
       <ReceiptModal
@@ -1301,13 +1523,25 @@ export default function App() {
           setActiveTab('ledger');
           setExternalTeammateFilter(name);
         }}
+        onFilterSource={(source) => {
+          setIsReceiptModalOpen(false);
+          setReceiptEntry(null);
+          setActiveTab('ledger');
+          setExternalSourceFilter(source);
+        }}
       />
 
       <SettingsModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setSettingsInitialScrollSection(null);
+        }}
+        initialScrollSection={settingsInitialScrollSection}
         globalCurrency={globalCurrency}
         onCurrencyChange={handleCurrencyChange}
+        categories={categories}
+        onRefreshCategories={refreshCategories}
         closeToTray={closeToTray}
         onCloseToTrayChange={handleCloseToTrayChange}
         minimizeToTray={minimizeToTray}
@@ -1335,6 +1569,49 @@ export default function App() {
         theme={currentTheme}
         onThemeChange={handleThemeChange}
         handleThemeChange={handleThemeChange}
+      />
+
+      {/* Context Menu (Apple-grade floating spring menu) */}
+      <ContextMenu
+        isOpen={contextMenuState.isOpen}
+        position={{ x: contextMenuState.x, y: contextMenuState.y, rect: contextMenuState.rect }}
+        onClose={handleCloseContextMenu}
+        targetEntry={contextMenuState.targetEntry}
+        selectedCount={selectedEntryIds.size}
+        isTargetInSelection={
+          contextMenuState.targetEntry ? selectedEntryIds.has(contextMenuState.targetEntry.id) : false
+        }
+        isSelectMode={isSelectMode}
+        globalCurrency={globalCurrency}
+        theme={currentTheme}
+        onAddWork={handleContextAddWork}
+        onQuickAdd={handleContextQuickAdd}
+        onToggleSelectMode={handleContextToggleSelectMode}
+        onToggleCurrency={handleContextToggleCurrency}
+        onExport={handleContextExport}
+        onReload={handleContextReload}
+        onOpenShortcuts={handleContextShortcuts}
+        onThemeChange={handleThemeChange}
+        onLanguageChange={setLanguage}
+        onEditEntry={(entry) => handleOpenWorkModal(entry)}
+        onDuplicateEntry={(entry) => handleDuplicateEntry(entry.id)}
+        onViewReceipt={(entry) => handleOpenReceipt(entry)}
+        onCopyDiscordReceipt={handleContextCopyDiscord}
+        onAddScreenshot={(entry) => handleOpenWorkModal(entry)}
+        onOpenLink={(entry) => openAppAwareUrl(entry.link)}
+        onDeleteEntry={(entry) => {
+          if (activeTab !== 'ledger') {
+            setActiveTab('ledger');
+          }
+          setConfirmDeleteEntryId(entry.id);
+        }}
+        onBulkMarkPaid={handleContextBulkMarkPaid}
+        onBulkExportCsv={handleContextBulkExportCsv}
+        onDeselectAll={() => {
+          setSelectedEntryIds(new Set());
+          setIsSelectMode(false);
+        }}
+        onBulkDelete={handleContextBulkDelete}
       />
 
       <NotificationCenter

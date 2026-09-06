@@ -205,7 +205,7 @@ export function Select({
               groups.map((group, idx) => (
                 <div key={group.groupName || idx} className="py-1">
                   {group.groupName && (
-                    <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                       {group.groupName}
                     </div>
                   )}

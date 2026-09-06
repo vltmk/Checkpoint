@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   MessageSquare,
   Users,
+  Store,
 } from 'lucide-react';
 import { CheckpointLogo } from './ui/Icons';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../lib/desktop';
@@ -29,6 +30,7 @@ export function ReceiptModal({
   globalCurrency = 'TOMAN',
   onOpenLightbox,
   onFilterTeammate,
+  onFilterSource,
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
   const receiptCardRef = useRef(null);
@@ -108,7 +110,7 @@ export function ReceiptModal({
 مشتری / سورس: ${safeEntry.source || 'مشتری مستقیم'}${
           isTeamWork
             ? `\nپات تیمی: ${formattedPot} (${formatNumber(totalShares)} سهم)\nسهم شما: ${formattedIncome}\nسهم هم‌تیمی‌ها: ${teamCutsBreakdown}`
-            : `\nمبلغ درآمد: ${formattedIncome}`
+            : `\n${safeEntry.status === 'Failed' ? 'مبلغ سفارش (پرداخت‌نشده)' : 'مبلغ درآمد'}: ${formattedIncome}`
         }
 نرخ تبدیل: ${formatMoney(effectiveRate, 'TOMAN', false, true)} / ${rateUnitText}
 وضعیت: ${t(`status.${safeEntry.status || 'Paid'}`)}
@@ -122,7 +124,7 @@ Work Title: ${safeEntry.title || 'Work Record'}
 Job Source: ${safeEntry.source || 'Direct Client'}${
           isTeamWork
             ? `\nPot: ${formattedPot} (${totalShares} Shares)\nYour Share: ${formattedIncome}\nTeam Cuts: ${teamCutsBreakdown}`
-            : `\nAmount: ${formattedIncome}`
+            : `\n${safeEntry.status === 'Failed' ? 'Order Value (Unpaid)' : 'Amount'}: ${formattedIncome}`
         }
 Exchange Rate: ${effectiveRate.toLocaleString()} Toman / ${rateUnitText}
 Status: ${safeEntry.status || 'Paid'}
@@ -164,7 +166,7 @@ Notes: ${safeEntry.notes || 'None'}
 سورس       = ${safeEntry.source || 'مشتری مستقیم'}${
           isTeamWork
             ? `\nپات تیمی   = ${formattedPot} (${formatNumber(totalShares)} سهم)\nسهم شما    = ${formattedIncome}\nسهم تیم    = ${teamCutsBreakdown}`
-            : `\nمبلغ       = ${formattedIncome}`
+            : `\n${safeEntry.status === 'Failed' ? 'مبلغ (پرداخت‌نشده)' : 'مبلغ       '} = ${formattedIncome}`
         }
 نرخ تبدیل  = ${formatMoney(effectiveRate, 'TOMAN', false, true)} / ${rateDiscordText}
 وضعیت      = ${t(`status.${safeEntry.status || 'Paid'}`)}
@@ -179,7 +181,7 @@ Title      = ${safeEntry.title || 'Work Record'}
 Source     = ${safeEntry.source || 'Direct Client'}${
           isTeamWork
             ? `\nPot        = ${formattedPot} (${totalShares} Shares)\nYour Share = ${formattedIncome}\nTeam Cuts  = ${teamCutsBreakdown}`
-            : `\nAmount     = ${formattedIncome}`
+            : `\n${safeEntry.status === 'Failed' ? 'Amount (Unpaid)' : 'Amount     '} = ${formattedIncome}`
         }
 Rate       = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
 Status     = ${safeEntry.status || 'Paid'}
@@ -297,7 +299,7 @@ Notes      = ${safeEntry.notes || 'None'}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'fa'
-                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-semibold shadow-xs'
+                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-medium shadow-xs'
                   : 'text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
@@ -309,7 +311,7 @@ Notes      = ${safeEntry.notes || 'None'}
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 receiptLang === 'en'
-                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-semibold shadow-xs'
+                  ? 'bg-white text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-medium shadow-xs'
                   : 'text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
@@ -351,17 +353,17 @@ Notes      = ${safeEntry.notes || 'None'}
           {/* Core Info */}
           <div className="space-y-4">
             <div>
-              <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-1">
+              <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-1">
                 {isReceiptFa ? 'عنوان کار' : 'Work Title'}
               </span>
-              <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 block">
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 block">
                 {safeEntry.title || (isReceiptFa ? 'بدون عنوان' : 'Untitled Work')}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
+                <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'بازی / پلتفرم' : 'Game / Platform'}
                 </span>
                 <span className="text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 mt-0.5 font-medium">
@@ -371,16 +373,31 @@ Notes      = ${safeEntry.notes || 'None'}
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
+                <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'سورس / سفارش‌دهنده' : 'Job Source / Seller'}
                 </span>
-                <span className="text-zinc-700 dark:text-zinc-300 font-mono mt-0.5 block">
-                  {safeEntry.source || (isReceiptFa ? 'مشتری مستقیم' : 'Direct Client')}
-                </span>
+                {safeEntry.source ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFilterSource?.(safeEntry.source);
+                      onClose?.();
+                    }}
+                    title={isReceiptFa ? `فیلتر کردن کارها بر اساس ${safeEntry.source}` : `Filter jobs from ${safeEntry.source}`}
+                    className="px-2 py-0.5 mt-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Store className="w-3 h-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                    <span>{safeEntry.source}</span>
+                  </button>
+                ) : (
+                  <span className="text-zinc-700 dark:text-zinc-300 font-mono mt-0.5 block">
+                    {isReceiptFa ? 'مشتری مستقیم' : 'Direct Client'}
+                  </span>
+                )}
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
+                <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'وضعیت' : 'Status'}
                 </span>
                 <div className="mt-1">
@@ -389,27 +406,45 @@ Notes      = ${safeEntry.notes || 'None'}
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
-                  {isTeamWork ? (isReceiptFa ? 'سهم شما' : 'Your Share') : (isReceiptFa ? 'مبلغ درآمد' : 'Amount Earned')}
+                <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-0.5">
+                  {safeEntry.status === 'Failed'
+                    ? (isReceiptFa ? t('receipt.orderValueFailed') : 'Order Value (Unpaid)')
+                    : isTeamWork
+                    ? (isReceiptFa ? 'سهم شما' : 'Your Share')
+                    : (isReceiptFa ? 'مبلغ درآمد' : 'Amount Earned')}
                 </span>
-                <div className="text-sm font-bold text-zinc-800 dark:text-zinc-200 font-mono mt-0.5">
+                <div
+                  className={cn(
+                    'text-sm font-medium font-mono mt-0.5',
+                    safeEntry.status === 'Failed'
+                      ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                      : 'text-zinc-800 dark:text-zinc-200'
+                  )}
+                >
                   <MoneyDisplay amount={safeEntry.income || 0} currency={entryCurrency} />
                 </div>
               </div>
 
               {isTeamWork && (
                 <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between text-xs">
-                  <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                  <span className="text-[10px] uppercase font-medium text-zinc-500">
                     {isReceiptFa ? `پات تیمی (${formatNumber(totalShares)} سهم)` : `Pot (${totalShares} Shares)`}
                   </span>
-                  <strong className="font-mono text-amber-600 dark:text-amber-300 font-bold">
+                  <strong
+                    className={cn(
+                      'font-mono font-medium',
+                      safeEntry.status === 'Failed'
+                        ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                        : 'text-amber-600 dark:text-amber-300'
+                    )}
+                  >
                     <MoneyDisplay amount={totalPot} currency={entryCurrency} />
                   </strong>
                 </div>
               )}
 
               <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 flex items-center justify-between text-xs">
-                <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                <span className="text-[10px] uppercase font-medium text-zinc-500">
                   {isReceiptFa ? 'نرخ تبدیل' : 'Conversion Rate'}
                 </span>
                 <span className="text-zinc-700 dark:text-zinc-300 font-medium">
@@ -421,7 +456,7 @@ Notes      = ${safeEntry.notes || 'None'}
               {hasTeammates && (
                 <div className="col-span-2 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/70 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-semibold text-zinc-500">
+                    <span className="text-[10px] uppercase font-medium text-zinc-500">
                       {isReceiptFa ? 'هم‌تیمی‌ها و سهم' : 'Teammates & Cuts'}
                     </span>
                     <span className="text-[9px] text-zinc-500 font-mono hide-in-screenshot">
@@ -455,7 +490,7 @@ Notes      = ${safeEntry.notes || 'None'}
 
             {safeEntry.notes && (
               <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80">
-                <span className="text-[10px] uppercase font-semibold text-zinc-500 block mb-0.5">
+                <span className="text-[10px] uppercase font-medium text-zinc-500 block mb-0.5">
                   {isReceiptFa ? 'یادداشت' : 'Client Notes'}
                 </span>
                 <p className="text-xs text-zinc-700 dark:text-zinc-300 italic">
@@ -468,7 +503,7 @@ Notes      = ${safeEntry.notes || 'None'}
           {/* Proof Screenshot Preview */}
           {safeEntry.proofs && safeEntry.proofs.length > 0 && (
             <div className="pt-3.5 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
-              <span className="text-[10px] uppercase font-semibold text-zinc-500 block">
+              <span className="text-[10px] uppercase font-medium text-zinc-500 block">
                 {isReceiptFa ? `مدارک پیوست شده (${formatNumber(safeEntry.proofs.length)})` : `Attached Proofs (${safeEntry.proofs.length})`}
               </span>
               <div className="flex gap-2 flex-wrap">

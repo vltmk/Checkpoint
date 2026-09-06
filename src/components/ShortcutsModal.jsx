@@ -58,7 +58,7 @@ export function ShortcutsModal({ isOpen, onClose }) {
       <DialogContent className="space-y-4">
         {shortcutGroups.map((grp) => (
           <div key={grp.group} className="space-y-2">
-            <h4 className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
+            <h4 className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {grp.group}
             </h4>
             <div className="bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800/60 overflow-hidden">

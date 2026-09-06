@@ -178,7 +178,7 @@ export function NotificationCenter({
                   <Bell className="w-3.5 h-3.5" />
                 </div>
                 <div>
-                  <h2 className={cn('text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                  <h2 className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200 uppercase tracking-wider', isRtl && 'font-farsi')}>
                     {t('notifications.title')}
                   </h2>
                   <p className="text-[10px] text-zinc-500 font-mono">
@@ -218,7 +218,7 @@ export function NotificationCenter({
                 onClick={() => setFilterMode('all')}
                 className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'all'
-                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                     : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`, isRtl && 'font-farsi')}
               >
@@ -229,7 +229,7 @@ export function NotificationCenter({
                 onClick={() => setFilterMode('unread')}
                 className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'unread'
-                    ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                    ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                     : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`, isRtl && 'font-farsi')}
               >
@@ -240,7 +240,7 @@ export function NotificationCenter({
                 onClick={() => setFilterMode('releases')}
                 className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'releases'
-                    ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-300 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                    ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                     : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`, isRtl && 'font-farsi')}
               >
@@ -251,7 +251,7 @@ export function NotificationCenter({
                 onClick={() => setFilterMode('announcements')}
                 className={cn(`flex-1 py-1 px-2 rounded-md font-medium text-center transition-colors ${
                   filterMode === 'announcements'
-                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
                     : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`, isRtl && 'font-farsi')}
               >
@@ -297,7 +297,7 @@ export function NotificationCenter({
                         </div>
                         <span
                           dir="ltr"
-                          className={`text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded border ${getBadgeStyle(
+                          className={`text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border ${getBadgeStyle(
                             item
                           )}`}
                         >
@@ -316,7 +316,7 @@ export function NotificationCenter({
                     {/* Notification Title & Body */}
                     <div className="space-y-1">
                       <div
-                        className={`font-semibold text-zinc-900 dark:text-zinc-100 break-words ${
+                        className={`font-medium text-zinc-900 dark:text-zinc-100 break-words ${
                           isRTLItem
                             ? 'text-right font-farsi tracking-normal text-xs leading-[1.65]'
                             : 'leading-snug'
@@ -354,7 +354,7 @@ export function NotificationCenter({
                                   <span
                                     dir="ltr"
                                     className={cn(
-                                      'text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                      'text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
                                       tagInfo.style,
                                       language === 'fa' && 'font-farsi text-[8.5px]'
                                     )}
@@ -402,7 +402,7 @@ export function NotificationCenter({
                                 onOpenUpdateModal?.();
                                 onClose();
                               }}
-                              className="gap-1.5 text-[11px] h-6 px-2.5 font-semibold"
+                              className="gap-1.5 text-[11px] h-6 px-2.5 font-medium"
                             >
                               <Download className="w-3 h-3" />
                               <span>{t('update.installNow')}</span>
@@ -450,7 +450,7 @@ export function NotificationCenter({
                                 onClick={handleAction}
                                 className={cn(
                                   'gap-1.5 text-[11px] h-6 px-2.5',
-                                  act.variant === 'primary' ? 'font-semibold' : 'text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100',
+                                  act.variant === 'primary' ? 'font-medium' : 'text-zinc-700 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100',
                                   isActionRTLItem && 'font-farsi tracking-normal'
                                 )}
                               >
@@ -494,7 +494,7 @@ export function NotificationCenter({
                 <DiscordIcon className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">
                   Official Discord Server
                 </div>
                 <div className="text-[10px] text-zinc-500 font-mono truncate">

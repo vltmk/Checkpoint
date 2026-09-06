@@ -207,29 +207,29 @@ export function Navbar({
         <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800/80 pointer-events-none" />
 
         <div data-no-drag className="flex items-center">
-          <div className="inline-flex items-center rounded-lg bg-zinc-200/90 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 p-0.5 shadow-sm border border-zinc-300 dark:border-zinc-700">
+          <div className="add-work-double-btn inline-flex items-center rounded-lg bg-zinc-900 text-zinc-100 dark:bg-white dark:text-zinc-900 p-0.5 shadow-sm border border-zinc-800 dark:border-zinc-200 select-none">
             {/* Primary Add Work (Left Side) */}
             <button
               type="button"
               onClick={() => onOpenWorkModal?.()}
               title={`${t('nav.addWork')} (N)`}
-              className="flex items-center gap-1.5 h-6 px-2.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none"
+              className="add-work-btn-item flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-zinc-100 dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
             </button>
 
             {/* Subtle vertical hairline divider */}
-            <div className="h-3.5 w-px bg-zinc-300 dark:bg-zinc-700 my-auto mx-0.5" />
+            <div className="add-work-btn-divider h-3.5 w-px bg-zinc-700 dark:bg-zinc-200 my-auto mx-0.5" />
 
             {/* Quick Add Lightning (Right Side) */}
             <button
               type="button"
               onClick={() => onOpenQuickAdd?.()}
               title={`${t('nav.quickAdd')} (Q)`}
-              className="flex items-center justify-center h-6 px-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300/80 active:bg-zinc-300 dark:hover:bg-zinc-700 dark:active:bg-zinc-600 rounded-md transition-all cursor-pointer select-none gap-1"
+              className="add-work-btn-item flex items-center justify-center h-6 px-2 text-xs font-medium text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-zinc-100 dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
             >
-              <span className={cn('text-xs font-semibold', isRtl ? 'font-farsi' : 'leading-none')}>
+              <span className={cn('text-xs font-medium', isRtl ? 'font-farsi' : 'leading-none')}>
                 {t('nav.quickAdd')}
               </span>
             </button>
@@ -250,7 +250,7 @@ export function Navbar({
             onClick={() => onTabChange?.('ledger')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'ledger'
-                ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                ? 'text-zinc-800 dark:text-zinc-200 font-medium'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
@@ -267,7 +267,7 @@ export function Navbar({
               <span
                 className={`text-[10px] font-mono px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
                   activeTab === 'ledger'
-                    ? 'bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 font-semibold'
+                    ? 'bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 font-medium'
                     : 'bg-zinc-200/50 text-zinc-600 border-zinc-300/60 dark:bg-zinc-900/80 dark:text-zinc-400 dark:border-zinc-800/80'
                 }`}
               >
@@ -282,7 +282,7 @@ export function Navbar({
             onClick={() => onTabChange?.('analytics')}
             className={`relative isolate flex items-center justify-center gap-1.5 h-7 px-3 rounded-md text-xs transition-colors select-none ${
               activeTab === 'analytics'
-                ? 'text-zinc-800 dark:text-zinc-200 font-semibold'
+                ? 'text-zinc-800 dark:text-zinc-200 font-medium'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-medium'
             }`}
           >
@@ -362,7 +362,7 @@ export function Navbar({
                     <Coins className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <h4 className={cn('text-xs font-bold text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                    <h4 className={cn('text-xs font-medium text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
                       {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
                     </h4>
                     <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
@@ -384,7 +384,7 @@ export function Navbar({
                     size="xs"
                     onClick={handleDismissTour}
                     className={cn(
-                      'h-7 px-3.5 text-xs font-semibold bg-zinc-200 text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-sm active:scale-95 leading-none',
+                      'h-7 px-3.5 text-xs font-medium bg-zinc-200 text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-sm active:scale-95 leading-none',
                       isRtl && 'font-farsi'
                     )}
                   >
@@ -407,7 +407,7 @@ export function Navbar({
               className="absolute top-full right-0 mt-1.5 w-64 p-3 bg-zinc-950 border border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50"
             >
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-400">
+                <div className="flex items-center justify-between text-[10px] font-medium text-zinc-400">
                   <span className={cn('uppercase tracking-wider', isRtl && 'font-farsi')}>{language === 'fa' ? 'نرخ تبدیل گلد' : 'Gold Exchange Ratio'}</span>
                   <span className="font-mono text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
                 </div>
@@ -441,7 +441,7 @@ export function Navbar({
                           onClick={() => setTempRateTOMAN(pr)}
                           className={`py-1 px-1 rounded text-[10px] font-mono border transition-colors ${
                             Number(tempRateTOMAN) === pr
-                              ? 'bg-zinc-800 text-amber-300 border-amber-700/80 font-bold'
+                              ? 'bg-zinc-800 text-amber-300 border-amber-700/80 font-medium'
                               : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-800'
                           }`}
                         >
@@ -483,7 +483,7 @@ export function Navbar({
               className="h-7 px-2 flex items-center gap-1.5 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/60 hover:text-emerald-100 text-xs font-mono transition-colors shadow-sm cursor-pointer"
             >
               <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="font-semibold text-[11px]">v{updateInfo.version}</span>
+              <span className="font-medium text-[11px]">v{updateInfo.version}</span>
             </button>
           </div>
         )}

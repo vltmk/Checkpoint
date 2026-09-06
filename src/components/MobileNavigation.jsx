@@ -92,7 +92,7 @@ export function MobileBottomNav({
           type="button"
           onClick={() => onTabChange?.('ledger')}
           className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
-            activeTab === 'ledger' ? 'text-zinc-800 dark:text-zinc-200 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            activeTab === 'ledger' ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
           }`}
         >
           <Layers className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />
@@ -105,7 +105,7 @@ export function MobileBottomNav({
             type="button"
             onClick={onOpenWorkModal}
             title={`${t('nav.addWork')} (N)`}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-zinc-100 border border-zinc-800 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-300 shadow-lg active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
+            className="mobile-add-work-btn flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-zinc-100 border border-zinc-800 dark:bg-white dark:text-zinc-900 dark:border-zinc-200 shadow-lg active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -124,7 +124,7 @@ export function MobileBottomNav({
           type="button"
           onClick={() => onTabChange?.('analytics')}
           className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors ${
-            activeTab === 'analytics' ? 'text-zinc-800 dark:text-zinc-200 font-semibold' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            activeTab === 'analytics' ? 'text-zinc-800 dark:text-zinc-200 font-medium' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
           }`}
         >
           <BarChart3 className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />

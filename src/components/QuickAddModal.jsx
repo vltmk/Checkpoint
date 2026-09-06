@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select } from './ui/Select';
 import { SourceCombobox } from './ui/SourceCombobox';
 import { GameIcon } from './ui/GameIcon';
+import { CategoryModal } from './ui/CategoryModal';
 import { Kbd } from './ui/Tooltip';
-import { AlertTriangle, ArrowRightLeft, Banknote, Check, Coins, Copy, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Banknote, Check, Coins, Copy, Zap, Edit2, Plus } from 'lucide-react';
 import { toLocalISOString } from './ui/DateTimePicker';
 import { convertCurrency, formatMoney } from '../lib/currencies';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
@@ -29,14 +30,11 @@ export function QuickAddModal({
   onSave,
   globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
+  categories = [],
+  onRefreshCategories,
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
 
-  const GAME_OPTIONS = [
-    { value: 'World of Warcraft', label: 'World of Warcraft' },
-    { value: 'World of Warcraft Classic', label: 'World of Warcraft Classic' },
-    { value: '__custom__', label: `+ ${t('work.customGameOption', 'Custom Game / Realm')}` },
-  ];
   const [title, setTitle] = useState('');
   const [hasTitleError, setHasTitleError] = useState(false);
   const [hasGameError, setHasGameError] = useState(false);
@@ -50,6 +48,45 @@ export function QuickAddModal({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [diagnosticsCopied, setDiagnosticsCopied] = useState(false);
+
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+
+  const GAME_OPTIONS = useMemo(() => {
+    const opts = (categories || []).map((cat) => ({
+      value: cat.name,
+      label: cat.name,
+      icon: (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <GameIcon game={cat.name} customIcon={cat.icon} className="w-3.5 h-3.5" />
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: cat.color || '#71717A' }}
+          />
+        </div>
+      ),
+    }));
+
+    if (
+      game &&
+      !opts.some((o) => o.value.toLowerCase() === game.toLowerCase()) &&
+      game !== '__custom__'
+    ) {
+      opts.push({
+        value: game,
+        label: game,
+        icon: <GameIcon game={game} className="w-3.5 h-3.5" />,
+      });
+    }
+
+    opts.push({
+      value: '__custom__',
+      label: `+ ${t('categories.newCategoryOption', 'Add / Manage Categories...')}`,
+      icon: <Plus className="w-3.5 h-3.5 text-zinc-400" />,
+    });
+
+    return opts;
+  }, [categories, game, t]);
   
   const titleInputRef = useRef(null);
   const entryIdRef = useRef(null);
@@ -143,8 +180,8 @@ export function QuickAddModal({
     setHasGameError(false);
     if (saveError) setSaveError(null);
     if (val === '__custom__') {
-      setGame('__custom__');
-      setIsCustomGame(true);
+      setEditingCategory(null);
+      setIsCategoryModalOpen(true);
     } else {
       setGame(val);
       setIsCustomGame(false);
@@ -269,7 +306,8 @@ export function QuickAddModal({
   };
 
   return (
-    <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-md">
+    <>
+      <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-md">
       <DialogHeader onClose={isSaving ? undefined : onClose}>
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
@@ -288,7 +326,7 @@ export function QuickAddModal({
             <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
               <div className="min-w-0 flex-1 space-y-1">
-                <p className={cn('font-semibold text-rose-200', isRtl && 'font-farsi')}>
+                <p className={cn('font-medium text-rose-200', isRtl && 'font-farsi')}>
                   {language === 'fa' ? 'ذخیره رکورد انجام نشد' : 'Record was not saved'}
                 </p>
                 <p className={cn('text-[11px] leading-5 text-rose-200/80', isRtl && 'font-farsi')}>{saveError.message}</p>
@@ -309,7 +347,7 @@ export function QuickAddModal({
 
           {/* 1. Boost Title (Autofocused) */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('quickAdd.boostTitle')} *</span>
               {hasTitleError ? (
                 <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
@@ -336,15 +374,35 @@ export function QuickAddModal({
 
           {/* 2. Game / Platform */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-              <GameIcon game={game} className="w-3.5 h-3.5" />
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <GameIcon game={game} categories={categories} className="w-3.5 h-3.5" />
               <span>{t('work.gamePlatform')} *</span>
             </label>
-            <Select
-              value={game}
-              onChange={handleGameSelect}
-              options={GAME_OPTIONS}
-            />
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0">
+                <Select
+                  value={game}
+                  onChange={handleGameSelect}
+                  options={GAME_OPTIONS}
+                />
+              </div>
+              {game && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const matched = (categories || []).find(
+                      (c) => c.name.toLowerCase() === game.toLowerCase()
+                    );
+                    setEditingCategory(matched || { name: game });
+                    setIsCategoryModalOpen(true);
+                  }}
+                  title={t('categories.editCategory', 'Edit Category')}
+                  className="h-9 w-9 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 border border-zinc-700/80 transition-colors shrink-0"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             {isCustomGame && (
               <div className="mt-2">
                 <Input
@@ -368,7 +426,7 @@ export function QuickAddModal({
 
           {/* 3. Seller / Job Source */}
           <div>
-            <label className={cn('block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.sellerSource')}</span>
               <span className="text-[9px] font-mono text-zinc-500">Saved Sources</span>
             </label>
@@ -385,7 +443,7 @@ export function QuickAddModal({
           {/* 4. Price & Live Dual Currency Conversion */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className={cn('text-[10px] font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <label className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 {currency === 'TOMAN' ? (
                   <Banknote className="w-3.5 h-3.5 text-emerald-400" />
                 ) : (
@@ -401,7 +459,7 @@ export function QuickAddModal({
                   onClick={() => setCurrency('TOMAN')}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                     currency === 'TOMAN'
-                      ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
+                      ? 'bg-zinc-800 text-zinc-200 font-medium shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -412,7 +470,7 @@ export function QuickAddModal({
                   onClick={() => setCurrency('GOLD')}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                     currency === 'GOLD'
-                      ? 'bg-zinc-800 text-zinc-200 font-semibold shadow-xs'
+                      ? 'bg-zinc-800 text-zinc-200 font-medium shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -445,7 +503,7 @@ export function QuickAddModal({
                   )}
                   required
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-zinc-400 pointer-events-none">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-zinc-400 pointer-events-none">
                   {currency === 'TOMAN' ? 'تومان' : 'G'}
                 </div>
               </div>
@@ -457,7 +515,7 @@ export function QuickAddModal({
                 <div className="flex items-center justify-between bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 px-2.5 py-1.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-400">
                   <div className="flex items-center gap-1.5">
                     <span className="text-zinc-500">{t('quickAdd.liveEquivalent')}:</span>
-                    <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-200">
+                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-200">
                       ≈ {formatMoney(convertedPrice, altCurrency, false, language === 'fa')}
                     </span>
                   </div>
@@ -502,7 +560,7 @@ export function QuickAddModal({
             variant="primary"
             size="sm"
             disabled={isSaving}
-            className={cn('gap-1.5 font-semibold active:scale-[0.98] shadow-sm', isRtl && 'font-farsi')}
+            className={cn('gap-1.5 font-medium active:scale-[0.98] shadow-sm', isRtl && 'font-farsi')}
           >
             <Zap className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>{isSaving ? (language === 'fa' ? 'در حال ذخیره...' : 'Saving...') : t('quickAdd.addRecord')}</span>
@@ -510,6 +568,20 @@ export function QuickAddModal({
         </DialogFooter>
       </form>
     </Dialog>
+
+    <CategoryModal
+      isOpen={isCategoryModalOpen}
+      category={editingCategory}
+      onClose={() => setIsCategoryModalOpen(false)}
+      onSave={async (savedCat) => {
+        await onRefreshCategories?.();
+        setGame(savedCat.name);
+        setIsCustomGame(false);
+        setCustomGameText('');
+        setIsCategoryModalOpen(false);
+      }}
+    />
+  </>
   );
 }
 

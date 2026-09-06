@@ -38,51 +38,10 @@ export async function getAppVersion() {
  * Check if a newer version of Checkpoint is available.
  * Non-blocking, with strict timeout and offline graceful handling.
  */
-export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
+export async function checkForUpdate({ timeoutMs = 12000 } = {}) {
   const currentVersion = await getAppVersion();
 
-  // 1. If in Tauri desktop runtime, run official Tauri updater plugin
-  if (isTauri()) {
-    try {
-      const { check } = await import('@tauri-apps/plugin-updater');
-
-      // Run check with timeout to prevent hung requests on spotty networks
-      const checkPromise = check();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Update check timeout')), timeoutMs)
-      );
-
-      const update = await Promise.race([checkPromise, timeoutPromise]);
-
-      if (update && update.available) {
-        const cleanTag = update.version.replace(/^v/i, '');
-        const releaseTag = update.version.startsWith('v') ? update.version : `v${update.version}`;
-        return {
-          available: true,
-          currentVersion: update.currentVersion || currentVersion,
-          version: cleanTag,
-          date: update.date || null,
-          body: update.body || '',
-          releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
-          rawUpdate: update,
-        };
-      }
-
-      if (update && !update.available) {
-        return {
-          available: false,
-          currentVersion: update?.currentVersion || currentVersion,
-          rawUpdate: update,
-        };
-      }
-    } catch (err) {
-      const msg = err?.message || String(err);
-      console.info('[Updater] Official updater plugin check error:', msg);
-    }
-  }
-
-  // 2. Fallback / Dev / Redundancy: query GitHub Releases latest metadata
-  // In non-Tauri browser environments, skip desktop update checks to avoid browser CORS errors
+  // In non-Tauri browser environments, skip desktop update checks
   if (!isTauri()) {
     return {
       available: false,
@@ -90,35 +49,42 @@ export async function checkForUpdate({ timeoutMs = 8000 } = {}) {
     };
   }
 
+  // If in Tauri desktop runtime, run official Tauri updater plugin
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch('https://github.com/vltmk/Checkpoint/releases/latest/download/latest.json', {
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
+    const { check } = await import('@tauri-apps/plugin-updater');
 
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.version) {
-        const cleanRemote = json.version.replace(/^v/i, '').trim();
-        const cleanCurrent = (currentVersion || '0.0.0').replace(/^v/i, '').trim();
-        if (compareSemver(cleanRemote, cleanCurrent) > 0) {
-          const releaseTag = json.version.startsWith('v') ? json.version : `v${json.version}`;
-          return {
-            available: true,
-            currentVersion: cleanCurrent,
-            version: cleanRemote,
-            date: json.pub_date || null,
-            body: json.notes || '',
-            releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
-            rawUpdate: null,
-          };
-        }
-      }
+    // Run check with timeout to prevent hung requests on spotty networks
+    const checkPromise = check();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Update check timeout')), timeoutMs)
+    );
+
+    const update = await Promise.race([checkPromise, timeoutPromise]);
+
+    if (update && update.available) {
+      const cleanTag = update.version.replace(/^v/i, '');
+      const releaseTag = update.version.startsWith('v') ? update.version : `v${update.version}`;
+      return {
+        available: true,
+        currentVersion: update.currentVersion || currentVersion,
+        version: cleanTag,
+        date: update.date || null,
+        body: update.body || '',
+        releaseUrl: `https://github.com/vltmk/Checkpoint/releases/tag/${releaseTag}`,
+        rawUpdate: update,
+      };
     }
-  } catch (e) {
-    // Ignore fallback fetch error
+
+    if (update && !update.available) {
+      return {
+        available: false,
+        currentVersion: update?.currentVersion || currentVersion,
+        rawUpdate: update,
+      };
+    }
+  } catch (err) {
+    const msg = err?.message || String(err);
+    console.info('[Updater] Official updater plugin check error:', msg);
   }
 
   return {

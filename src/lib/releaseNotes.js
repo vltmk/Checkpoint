@@ -26,6 +26,71 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '3.0.0': {
+    date: '2026-09-07',
+    title: {
+      en: "What's New in Checkpoint v3.0.0",
+      fa: 'امکانات و تغییرات نسخه ۳.۰.۰',
+    },
+    summary: {
+      en: 'Major upgrade introducing custom work categories, Failed status with lost revenue analytics, desktop context menus, image cropper modal, and enhanced cockpit visualizations.',
+      fa: 'ارتقای بزرگ با افزودن دسته‌بندی‌های سفارشی، وضعیت ناموفق (Failed) با تحلیل درآمدهای از دست رفته، منوی کلیک راست دسکتاپ، مدال برش تصاویر و جلوه‌های بصری پیشرفته کاکپیت.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Added custom Category management system with color presets, dynamic filtering in Ledger, and safe migration on deletion.',
+        },
+        {
+          tag: 'new',
+          text: 'Added "Failed" status lifecycle support across ledger, excluding cancelled/failed tasks from net earnings and tracking lost revenue in Analytics.',
+        },
+        {
+          tag: 'new',
+          text: 'Added native desktop Context Menu on ledger rows for quick actions (edit, duplicate, copy details, change status, delete).',
+        },
+        {
+          tag: 'new',
+          text: 'Added Image Cropper modal for profile avatars and receipt attachments with zoom, pan, and custom aspect ratio controls.',
+        },
+        {
+          tag: 'improved',
+          text: 'Upgraded Cockpit visual layer with high-performance status gradient and hardware-accelerated dot matrix background.',
+        },
+        {
+          tag: 'improved',
+          text: 'Refined dual-theme consistency and micro-interactions across all modals, dialogs, and navigation elements.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'افزودن سیستم مدیریت دسته‌بندی‌های سفارشی با پالت‌های رنگی، فیلتر پویا در دفتر کل و مهاجرت ایمن هنگام حذف.',
+        },
+        {
+          tag: 'new',
+          text: 'افزودن وضعیت «ناموفق» (Failed) به چرخه کارها، کسر خودکار از درآمد خالص و نمایش درآمد از دست رفته در بخش تحلیل و آمار.',
+        },
+        {
+          tag: 'new',
+          text: 'افزودن منوی راست‌کلیک (Context Menu) برای کارها جهت ویرایش سریع، کپی، تغییر وضعیت و حذف.',
+        },
+        {
+          tag: 'new',
+          text: 'افزودن مدال برش و تنظیم تصویر (Image Cropper) برای آواتار و پیوست‌ها با بزرگ‌نمایی و کنترل نسبت تصویر.',
+        },
+        {
+          tag: 'improved',
+          text: 'ارتقای بخش کاکپیت با گرادیان وضعیت بهینه‌سازی‌شده و پس‌زمینه ماتریکس نقطه‌ای مبتنی بر شتاب‌دهنده گرافیکی.',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود یکپارچگی تم‌های تاریک و روشن و تعاملات ظریف در تمامی پنجره‌ها و بخش‌های برنامه.',
+        },
+      ],
+    },
+  },
   '2.5.1': {
     date: '2026-09-05',
     title: {

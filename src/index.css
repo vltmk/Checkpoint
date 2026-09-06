@@ -344,10 +344,7 @@ html.light .bg-zinc-800\/40 {
   background-color: #f4f4f5 !important;
 }
 
-/* Inverted contrast items (Primary action buttons use soft off-white text in light mode) */
-html.light .bg-zinc-900.text-white,
-html.light .bg-zinc-900 .text-white,
-html.light button.bg-zinc-900,
+/* Inverted contrast items (Danger/red buttons use soft off-white text in light mode) */
 html.light button.bg-red-600,
 html.light [class*="bg-red-600"] {
   color: #f4f4f5 !important;
@@ -477,25 +474,110 @@ html.light .bg-zinc-100 kbd {
   border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
-/* GPU-Accelerated Monochromatic Ambient Rotation around Cockpit Total Income */
-@keyframes cockpit-ambient-rotate {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
+/* ==========================================================================
+   Add Work Double Button - Inverted High-Contrast Styling
+   Dark Mode: White background with black/dark text & borders
+   White (Light) Mode: Black/dark background with white/light text & borders
+   ========================================================================== */
+
+.add-work-double-btn {
+  background-color: #18181b;
+  color: #fafafa;
+  border-color: #27272a;
 }
 
-.animate-cockpit-rotate {
-  animation: cockpit-ambient-rotate 30s linear infinite;
-  will-change: transform;
-  backface-visibility: hidden;
+.add-work-double-btn .add-work-btn-item {
+  color: #fafafa;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-cockpit-rotate {
-    animation: none !important;
-    transform: translate(-50%, -50%) rotate(0deg) !important;
-  }
+.add-work-double-btn .add-work-btn-item:hover {
+  background-color: #27272a;
+  color: #ffffff;
 }
+
+.add-work-double-btn .add-work-btn-item:active {
+  background-color: #3f3f46;
+}
+
+.add-work-double-btn .add-work-btn-divider {
+  background-color: #3f3f46;
+}
+
+/* White (Light) Mode: Black/dark background */
+html.light .add-work-double-btn,
+html:not(.dark) .add-work-double-btn {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+  border-color: #27272a !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25) !important;
+}
+
+html.light .add-work-double-btn .add-work-btn-item,
+html:not(.dark) .add-work-double-btn .add-work-btn-item {
+  color: #fafafa !important;
+}
+
+html.light .add-work-double-btn .add-work-btn-item:hover,
+html:not(.dark) .add-work-double-btn .add-work-btn-item:hover {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+html.light .add-work-double-btn .add-work-btn-item:active,
+html:not(.dark) .add-work-double-btn .add-work-btn-item:active {
+  background-color: #3f3f46 !important;
+}
+
+html.light .add-work-double-btn .add-work-btn-divider,
+html:not(.dark) .add-work-double-btn .add-work-btn-divider {
+  background-color: #3f3f46 !important;
+}
+
+/* Dark Mode: White background */
+html.dark .add-work-double-btn {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+  border-color: #e4e4e7 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark .add-work-double-btn .add-work-btn-item {
+  color: #09090b !important;
+}
+
+html.dark .add-work-double-btn .add-work-btn-item:hover {
+  background-color: #f4f4f5 !important;
+  color: #000000 !important;
+}
+
+html.dark .add-work-double-btn .add-work-btn-item:active {
+  background-color: #e4e4e7 !important;
+}
+
+html.dark .add-work-double-btn .add-work-btn-divider {
+  background-color: #e4e4e7 !important;
+}
+
+/* Mobile CTA button contrast support */
+html.light .mobile-add-work-btn,
+html:not(.dark) .mobile-add-work-btn {
+  background-color: #18181b !important;
+  color: #fafafa !important;
+  border-color: #27272a !important;
+}
+
+html.light .mobile-add-work-btn:hover,
+html:not(.dark) .mobile-add-work-btn:hover {
+  background-color: #27272a !important;
+}
+
+html.dark .mobile-add-work-btn {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+  border-color: #e4e4e7 !important;
+}
+
+html.dark .mobile-add-work-btn:hover {
+  background-color: #f4f4f5 !important;
+}
+

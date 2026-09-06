@@ -35,13 +35,14 @@ export const JOB_SOURCES = [
   'Personal Client',
 ];
 
-export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold'];
+export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold', 'Failed'];
 
 export const STATUS_LABELS = {
   Paid: 'پرداخت شده',
   Pending: 'درحال انتظار',
   Working: 'درحال انجام',
   'On Hold': 'توقف موقت',
+  Failed: 'ناموفق',
 };
 
 export const STATUS_CONFIG = {
@@ -71,11 +72,18 @@ export const STATUS_CONFIG = {
     color: 'zinc',
     badgeClass: 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:bg-zinc-800',
     dotClass: 'bg-zinc-500',
+    next: 'Failed',
+  },
+  Failed: {
+    label: 'ناموفق',
+    color: 'rose',
+    badgeClass: 'bg-rose-950/40 text-rose-400 border border-rose-800/40 hover:bg-rose-900/40',
+    dotClass: 'bg-rose-400',
     next: 'Paid',
   },
 };
 
-import { toPersianDigits } from './i18n';
+import { toPersianDigits, formatShamsiDate } from './i18n';
 
 /**
  * Extract numeric and unit parts for customized typography styling
@@ -174,6 +182,78 @@ export function convertEntryCurrency(entry, targetCurrency, defaultRates = {}) {
   const defaultRate = isClassic ? 7000 : (Number(defaultRates?.goldRateTOMAN) || 3200);
   const entryRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
   return convertCurrency(inc, cur, targetCurrency, defaultRates, entryRate, isClassic);
+}
+
+/**
+ * Generate Discord Markdown Receipt for a work entry
+ */
+export function generateDiscordReceiptText(entry, { language = 'en', globalCurrency = 'TOMAN' } = {}) {
+  if (!entry) return '';
+  const isFa = language === 'fa';
+  const receiptId = (entry.id || 'JOB').toUpperCase();
+  const dt = entry.dateTime ? new Date(entry.dateTime) : new Date();
+  const dateStr = dt && !isNaN(dt.getTime())
+    ? isFa
+      ? formatShamsiDate(dt, { month: 'long', day: 'numeric', year: 'numeric' })
+      : dt.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+    : '--';
+
+  const entryCurrency = entry.currency && entry.currency !== 'DEFAULT' ? entry.currency : globalCurrency;
+  const formattedIncome = formatMoney(entry.income || 0, entryCurrency, false, isFa);
+
+  const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
+  const effectiveRate = Number(entry.exchangeRate) || (isClassic ? 7000 : 3200);
+  const rateDiscordText = isClassic ? '1 Gold' : '1k Gold';
+  const hasTeammates = Array.isArray(entry.teammates) && entry.teammates.length > 0;
+  const totalShares = 1 + (hasTeammates ? entry.teammates.length : 0);
+  const isTeamWork = Boolean(entry.teamMode || hasTeammates);
+  const totalPot = entry.pot !== undefined && entry.pot !== null
+    ? entry.pot
+    : (entry.income ? entry.income * totalShares : 0);
+  const formattedPot = formatMoney(totalPot, entryCurrency, false, isFa);
+
+  const teamCutsBreakdown = hasTeammates
+    ? entry.teammates
+        .map((tm) => {
+          const cut = entry.teammateCuts?.[tm] || entry.income;
+          return `${tm}: ${formatMoney(cut, entryCurrency, false, isFa)}`;
+        })
+        .join(', ')
+    : '';
+
+  if (isFa) {
+    return `\`\`\`ini
+[ رسید اثبات کار چک‌پوینت ]
+شناسه      = ${receiptId}
+تاریخ      = ${dateStr}
+بازی       = ${entry.game || 'World of Warcraft'}
+عنوان      = ${entry.title || 'کار ثبت‌شده'}
+سورس       = ${entry.source || 'مشتری مستقیم'}${
+      isTeamWork
+        ? `\nپات تیمی   = ${formattedPot} (${totalShares} سهم)\nسهم شما    = ${formattedIncome}\nسهم تیم    = ${teamCutsBreakdown}`
+        : `\nمبلغ       = ${formattedIncome}`
+    }
+نرخ تبدیل  = ${formatMoney(effectiveRate, 'TOMAN', false, true)} / ${rateDiscordText}
+وضعیت      = ${STATUS_CONFIG[entry.status]?.label || entry.status || 'پرداخت شده'}
+یادداشت    = ${entry.notes || 'ندارد'}
+\`\`\``;
+  }
+
+  return `\`\`\`ini
+[ CHECKPOINT - PROOF OF WORK RECEIPT ]
+ID         = ${receiptId}
+Date       = ${dateStr}
+Game       = ${entry.game || 'World of Warcraft'}
+Title      = ${entry.title || 'Work Record'}
+Source     = ${entry.source || 'Direct Client'}${
+    isTeamWork
+      ? `\nPot        = ${formattedPot} (${totalShares} Shares)\nYour Share = ${formattedIncome}\nTeam Cuts  = ${teamCutsBreakdown}`
+      : `\nAmount     = ${formattedIncome}`
+  }
+Rate       = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
+Status     = ${entry.status || 'Paid'}
+Notes      = ${entry.notes || 'None'}
+\`\`\``;
 }
 
 

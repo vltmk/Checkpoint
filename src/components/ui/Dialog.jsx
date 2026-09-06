@@ -103,7 +103,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
 
 export function DialogTitle({ children, className }) {
   return (
-    <h3 className={cn('text-sm font-semibold tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2', className)}>
+    <h3 className={cn('text-sm font-medium tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2', className)}>
       {children}
     </h3>
   );

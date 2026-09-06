@@ -125,23 +125,31 @@ export function AnalyticsView({
   const stats = useMemo(() => {
     let totalIncome = 0;
     let paidCount = 0;
+    let failedCount = 0;
+    let lostRevenue = 0;
     const gameMap = {};
 
     filteredEntries.forEach((e) => {
       const inc = convertEntryCurrency(e, globalCurrency, rates);
-      totalIncome += inc;
 
       if (e.status === 'Paid') {
         paidCount++;
+      } else if (e.status === 'Failed') {
+        failedCount++;
+        lostRevenue += inc;
       }
 
-      const g = e.game || 'Other';
-      gameMap[g] = (gameMap[g] || 0) + inc;
+      if (e.status !== 'Failed') {
+        totalIncome += inc;
+        const g = e.game || 'Other';
+        gameMap[g] = (gameMap[g] || 0) + inc;
+      }
     });
 
     const completionRate =
       filteredEntries.length > 0 ? Math.round((paidCount / filteredEntries.length) * 100) : 0;
-    const avgPerJob = filteredEntries.length > 0 ? totalIncome / filteredEntries.length : 0;
+    const payableJobsCount = filteredEntries.length - failedCount;
+    const avgPerJob = payableJobsCount > 0 ? totalIncome / payableJobsCount : 0;
 
     const sortedGames = Object.entries(gameMap)
       .map(([game, revenue]) => ({
@@ -154,6 +162,8 @@ export function AnalyticsView({
     return {
       totalIncome,
       paidCount,
+      failedCount,
+      lostRevenue,
       completionRate,
       avgPerJob,
       sortedGames,
@@ -167,7 +177,7 @@ export function AnalyticsView({
     if (timeframe === 'daily') {
       const dayMap = new Map();
       filteredEntries.forEach((e) => {
-        if (e.dateTime) {
+        if (e.dateTime && e.status !== 'Failed') {
           const dayKey = e.dateTime.slice(0, 10);
           const inc = convertEntryCurrency(e, globalCurrency, rates);
           dayMap.set(dayKey, (dayMap.get(dayKey) || 0) + inc);
@@ -198,6 +208,7 @@ export function AnalyticsView({
       const ONE_WEEK_MS = 7 * 86400000;
 
       filteredEntries.forEach((e) => {
+        if (e.status === 'Failed') return;
         const dt = e.dateTime ? new Date(e.dateTime) : null;
         if (dt && !isNaN(dt.getTime())) {
           const diffMs = nowMs - dt.getTime();
@@ -238,7 +249,7 @@ export function AnalyticsView({
       }
 
       filteredEntries.forEach((e) => {
-        if (e.dateTime) {
+        if (e.dateTime && e.status !== 'Failed') {
           const key = e.dateTime.slice(0, 7);
           if (monthBuckets.has(key)) {
             monthBuckets.set(key, monthBuckets.get(key) + convertEntryCurrency(e, globalCurrency, rates));
@@ -256,6 +267,7 @@ export function AnalyticsView({
     // All-time monthly buckets
     const monthMap = {};
     entries.forEach((e) => {
+      if (e.status === 'Failed') return;
       const dt = new Date(e.dateTime);
       if (!isNaN(dt)) {
         const key = language === 'fa'
@@ -404,7 +416,7 @@ export function AnalyticsView({
       {/* Header Row: Title & Segmented Timeframe Switcher */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-200 dark:border-zinc-800/80">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+          <h2 className="text-base font-medium tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.title')}</span>
           </h2>
@@ -426,7 +438,7 @@ export function AnalyticsView({
                   'px-3 py-1 rounded-lg text-xs font-medium transition-all select-none',
                   isRtl && 'font-farsi',
                   isSelected
-                    ? 'bg-white text-zinc-800 shadow-sm border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700/60 font-semibold'
+                    ? 'bg-white text-zinc-800 shadow-sm border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700/60 font-medium'
                     : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/40'
                 )}
               >
@@ -444,7 +456,7 @@ export function AnalyticsView({
             <Coins className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
           </div>
-          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
+          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -454,7 +466,7 @@ export function AnalyticsView({
             <Trophy className="w-3.5 h-3.5 text-zinc-400" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
           </div>
-          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200 truncate">
+          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -464,18 +476,35 @@ export function AnalyticsView({
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
             <span className={cn(isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
           </div>
-          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200">
+          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200">
             {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
 
         <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
-          <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
+          <div className="flex items-center justify-between gap-1 text-zinc-500 text-xs font-medium">
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
+              <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
+            </div>
+            {stats.failedCount > 0 && (
+              <span className={cn('text-[10px] text-rose-600 dark:text-rose-400 font-mono font-normal', isRtl && 'font-farsi')}>
+                {formatNumber(stats.failedCount)} {t('status.Failed')}
+              </span>
+            )}
           </div>
-          <div className="text-xl font-bold font-mono text-zinc-800 dark:text-zinc-200">
-            {formatNumber(stats.completionRate)}%
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200">
+              {formatNumber(stats.completionRate)}%
+            </div>
+            {stats.lostRevenue > 0 && (
+              <div
+                title={`${t('analytics.lostRevenue')}: ${formatMoney(stats.lostRevenue, globalCurrency, false, language === 'fa')}`}
+                className={cn('text-[11px] font-mono text-rose-600/80 dark:text-rose-400/80 truncate', isRtl && 'font-farsi')}
+              >
+                -<MoneyDisplay amount={stats.lostRevenue} currency={globalCurrency} compact={true} />
+              </div>
+            )}
           </div>
         </div>
       </div>

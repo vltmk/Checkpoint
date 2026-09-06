@@ -119,10 +119,10 @@ export function UpdateModal({
           <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
 
           <div className="space-y-0.5 text-right">
-            <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 font-mono uppercase tracking-wider block font-semibold', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 font-mono uppercase tracking-wider block font-medium', isRtl && 'font-farsi')}>
               {t('update.newVersion')}
             </span>
-            <span className="text-xs font-mono font-bold text-zinc-800 dark:text-zinc-200 flex items-center justify-end gap-1">
+            <span className="text-xs font-mono font-medium text-zinc-800 dark:text-zinc-200 flex items-center justify-end gap-1">
               <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
               <span>v{newVersion}</span>
             </span>
@@ -137,7 +137,7 @@ export function UpdateModal({
 
           return (
             <div className="space-y-1.5">
-              <label className={cn('text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
+              <label className={cn('text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block', isRtl && 'font-farsi')}>
                 {t('update.releaseNotes')}
               </label>
               <div
@@ -167,7 +167,7 @@ export function UpdateModal({
                             <span
                               dir="ltr"
                               className={cn(
-                                'text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                'text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
                                 tagInfo.style,
                                 language === 'fa' && 'font-farsi text-[8.5px]'
                               )}
@@ -209,7 +209,7 @@ export function UpdateModal({
                 <RotateCw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 animate-spin" />
                 <span>{t('update.downloading')}</span>
               </span>
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatNumber(progress.percent)}%</span>
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">{formatNumber(progress.percent)}%</span>
             </div>
 
             {/* Monochromatic Progress Bar */}
@@ -232,7 +232,7 @@ export function UpdateModal({
           <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div className={cn('text-xs text-emerald-900 dark:text-emerald-200', isRtl && 'font-farsi')}>
-              <p className="font-semibold">{t('update.readyRestart')}</p>
+              <p className="font-medium">{t('update.readyRestart')}</p>
               <p className="text-[11px] text-emerald-700 dark:text-emerald-300/80">
                 {language === 'fa' ? `برنامه را مجدداً راه‌اندازی کنید تا نسخه ${newVersion} اعمال شود.` : `Restart Checkpoint now to apply version ${newVersion}.`}
               </p>
@@ -245,7 +245,7 @@ export function UpdateModal({
           <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
             <div className={cn('text-xs text-rose-900 dark:text-rose-200', isRtl && 'font-farsi')}>
-              <p className="font-semibold">{language === 'fa' ? 'خطا در به‌روزرسانی' : 'Update failed'}</p>
+              <p className="font-medium">{language === 'fa' ? 'خطا در به‌روزرسانی' : 'Update failed'}</p>
               <p className="text-[11px] text-rose-700 dark:text-rose-300/80">{errorMessage}</p>
             </div>
           </div>
@@ -276,7 +276,7 @@ export function UpdateModal({
               variant="primary"
               size="sm"
               onClick={handleRelaunch}
-              className={cn('gap-1.5 font-semibold', isRtl && 'font-farsi')}
+              className={cn('gap-1.5 font-medium', isRtl && 'font-farsi')}
             >
               <RotateCw className="w-3.5 h-3.5" />
               <span>{t('update.readyRestart')}</span>
@@ -287,7 +287,7 @@ export function UpdateModal({
               size="sm"
               disabled={installState === 'downloading'}
               onClick={handleStartUpdate}
-              className={cn('gap-1.5 font-semibold', isRtl && 'font-farsi')}
+              className={cn('gap-1.5 font-medium', isRtl && 'font-farsi')}
             >
               {installState === 'downloading' ? (
                 <>

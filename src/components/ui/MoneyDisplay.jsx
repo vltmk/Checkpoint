@@ -38,7 +38,7 @@ export function MoneyDisplay({
         <span
           className={cn(
             isGold
-              ? 'text-[0.8em] font-bold text-amber-400 select-none'
+              ? 'text-[0.8em] font-medium text-amber-400 select-none'
               : 'text-[0.72em] font-farsi font-medium text-zinc-400 opacity-85 select-none',
             unitClassName
           )}
@@ -75,7 +75,7 @@ export function ConvertedSecondaryDisplay({
         amount={converted}
         currency={to}
         prefix="≈"
-        unitClassName={to === 'GOLD' ? 'text-[0.75em] font-bold text-amber-400' : 'text-[0.7em] text-zinc-500'}
+        unitClassName={to === 'GOLD' ? 'text-[0.75em] font-medium text-amber-400' : 'text-[0.7em] text-zinc-500'}
       />
       {showRateLabel && (
         <span
