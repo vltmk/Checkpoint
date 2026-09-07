@@ -1,10 +1,11 @@
 # CHECKPOINT // Nodra Freelance & Gaming Ledger
 ##Image Gallery:
 <p align="center">
-<img width="1082" height="1032" alt="nodra-vault_QMtuHMSmEP" src="https://github.com/user-attachments/assets/621ee9ce-e56a-4077-913a-5321b429d004" />
-<img width="1082" height="1032" alt="image" src="https://github.com/user-attachments/assets/52b2e4cd-fe3b-42d0-a637-e4258770d8b0" />
-<img width="1082" height="1032" alt="image" src="https://github.com/user-attachments/assets/72c5b599-3c9e-4f11-a6f7-751fbc4ddc4e" />
-<img width="1082" height="1032" alt="image" src="https://github.com/user-attachments/assets/53dd3ce7-7597-406a-ae2d-546949652773" />
+<img width="1082" height="1032" alt="checkpoint_J4DFKCm6S9" src="https://github.com/user-attachments/assets/ce1ac60b-59a9-4f17-b9f6-67ad2d050207" />
+  <img width="1082" height="920" alt="checkpoint_KxiIbtnvIn" src="https://github.com/user-attachments/assets/45959ec2-57dc-4397-bd33-c9a986f2ed89" />
+<img width="1082" height="920" alt="checkpoint_MWYOD8OQgE" src="https://github.com/user-attachments/assets/dd13c973-31f6-4f5b-ac0b-aa824163d182" />
+<img width="1082" height="920" alt="checkpoint_dTKhllaOOf" src="https://github.com/user-attachments/assets/b31f7c3e-c7c3-4f28-b534-7fd23775dc85" />
+
 
 </p>
 
