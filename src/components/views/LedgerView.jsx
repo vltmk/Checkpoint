@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -31,12 +31,11 @@ import { StatusBadge } from '../ui/Badge';
 import { GameIcon } from '../ui/GameIcon';
 import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Tooltip, Kbd } from '../ui/Tooltip';
-import { CockpitDotMatrix } from '../ui/CockpitDotMatrix';
-import { CockpitStatusGradient } from '../ui/CockpitStatusGradient';
+import { CockpitFluid } from '../ui/fluid/CockpitFluid';
 import { cn } from '../../lib/utils';
 import { openExternalUrl, openAppAwareUrl } from '../../lib/desktop';
 import { detectAppLink } from '../../lib/appLinks';
-import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon } from '../ui/Icons';
+import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon, TomanIcon } from '../ui/Icons';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage, formatShamsiDate, normalizeDigits, toPersianDigits } from '../../lib/i18n';
 import { getCategoryByName } from '../../lib/categories';
@@ -51,6 +50,433 @@ import {
 } from '../../lib/currencies';
 
 const ITEMS_PER_PAGE = 15;
+
+const TIME_FORMATTER_LTR = new Intl.DateTimeFormat('en-US', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const TIME_FORMATTER_RTL = new Intl.DateTimeFormat('fa-IR', {
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+const LedgerRow = React.memo(function LedgerRow({
+  entry,
+  isConfirmDeleting,
+  isSelected,
+  isSelectMode,
+  contextMenuTargetId,
+  categories,
+  globalCurrency,
+  rates,
+  sourceFilter,
+  teammateFilter,
+  language,
+  isRtl,
+  t,
+  formatRowTime,
+  onOpenReceipt,
+  onOpenLightbox,
+  handleToggleEntrySelection,
+  onDeleteEntry,
+  setConfirmDeleteEntryId,
+  setSelectedEntryIds,
+  setSourceFilter,
+  setTeammateFilter,
+  handleOpenExternalLink,
+  handleStatusSelect,
+  onOpenEntryContextMenu,
+}) {
+  const formattedTime = formatRowTime(entry.dateTime);
+  const entryCat = getCategoryByName(entry.game, categories);
+  const accentColor = entryCat?.color || '#C68A4C';
+
+  return (
+    <div className="space-y-1 relative job-row-item">
+      {/* 1. In-Line Morphing Delete Confirmation Strip */}
+      <AnimatePresence mode="wait">
+        {isConfirmDeleting ? (
+          <motion.div
+            key="confirm-delete"
+            layout
+            initial={{ opacity: 0, scale: 0.98, y: -2 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 2 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <p className={cn('text-zinc-900 dark:text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
+                  {language === 'fa' ? (
+                    <>حذف <span className="text-zinc-900 dark:text-zinc-200 font-medium">«{entry.title}»</span>؟</>
+                  ) : (
+                    <>Delete <span className="text-zinc-900 dark:text-zinc-200 font-medium">"{entry.title}"</span>?</>
+                  )}
+                </p>
+                <p className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                  {t('ledger.deleteRecordWarning', 'This work record and any attached screenshot proof will be permanently removed.')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => setConfirmDeleteEntryId(null)}
+                className={cn('h-7 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200', isRtl && 'font-farsi')}
+              >
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                size="xs"
+                onClick={() => {
+                  onDeleteEntry?.(entry.id);
+                  setConfirmDeleteEntryId(null);
+                  setSelectedEntryIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(entry.id);
+                    return next;
+                  });
+                }}
+                className={cn('h-7 text-xs bg-rose-600 hover:bg-rose-500 text-zinc-100 font-medium shadow-sm gap-1', isRtl && 'font-farsi')}
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>{t('ledger.deleteRecordBtn', 'Delete Record')}</span>
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          /* 2. Standard Work Record Card */
+          <div
+            dir="ltr"
+            data-entry-id={entry.id}
+            onClick={(e) => {
+              if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
+                return;
+              }
+              if (isSelectMode || e.shiftKey) {
+                handleToggleEntrySelection(entry.id, e);
+              } else {
+                onOpenReceipt?.(entry);
+              }
+            }}
+            className={cn(
+              'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-[background-color,border-color,box-shadow] duration-150 cursor-pointer border',
+              contextMenuTargetId === entry.id
+                ? 'bg-zinc-100/90 dark:bg-zinc-900/40 border-zinc-400 dark:border-zinc-500 ring-1 ring-zinc-400/80 dark:ring-zinc-400/80 shadow-md shadow-zinc-950/5 dark:shadow-lg dark:shadow-black/30'
+                : isSelected
+                ? 'bg-zinc-100/90 dark:bg-zinc-900/30 border-zinc-300 dark:border-zinc-600/50 shadow-xs'
+                : 'bg-transparent hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 border-zinc-200/50 dark:border-zinc-800/40 hover:border-zinc-300/60 dark:hover:border-zinc-700/50'
+            )}
+          >
+            {/* Subtle 135° category accent gradient border */}
+            <div
+              className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 group-hover:opacity-0"
+              style={{
+                padding: '1px',
+                background: `linear-gradient(135deg, ${accentColor}44 0%, ${accentColor}12 28%, transparent 68%)`,
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+              }}
+            />
+            {/* Hover: gently blooming 135° border gradient */}
+            <div
+              className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100"
+              style={{
+                padding: '1px',
+                background: `linear-gradient(135deg, ${accentColor}75 0%, ${accentColor}25 35%, transparent 75%)`,
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+              }}
+            />
+            {/* Hover: subtle ambient top-left corner glow */}
+            <div className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100 overflow-hidden">
+              <div
+                className="absolute -top-12 -left-12 w-28 h-28 rounded-full blur-xl pointer-events-none"
+                style={{ backgroundColor: `${accentColor}10` }}
+              />
+            </div>
+
+            {/* Multi-Selection Square Checkbox Hovering Over Top-Left Border Corner */}
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={isSelected}
+              data-no-row-click="true"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleEntrySelection(entry.id, e);
+              }}
+              title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
+              className={cn(
+                'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
+                isSelected
+                  ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:border-zinc-200 dark:text-zinc-900 scale-100 opacity-100'
+                  : isSelectMode
+                  ? 'bg-white border-zinc-400 text-transparent opacity-100 hover:border-zinc-600 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700 dark:hover:border-zinc-400'
+                  : 'bg-white border-zinc-300 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700/80 dark:hover:border-zinc-400'
+              )}
+            >
+              <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-100 dark:text-zinc-900' : 'opacity-0 hover:opacity-50 text-zinc-400 dark:text-zinc-400')} />
+            </button>
+
+            {/* Left: Game Emblem & Details */}
+            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+              <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <GameIcon game={entry.game} categories={categories} className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity" />
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-0.5">
+                {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-zinc-800 dark:text-zinc-300 truncate leading-normal">
+                    {entry.title}
+                  </span>
+                  {entry.proofs && entry.proofs.length > 0 && (
+                    <Tooltip content={t('ledger.viewScreenshotProof', 'View screenshot proof')} side="top">
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenLightbox?.(entry.proofs[0].data, entry.title);
+                        }}
+                        className="p-1 rounded text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
+                        title={t('ledger.viewScreenshotProof', 'View screenshot proof')}
+                      >
+                        <FileImage className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
+                  )}
+                  {entry.source && (() => {
+                    const isMatch = sourceFilter.toLowerCase() === entry.source.toLowerCase();
+                    return (
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSourceFilter(isMatch ? '' : entry.source);
+                        }}
+                        title={isMatch ? t('ledger.clearSellerFilter', 'Clear seller filter') : `${t('ledger.filterBySeller', 'Click to filter jobs from')} ${entry.source}`}
+                        className={cn(
+                          'text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer max-w-[140px]',
+                          isMatch
+                            ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs'
+                            : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                        )}
+                      >
+                        <Store className={cn('w-2.5 h-2.5 shrink-0', isMatch ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500')} />
+                        <span className="truncate leading-normal">{entry.source}</span>
+                      </button>
+                    );
+                  })()}
+                  {formattedTime && (
+                    <span className="text-[10px] text-zinc-500 flex items-center gap-1 select-none">
+                      <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
+                      <span>{formattedTime}</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Line 2: Game & Notes */}
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate leading-normal">
+                  <span>{entry.game}</span>
+                  {entry.notes && (
+                    <>
+                      <span>•</span>
+                      <span className="truncate max-w-[180px] text-zinc-500 italic leading-normal">
+                        "{entry.notes}"
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Line 3: Interactive Teammate Badges & Team Pot */}
+                {entry.teammates && entry.teammates.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
+                    <span className="text-zinc-500 flex items-center gap-1">
+                      <Users className="w-3 h-3 text-zinc-500" />
+                      <span>Team:</span>
+                    </span>
+
+                    {entry.pot && (
+                      <span className={cn(
+                        'px-1.5 py-0.5 rounded text-[10px] border ring-1 ring-inset inline-flex items-baseline gap-1',
+                        entry.status === 'Failed'
+                          ? 'bg-zinc-100/60 dark:bg-zinc-900/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 ring-transparent line-through decoration-zinc-400 dark:decoration-zinc-600'
+                          : 'bg-amber-500/10 dark:bg-zinc-900/90 text-amber-700 dark:text-amber-300/90 border-amber-600/30 dark:border-amber-800/40 ring-amber-600/20'
+                      )}>
+                        <span>Pot:</span>
+                        <MoneyDisplay amount={entry.pot} currency={entry.currency} />
+                        <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
+                      </span>
+                    )}
+
+                    {entry.teammates.map((tm) => {
+                      const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                      const customCut = entry.teammateCuts && entry.teammateCuts[tm];
+                      return (
+                        <button
+                          key={tm}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTeammateFilter(isMatch ? '' : tm);
+                          }}
+                          title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
+                            isMatch
+                              ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
+                              : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span>{tm}</span>
+                          {customCut && (
+                            <span className={cn(
+                              'text-[9px] inline-flex items-baseline',
+                              entry.status === 'Failed'
+                                ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                                : isMatch
+                                ? 'text-zinc-800 dark:text-zinc-300'
+                                : 'text-zinc-500 dark:text-zinc-400'
+                            )}>
+                              (<MoneyDisplay amount={customCut} currency={entry.currency} />)
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Income (Your Cut), External Link, Status, Menu */}
+            <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
+              <div className="text-left sm:text-right">
+                {entry.teamMode && (
+                  <div className={cn('text-[9px] text-zinc-500 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                    {t('ledger.yourShare', 'Your Share')}
+                  </div>
+                )}
+                <div className={cn(
+                  'text-xs font-medium inline-flex items-center justify-start sm:justify-end',
+                  entry.status === 'Failed'
+                    ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                    : 'text-zinc-800 dark:text-zinc-200'
+                )}>
+                  <MoneyDisplay amount={entry.income} currency={entry.currency} />
+                </div>
+                {entry.currency !== globalCurrency && (
+                  <div className={cn(entry.status === 'Failed' && 'opacity-60 line-through decoration-zinc-400 dark:decoration-zinc-600')}>
+                    <ConvertedSecondaryDisplay
+                      amount={entry.income}
+                      fromCurrency={entry.currency}
+                      targetCurrency={globalCurrency}
+                      rates={rates}
+                      customRate={entry.exchangeRate}
+                      isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
+                      showRateLabel={false}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* App-Aware External Link Button */}
+                {entry.link && (() => {
+                  const linkInfo = detectAppLink(entry.link);
+                  const platform = linkInfo?.platform;
+                  const isApp = linkInfo?.appLaunchable;
+
+                  let IconComponent = ExternalLink;
+                  if (platform === 'discord') IconComponent = DiscordIcon;
+                  else if (platform === 'telegram') IconComponent = TelegramIcon;
+                  else if (platform === 'steam') IconComponent = SteamIcon;
+                  else if (platform === 'sheets') IconComponent = GoogleSheetsIcon;
+                  else if (platform === 'github') IconComponent = GithubIcon;
+
+                  const tooltipLabel = linkInfo
+                    ? (isApp
+                        ? (language === 'fa' && linkInfo.labelFa ? `باز کردن در ${linkInfo.labelFa}` : `Open in ${linkInfo.label} App`)
+                        : (language === 'fa' && linkInfo.labelFa ? `باز کردن ${linkInfo.labelFa}` : `Open ${linkInfo.label}`))
+                    : t('ledger.openLink', 'Open Link');
+
+                  return (
+                    <Tooltip
+                      content={
+                        <div className="max-w-[260px] space-y-0.5 text-left rtl:text-right">
+                          <div className="font-medium text-zinc-800 dark:text-zinc-200">{tooltipLabel}</div>
+                          <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">{entry.link}</div>
+                        </div>
+                      }
+                      side="top"
+                      align="end"
+                    >
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenExternalLink(entry.link);
+                        }}
+                        title={tooltipLabel}
+                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
+                      >
+                        <IconComponent className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
+                  );
+                })()}
+
+                <StatusBadge
+                  status={entry.status}
+                  interactive={true}
+                  onSelectStatus={(st) => handleStatusSelect(entry, st)}
+                />
+
+                {/* 3-Dot More Actions Button (Triggers Unified Row Context Menu) */}
+                <button
+                  type="button"
+                  data-no-row-click="true"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = isRtl ? rect.left : rect.right;
+                    const y = rect.bottom + 4;
+                    onOpenEntryContextMenu?.(entry, { x, y, rect });
+                  }}
+                  title={t('common.moreOptions', 'More options')}
+                  className={cn(
+                    'w-[26px] h-[26px] flex items-center justify-center rounded-md transition-all shrink-0 active:scale-[0.95]',
+                    contextMenuTargetId === entry.id
+                      ? 'text-zinc-900 bg-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-300 dark:ring-zinc-700'
+                      : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800'
+                  )}
+                >
+                  <MoreVertical className="w-3.5 h-3.5 shrink-0" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
 
 export function LedgerView({
   entries = [],
@@ -182,22 +608,22 @@ export function LedgerView({
     return count;
   }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, sortOption]);
 
-  const formatRowTime = (dateTimeStr) => {
-    if (!dateTimeStr) return '';
-    const d = new Date(dateTimeStr);
-    if (isNaN(d.getTime())) return '';
-    try {
-      return new Intl.DateTimeFormat(isRtl ? 'fa-IR' : 'en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }).format(d);
-    } catch (e) {
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
-    }
-  };
+  const formatRowTime = useCallback(
+    (dateTimeStr) => {
+      if (!dateTimeStr) return '';
+      const d = new Date(dateTimeStr);
+      if (isNaN(d.getTime())) return '';
+      try {
+        const formatter = isRtl ? TIME_FORMATTER_RTL : TIME_FORMATTER_LTR;
+        return formatter.format(d);
+      } catch (e) {
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+    },
+    [isRtl]
+  );
 
   const handleOpenExternalLink = (url) => {
     if (!url || typeof url !== 'string') return;
@@ -361,66 +787,35 @@ export function LedgerView({
     };
   }, [filteredEntries, globalCurrency, rates]);
 
-  // Dominant status for cockpit background gradient (Dominant share by value / count)
-  const dominantStatus = useMemo(() => {
-    if (!filteredEntries || filteredEntries.length === 0) return 'neutral';
+  // Cockpit scroll detection: appears once the entire cockpit hero card has fully exited the user's viewport
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const cockpitHeroRef = useRef(null);
 
-    const paid = metrics.totalPaid || 0;
-    const pending = metrics.totalPending || 0;
-    const failed = metrics.totalFailed || 0;
-    const totalValue = metrics.totalValue || 0;
+  useEffect(() => {
+    const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
+    const handleScroll = () => {
+      const hero = cockpitHeroRef.current;
+      if (!hero) return;
 
-    if (totalValue > 0) {
-      if (paid >= pending && paid >= failed && paid > 0) return 'complete';
-      if (failed >= pending && failed > paid) return 'failed';
-      if (pending > 0) return 'pending';
-    }
+      const containerTop = scrollContainer === window ? 0 : scrollContainer.getBoundingClientRect().top;
+      const heroBottom = hero.getBoundingClientRect().bottom;
 
-    // Fallback if monetary value is 0
-    if (metrics.paidCount >= metrics.pendingCount && metrics.paidCount >= metrics.failedCount && metrics.paidCount > 0) return 'complete';
-    if (metrics.failedCount >= metrics.pendingCount && metrics.failedCount > metrics.paidCount) return 'failed';
-    if (metrics.pendingCount > 0) return 'pending';
+      // Fully exits: bottom of the cockpit hero card has scrolled past the top of the scroll container
+      const isExited = heroBottom <= containerTop + 2;
+      // Re-enter threshold with hysteresis buffer: dismisses when scrolling back up and hero re-enters by 35px
+      const isReEntering = heroBottom > containerTop + 35;
 
-    return 'neutral';
-  }, [filteredEntries, metrics]);
+      setShowStickyBar((prev) => {
+        if (!prev && isExited) return true;
+        if (prev && isReEntering) return false;
+        return prev;
+      });
+    };
 
-  // Status-driven Apple & Emil Kowalski visual hierarchy for the cockpit card frame
-  // Provides rim lighting (ring-1 ring-inset), status-tinted borders, and language-aware directional ambient glow
-  const cockpitStatusClasses = useMemo(() => {
-    switch (dominantStatus) {
-      case 'complete':
-        return {
-          border: 'border-emerald-500/40 dark:border-emerald-500/30',
-          ring: 'ring-1 ring-inset ring-emerald-500/20 dark:ring-emerald-400/15',
-          shadow: isRtl
-            ? 'shadow-[0_2px_8px_-2px_rgba(16,185,129,0.08),-2px_2px_6px_-2px_rgba(16,185,129,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(16,185,129,0.12),-3px_3px_8px_-2px_rgba(16,185,129,0.08)]'
-            : 'shadow-[0_2px_8px_-2px_rgba(16,185,129,0.08),2px_2px_6px_-2px_rgba(16,185,129,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(16,185,129,0.12),3px_3px_8px_-2px_rgba(16,185,129,0.08)]',
-        };
-      case 'pending':
-        return {
-          border: 'border-amber-500/40 dark:border-amber-500/30',
-          ring: 'ring-1 ring-inset ring-amber-500/20 dark:ring-amber-400/15',
-          shadow: isRtl
-            ? 'shadow-[0_2px_8px_-2px_rgba(245,158,11,0.08),-2px_2px_6px_-2px_rgba(245,158,11,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(245,158,11,0.12),-3px_3px_8px_-2px_rgba(245,158,11,0.08)]'
-            : 'shadow-[0_2px_8px_-2px_rgba(245,158,11,0.08),2px_2px_6px_-2px_rgba(245,158,11,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(245,158,11,0.12),3px_3px_8px_-2px_rgba(245,158,11,0.08)]',
-        };
-      case 'failed':
-        return {
-          border: 'border-rose-500/40 dark:border-rose-500/30',
-          ring: 'ring-1 ring-inset ring-rose-500/20 dark:ring-rose-400/15',
-          shadow: isRtl
-            ? 'shadow-[0_2px_8px_-2px_rgba(244,63,94,0.08),-2px_2px_6px_-2px_rgba(244,63,94,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(244,63,94,0.12),-3px_3px_8px_-2px_rgba(244,63,94,0.08)]'
-            : 'shadow-[0_2px_8px_-2px_rgba(244,63,94,0.08),2px_2px_6px_-2px_rgba(244,63,94,0.05)] dark:shadow-[0_2px_12px_-2px_rgba(244,63,94,0.12),3px_3px_8px_-2px_rgba(244,63,94,0.08)]',
-        };
-      case 'neutral':
-      default:
-        return {
-          border: 'border-zinc-200 dark:border-zinc-800/80',
-          ring: 'ring-0 ring-transparent',
-          shadow: 'shadow-sm dark:shadow-none',
-        };
-    }
-  }, [dominantStatus, isRtl]);
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Pagination calculation
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE));
@@ -473,6 +868,16 @@ export function LedgerView({
     return { totalSum, paid, pending, working, onHold, failed };
   }, [selectedEntriesList, globalCurrency, rates]);
 
+  const paginatedEntriesRef = useRef(paginatedEntries);
+  useEffect(() => {
+    paginatedEntriesRef.current = paginatedEntries;
+  }, [paginatedEntries]);
+
+  const selectedEntryIdsRef = useRef(selectedEntryIds);
+  useEffect(() => {
+    selectedEntryIdsRef.current = selectedEntryIds;
+  }, [selectedEntryIds]);
+
   // Keyboard Shortcuts Listener (Esc to clear, S to toggle select mode, Ctrl+A in select mode, / for search)
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -498,7 +903,7 @@ export function LedgerView({
           setSearchQuery('');
           return;
         }
-        if (selectedEntryIds.size > 0 || isSelectMode) {
+        if (selectedEntryIdsRef.current.size > 0 || isSelectMode) {
           setSelectedEntryIds(new Set());
           setIsSelectMode(false);
           setLastSelectedId(null);
@@ -562,7 +967,7 @@ export function LedgerView({
       if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
         e.preventDefault();
         setIsSelectMode(true);
-        const pageIds = paginatedEntries.map((entry) => entry.id);
+        const pageIds = paginatedEntriesRef.current.map((entry) => entry.id);
         setSelectedEntryIds(new Set(pageIds));
         return;
       }
@@ -576,14 +981,17 @@ export function LedgerView({
     isStatusDropdownOpen,
     isFiltersPopoverOpen,
     searchQuery,
-    selectedEntryIds,
     isSelectMode,
     sourceFilter,
     teammateFilter,
-    paginatedEntries,
     globalCurrency,
     onCurrencyChange,
     searchInputRef,
+    setConfirmDeleteEntryId,
+    setIsSelectMode,
+    setSelectedEntryIds,
+    setSourceFilter,
+    setTeammateFilter,
   ]);
 
   // Shift + Click Range Selection & Direct Toggle Handler
@@ -704,7 +1112,9 @@ export function LedgerView({
   const handlePageChange = (pageNum) => {
     setCurrentPage(pageNum);
     setSelectedDayKeys(new Set());
-    setSelectedEntryIds(new Set());
+    if (selectedEntryIds.size > 0) {
+      setSelectedEntryIds(new Set());
+    }
     setConfirmDeleteEntryId(null);
     setIsBulkDeleting(false);
     const mainEl = document.querySelector('main');
@@ -750,191 +1160,331 @@ export function LedgerView({
   };
 
   return (
-    <div className="space-y-5 pb-20 md:pb-6 relative">
-      {/* 1. Unified Ledger Cockpit Card (Optical Frosted Glass & Dark Zinc Palette) */}
-      <div
-        className={cn(
-          'relative overflow-hidden rounded-xl bg-zinc-50/70 dark:bg-zinc-950/40 border p-3.5 sm:p-4 transition-[border-color,box-shadow] duration-500 ease-out',
-          cockpitStatusClasses.border,
-          cockpitStatusClasses.ring,
-          cockpitStatusClasses.shadow
-        )}
-      >
-        {/* Language-aware, theme-aware monochromatic & status gradient */}
-        <CockpitStatusGradient isRtl={isRtl} status={dominantStatus} />
-        {/* Monochromatic 30-degree animated dot matrix */}
-        <CockpitDotMatrix isRtl={isRtl} />
-
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-              {t('ledger.totalEarned')}
-            </span>
-
-            {/* Minimal Currency Switcher Pill Right in Front of Label */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-950 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner">
-              <button
-                type="button"
-                onClick={() => onCurrencyChange?.('TOMAN')}
-                title="Display in Toman (Press T to toggle)"
-                className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
-                  globalCurrency === 'TOMAN'
-                    ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                }`}
-              >
-                {globalCurrency === 'TOMAN' && (
-                  <motion.div
-                    layoutId="totalEarnedCurrencyPill"
-                    className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <Banknote className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
-                <span className="font-farsi font-medium">تومان</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onCurrencyChange?.('GOLD')}
-                title="Display in Gold (Press T to toggle)"
-                className={`relative isolate flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
-                  globalCurrency === 'GOLD'
-                    ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                }`}
-              >
-                {globalCurrency === 'GOLD' && (
-                  <motion.div
-                    layoutId="totalEarnedCurrencyPill"
-                    className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-                <Coins className="w-3 h-3 text-amber-500 dark:text-amber-400" />
-                <span>Gold</span>
-              </button>
-            </div>
-
-            {filteredEntries.length !== entries.length && (
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                title={t('ledger.clearFilters')}
-                className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors"
-              >
-                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
-                <X className="w-2.5 h-2.5 text-zinc-500" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={cn('text-xs text-zinc-500 font-mono', isRtl && 'font-farsi')}>
-              {formatNumber(metrics.completionRate)}% {t('status.Paid')}
-            </span>
-            {metrics.failedCount > 0 && (
-              <span className={cn('text-[11px] text-rose-600 dark:text-rose-400 font-mono', isRtl && 'font-farsi')}>
-                • {formatNumber(metrics.failedCount)} {t('status.Failed')}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <div className="text-2xl sm:text-3xl font-medium tracking-tight text-zinc-800 dark:text-zinc-200 leading-tight">
-            <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
-          </div>
-          {globalCurrency !== 'GOLD' && (
-            <ConvertedSecondaryDisplay
-              amount={metrics.totalPaid}
-              fromCurrency={globalCurrency}
-              targetCurrency="GOLD"
-              rates={rates}
-            />
-          )}
-        </div>
-
-        {/* Enhanced High-Density Segmented Progress Bar with Accent Colors */}
-        <div className="pt-1 pb-1.5">
-          <div className="h-2.5 w-full bg-zinc-100/80 dark:bg-zinc-950/80 rounded-full p-0.5 border border-zinc-200 dark:border-zinc-800/80 shadow-inner flex overflow-hidden">
-            <div
-              className={cn(
-                'bg-emerald-500 h-full transition-all duration-300 relative group',
-                metrics.totalPending === 0 && metrics.totalFailed === 0 ? 'rounded-full' : 'rounded-l-full'
-              )}
-              style={{
-                width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
-              }}
-              title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}%`}
-            />
-            <div
-              className={cn(
-                'bg-amber-500/80 h-full transition-all duration-300 relative group',
-                metrics.totalPaid === 0 && metrics.totalFailed === 0
-                  ? 'rounded-full'
-                  : metrics.totalPaid === 0
-                  ? 'rounded-l-full'
-                  : metrics.totalFailed === 0
-                  ? 'rounded-r-full'
-                  : ''
-              )}
-              style={{
-                width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
-              }}
-              title={`${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%`}
-            />
-            {metrics.totalFailed > 0 && (
+    <div className="space-y-4 pb-20 md:pb-6 relative">
+      {/* 1. Independent Floating Sticky Island (zero-height in document flow so it never shifts layout or causes infinite scroll jitter) */}
+      <div className="sticky top-[calc(-1rem+6px)] sm:top-[calc(-1.5rem+6px)] lg:top-[calc(-2rem+6px)] z-40 h-0 pointer-events-none -mx-1 sm:mx-0">
+        <AnimatePresence>
+          {showStickyBar && (
+            <motion.div
+              key="cockpit-sticky-island"
+              initial={{ opacity: 0, y: -4, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.99 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+              className="pointer-events-auto w-full"
+            >
               <div
-                className={cn(
-                  'bg-rose-500/80 h-full transition-all duration-300 relative group',
-                  metrics.totalPaid === 0 && metrics.totalPending === 0 ? 'rounded-full' : 'rounded-r-full'
-                )}
-                style={{
-                  width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
+                onClick={(e) => {
+                  if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
+                  const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
+                  scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                title={`${t('status.Failed')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalFailed / metrics.totalValue) * 100) : 0}%`}
+                className="relative group rounded-xl bg-white/95 dark:bg-zinc-950/95 border border-zinc-200/90 dark:border-zinc-800 shadow-xl shadow-black/10 dark:shadow-black/50 backdrop-blur-md px-3.5 sm:px-4 py-2 cursor-pointer overflow-hidden transition-all duration-200"
+              >
+                <div className="flex items-center justify-between gap-2.5 flex-wrap sm:flex-nowrap" dir={isRtl ? 'rtl' : 'ltr'}>
+                  {/* Left: Total Earned + Currency Switcher + Filtered Chip */}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                    <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 shrink-0', isRtl && 'font-farsi')}>
+                      {t('ledger.totalEarned')}:
+                    </span>
+                    <div className="text-base sm:text-lg font-medium tracking-tight text-zinc-800 dark:text-zinc-200 shrink-0">
+                      <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
+                    </div>
+
+                    {/* Currency Switcher Pill */}
+                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onCurrencyChange?.('TOMAN')}
+                        title="Display in Toman"
+                        className={`relative isolate flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
+                          globalCurrency === 'TOMAN'
+                            ? 'text-zinc-800 dark:text-zinc-200 font-medium'
+                            : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                        }`}
+                      >
+                        {globalCurrency === 'TOMAN' && (
+                          <motion.div
+                            layoutId="stickyCurrencyPill"
+                            className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                          />
+                        )}
+                        <TomanIcon className="w-[22px] h-[22px] min-w-[22px] min-h-[22px] text-emerald-500 dark:text-emerald-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onCurrencyChange?.('GOLD')}
+                        title="Display in Gold"
+                        className="relative isolate flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] transition-colors"
+                      >
+                        {globalCurrency === 'GOLD' && (
+                          <motion.div
+                            layoutId="stickyCurrencyPill"
+                            className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                          />
+                        )}
+                        <span className="font-semibold tracking-wider text-[10px] text-amber-600 dark:text-amber-400">GOLD</span>
+                      </button>
+                    </div>
+
+                    {filteredEntries.length !== entries.length && (
+                      <button
+                        type="button"
+                        onClick={handleClearFilters}
+                        title={t('ledger.clearFilters')}
+                        className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors shrink-0"
+                      >
+                        <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
+                        <X className="w-2.5 h-2.5 text-zinc-500" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Right: Progress completion text + Quick Search Jump */}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className={cn('font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+                        {formatNumber(metrics.completionRate)}%
+                      </span>
+                      <span className={cn('text-[11px]', isRtl && 'font-farsi')}>
+                        {t('status.Paid')}
+                      </span>
+                      {metrics.failedCount > 0 && (
+                        <span className={cn('text-[10px] text-rose-600 dark:text-rose-400', isRtl && 'font-farsi')}>
+                          • {formatNumber(metrics.failedCount)} {t('status.Failed')}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Quick Filter Search Jump Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        searchInputRef?.current?.focus();
+                        const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
+                        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      title={language === 'fa' ? 'جستجو (فشردن /)' : 'Search jobs (Press /)'}
+                      className="flex items-center gap-1.5 h-7 px-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs transition-colors active:scale-95"
+                    >
+                      <Search className="w-3.5 h-3.5 text-zinc-500" />
+                      <span className={cn('hidden sm:inline text-[11px]', isRtl && 'font-farsi')}>{t('common.search', 'Search')}</span>
+                      <Kbd>/</Kbd>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Segmented Progress Bar as Bottom Border (Hover expands 2.5px -> 4px) */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-[2.5px] group-hover:h-[4px] transition-[height] duration-200 bg-zinc-200/80 dark:bg-zinc-800/80 flex overflow-hidden"
+                  title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}% | ${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%${metrics.totalFailed > 0 ? ` | ${t('status.Failed')}: ${Math.round((metrics.totalFailed / metrics.totalValue) * 100)}%` : ''}`}
+                >
+                  <div
+                    className="bg-emerald-500 h-full transition-all duration-300"
+                    style={{
+                      width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
+                    }}
+                  />
+                  <div
+                    className="bg-amber-500/90 h-full transition-all duration-300"
+                    style={{
+                      width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
+                    }}
+                  />
+                  {metrics.totalFailed > 0 && (
+                    <div
+                      className="bg-rose-500/90 h-full transition-all duration-300"
+                      style={{
+                        width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 2. Spacious Hero Cockpit Card (Persistent in document flow, never shrinks or jumps) */}
+      <div
+        ref={cockpitHeroRef}
+        className="relative overflow-hidden rounded-2xl bg-zinc-50/70 dark:bg-zinc-950/50 border border-zinc-200/80 dark:border-zinc-800/80 p-5 sm:p-7 shadow-xs mb-6 min-h-[290px]"
+      >
+        {/* WebGPU Interactive Fluid Background */}
+        <CockpitFluid isRtl={isRtl} containerRef={cockpitHeroRef} />
+
+        {/* Optical Text Scrim: Soft vertical gradient for high legibility over vibrant fluid dyes */}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/65 via-white/20 to-white/70 dark:from-zinc-950/70 dark:via-zinc-950/25 dark:to-zinc-950/85 pointer-events-none rounded-[inherit]" />
+
+        <div className="relative z-10 space-y-4 sm:space-y-5" dir={isRtl ? 'rtl' : 'ltr'}>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn('text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                {t('ledger.totalEarned')}
+              </span>
+
+              {/* Currency Switcher Pill */}
+              <div className="flex items-center bg-zinc-100 dark:bg-zinc-950 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => onCurrencyChange?.('TOMAN')}
+                  title="Display in Toman (Press T to toggle)"
+                  className={`relative isolate flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] transition-colors ${
+                    globalCurrency === 'TOMAN'
+                      ? 'text-zinc-800 dark:text-zinc-200 font-medium'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  {globalCurrency === 'TOMAN' && (
+                    <motion.div
+                      layoutId="totalEarnedCurrencyPill"
+                      className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <TomanIcon className="w-[26px] h-[26px] min-w-[26px] min-h-[26px] text-emerald-500 dark:text-emerald-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCurrencyChange?.('GOLD')}
+                  title="Display in Gold (Press T to toggle)"
+                  className="relative isolate flex items-center justify-center px-2.5 py-0.5 rounded-md text-[11px] transition-colors"
+                >
+                  {globalCurrency === 'GOLD' && (
+                    <motion.div
+                      layoutId="totalEarnedCurrencyPill"
+                      className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
+                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                    />
+                  )}
+                  <span className="font-semibold tracking-wider text-[11px] text-amber-600 dark:text-amber-400">GOLD</span>
+                </button>
+              </div>
+
+              {filteredEntries.length !== entries.length && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  title={t('ledger.clearFilters')}
+                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors"
+                >
+                  <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
+                  <X className="w-2.5 h-2.5 text-zinc-500" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>
+                {formatNumber(metrics.completionRate)}% {t('status.Paid')}
+              </span>
+              {metrics.failedCount > 0 && (
+                <span className={cn('text-[11px] text-rose-600 dark:text-rose-400', isRtl && 'font-farsi')}>
+                  • {formatNumber(metrics.failedCount)} {t('status.Failed')}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Spacious Hero Balance */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 py-1">
+            <div className="text-3xl sm:text-4xl font-medium tracking-tight text-zinc-800 dark:text-zinc-200 leading-tight">
+              <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} iconSize="0.9em" />
+            </div>
+            {globalCurrency !== 'GOLD' && (
+              <ConvertedSecondaryDisplay
+                amount={metrics.totalPaid}
+                fromCurrency={globalCurrency}
+                targetCurrency="GOLD"
+                rates={rates}
               />
             )}
           </div>
-        </div>
 
-        {/* Inset Cockpit Metric Tiles with Optical Frosted Glass */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-0.5">
-          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 transition-colors">
-            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-              <CheckCircle2 className="w-3 h-3 text-emerald-500/80 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
-            </div>
-            <div className="text-base sm:text-lg font-medium font-mono text-zinc-800 dark:text-zinc-200">
-              {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+          {/* Spacious Segmented Progress Bar */}
+          <div className="pt-1 pb-1">
+            <div className="h-3 w-full bg-zinc-100/90 dark:bg-zinc-950/90 rounded-full p-0.5 border border-zinc-200 dark:border-zinc-800/80 shadow-inner flex overflow-hidden">
+              <div
+                className={cn(
+                  'bg-emerald-500 h-full transition-all duration-300 relative group',
+                  metrics.totalPending === 0 && metrics.totalFailed === 0 ? 'rounded-full' : 'rounded-l-full'
+                )}
+                style={{
+                  width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
+                }}
+                title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}%`}
+              />
+              <div
+                className={cn(
+                  'bg-amber-500/80 h-full transition-all duration-300 relative group',
+                  metrics.totalPaid === 0 && metrics.totalFailed === 0
+                    ? 'rounded-full'
+                    : metrics.totalPaid === 0
+                    ? 'rounded-l-full'
+                    : metrics.totalFailed === 0
+                    ? 'rounded-r-full'
+                    : ''
+                )}
+                style={{
+                  width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
+                }}
+                title={`${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%`}
+              />
+              {metrics.totalFailed > 0 && (
+                <div
+                  className={cn(
+                    'bg-rose-500/80 h-full transition-all duration-300 relative group',
+                    metrics.totalPaid === 0 && metrics.totalPending === 0 ? 'rounded-full' : 'rounded-r-full'
+                  )}
+                  style={{
+                    width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
+                  }}
+                  title={`${t('status.Failed')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalFailed / metrics.totalValue) * 100) : 0}%`}
+                />
+              )}
             </div>
           </div>
 
-          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 transition-colors">
-            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-              <Clock className="w-3 h-3 text-amber-500/80 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
+          {/* Spacious Cockpit Metric Tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
+              </div>
+              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
+                {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+              </div>
             </div>
-            <div className="text-base sm:text-lg font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
-              <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} />
-            </div>
-          </div>
 
-          <div className="rounded-lg bg-white/85 dark:bg-zinc-900/60 backdrop-blur-md border border-zinc-200/80 dark:border-white/[0.05] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-2.5 space-y-0.5 col-span-2 sm:col-span-1 transition-colors">
-            <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-              <TrendingUp className="w-3 h-3 text-zinc-400 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
+            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                <Clock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
+              </div>
+              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26} />
+              </div>
             </div>
-            <div className="text-base sm:text-lg font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
-              <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} />
+
+            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
+              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                <TrendingUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
+              </div>
+              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26} />
+              </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
 
-      {/* Subtle Gradient Fade Separator Line */}
-      <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-700/60 to-transparent" />
+      {/* Clean Monochromatic Separator Line */}
+      <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800/80" />
 
       {/* 3. Game Categories & Minimalist Unified Filter Bar */}
       <div className="relative z-30 space-y-2.5">
@@ -963,7 +1513,7 @@ export function LedgerView({
                     'h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shrink-0 border active:scale-[0.97]',
                     isSelected
                       ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs font-medium'
-                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-200 dark:border-zinc-800/80 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/60'
+                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 dark:bg-[#0c0c0c] dark:text-zinc-400 dark:hover:text-zinc-200 dark:border-zinc-800/80 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/60'
                   )}
                 >
                   {cat.id && (
@@ -978,7 +1528,7 @@ export function LedgerView({
                   <span className={cn(isRtl && 'font-farsi')}>{cat.label}</span>
                   <span
                     className={cn(
-                      'text-[10px] font-mono px-1 rounded leading-tight',
+                      'text-[10px] px-1 rounded leading-tight',
                       isSelected
                         ? 'bg-zinc-300/80 text-zinc-900 dark:bg-zinc-700/80 dark:text-zinc-200 font-medium'
                         : 'bg-zinc-200/80 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'
@@ -994,9 +1544,14 @@ export function LedgerView({
 
         {/* Bottom Tier: Minimal Unified Desktop Toolbar */}
         <div className="flex items-center justify-between gap-3 w-full">
-          {/* Left: Always-Accessible Search Input */}
-          <div className="relative flex-1 max-w-sm sm:max-w-md">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+          {/* Always-Accessible Search Input with Embedded Filters Icon Button */}
+          <div className="relative flex-1 max-w-sm sm:max-w-md" dir={isRtl ? 'rtl' : 'ltr'}>
+            <Search
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none',
+                isRtl ? 'right-2.5' : 'left-2.5'
+              )}
+            />
             <Input
               ref={searchInputRef}
               type="text"
@@ -1004,12 +1559,19 @@ export function LedgerView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={cn(
-                'pl-8 pr-8 h-8 text-xs bg-transparent dark:bg-transparent border-zinc-200 dark:border-zinc-800/80 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-500 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-zinc-700',
-                isRtl && 'font-farsi placeholder:font-farsi text-right'
+                'h-8 text-xs bg-white dark:bg-[#0c0c0c] border-zinc-200 dark:border-zinc-800/80 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-500 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-zinc-700',
+                isRtl
+                  ? 'font-farsi placeholder:font-farsi text-right pr-8 pl-12'
+                  : 'pl-8 pr-12'
               )}
             />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {searchQuery ? (
+            <div
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2 flex items-center gap-1',
+                isRtl ? 'left-2' : 'right-2'
+              )}
+            >
+              {searchQuery && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1021,50 +1583,48 @@ export function LedgerView({
                 >
                   ✕
                 </button>
-              ) : (
-                <Kbd className="text-[9px] bg-transparent border-zinc-300 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500 px-1 py-0 select-none">
-                  /
-                </Kbd>
               )}
-            </div>
-          </div>
 
-          {/* Right: Unified Filters Popover Trigger */}
-          <div className="relative shrink-0" ref={filtersPopoverRef}>
-            <button
-              type="button"
-              onClick={() => setIsFiltersPopoverOpen((prev) => !prev)}
-              title={t('ledger.filters')}
-              className={cn(
-                'h-8 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-all active:scale-[0.97] shrink-0',
-                isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
-                  ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs'
-                  : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-900 dark:hover:bg-zinc-850 dark:text-zinc-300 dark:hover:text-zinc-100 dark:border-zinc-800 dark:hover:border-zinc-700'
-              )}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filters')}</span>
-              {activeSecondaryFiltersCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900 font-mono text-[10px] font-medium flex items-center justify-center leading-none">
-                  {activeSecondaryFiltersCount}
-                </span>
-              )}
-            </button>
-
-            {/* Origin-aware Popover Dropdown */}
-            <AnimatePresence>
-              {isFiltersPopoverOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
-                  transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
-                  dir={isRtl ? 'rtl' : 'ltr'}
+              {/* Embedded Filters Icon Button */}
+              <div className="relative" ref={filtersPopoverRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsFiltersPopoverOpen((prev) => !prev)}
+                  title={t('ledger.filters')}
                   className={cn(
-                    'absolute top-full mt-1.5 w-72 sm:w-80 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-50 space-y-3 text-xs',
-                    isRtl ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
+                    'relative w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-95 border',
+                    isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
+                      ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 shadow-xs'
+                      : 'bg-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900'
                   )}
                 >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  {activeSecondaryFiltersCount > 0 && (
+                    <span
+                      className={cn(
+                        'absolute -top-1 w-3.5 h-3.5 rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900 text-[9px] font-medium flex items-center justify-center leading-none',
+                        isRtl ? '-left-1' : '-right-1'
+                      )}
+                    >
+                      {activeSecondaryFiltersCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Origin-aware Popover Dropdown */}
+                <AnimatePresence>
+                  {isFiltersPopoverOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                      transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      className={cn(
+                        'absolute top-full mt-2 w-72 sm:w-80 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-50 space-y-3 text-xs',
+                        isRtl ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
+                      )}
+                    >
                   <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                     <span className={cn('font-medium text-zinc-800 dark:text-zinc-200 text-xs', isRtl && 'font-farsi')}>
                       {t('ledger.filters')}
@@ -1104,7 +1664,7 @@ export function LedgerView({
                         )}
                       >
                         <span className={cn(isRtl && 'font-farsi')}>{t('status.all')}</span>
-                        <span className="text-[10px] font-mono text-zinc-500">{formatNumber(entries.length)}</span>
+                        <span className="text-[10px] text-zinc-500">{formatNumber(entries.length)}</span>
                       </button>
                       {STATUSES.map((st) => {
                         const isCurrent = statusFilter === st;
@@ -1123,7 +1683,7 @@ export function LedgerView({
                           >
                             <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
                             {count > 0 && (
-                              <span className={cn('text-[10px] font-mono', isCurrent ? 'text-zinc-900 dark:text-zinc-300' : 'text-zinc-500')}>
+                              <span className={cn('text-[10px]', isCurrent ? 'text-zinc-900 dark:text-zinc-300' : 'text-zinc-500')}>
                                 {formatNumber(count)}
                               </span>
                             )}
@@ -1174,7 +1734,7 @@ export function LedgerView({
                             : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                         )}
                       >
-                        <Banknote className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
+                        <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px] text-zinc-500 dark:text-zinc-400" />
                         <span className="font-farsi">تومان</span>
                       </button>
                     </div>
@@ -1264,6 +1824,8 @@ export function LedgerView({
                 </motion.div>
               )}
             </AnimatePresence>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1329,7 +1891,7 @@ export function LedgerView({
                   >
                     <span
                       className={cn(
-                        'text-[9px] uppercase font-medium',
+                        'text-[9px] uppercase font-medium inline-flex items-center',
                         isDaySelected
                           ? 'text-zinc-300 dark:text-zinc-400'
                           : 'text-zinc-500 dark:text-zinc-600',
@@ -1339,11 +1901,12 @@ export function LedgerView({
                       {t('ledger.dayTotal')}:
                     </span>
                     <strong
-                      className={
+                      className={cn(
+                        'inline-flex items-center',
                         isDaySelected
                           ? 'text-zinc-100 dark:text-zinc-200 font-medium'
                           : 'text-zinc-800 dark:text-zinc-400 font-normal'
-                      }
+                      )}
                     >
                       <MoneyDisplay amount={dayTotal} currency={globalCurrency} />
                     </strong>
@@ -1368,409 +1931,36 @@ export function LedgerView({
                 </div>
 
                 <div className="space-y-1.5">
-                  <AnimatePresence initial={false}>
-                    {groupItems.map((entry) => {
-                      const isConfirmDeleting = confirmDeleteEntryId === entry.id;
-                      const isSelected = selectedEntryIds.has(entry.id);
-                      const entryCat = getCategoryByName(entry.game, categories);
-                      const accentColor = entryCat?.color || '#C68A4C';
-
-                      return (
-                        <motion.div
-                          key={entry.id}
-                          initial={{ opacity: 0, y: 4, scale: 0.99 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12, ease: 'easeOut' } }}
-                          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                          className="space-y-1 relative job-row-item"
-                        >
-                          {/* 1. In-Line Morphing Delete Confirmation Strip */}
-                          <AnimatePresence mode="wait">
-                            {isConfirmDeleting ? (
-                              <motion.div
-                                key="confirm-delete"
-                                layout
-                                initial={{ opacity: 0, scale: 0.98, y: -2 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.98, y: 2 }}
-                                transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-                                dir={isRtl ? 'rtl' : 'ltr'}
-                                className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
-                                    <Trash2 className="w-4 h-4" />
-                                  </div>
-                                  <div className="min-w-0 space-y-0.5">
-                                    <p className={cn('text-zinc-900 dark:text-zinc-200 font-medium truncate', isRtl && 'font-farsi')}>
-                                      {language === 'fa' ? (
-                                        <>حذف <span className="text-zinc-900 dark:text-zinc-200 font-medium">«{entry.title}»</span>؟</>
-                                      ) : (
-                                        <>Delete <span className="text-zinc-900 dark:text-zinc-200 font-medium">"{entry.title}"</span>?</>
-                                      )}
-                                    </p>
-                                    <p className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-                                      {t('ledger.deleteRecordWarning', 'This work record and any attached screenshot proof will be permanently removed.')}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    onClick={() => setConfirmDeleteEntryId(null)}
-                                    className={cn('h-7 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200', isRtl && 'font-farsi')}
-                                  >
-                                    {t('common.cancel', 'Cancel')}
-                                  </Button>
-                                  <Button
-                                    variant="danger"
-                                    size="xs"
-                                    onClick={() => {
-                                      onDeleteEntry?.(entry.id);
-                                      setConfirmDeleteEntryId(null);
-                                      setSelectedEntryIds((prev) => {
-                                        const next = new Set(prev);
-                                        next.delete(entry.id);
-                                        return next;
-                                      });
-                                    }}
-                                    className={cn('h-7 text-xs bg-rose-600 hover:bg-rose-500 text-zinc-100 font-medium shadow-sm gap-1', isRtl && 'font-farsi')}
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    <span>{t('ledger.deleteRecordBtn', 'Delete Record')}</span>
-                                  </Button>
-                                </div>
-                              </motion.div>
-                              ) : (
-                                /* 2. Standard Work Record Card */
-                                <div
-                                  dir="ltr"
-                                  data-entry-id={entry.id}
-                                  onClick={(e) => {
-                                    if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
-                                      return;
-                                    }
-                                    if (isSelectMode || e.shiftKey) {
-                                      handleToggleEntrySelection(entry.id, e);
-                                    } else {
-                                      onOpenReceipt?.(entry);
-                                    }
-                                  }}
-                                  className={cn(
-                                    'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-all duration-150 cursor-pointer border',
-                                    contextMenuTargetId === entry.id
-                                      ? 'bg-zinc-100/90 dark:bg-zinc-900/40 border-zinc-400 dark:border-zinc-500 ring-1 ring-zinc-400/80 dark:ring-zinc-400/80 shadow-md shadow-zinc-950/5 dark:shadow-lg dark:shadow-black/30'
-                                      : isSelected
-                                      ? 'bg-zinc-100/90 dark:bg-zinc-900/30 border-zinc-300 dark:border-zinc-600/50 shadow-xs'
-                                      : 'bg-transparent hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 border-zinc-200/50 dark:border-zinc-800/40 hover:border-zinc-300/60 dark:hover:border-zinc-700/50'
-                                  )}
-                                >
-                                  {/* 135° Minimal Mixed Gradient Border Overlays */}
-                                  {!isSelected && contextMenuTargetId !== entry.id && (
-                                    <>
-                                      {/* Resting: subtle 135° diagonal border gradient */}
-                                      <div
-                                        className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 group-hover:opacity-0"
-                                        style={{
-                                          padding: '1px',
-                                          background: `linear-gradient(135deg, ${accentColor}44 0%, ${accentColor}12 28%, transparent 68%)`,
-                                          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                          WebkitMaskComposite: 'xor',
-                                          maskComposite: 'exclude',
-                                        }}
-                                      />
-                                      {/* Hover: gently blooming 135° border gradient */}
-                                      <div
-                                        className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100"
-                                        style={{
-                                          padding: '1px',
-                                          background: `linear-gradient(135deg, ${accentColor}75 0%, ${accentColor}25 35%, transparent 75%)`,
-                                          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                          WebkitMaskComposite: 'xor',
-                                          maskComposite: 'exclude',
-                                        }}
-                                      />
-                                      {/* Hover: subtle ambient top-left corner glow */}
-                                      <div className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100 overflow-hidden">
-                                        <div
-                                          className="absolute -top-8 -left-8 w-28 h-28 rounded-full blur-xl pointer-events-none"
-                                          style={{ backgroundColor: `${accentColor}10` }}
-                                        />
-                                      </div>
-                                    </>
-                                  )}
-
-                                  {/* Multi-Selection Square Checkbox Hovering Over Top-Left Border Corner */}
-                                  <button
-                                    type="button"
-                                    role="checkbox"
-                                    aria-checked={isSelected}
-                                    data-no-row-click="true"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleToggleEntrySelection(entry.id, e);
-                                    }}
-                                    title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
-                                    className={cn(
-                                      'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
-                                      isSelected
-                                        ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:border-zinc-200 dark:text-zinc-900 scale-100 opacity-100'
-                                        : isSelectMode
-                                        ? 'bg-white border-zinc-400 text-transparent opacity-100 hover:border-zinc-600 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700 dark:hover:border-zinc-400'
-                                        : 'bg-white border-zinc-300 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700/80 dark:hover:border-zinc-400'
-                                    )}
-                                  >
-                                    <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-100 dark:text-zinc-900' : 'opacity-0 hover:opacity-50 text-zinc-400 dark:text-zinc-400')} />
-                                  </button>
-
-                                  {/* Left: Game Emblem & Details (Always keep GameIcon on far left) */}
-                                  <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                                      <GameIcon game={entry.game} categories={categories} className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity" />
-                                    </div>
-
-                                  <div className="min-w-0 flex-1 space-y-0.5">
-                                    {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-xs font-medium text-zinc-800 dark:text-zinc-300 truncate">
-                                        {entry.title}
-                                      </span>
-                                      {entry.proofs && entry.proofs.length > 0 && (
-                                        <Tooltip content={t('ledger.viewScreenshotProof', 'View screenshot proof')} side="top">
-                                          <button
-                                            type="button"
-                                            data-no-row-click="true"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              onOpenLightbox?.(entry.proofs[0].data, entry.title);
-                                            }}
-                                            className="p-1 rounded text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
-                                            title={t('ledger.viewScreenshotProof', 'View screenshot proof')}
-                                          >
-                                            <FileImage className="w-3.5 h-3.5" />
-                                          </button>
-                                        </Tooltip>
-                                      )}
-                                      {entry.source && (() => {
-                                        const isMatch = sourceFilter.toLowerCase() === entry.source.toLowerCase();
-                                        return (
-                                          <button
-                                            type="button"
-                                            data-no-row-click="true"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setSourceFilter(isMatch ? '' : entry.source);
-                                            }}
-                                            title={isMatch ? t('ledger.clearSellerFilter', 'Clear seller filter') : `${t('ledger.filterBySeller', 'Click to filter jobs from')} ${entry.source}`}
-                                            className={cn(
-                                              'text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer max-w-[140px]',
-                                              isMatch
-                                                ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs'
-                                                : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                                            )}
-                                          >
-                                            <Store className={cn('w-2.5 h-2.5 shrink-0', isMatch ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500')} />
-                                            <span className="truncate">{entry.source}</span>
-                                          </button>
-                                        );
-                                      })()}
-                                      {entry.dateTime && formatRowTime(entry.dateTime) && (
-                                        <span className="text-[10px] font-mono text-zinc-500 flex items-center gap-1 select-none">
-                                          <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
-                                          <span>{formatRowTime(entry.dateTime)}</span>
-                                        </span>
-                                      )}
-                                    </div>
-
-                                  {/* Line 2: Game & Notes */}
-                                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate">
-                                    <span>{entry.game}</span>
-                                    {entry.notes && (
-                                      <>
-                                        <span>•</span>
-                                        <span className="truncate max-w-[180px] text-zinc-500 italic">
-                                          "{entry.notes}"
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Line 3: Interactive Teammate Badges & Team Pot */}
-                                  {entry.teammates && entry.teammates.length > 0 && (
-                                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
-                                      <span className="text-zinc-500 flex items-center gap-1">
-                                        <Users className="w-3 h-3 text-zinc-500" />
-                                        <span>Team:</span>
-                                      </span>
-
-                                      {entry.pot && (
-                                        <span className={cn(
-                                          'px-1.5 py-0.5 rounded text-[10px] font-mono border ring-1 ring-inset backdrop-blur-md inline-flex items-baseline gap-1',
-                                          entry.status === 'Failed'
-                                            ? 'bg-zinc-100/60 dark:bg-zinc-900/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 ring-transparent line-through decoration-zinc-400 dark:decoration-zinc-600'
-                                            : 'bg-amber-500/10 dark:bg-zinc-900/90 text-amber-700 dark:text-amber-300/90 border-amber-600/30 dark:border-amber-800/40 ring-amber-600/20'
-                                        )}>
-                                          <span>Pot:</span>
-                                          <MoneyDisplay amount={entry.pot} currency={entry.currency} />
-                                          <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
-                                        </span>
-                                      )}
-
-                                      {entry.teammates.map((tm) => {
-                                        const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
-                                        const customCut = entry.teammateCuts && entry.teammateCuts[tm];
-                                        return (
-                                          <button
-                                            key={tm}
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setTeammateFilter(isMatch ? '' : tm);
-                                            }}
-                                            title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
-                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
-                                              isMatch
-                                                ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
-                                                : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                                            }`}
-                                          >
-                                            <span>{tm}</span>
-                                            {customCut && (
-                                              <span className={cn(
-                                                'font-mono text-[9px] inline-flex items-baseline',
-                                                entry.status === 'Failed'
-                                                  ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
-                                                  : isMatch
-                                                  ? 'text-zinc-800 dark:text-zinc-300'
-                                                  : 'text-zinc-500 dark:text-zinc-400'
-                                              )}>
-                                                (<MoneyDisplay amount={customCut} currency={entry.currency} />)
-                                              </span>
-                                            )}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Right: Income (Your Cut), External Link, Status, Menu */}
-                              <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
-                                <div className="text-left sm:text-right">
-                                  {entry.teamMode && (
-                                    <div className={cn('text-[9px] font-mono text-zinc-500 uppercase tracking-wider', isRtl && 'font-farsi')}>
-                                      {t('ledger.yourShare', 'Your Share')}
-                                    </div>
-                                  )}
-                                  <div className={cn(
-                                    'text-xs font-medium font-mono',
-                                    entry.status === 'Failed'
-                                      ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
-                                      : 'text-zinc-800 dark:text-zinc-200'
-                                  )}>
-                                    <MoneyDisplay amount={entry.income} currency={entry.currency} />
-                                  </div>
-                                  {entry.currency !== globalCurrency && (
-                                    <div className={cn(entry.status === 'Failed' && 'opacity-60 line-through decoration-zinc-400 dark:decoration-zinc-600')}>
-                                      <ConvertedSecondaryDisplay
-                                        amount={entry.income}
-                                        fromCurrency={entry.currency}
-                                        targetCurrency={globalCurrency}
-                                        rates={rates}
-                                        customRate={entry.exchangeRate}
-                                        isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
-                                        showRateLabel={false}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-1.5">
-                                  {/* App-Aware External Link Button */}
-                                  {entry.link && (() => {
-                                    const linkInfo = detectAppLink(entry.link);
-                                    const platform = linkInfo?.platform;
-                                    const isApp = linkInfo?.appLaunchable;
-
-                                    let IconComponent = ExternalLink;
-                                    if (platform === 'discord') IconComponent = DiscordIcon;
-                                    else if (platform === 'telegram') IconComponent = TelegramIcon;
-                                    else if (platform === 'steam') IconComponent = SteamIcon;
-                                    else if (platform === 'sheets') IconComponent = GoogleSheetsIcon;
-                                    else if (platform === 'github') IconComponent = GithubIcon;
-
-                                    const tooltipLabel = linkInfo
-                                      ? (isApp
-                                          ? (language === 'fa' && linkInfo.labelFa ? `باز کردن در ${linkInfo.labelFa}` : `Open in ${linkInfo.label} App`)
-                                          : (language === 'fa' && linkInfo.labelFa ? `باز کردن ${linkInfo.labelFa}` : `Open ${linkInfo.label}`))
-                                      : t('ledger.openLink', 'Open Link');
-
-                                    return (
-                                      <Tooltip
-                                        content={
-                                          <div className="max-w-[260px] space-y-0.5 text-left rtl:text-right">
-                                            <div className="font-medium text-zinc-800 dark:text-zinc-200">{tooltipLabel}</div>
-                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate">{entry.link}</div>
-                                          </div>
-                                        }
-                                        side="top"
-                                        align="end"
-                                      >
-                                        <button
-                                          type="button"
-                                          data-no-row-click="true"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenExternalLink(entry.link);
-                                          }}
-                                          title={tooltipLabel}
-                                          className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
-                                        >
-                                          <IconComponent className="w-3.5 h-3.5" />
-                                        </button>
-                                      </Tooltip>
-                                    );
-                                  })()}
-
-                                  <StatusBadge
-                                    status={entry.status}
-                                    interactive={true}
-                                    onSelectStatus={(st) => handleStatusSelect(entry, st)}
-                                  />
-
-                                  {/* 3-Dot More Actions Button (Triggers Unified Row Context Menu) */}
-                                  <button
-                                    type="button"
-                                    data-no-row-click="true"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const x = isRtl ? rect.left : rect.right;
-                                      const y = rect.bottom + 4;
-                                      onOpenEntryContextMenu?.(entry, { x, y, rect });
-                                    }}
-                                    title={t('common.moreOptions', 'More options')}
-                                    className={cn(
-                                      'w-[26px] h-[26px] flex items-center justify-center rounded-md transition-all shrink-0 active:scale-[0.95]',
-                                      contextMenuTargetId === entry.id
-                                        ? 'text-zinc-900 bg-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-300 dark:ring-zinc-700'
-                                        : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800'
-                                    )}
-                                  >
-                                    <MoreVertical className="w-3.5 h-3.5 shrink-0" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                      </AnimatePresence>
-                      </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
+                  {groupItems.map((entry) => (
+                    <LedgerRow
+                      key={entry.id}
+                      entry={entry}
+                      isConfirmDeleting={confirmDeleteEntryId === entry.id}
+                      isSelected={selectedEntryIds.has(entry.id)}
+                      isSelectMode={isSelectMode}
+                      contextMenuTargetId={contextMenuTargetId}
+                      categories={categories}
+                      globalCurrency={globalCurrency}
+                      rates={rates}
+                      sourceFilter={sourceFilter}
+                      teammateFilter={teammateFilter}
+                      language={language}
+                      isRtl={isRtl}
+                      t={t}
+                      formatRowTime={formatRowTime}
+                      onOpenReceipt={onOpenReceipt}
+                      onOpenLightbox={onOpenLightbox}
+                      handleToggleEntrySelection={handleToggleEntrySelection}
+                      onDeleteEntry={onDeleteEntry}
+                      setConfirmDeleteEntryId={setConfirmDeleteEntryId}
+                      setSelectedEntryIds={setSelectedEntryIds}
+                      setSourceFilter={setSourceFilter}
+                      setTeammateFilter={setTeammateFilter}
+                      handleOpenExternalLink={handleOpenExternalLink}
+                      handleStatusSelect={handleStatusSelect}
+                      onOpenEntryContextMenu={onOpenEntryContextMenu}
+                    />
+                  ))}
                 </div>
               </div>
             );
@@ -1779,7 +1969,7 @@ export function LedgerView({
           {/* 5. Numbered Pagination Toolbar */}
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 text-xs text-zinc-600 dark:text-zinc-400">
-              <span className={cn('text-zinc-500 font-mono text-[11px]', isRtl && 'font-farsi')}>
+              <span className={cn('text-zinc-500 text-[11px]', isRtl && 'font-farsi')}>
                 {language === 'fa'
                   ? `نمایش ${formatNumber((currentPage - 1) * ITEMS_PER_PAGE + 1)} تا ${formatNumber(Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length))} از ${formatNumber(filteredEntries.length)} کار`
                   : `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)} of ${filteredEntries.length} jobs`}
@@ -1804,7 +1994,7 @@ export function LedgerView({
                   ) {
                     if (pageNum === 2 || pageNum === totalPages - 1) {
                       return (
-                        <span key={pageNum} className="px-1 text-zinc-400 dark:text-zinc-600 font-mono">
+                        <span key={pageNum} className="px-1 text-zinc-400 dark:text-zinc-600">
                           ...
                         </span>
                       );
@@ -1817,7 +2007,7 @@ export function LedgerView({
                       key={pageNum}
                       type="button"
                       onClick={() => handlePageChange(pageNum)}
-                      className={cn(`h-8 w-8 rounded-md text-xs font-mono font-medium transition-colors border ${
+                      className={cn(`h-8 w-8 rounded-md text-xs font-medium transition-colors border ${
                         currentPage === pageNum
                           ? 'bg-zinc-900 text-zinc-100 border-zinc-900 dark:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-300 shadow-sm font-medium'
                           : 'bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800'
@@ -1861,9 +2051,9 @@ export function LedgerView({
                 {formatNumber(selectedDaysSummary.daysCount)} {selectedDaysSummary.daysCount === 1 ? t('ledger.day') : t('ledger.days')}
               </span>
 
-              <div className="flex items-baseline gap-2 min-w-0 shrink-0">
+              <div className="flex items-center gap-2 min-w-0 shrink-0">
                 <span className={cn('text-zinc-500 dark:text-zinc-400 text-xs hidden sm:inline', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-900 dark:text-zinc-200 font-medium text-base sm:text-lg tracking-tight shrink-0">
+                <strong className="text-zinc-900 dark:text-zinc-200 font-medium text-base sm:text-lg tracking-tight shrink-0 inline-flex items-center">
                   <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
                 </strong>
                 <span className={cn('text-[11px] text-zinc-500 dark:text-zinc-500 shrink-0', isRtl && 'font-farsi')}>
@@ -1941,21 +2131,21 @@ export function LedgerView({
           >
             {/* Left: Count Badge & Live Converted Total Income Sum */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0', isRtl ? 'font-farsi' : 'font-mono')}>
+              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
                 {formatNumber(selectedEntryIds.size)} <span className="hidden xs:inline">{t('ledger.selected')}</span>
               </span>
 
-              <div className="flex items-baseline gap-1.5 sm:gap-2 min-w-0 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
                 <span className={cn('text-zinc-400 text-xs', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-200 font-medium text-xs sm:text-sm tracking-tight shrink-0">
+                <strong className="text-zinc-200 font-medium text-xs sm:text-sm tracking-tight shrink-0 inline-flex items-center">
                   <MoneyDisplay amount={bulkMetrics.totalSum} currency={globalCurrency} />
                 </strong>
                 {globalCurrency !== 'GOLD' ? (
-                  <span dir="ltr" className="text-[10px] sm:text-[11px] text-amber-400/80 font-mono shrink-0 select-none">
+                  <span dir="ltr" className="text-[10px] sm:text-[11px] text-amber-400/80 shrink-0 select-none">
                     (~{Math.round(bulkMetrics.totalSum / (goldRateTOMAN / 1000)).toLocaleString()} G)
                   </span>
                 ) : (
-                  <span dir={isRtl ? 'rtl' : 'ltr'} className={cn('text-[10px] sm:text-[11px] text-zinc-400 font-mono shrink-0 select-none', isRtl && 'font-farsi')}>
+                  <span dir={isRtl ? 'rtl' : 'ltr'} className={cn('text-[10px] sm:text-[11px] text-zinc-400 shrink-0 select-none', isRtl && 'font-farsi')}>
                     (~{formatMoney(Math.round(bulkMetrics.totalSum * (goldRateTOMAN / 1000)), 'TOMAN')})
                   </span>
                 )}

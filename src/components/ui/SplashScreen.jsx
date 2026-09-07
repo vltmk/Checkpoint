@@ -46,7 +46,7 @@ export function SplashScreen() {
 
       {/* Dimmed Bottom-Centered Open Source Badge */}
       <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none">
-        <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded bg-zinc-900/80 border border-zinc-800/80 text-zinc-500">
+        <span className="text-[10px] font-medium px-2.5 py-0.5 rounded bg-zinc-900/80 border border-zinc-800/80 text-zinc-500">
           Free & Open Source with ❤️
         </span>
       </div>

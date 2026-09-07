@@ -3,6 +3,7 @@ import { ChevronDown, Plus, X, Bookmark, Check, Store } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 import { trackerDB } from '../../lib/db';
+import { FrostedGlass } from './FrostedGlass';
 
 const LEGACY_PRESETS = new Set([
   'direct client',
@@ -122,13 +123,13 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           }}
           placeholder={placeholder}
           className={cn(
-            'w-full h-9 pl-3 pr-16 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
-            isRtl && 'font-farsi'
+            'w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
+            isRtl ? 'pr-3 pl-16 font-farsi' : 'pl-3 pr-16'
           )}
         />
 
         {/* Action icons in input */}
-        <div className="absolute right-1.5 flex items-center gap-0.5" dir="ltr">
+        <div className={cn('absolute flex items-center gap-0.5', isRtl ? 'left-1.5' : 'right-1.5')} dir="ltr">
           {trimmedValue && !isAlreadySaved && (
             <button
               type="button"
@@ -153,9 +154,10 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div
+        <FrostedGlass
+          variant="popover"
           dir={isRtl ? 'rtl' : 'ltr'}
-          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-white/95 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-2xl p-1.5 space-y-1"
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl p-1.5 space-y-1"
         >
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
@@ -168,7 +170,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
                 <Plus className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span>{language === 'fa' ? 'ذخیره سورس' : 'Save'} <strong className="text-zinc-800 dark:text-zinc-200 font-medium">"{trimmedValue}"</strong></span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
+              <span className="text-[10px] font-medium text-zinc-400">{language === 'fa' ? 'ثبت' : 'Save'}</span>
             </button>
           )}
 
@@ -196,10 +198,10 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
                 >
                   <span className="flex items-center gap-2 truncate">
                     <Store className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 shrink-0" />
-                    <span className="truncate">{src}</span>
+                    <span className={cn('truncate', isRtl && 'font-farsi')}>{src}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-2" dir="ltr">
+                  <div className="flex items-center gap-1 shrink-0 ms-2" dir="ltr">
                     {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />}
                     <button
                       type="button"
@@ -218,7 +220,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
               {language === 'fa' ? 'سورسی مطابق با جستجو یافت نشد' : 'No matching sources found'}
             </div>
           )}
-        </div>
+        </FrostedGlass>
       )}
     </div>
   );

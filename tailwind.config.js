@@ -28,8 +28,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'IRANYekanRd', 'IranYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', 'monospace'],
-        farsi: ['IRANYekanRd', 'IranYekanRd', 'sans-serif']
+        mono: ['Inter', 'IRANYekanRd', 'IranYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        farsi: ['Inter', 'IRANYekanRd', 'IranYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
       }
     },
   },

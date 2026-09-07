@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { FrostedGlass } from './FrostedGlass';
 
 let openDialogCount = 0;
 
@@ -45,30 +46,34 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-          {/* Backdrop */}
+          {/* Balanced Backdrop Scrim */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/45 dark:bg-black/55 backdrop-blur-[2px]"
           />
 
-          {/* Dialog Container */}
-          <motion.div
+          {/* Frosted Glass Dialog Container */}
+          <FrostedGlass
+            as="motion.div"
+            variant="modal"
             initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
             animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+            role="dialog"
+            aria-modal="true"
             className={cn(
-              'relative z-10 w-full bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t sm:border border-zinc-200 dark:border-zinc-800 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden my-0 sm:my-auto max-h-[92vh] flex flex-col',
+              'relative z-10 w-full my-0 sm:my-auto max-h-[92vh] flex flex-col',
               maxWidth,
               className
             )}
           >
             {children}
-          </motion.div>
+          </FrostedGlass>
         </div>
       )}
     </AnimatePresence>
@@ -78,9 +83,8 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
 export function DialogHeader({ children, className, onClose, actions }) {
   return (
     <div
-      dir="ltr"
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/40 dark:bg-zinc-950/40 relative z-10',
         className
       )}
     >
@@ -91,7 +95,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -110,15 +114,14 @@ export function DialogTitle({ children, className }) {
 }
 
 export function DialogContent({ children, className }) {
-  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1', className)}>{children}</div>;
+  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1 relative z-10', className)}>{children}</div>;
 }
 
 export function DialogFooter({ children, className }) {
   return (
     <div
-      dir="ltr"
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800 shrink-0 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/40 dark:bg-zinc-950/40 relative z-10',
         className
       )}
     >

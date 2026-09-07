@@ -215,7 +215,7 @@ Notes      = ${safeEntry.notes || 'None'}
     try {
       setIsCapturing(true);
 
-      // Ensure all custom fonts (IRANYekanRd, IoskeleyMono, Inter) are loaded
+      // Ensure all custom fonts (IRANYekanRd, Inter) are loaded
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
@@ -283,10 +283,10 @@ Notes      = ${safeEntry.notes || 'None'}
   return (
     <Dialog open={Boolean(isOpen && entry)} onClose={onClose} maxWidth="max-w-lg">
       <DialogHeader onClose={onClose}>
-        <div className="flex items-center justify-between w-full pr-6">
+        <div className="flex items-center justify-between w-full pe-6">
           <div className="flex items-center gap-2">
             <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('receipt.title')}</DialogTitle>
-            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/40 flex items-center gap-1">
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800/40 flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> VERIFIED
             </span>
           </div>
@@ -339,13 +339,13 @@ Notes      = ${safeEntry.notes || 'None'}
                 <h4 className="text-sm font-black tracking-wider text-zinc-800 dark:text-zinc-200 uppercase">
                   CHECKPOINT
                 </h4>
-                <p className="text-[10px] text-zinc-500 font-mono">
+                <p className={cn('text-[10px] text-zinc-500 leading-normal', isReceiptFa && 'font-farsi')}>
                   {isReceiptFa ? 'دفتر ثبت درآمد دیجیتال و گیمینگ' : 'Freelance & Gaming Ledger'}
                 </p>
               </div>
             </div>
             <div className={cn(isReceiptFa ? 'text-left' : 'text-right')}>
-              <div className="text-[10px] font-mono text-zinc-500">ID: {receiptId}</div>
+              <div className="text-[10px] font-medium text-zinc-500">ID: {receiptId}</div>
               <div className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">{dateStr}</div>
             </div>
           </div>
@@ -384,13 +384,13 @@ Notes      = ${safeEntry.notes || 'None'}
                       onClose?.();
                     }}
                     title={isReceiptFa ? `فیلتر کردن کارها بر اساس ${safeEntry.source}` : `Filter jobs from ${safeEntry.source}`}
-                    className="px-2 py-0.5 mt-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                    className="px-2 py-0.5 mt-0.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors inline-flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
                   >
                     <Store className="w-3 h-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
                     <span>{safeEntry.source}</span>
                   </button>
                 ) : (
-                  <span className="text-zinc-700 dark:text-zinc-300 font-mono mt-0.5 block">
+                  <span className={cn('text-zinc-700 dark:text-zinc-300 font-medium mt-0.5 block leading-normal', isReceiptFa && 'font-farsi')}>
                     {isReceiptFa ? 'مشتری مستقیم' : 'Direct Client'}
                   </span>
                 )}
@@ -401,7 +401,7 @@ Notes      = ${safeEntry.notes || 'None'}
                   {isReceiptFa ? 'وضعیت' : 'Status'}
                 </span>
                 <div className="mt-1">
-                  <StatusBadge status={safeEntry.status || 'Paid'} />
+                  <StatusBadge status={safeEntry.status || 'Paid'} variant="solid" />
                 </div>
               </div>
 
@@ -415,7 +415,7 @@ Notes      = ${safeEntry.notes || 'None'}
                 </span>
                 <div
                   className={cn(
-                    'text-sm font-medium font-mono mt-0.5',
+                    'text-sm font-medium mt-0.5 inline-flex items-center',
                     safeEntry.status === 'Failed'
                       ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
                       : 'text-zinc-800 dark:text-zinc-200'
@@ -432,7 +432,7 @@ Notes      = ${safeEntry.notes || 'None'}
                   </span>
                   <strong
                     className={cn(
-                      'font-mono font-medium',
+                      'font-medium inline-flex items-center',
                       safeEntry.status === 'Failed'
                         ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
                         : 'text-amber-600 dark:text-amber-300'
@@ -459,7 +459,7 @@ Notes      = ${safeEntry.notes || 'None'}
                     <span className="text-[10px] uppercase font-medium text-zinc-500">
                       {isReceiptFa ? 'هم‌تیمی‌ها و سهم' : 'Teammates & Cuts'}
                     </span>
-                    <span className="text-[9px] text-zinc-500 font-mono hide-in-screenshot">
+                    <span className={cn('text-[9px] text-zinc-500 leading-normal hide-in-screenshot', isReceiptFa && 'font-farsi')}>
                       {isReceiptFa ? 'کلیک برای فیلتر در دفتر' : 'Click to filter in ledger'}
                     </span>
                   </div>
@@ -475,11 +475,11 @@ Notes      = ${safeEntry.notes || 'None'}
                             onClose?.();
                           }}
                           title={`Filter ledger for ${tm} (Cut: ${formatMoney(cut, entryCurrency, false, isReceiptFa)})`}
-                          className="px-2 py-0.5 rounded-md text-xs font-mono font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          className="px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
                         >
                           <Users className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
                           <span>{tm}</span>
-                          <span className="text-zinc-500 dark:text-zinc-400 text-[10px] inline-flex items-baseline">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
+                          <span className="text-zinc-500 dark:text-zinc-400 text-[10px] inline-flex items-center">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
                         </button>
                       );
                     })}
@@ -521,7 +521,7 @@ Notes      = ${safeEntry.notes || 'None'}
           )}
 
           {/* Discrete Verification Footer in Screenshot */}
-          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between text-[9px] font-mono text-zinc-500">
+          <div className="pt-3 border-t border-zinc-200 dark:border-zinc-800/60 flex items-center justify-between text-[9px] font-medium text-zinc-500">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 inline-block" />
               <span>CHECKPOINT PROOF OF WORK</span>

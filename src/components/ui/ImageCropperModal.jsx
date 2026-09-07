@@ -5,6 +5,7 @@ import { Button } from './Button';
 import { extractDominantColor } from '../../lib/categories';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { FrostedGlass } from './FrostedGlass';
 
 // Apple Design rubber-band formula for elastic resistance
 function rubberband(overshoot, dimension, constant = 0.55) {
@@ -307,13 +308,14 @@ export function ImageCropperModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div
-        className="w-full max-w-[380px] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/45 dark:bg-black/55 backdrop-blur-[2px] animate-in fade-in duration-150">
+      <FrostedGlass
+        variant="modal"
+        className="w-full max-w-[380px] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 relative z-10">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             <span>{t('categories.editImage', 'Edit Image')}</span>
@@ -321,7 +323,7 @@ export function ImageCropperModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -399,7 +401,7 @@ export function ImageCropperModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-900/40 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-4 py-3 bg-white/40 dark:bg-zinc-950/40 border-t border-zinc-200/80 dark:border-zinc-800/80 relative z-10">
           <div className="flex items-center gap-2">
             {imageSrc && (
               <button
@@ -434,7 +436,7 @@ export function ImageCropperModal({
             </Button>
           </div>
         </div>
-      </div>
+      </FrostedGlass>
     </div>
   );
 }

@@ -26,6 +26,71 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '3.0.1': {
+    date: '2026-09-07',
+    title: {
+      en: "What's New in Checkpoint v3.0.1",
+      fa: 'امکانات و تغییرات نسخه ۳.۰.۱',
+    },
+    summary: {
+      en: 'Interactive WebGPU fluid simulation cockpit backdrop, new official Toman currency symbol, Inter typography calibration, and UX enhancements.',
+      fa: 'پس‌زمینه تعاملی و شبیه‌سازی سیال WebGPU در کاکپیت، نماد رسمی جدید ارز تومان، کالیبراسیون تایپوگرافی Inter و ارتقای تجربه کاربری.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Interactive WebGPU fluid simulation backdrop in Cockpit card with real-time cursor dynamics, isotropic 16:9 canvas scaling, and dual-theme palettes.',
+        },
+        {
+          tag: 'new',
+          text: 'Official vector Toman (TMN) currency icon across all financial displays, metric pills, cockpit cards, and receipts.',
+        },
+        {
+          tag: 'improved',
+          text: 'Integrated Inter Variable font typography for English UI with refined contrast and alignment across all dialogs and navigation.',
+        },
+        {
+          tag: 'improved',
+          text: 'Disabled overscroll elastic rubberbanding and horizontal swipe navigation gestures for desktop webview stability.',
+        },
+        {
+          tag: 'improved',
+          text: 'Streamlined announcement center with clean slate and refreshed status indicators.',
+        },
+        {
+          tag: 'fix',
+          text: 'Fixed date picker alignment, dialog z-index stacking, and contextual action menu overflows.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'پس‌زمینه تعاملی و شبیه‌سازی سیال مبتنی بر WebGPU در بخش کاکپیت با امواج پویا هنگام حرکت نشانگر ماوس و تنظیم خودکار کنتراست تم تاریک و روشن.',
+        },
+        {
+          tag: 'new',
+          text: 'آیکون و نشان وکتور رسمی ارز تومان (TMN) در تمام بخش‌های مالی، کارت‌های کاکپیت، مبالغ کل و رسیدها.',
+        },
+        {
+          tag: 'improved',
+          text: 'ادغام فونت استاندارد Inter Variable برای زبان انگلیسی با کنتراست دقیق و هماهنگی فونت‌ها در تمامی پنجره‌ها.',
+        },
+        {
+          tag: 'improved',
+          text: 'غیرفعال‌سازی ژست‌های حرکتی بازگشت به صفحه قبل و کشسانی اسکرول در محیط دسکتاپ جهت پایداری پنجره.',
+        },
+        {
+          tag: 'improved',
+          text: 'پاک‌سازی و بازنشانی پیام‌های مرکز اطلاعیه‌ها به وضعیت جدید.',
+        },
+        {
+          tag: 'fix',
+          text: 'اصلاح چینش تقویم، ترتیب نمایش لایه‌ها (z-index) در پنجره‌ها و جلوگیری از سرریز منوی عملیات کارها.',
+        },
+      ],
+    },
+  },
   '3.0.0': {
     date: '2026-09-07',
     title: {

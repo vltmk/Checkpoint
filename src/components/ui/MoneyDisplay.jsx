@@ -2,6 +2,7 @@ import React from 'react';
 import { formatMoneyParts, convertCurrency } from '../../lib/currencies';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { TomanIcon } from './Icons';
 
 export function MoneyDisplay({
   amount,
@@ -9,6 +10,8 @@ export function MoneyDisplay({
   compact = false,
   className = '',
   unitClassName = '',
+  iconClassName = '',
+  iconSize,
   prefix = '',
 }) {
   const { language } = useLanguage();
@@ -20,31 +23,47 @@ export function MoneyDisplay({
     <span
       dir={isGold ? 'ltr' : undefined}
       className={cn(
-        'inline-flex items-baseline gap-1 tracking-tight',
+        'inline-flex items-center gap-1 tracking-tight',
         isGold && '[direction:ltr]',
         className
       )}
     >
-      {prefix && <span className="text-zinc-500 font-normal mr-0.5">{prefix}</span>}
-      <span dir="ltr" className="inline-flex items-baseline [direction:ltr]">
-        <span>{formattedNum}</span>
+      {prefix && <span className="text-zinc-500 font-normal mr-0.5 inline-flex items-center leading-none">{prefix}</span>}
+      <span dir="ltr" className="inline-flex items-center [direction:ltr]">
+        <span className="leading-none">{formattedNum}</span>
         {magnitude && (
-          <span className="text-[0.72em] text-zinc-500 font-medium select-none ml-0.5">
+          <span className="text-[0.72em] text-zinc-500 font-medium select-none ml-0.5 leading-none">
             {magnitude}
           </span>
         )}
       </span>
       {unit && (
-        <span
-          className={cn(
-            isGold
-              ? 'text-[0.8em] font-medium text-amber-400 select-none'
-              : 'text-[0.72em] font-farsi font-medium text-zinc-400 opacity-85 select-none',
-            unitClassName
-          )}
-        >
-          {unit}
-        </span>
+        isGold ? (
+          <span
+            className={cn(
+              'text-[0.8em] font-medium text-amber-400 select-none leading-none',
+              unitClassName
+            )}
+          >
+            {unit}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'inline-flex items-center justify-center text-zinc-500 dark:text-zinc-400 select-none shrink-0 leading-none',
+              unitClassName
+            )}
+            title="تومان"
+          >
+            <TomanIcon
+              size={iconSize}
+              className={cn(
+                iconSize ? '' : 'w-[24px] h-[24px] min-w-[24px] min-h-[24px]',
+                iconClassName
+              )}
+            />
+          </span>
+        )
       )}
     </span>
   );
@@ -79,7 +98,7 @@ export function ConvertedSecondaryDisplay({
       />
       {showRateLabel && (
         <span
-          className="text-[9px] text-zinc-500 dark:text-zinc-400 tracking-tight inline-flex items-baseline"
+          className="text-[9px] text-zinc-500 dark:text-zinc-400 tracking-tight inline-flex items-center"
           title={
             isPerOneGold
               ? `Locked conversion rate: ${effectiveRate.toLocaleString()} Toman / 1 Gold`
@@ -94,7 +113,13 @@ export function ConvertedSecondaryDisplay({
           ) : (
             effectiveRate
           )}
-          {isPerOneGold ? 'T/G' : 'T'}
+          {isPerOneGold ? (
+            <span className="inline-flex items-center gap-0.5 ml-0.5">
+              <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px] shrink-0" />/G
+            </span>
+          ) : (
+            <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px] inline-block shrink-0 ml-0.5" />
+          )}
         </span>
       )}
     </div>

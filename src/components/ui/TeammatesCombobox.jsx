@@ -3,6 +3,7 @@ import { ChevronDown, Plus, X, Bookmark, Check, Users, UserPlus } from 'lucide-r
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 import { trackerDB } from '../../lib/db';
+import { FrostedGlass } from './FrostedGlass';
 
 const SAVED_TEAMMATES_KEY = 'checkpoint_saved_teammates_v1';
 
@@ -139,7 +140,7 @@ export function TeammatesCombobox({
                 e.stopPropagation();
                 handleRemoveTeammate(idx);
               }}
-              className="p-0.5 rounded text-zinc-400 hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-700/60 transition-colors ml-0.5"
+              className="p-0.5 rounded text-zinc-400 hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-700/60 transition-colors ms-0.5"
               title={language === 'fa' ? `حذف ${name}` : `Remove ${name}`}
             >
               <X className="w-2.5 h-2.5" />
@@ -163,7 +164,7 @@ export function TeammatesCombobox({
         />
 
         {/* Dropdown Toggle / Add Action */}
-        <div className="flex items-center gap-0.5 ml-auto shrink-0" dir="ltr">
+        <div className="flex items-center gap-0.5 ms-auto shrink-0" dir="ltr">
           {inputValue.trim() && (
             <button
               type="button"
@@ -188,9 +189,10 @@ export function TeammatesCombobox({
 
       {/* Dropdown List */}
       {isOpen && (
-        <div
+        <FrostedGlass
+          variant="popover"
           dir={isRtl ? 'rtl' : 'ltr'}
-          className="absolute top-full left-0 right-0 z-[100] mt-1 max-h-52 overflow-y-auto rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 shadow-2xl p-1.5 space-y-1"
+          className="absolute top-full left-0 right-0 z-[100] mt-1 max-h-52 overflow-y-auto rounded-xl p-1.5 space-y-1"
         >
           {inputValue.trim() && !savedTeammates.some((s) => s.toLowerCase() === inputValue.trim().toLowerCase()) && (
             <button
@@ -202,7 +204,7 @@ export function TeammatesCombobox({
                 <UserPlus className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-300 shrink-0" />
                 <span>{language === 'fa' ? 'افزودن' : 'Add'} <strong className="text-zinc-800 dark:text-zinc-200 font-medium">"{inputValue.trim()}"</strong></span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">{language === 'fa' ? 'ثبت' : 'Add'}</span>
+              <span className="text-[10px] font-medium text-zinc-400">{language === 'fa' ? 'ثبت' : 'Add'}</span>
             </button>
           )}
 
@@ -230,10 +232,10 @@ export function TeammatesCombobox({
                 >
                   <span className="flex items-center gap-2 truncate">
                     <Users className="w-3 h-3 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-400 shrink-0" />
-                    <span className="truncate">{member}</span>
+                    <span className={cn('truncate', isRtl && 'font-farsi')}>{member}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 shrink-0 ml-2" dir="ltr">
+                  <div className="flex items-center gap-1 shrink-0 ms-2" dir="ltr">
                     {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />}
                     <button
                       type="button"
@@ -252,7 +254,7 @@ export function TeammatesCombobox({
               {language === 'fa' ? 'هم‌تیمی‌ای مطابق با جستجو یافت نشد' : 'No matching teammates found'}
             </div>
           )}
-        </div>
+        </FrostedGlass>
       )}
     </div>
   );

@@ -39,7 +39,7 @@ import {
   Edit2,
 } from 'lucide-react';
 import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative, openPathNative } from '../lib/desktop';
-import { DiscordIcon, TelegramIcon } from './ui/Icons';
+import { DiscordIcon, TelegramIcon, TomanIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
 import { useTheme } from 'next-themes';
 import { Input } from './ui/Input';
@@ -80,6 +80,8 @@ export function SettingsModal({
   autoBackupRetention = 5,
   onAutoBackupRetentionChange,
   onManualAutoBackup,
+  telemetryEnabled = true,
+  onTelemetryEnabledChange,
   theme = 'dark',
   onThemeChange,
   handleThemeChange,
@@ -143,12 +145,12 @@ export function SettingsModal({
   const currencyOptions = [
     {
       value: 'TOMAN',
-      label: 'Toman (تومان)',
-      icon: <Banknote className="w-3.5 h-3.5" />,
+      label: 'Toman',
+      icon: <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px]" />,
     },
     {
       value: 'GOLD',
-      label: 'GOLD (G)',
+      label: 'Gold',
       icon: <Coins className="w-3.5 h-3.5" />,
     },
   ];
@@ -265,9 +267,9 @@ export function SettingsModal({
         />
 
         {/* 0. Language Selector */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
-          <div className="space-y-0.5 min-w-0 pr-1">
-            <label className={cn('block text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+          <div className="space-y-0.5 min-w-0 pe-1">
+            <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
               {t('settings.language')}
             </label>
             <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
@@ -284,15 +286,15 @@ export function SettingsModal({
                 { value: 'fa', label: 'فارسی (پیش‌فرض)' },
                 { value: 'en', label: 'English' },
               ]}
-              className="h-8 text-xs bg-zinc-950/80 font-medium"
+              className="h-8 text-xs bg-white dark:bg-zinc-950/80 font-medium"
             />
           </div>
         </div>
 
         {/* 1. Global Currency Preference */}
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80">
-          <div className="space-y-0.5 min-w-0 pr-1">
-            <label className={cn('block text-xs font-medium text-zinc-200', isRtl && 'font-farsi')}>
+        <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+          <div className="space-y-0.5 min-w-0 pe-1">
+            <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
               {t('settings.currency')}
             </label>
             <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
@@ -306,7 +308,7 @@ export function SettingsModal({
                 onCurrencyChange?.(val);
               }}
               options={currencyOptions}
-              className="h-8 text-xs bg-zinc-950/80"
+              className="h-8 text-xs bg-white dark:bg-zinc-950/80"
             />
           </div>
         </div>
@@ -356,7 +358,7 @@ export function SettingsModal({
                         {cat.name}
                       </span>
                       {cat.isDefault && (
-                        <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono">
+                        <span className={cn('text-[9px] px-1 py-0.2 rounded bg-zinc-800 text-zinc-400 font-medium leading-normal', isRtl && 'font-farsi')}>
                           {language === 'fa' ? 'پیش‌فرض' : 'default'}
                         </span>
                       )}
@@ -366,7 +368,7 @@ export function SettingsModal({
 
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Color swatch badge */}
-                  <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-[10px] font-mono text-zinc-400">
+                  <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700 text-[10px] font-medium text-zinc-400">
                     <span
                       className="w-2.5 h-2.5 rounded-full shadow-inner shrink-0"
                       style={{ backgroundColor: cat.color }}
@@ -410,7 +412,7 @@ export function SettingsModal({
                 <Monitor className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{t('settings.desktopTray')}</span>
               </label>
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="text-[10px] font-medium text-zinc-500">
                 Tray
               </span>
             </div>
@@ -463,7 +465,7 @@ export function SettingsModal({
                 <FolderArchive className="w-3.5 h-3.5 text-zinc-400" />
                 <span>{t('settings.autoBackups')}</span>
               </label>
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="text-[10px] font-medium text-zinc-500">
                 {autoBackupEnabled ? 'Enabled' : 'Disabled'}
               </span>
             </div>
@@ -511,7 +513,7 @@ export function SettingsModal({
                       {t('settings.backupFolder')}
                     </span>
                     {autoBackupPath && (
-                      <span className={cn('text-[10px] text-zinc-500 font-mono', isRtl && 'font-farsi')}>
+                      <span className={cn('text-[10px] text-zinc-500 font-medium leading-normal', isRtl && 'font-farsi')}>
                         {language === 'fa' ? 'برای باز کردن در فایل‌ها کلیک کنید' : 'Click to open in Explorer'}
                       </span>
                     )}
@@ -529,7 +531,7 @@ export function SettingsModal({
                       }
                     }}
                     className={cn(
-                      'w-full px-2.5 py-1.5 bg-zinc-950 hover:bg-zinc-900/80 border rounded-md text-xs font-mono transition-all flex items-center justify-between gap-2 text-left group cursor-pointer',
+                      'w-full px-2.5 py-1.5 bg-zinc-950 hover:bg-zinc-900/80 border rounded-md text-xs font-medium transition-all flex items-center justify-between gap-2 text-left group cursor-pointer',
                       manualBackupState === 'no_folder_error'
                         ? 'border-rose-500/80 ring-1 ring-rose-500/60'
                         : 'border-zinc-800 hover:border-zinc-700'
@@ -712,7 +714,7 @@ export function SettingsModal({
                     value: s.id,
                     label: `${s.name} (${formatNumber(s.entries_count)} records)`,
                   }))}
-                  className="h-8 text-xs font-mono"
+                  className="h-8 text-xs font-medium"
                 />
               </div>
               <Button
@@ -776,7 +778,7 @@ export function SettingsModal({
               <span>{t('settings.updates')}</span>
             </label>
             {appVersion && (
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="text-[10px] font-medium text-zinc-500">
                 v{appVersion}
               </span>
             )}
@@ -826,14 +828,44 @@ export function SettingsModal({
           </div>
         </div>
 
-        {/* 6. Community & Contact Info */}
-        <div className="space-y-2.5 pt-2 border-t border-zinc-800">
+        {/* Anonymous Usage Analytics & Telemetry */}
+        <div className="space-y-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center justify-between">
-            <label className={cn('block text-xs font-medium text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+            <label className={cn('block text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <ShieldCheck className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{t('settings.telemetry')}</span>
+            </label>
+            <span className="text-[10px] font-medium text-zinc-500">
+              {telemetryEnabled ? t('settings.telemetryEnabled') : t('settings.telemetryDisabled')}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+                {t('settings.telemetryLabel')}
+              </div>
+              <p className={cn('text-[11px] text-zinc-500 leading-relaxed', isRtl && 'font-farsi')}>
+                {t('settings.telemetryDesc')}
+              </p>
+            </div>
+            <Switch
+              checked={telemetryEnabled}
+              onChange={(val) => onTelemetryEnabledChange?.(val)}
+              aria-label={t('settings.telemetry')}
+              className="shrink-0"
+            />
+          </div>
+        </div>
+
+        {/* 6. Community & Contact Info */}
+        <div className="space-y-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between">
+            <label className={cn('block text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
               <DiscordIcon className="w-3.5 h-3.5 text-zinc-400" />
               <span>{t('settings.community')}</span>
             </label>
-            <span className="text-[10px] font-mono text-zinc-500">
+            <span className="text-[10px] font-medium text-zinc-500">
               Direct Support
             </span>
           </div>
@@ -843,42 +875,32 @@ export function SettingsModal({
             <button
               type="button"
               onClick={() => openExternalUrl('https://discord.gg/TYPRXeKPp')}
-              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-900/60 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-left group cursor-pointer"
               title="Join official Discord server: https://discord.gg/TYPRXeKPp"
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <DiscordIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
-                    Discord
-                  </span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              <div className="flex items-center gap-2 min-w-0">
+                <DiscordIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 shrink-0" />
+                <span className="text-xs font-medium text-zinc-700 group-hover:text-zinc-900 dark:text-zinc-300 dark:group-hover:text-zinc-100">
+                  Discord
+                </span>
               </div>
-              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
-                discord.gg/TYPRXeKPp
-              </div>
+              <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300 shrink-0" />
             </button>
 
             {/* Telegram */}
             <button
               type="button"
               onClick={() => openExternalUrl('https://t.me/sovrgn0')}
-              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-900/60 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-left group cursor-pointer"
               title="Message @sovrgn0 on Telegram"
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <TelegramIcon className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 shrink-0" />
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
-                    Telegram
-                  </span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              <div className="flex items-center gap-2 min-w-0">
+                <TelegramIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 shrink-0" />
+                <span className="text-xs font-medium text-zinc-700 group-hover:text-zinc-900 dark:text-zinc-300 dark:group-hover:text-zinc-100">
+                  Telegram
+                </span>
               </div>
-              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
-                @sovrgn0
-              </div>
+              <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300 shrink-0" />
             </button>
 
             {/* Email */}
@@ -890,44 +912,39 @@ export function SettingsModal({
                 setTimeout(() => setCopiedEmail(false), 1800);
                 openExternalUrl('mailto:sovrgnx@proton.me');
               }}
-              className="flex flex-col gap-1.5 p-2.5 rounded-lg bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors text-left group"
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-900/60 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-left group cursor-pointer"
               title="Copy email: sovrgnx@proton.me"
             >
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {copiedEmail ? (
-                      <motion.span
-                        key="copied-email"
-                        initial={{ scale: 0.92, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.92, opacity: 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                        className="flex items-center justify-center shrink-0"
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      </motion.span>
-                    ) : (
-                      <motion.span
-                        key="default-email"
-                        initial={{ scale: 0.92, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.92, opacity: 0 }}
-                        className="flex items-center justify-center shrink-0"
-                      >
-                        <Mail className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" />
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 group-hover:text-zinc-300">
-                    Email
-                  </span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 shrink-0" />
+              <div className="flex items-center gap-2 min-w-0">
+                <AnimatePresence mode="wait" initial={false}>
+                  {copiedEmail ? (
+                    <motion.span
+                      key="copied-email"
+                      initial={{ scale: 0.92, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.92, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className="flex items-center justify-center shrink-0"
+                    >
+                      <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="default-email"
+                      initial={{ scale: 0.92, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.92, opacity: 0 }}
+                      className="flex items-center justify-center shrink-0"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                <span className="text-xs font-medium text-zinc-700 group-hover:text-zinc-900 dark:text-zinc-300 dark:group-hover:text-zinc-100">
+                  {copiedEmail ? (isRtl ? 'کپی شد' : 'Copied') : 'Email'}
+                </span>
               </div>
-              <div className="text-xs font-medium text-zinc-200 truncate w-full font-mono">
-                sovrgnx@proton.me
-              </div>
+              <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300 shrink-0" />
             </button>
           </div>
         </div>
@@ -961,7 +978,7 @@ export function SettingsModal({
             <label className={cn('block text-xs font-medium text-zinc-300', isRtl && 'font-farsi')}>
               {t('settings.dataPortability')}
             </label>
-            <span className="text-[10px] font-mono text-zinc-500">
+            <span className="text-[10px] font-medium text-zinc-500">
               {formatNumber(entriesCount)} Records{categories?.length > 0 ? ` • ${formatNumber(categories.length)} Categories` : ''}
             </span>
           </div>
@@ -1129,20 +1146,20 @@ export function SettingsModal({
               {t('settings.eraseWarning')}
             </p>
             <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
-              All <strong className="text-zinc-200 font-mono">{formatNumber(entriesCount)}</strong> work entries, earnings records, and screenshot proof attachments will be permanently purged.
+              All <strong className="text-zinc-200 font-medium">{formatNumber(entriesCount)}</strong> work entries, earnings records, and screenshot proof attachments will be permanently purged.
             </p>
           </div>
 
           <div className="space-y-1.5">
             <label className={cn('block text-[11px] font-medium text-zinc-300', isRtl && 'font-farsi')}>
-              Type <span className="font-mono font-medium text-rose-400">DELETE ALL</span> or <span className="font-mono font-medium text-rose-400">CLEAR</span> to confirm:
+              Type <span className="font-medium text-rose-400">DELETE ALL</span> or <span className="font-medium text-rose-400">CLEAR</span> to confirm:
             </label>
             <Input
               type="text"
               placeholder="DELETE ALL"
               value={clearConfirmText}
               onChange={(e) => setClearConfirmText(e.target.value)}
-              className="h-8 text-xs font-mono bg-zinc-950/80 border-rose-900/60 focus:border-rose-500 text-zinc-100"
+              className="h-8 text-xs font-medium bg-zinc-950/80 border-rose-900/60 focus:border-rose-500 text-zinc-100"
               autoFocus
             />
           </div>

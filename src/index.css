@@ -76,35 +76,11 @@
   unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF, U+0750-077F, U+08A0-08FF;
 }
 
-/* IoskeleyMono */
+/* Inter Variable Font (Weights 100-900) */
 @font-face {
-  font-family: 'IoskeleyMono';
-  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'IoskeleyMono';
-  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'IoskeleyMono';
-  src: url('../fonts/Ioskeley-mono/IoskeleyMono-SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'IoskeleyMono';
-  src: url('../fonts/Ioskeley-mono/IoskeleyMono-Bold.woff2') format('woff2');
-  font-weight: 700;
+  font-family: 'Inter';
+  src: url('../fonts/Inter/Inter-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
@@ -144,7 +120,6 @@
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
   }
 
   html,
@@ -157,6 +132,7 @@
     overflow-x: hidden;
     margin: 0;
     padding: 0;
+    overscroll-behavior: none;
   }
 
   button,
@@ -171,7 +147,7 @@
   kbd,
   samp,
   pre {
-    font-family: 'IoskeleyMono', monospace;
+    font-family: inherit;
   }
 
   ::selection {
@@ -201,8 +177,10 @@
 
 /* GPU-Accelerated Hardware Scrolling & Containment */
 .gpu-scroll {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+  overscroll-behavior: none;
+  contain: layout style paint;
+  will-change: scroll-position;
+  transform: translateZ(0);
 }
 
 /* Mobile Safe Area Insets */
@@ -239,33 +217,62 @@
   }
 }
 
-/* Desktop Window Dragging */
-[data-tauri-drag-region] {
+/* Desktop Window Dragging: Confined strictly to header to prevent IPC hit-test storms during scroll */
+header[data-tauri-drag-region],
+header [data-tauri-drag-region] {
   app-region: drag;
   -webkit-app-region: drag;
 }
 
-button, a, input, textarea, select, .no-drag, [data-no-drag] {
+header button,
+header a,
+header input,
+header select,
+header textarea,
+[data-no-drag],
+.no-drag {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
 
 /* Persian (Farsi) & RTL Typography Utilities */
 .font-farsi {
-  font-family: 'IRANYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  letter-spacing: normal !important;
+  font-family: 'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: normal;
+  text-rendering: optimizeLegibility;
 }
 
-/* Optical vertical centering for Persian text (IRANYekan) inside buttons and interactive triggers */
+/* Ensure Persian text descenders (ی، ق، ع، م، ر، ز، ل، etc.) have adequate vertical clearance and are never blocked or clipped */
+[dir="rtl"],
+.font-farsi,
+[dir="rtl"] .font-farsi {
+  text-rendering: optimizeLegibility;
+  text-decoration-skip-ink: auto;
+}
+
+/* Prevent clipping of Persian descenders across buttons, badges, chips, and labels */
+[dir="rtl"] .leading-none,
+.font-farsi.leading-none,
+.font-farsi .leading-none {
+  line-height: 1.35 !important;
+}
+
+/* Ensure interactive triggers, chips, badges, and text blocks accommodate Persian descenders */
 button .font-farsi,
+button.font-farsi,
 button.font-farsi > span,
-.btn-farsi {
-  position: relative;
-  top: -1px;
+.btn-farsi,
+span.font-farsi,
+p.font-farsi,
+div.font-farsi,
+label.font-farsi {
+  overflow: visible;
 }
 
-button .font-farsi .font-farsi {
-  top: 0;
+/* Ensure borders, underlines and table divider lines never obscure or cut through Persian descending stems */
+[dir="rtl"] table td,
+[dir="rtl"] table th {
+  padding-bottom: 0.625rem;
 }
 
 /* Accessibility: Reduced Motion (AUDIT.md:82-96) */
@@ -580,4 +587,149 @@ html.dark .mobile-add-work-btn {
 html.dark .mobile-add-work-btn:hover {
   background-color: #f4f4f5 !important;
 }
+
+/* ==========================================================================
+   Apple-Grade Frosted Glass Material System (FrostedGlass.jsx)
+   ========================================================================== */
+
+.checkpoint-frosted-base {
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(var(--glass-saturate, 180%));
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(var(--glass-saturate, 180%));
+  background-color: var(--glass-bg-dark, rgba(9, 9, 11, 0.75));
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+/* Light mode overrides - protects from aggressive global !important color wiping */
+html.light .checkpoint-frosted-base,
+html:not(.dark) .checkpoint-frosted-base {
+  background-color: var(--glass-bg-light, rgba(255, 255, 255, 0.78)) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Semantic Material Presets */
+.checkpoint-frosted-modal {
+  --glass-blur: 30px;
+  --glass-saturate: 180%;
+  --glass-bg-dark: rgba(9, 9, 11, 0.74);
+  --glass-bg-light: rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 24px 48px -12px rgba(0, 0, 0, 0.65);
+}
+
+html.light .checkpoint-frosted-modal,
+html:not(.dark) .checkpoint-frosted-modal {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85), 0 20px 40px -12px rgba(0, 0, 0, 0.12) !important;
+}
+
+.checkpoint-frosted-menu {
+  --glass-blur: 24px;
+  --glass-saturate: 180%;
+  --glass-bg-dark: rgba(9, 9, 11, 0.82);
+  --glass-bg-light: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 12px 32px -4px rgba(0, 0, 0, 0.5);
+}
+
+html.light .checkpoint-frosted-menu,
+html:not(.dark) .checkpoint-frosted-menu {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 12px 32px -4px rgba(0, 0, 0, 0.08) !important;
+}
+
+.checkpoint-frosted-popover {
+  --glass-blur: 24px;
+  --glass-saturate: 180%;
+  --glass-bg-dark: rgba(9, 9, 11, 0.82);
+  --glass-bg-light: rgba(255, 255, 255, 0.84);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 16px 36px -6px rgba(0, 0, 0, 0.5);
+}
+
+html.light .checkpoint-frosted-popover,
+html:not(.dark) .checkpoint-frosted-popover {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 16px 36px -6px rgba(0, 0, 0, 0.08) !important;
+}
+
+.checkpoint-frosted-drawer {
+  --glass-blur: 30px;
+  --glass-saturate: 180%;
+  --glass-bg-dark: rgba(9, 9, 11, 0.78);
+  --glass-bg-light: rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), -12px 0 32px -4px rgba(0, 0, 0, 0.5);
+}
+
+html.light .checkpoint-frosted-drawer,
+html:not(.dark) .checkpoint-frosted-drawer {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85), -12px 0 32px -4px rgba(0, 0, 0, 0.08) !important;
+}
+
+.checkpoint-frosted-subtle {
+  --glass-blur: 16px;
+  --glass-saturate: 150%;
+  --glass-bg-dark: rgba(18, 18, 21, 0.60);
+  --glass-bg-light: rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+html.light .checkpoint-frosted-subtle,
+html:not(.dark) .checkpoint-frosted-subtle {
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Anti-Banding Micro-Noise Overlay (Pure SVG inline, zero HTTP request) */
+.checkpoint-glass-dither {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.022;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+html.light .checkpoint-glass-dither,
+html:not(.dark) .checkpoint-glass-dither {
+  opacity: 0.015;
+}
+
+/* Accessibility: Prefers Reduced Transparency (Apple Design §14) */
+@media (prefers-reduced-transparency: reduce) {
+  .checkpoint-frosted-base,
+  .checkpoint-frosted-modal,
+  .checkpoint-frosted-menu,
+  .checkpoint-frosted-popover,
+  .checkpoint-frosted-drawer,
+  .checkpoint-frosted-subtle {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .checkpoint-frosted-base,
+  .checkpoint-frosted-modal,
+  .checkpoint-frosted-menu,
+  .checkpoint-frosted-popover,
+  .checkpoint-frosted-drawer,
+  .checkpoint-frosted-subtle {
+    background-color: #09090b !important;
+  }
+
+  html.light .checkpoint-frosted-base,
+  html.light .checkpoint-frosted-modal,
+  html.light .checkpoint-frosted-menu,
+  html.light .checkpoint-frosted-popover,
+  html.light .checkpoint-frosted-drawer,
+  html.light .checkpoint-frosted-subtle,
+  html:not(.dark) .checkpoint-frosted-base,
+  html:not(.dark) .checkpoint-frosted-modal,
+  html:not(.dark) .checkpoint-frosted-menu,
+  html:not(.dark) .checkpoint-frosted-popover,
+  html:not(.dark) .checkpoint-frosted-drawer,
+  html:not(.dark) .checkpoint-frosted-subtle {
+    background-color: #ffffff !important;
+  }
+
+  .checkpoint-glass-dither {
+    display: none !important;
+  }
+}
+
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../lib/i18n';
 
 let globalTooltipActive = false;
 let globalTooltipWarmTimer = null;
@@ -15,6 +16,7 @@ export function Tooltip({
   className,
   delay = INITIAL_HOVER_DELAY,
 }) {
+  const { isRtl } = useLanguage();
   const [visible, setVisible] = useState(false);
   const showTimerRef = React.useRef(null);
 
@@ -53,8 +55,8 @@ export function Tooltip({
   const getAlignmentClasses = () => {
     if (side === 'top' || side === 'bottom') {
       const vOffset = side === 'top' ? 'bottom-full mb-1.5' : 'top-full mt-1.5';
-      if (align === 'start') return `${vOffset} left-0`;
-      if (align === 'end') return `${vOffset} right-0`;
+      if (align === 'start') return `${vOffset} ${isRtl ? 'right-0' : 'left-0'}`;
+      if (align === 'end') return `${vOffset} ${isRtl ? 'left-0' : 'right-0'}`;
       return `${vOffset} left-1/2 -translate-x-1/2`;
     }
     const hOffset = side === 'left' ? 'right-full mr-1.5' : 'left-full ml-1.5';
@@ -65,13 +67,13 @@ export function Tooltip({
 
   const getOriginClass = () => {
     if (side === 'top') {
-      if (align === 'end') return 'origin-bottom-right';
-      if (align === 'start') return 'origin-bottom-left';
+      if (align === 'end') return isRtl ? 'origin-bottom-left' : 'origin-bottom-right';
+      if (align === 'start') return isRtl ? 'origin-bottom-right' : 'origin-bottom-left';
       return 'origin-bottom';
     }
     if (side === 'bottom') {
-      if (align === 'end') return 'origin-top-right';
-      if (align === 'start') return 'origin-top-left';
+      if (align === 'end') return isRtl ? 'origin-top-left' : 'origin-top-right';
+      if (align === 'start') return isRtl ? 'origin-top-right' : 'origin-top-left';
       return 'origin-top';
     }
     if (side === 'left') {
@@ -102,8 +104,10 @@ export function Tooltip({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: globalTooltipActive ? 0.08 : 0.12, ease: [0.23, 1, 0.32, 1] }}
+            dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
               'absolute z-50 px-2 py-1 text-[11px] font-medium text-zinc-800 bg-white border border-zinc-200 dark:text-zinc-200 dark:bg-zinc-900 dark:border-zinc-800 rounded-md shadow-lg pointer-events-none select-none',
+              isRtl && 'font-farsi',
               !hasCustomWrap && 'whitespace-nowrap',
               getOriginClass(),
               getAlignmentClasses(),
@@ -122,7 +126,7 @@ export function Kbd({ children, className }) {
   return (
     <kbd
       className={cn(
-        'inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-mono font-medium text-zinc-700 bg-zinc-100 border border-zinc-300 dark:text-zinc-300 dark:bg-zinc-900 dark:border-zinc-700/60 rounded shadow-xs tracking-normal',
+        'inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-medium text-zinc-700 bg-zinc-100 border border-zinc-300 dark:text-zinc-300 dark:bg-zinc-900 dark:border-zinc-700/60 rounded shadow-xs tracking-normal',
         className
       )}
     >

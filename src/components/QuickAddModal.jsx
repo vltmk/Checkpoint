@@ -9,6 +9,7 @@ import { CategoryModal } from './ui/CategoryModal';
 import { Kbd } from './ui/Tooltip';
 import { AlertTriangle, ArrowRightLeft, Banknote, Check, Coins, Copy, Zap, Edit2, Plus } from 'lucide-react';
 import { toLocalISOString } from './ui/DateTimePicker';
+import { TomanIcon } from './ui/Icons';
 import { convertCurrency, formatMoney } from '../lib/currencies';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { trackerDB } from '../lib/db';
@@ -314,7 +315,7 @@ export function QuickAddModal({
             <Zap className="w-3.5 h-3.5 text-amber-400" strokeWidth={1.75} />
           </div>
           <DialogTitle className={cn(isRtl && 'font-farsi')}>{t('quickAdd.title')}</DialogTitle>
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
             {t('quickAdd.badge')}
           </span>
         </div>
@@ -350,9 +351,9 @@ export function QuickAddModal({
             <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('quickAdd.boostTitle')} *</span>
               {hasTitleError ? (
-                <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                <span className="text-[9px] text-rose-400 font-medium">Required</span>
               ) : (
-                <span className="text-[9px] font-mono text-zinc-500">Required</span>
+                <span className="text-[9px] text-zinc-500">Required</span>
               )}
             </label>
             <Input
@@ -419,7 +420,7 @@ export function QuickAddModal({
                     hasGameError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
                   )}
                 />
-                {hasGameError && <p className="mt-1 text-[10px] font-mono text-rose-400">Required</p>}
+                {hasGameError && <p className="mt-1 text-[10px] text-rose-400">Required</p>}
               </div>
             )}
           </div>
@@ -428,7 +429,7 @@ export function QuickAddModal({
           <div>
             <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.sellerSource')}</span>
-              <span className="text-[9px] font-mono text-zinc-500">Saved Sources</span>
+              <span className="text-[9px] text-zinc-500">Saved Sources</span>
             </label>
             <SourceCombobox
               value={source}
@@ -457,13 +458,14 @@ export function QuickAddModal({
                 <button
                   type="button"
                   onClick={() => setCurrency('TOMAN')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                     currency === 'TOMAN'
                       ? 'bg-zinc-800 text-zinc-200 font-medium shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  {language === 'fa' ? 'تومان' : 'Toman'}
+                  <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px]" />
+                  <span>{language === 'fa' ? 'تومان' : 'Toman'}</span>
                 </button>
                 <button
                   type="button"
@@ -498,24 +500,28 @@ export function QuickAddModal({
                   }}
                   placeholder="0"
                   className={cn(
-                    'font-mono text-sm bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-800 dark:text-zinc-200 pr-12',
+                    'text-sm bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-800 dark:text-zinc-200',
+                    isRtl ? 'pl-12 pr-3 font-farsi' : 'pr-12 pl-3',
                     hasPriceError && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
                   )}
                   required
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-zinc-400 pointer-events-none">
-                  {currency === 'TOMAN' ? 'تومان' : 'G'}
+                <div className={cn(
+                  'absolute top-1/2 -translate-y-1/2 text-xs font-medium text-zinc-400 pointer-events-none flex items-center',
+                  isRtl ? 'left-3' : 'right-3'
+                )}>
+                  {currency === 'TOMAN' ? <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px]" /> : 'G'}
                 </div>
               </div>
 
-              {hasPriceError && <p className="text-[10px] font-mono text-rose-400">Required</p>}
+              {hasPriceError && <p className="text-[10px] text-rose-400">Required</p>}
 
               {/* Real-time Dual-Currency Conversion Pill */}
               {numericPrice > 0 && (
                 <div className="flex items-center justify-between bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 px-2.5 py-1.5 rounded-md text-[11px] text-zinc-600 dark:text-zinc-400">
                   <div className="flex items-center gap-1.5">
                     <span className="text-zinc-500">{t('quickAdd.liveEquivalent')}:</span>
-                    <span className="font-mono font-medium text-zinc-900 dark:text-zinc-200">
+                    <span className="font-medium text-zinc-900 dark:text-zinc-200">
                       ≈ {formatMoney(convertedPrice, altCurrency, false, language === 'fa')}
                     </span>
                   </div>

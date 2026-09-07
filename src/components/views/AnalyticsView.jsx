@@ -351,7 +351,7 @@ export function AnalyticsView({
           weight: '600',
         },
         bodyFont: {
-          family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace",
+          family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif",
           size: 11,
         },
         callbacks: {
@@ -372,7 +372,7 @@ export function AnalyticsView({
         grid: { color: isLight ? 'rgba(39, 39, 42, 0.06)' : 'rgba(228, 228, 231, 0.05)' },
         ticks: {
           color: '#71717a',
-          font: { size: 10, family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace" },
+          font: { size: 10, family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif" },
           callback: (value) => formatMoney(value, globalCurrency, true, language === 'fa'),
         },
         border: { display: false },
@@ -399,7 +399,7 @@ export function AnalyticsView({
           weight: '600',
         },
         bodyFont: {
-          family: "'IoskeleyMono', 'IRANYekanRd', 'IranYekanRd', monospace",
+          family: "'Inter', 'IRANYekanRd', 'IranYekanRd', sans-serif",
           size: 11,
         },
         callbacks: {
@@ -454,9 +454,9 @@ export function AnalyticsView({
         <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Coins className="w-3.5 h-3.5 text-zinc-400" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
+            <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('analytics.totalEarned')}</span>
           </div>
-          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
+          <div className="text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
             <MoneyDisplay amount={stats.totalIncome} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -464,9 +464,9 @@ export function AnalyticsView({
         <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <Trophy className="w-3.5 h-3.5 text-zinc-400" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
+            <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('analytics.averageJob')}</span>
           </div>
-          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200 truncate">
+          <div className="text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
             <MoneyDisplay amount={stats.avgPerJob} currency={globalCurrency} compact={true} />
           </div>
         </div>
@@ -474,9 +474,9 @@ export function AnalyticsView({
         <div className="rounded-xl bg-zinc-50 dark:bg-transparent border border-zinc-200 dark:border-zinc-800/80 p-3.5 space-y-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/80" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
+            <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('analytics.jobsDone')}</span>
           </div>
-          <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200">
+          <div className="text-xl font-medium text-zinc-800 dark:text-zinc-200">
             {formatNumber(stats.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
           </div>
         </div>
@@ -485,22 +485,22 @@ export function AnalyticsView({
           <div className="flex items-center justify-between gap-1 text-zinc-500 text-xs font-medium">
             <div className="flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-500/80" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
+              <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('analytics.completionRate')}</span>
             </div>
             {stats.failedCount > 0 && (
-              <span className={cn('text-[10px] text-rose-600 dark:text-rose-400 font-mono font-normal', isRtl && 'font-farsi')}>
+              <span className={cn('text-[10px] text-rose-600 dark:text-rose-400 font-normal leading-normal', isRtl && 'font-farsi')}>
                 {formatNumber(stats.failedCount)} {t('status.Failed')}
               </span>
             )}
           </div>
-          <div className="flex items-baseline justify-between gap-1">
-            <div className="text-xl font-medium font-mono text-zinc-800 dark:text-zinc-200">
+          <div className="flex items-center justify-between gap-1">
+            <div className="text-xl font-medium text-zinc-800 dark:text-zinc-200">
               {formatNumber(stats.completionRate)}%
             </div>
             {stats.lostRevenue > 0 && (
               <div
                 title={`${t('analytics.lostRevenue')}: ${formatMoney(stats.lostRevenue, globalCurrency, false, language === 'fa')}`}
-                className={cn('text-[11px] font-mono text-rose-600/80 dark:text-rose-400/80 truncate', isRtl && 'font-farsi')}
+                className={cn('text-[11px] font-medium text-rose-600/80 dark:text-rose-400/80 truncate leading-normal inline-flex items-center', isRtl && 'font-farsi')}
               >
                 -<MoneyDisplay amount={stats.lostRevenue} currency={globalCurrency} compact={true} />
               </div>
@@ -566,7 +566,7 @@ export function AnalyticsView({
                       <GameIcon game={item.game} className="w-3.5 h-3.5" />
                       <span>{item.game}</span>
                     </span>
-                    <span className="text-zinc-800 dark:text-zinc-300 font-medium font-mono">
+                    <span className="text-zinc-800 dark:text-zinc-300 font-medium inline-flex items-center">
                       <MoneyDisplay amount={item.revenue} currency={globalCurrency} />
                     </span>
                   </div>

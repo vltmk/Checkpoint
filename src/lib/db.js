@@ -720,11 +720,14 @@ export class StorageDB {
           await this.sqliteDb.execute('DELETE FROM proof_attachments WHERE entry_id = ?', [cleanEntry.id]);
           for (const p of cleanEntry.proofs) {
             if (p && (p.data || p.data_blob)) {
+              const proofId = (!p.id || (p.entry_id && p.entry_id !== cleanEntry.id))
+                ? 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)
+                : p.id;
               await this.sqliteDb.execute(
-                `INSERT INTO proof_attachments (id, entry_id, name, data_blob, size, created_at)
+                `INSERT OR REPLACE INTO proof_attachments (id, entry_id, name, data_blob, size, created_at)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [
-                  p.id || 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                  proofId,
                   cleanEntry.id,
                   p.name || 'Screenshot Proof',
                   p.data || p.data_blob,

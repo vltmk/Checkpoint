@@ -36,7 +36,7 @@ export function MobileHeader({
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
+            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
               v{appVersion}
             </span>
           )}
@@ -69,7 +69,7 @@ export function MobileHeader({
           onClick={onOpenSettings}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
         >
-          <span className="font-mono text-[11px]">{globalCurrency}</span>
+          <span className="text-[11px] font-medium">{globalCurrency}</span>
           <Settings className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
         </button>
       </div>
@@ -96,7 +96,7 @@ export function MobileBottomNav({
           }`}
         >
           <Layers className={`w-4 h-4 ${activeTab === 'ledger' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />
-          <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
+          <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
         </button>
 
         {/* Center CTA Group: + Add Work & ⚡ Quick Add */}
@@ -128,7 +128,7 @@ export function MobileBottomNav({
           }`}
         >
           <BarChart3 className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-zinc-800 dark:text-zinc-200' : 'text-zinc-400 dark:text-zinc-500'}`} />
-          <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
+          <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
         </button>
       </div>
     </nav>

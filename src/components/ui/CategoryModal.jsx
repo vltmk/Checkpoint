@@ -19,6 +19,7 @@ import {
 } from '../../lib/categories';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { FrostedGlass } from './FrostedGlass';
 import wowIcon from '../../assets/world-of-warcraft-retail.svg';
 
 export function CategoryModal({
@@ -140,13 +141,14 @@ export function CategoryModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-        <div
-          className="w-full max-w-[440px] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45 dark:bg-black/55 backdrop-blur-[2px] animate-in fade-in duration-150">
+        <FrostedGlass
+          variant="modal"
+          className="w-full max-w-[440px] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 relative z-10">
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <Gamepad2 className="w-4 h-4 text-zinc-500" />
               <span>
@@ -158,14 +160,14 @@ export function CategoryModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <form onSubmit={handleSubmit} className="p-5 space-y-4 relative z-10">
             {/* Row 1: Name & Icon Picker */}
             <div className="flex items-start gap-4">
               {/* Icon Uploader / Squircle Tile */}
@@ -312,7 +314,7 @@ export function CategoryModal({
 
                 {/* Custom Hex Input */}
                 <div className="flex items-center gap-1 ml-auto">
-                  <span className="text-xs font-mono text-zinc-400">#</span>
+                  <span className="text-xs font-medium text-zinc-400">#</span>
                   <input
                     type="text"
                     value={color.replace(/^#/, '').toUpperCase()}
@@ -322,7 +324,7 @@ export function CategoryModal({
                     }}
                     placeholder="HEX"
                     maxLength={6}
-                    className="w-16 h-7 text-[11px] font-mono uppercase bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded px-1 text-center text-zinc-800 dark:text-zinc-200 focus:outline-hidden focus:border-zinc-400"
+                    className="w-16 h-7 text-[11px] font-medium tracking-wider uppercase bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded px-1 text-center text-zinc-800 dark:text-zinc-200 focus:outline-hidden focus:border-zinc-400"
                   />
                 </div>
               </div>
@@ -344,7 +346,7 @@ export function CategoryModal({
               </Button>
             </div>
           </form>
-        </div>
+        </FrostedGlass>
       </div>
 
       {/* Cropper Modal */}

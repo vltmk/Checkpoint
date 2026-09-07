@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { DiscordIcon } from './ui/Icons';
+import { FrostedGlass } from './ui/FrostedGlass';
 import { openExternalUrl, copyTextNative } from '../lib/desktop';
 import { isNotificationRTL, isRTL } from '../lib/utils';
 import { useLanguage, formatShamsiDateTime } from '../lib/i18n';
@@ -149,12 +150,14 @@ export function NotificationCenter({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/45 dark:bg-black/55 backdrop-blur-[2px]"
           aria-hidden="true"
         />
 
         {/* Slide-over Drawer Frame */}
-        <motion.div
+        <FrostedGlass
+          as="motion.div"
+          variant="drawer"
           key="notification-drawer"
           initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
           animate={shouldReduceMotion ? { opacity: 1 } : { x: 0 }}
@@ -165,13 +168,13 @@ export function NotificationCenter({
               : { type: 'spring', damping: 30, stiffness: 350 }
           }
           className={cn(
-            'relative w-full max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800/90 h-full flex flex-col shadow-2xl z-10 text-zinc-900 dark:text-zinc-100',
+            'relative w-full max-w-md h-full flex flex-col z-10 text-zinc-900 dark:text-zinc-100',
             isRtl && 'border-l-0 border-r'
           )}
           data-no-drag
         >
           {/* Header */}
-          <div dir="ltr" className="px-4 py-3.5 border-b border-zinc-200 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-950/90 backdrop-blur shrink-0 space-y-2.5">
+          <div className="px-4 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 shrink-0 space-y-2.5 relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300">
@@ -181,7 +184,7 @@ export function NotificationCenter({
                   <h2 className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200 uppercase tracking-wider', isRtl && 'font-farsi')}>
                     {t('notifications.title')}
                   </h2>
-                  <p className="text-[10px] text-zinc-500 font-mono">
+                  <p className="text-[10px] text-zinc-500">
                     {formatNumber(notifications.length)} {notifications.length === 1 ? 'record' : 'records'}
                   </p>
                 </div>
@@ -195,7 +198,7 @@ export function NotificationCenter({
                     title="Mark all as read"
                     className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors', isRtl && 'font-farsi')}
                   >
-                    <CheckCheck className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
+                    <CheckCheck className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
                     <span>{t('notifications.readAll')}</span>
                   </button>
                 )}
@@ -203,7 +206,7 @@ export function NotificationCenter({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors ml-1"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors ms-1"
                   aria-label="Close Notification Center"
                 >
                   <X className="w-4 h-4" />
@@ -297,7 +300,7 @@ export function NotificationCenter({
                         </div>
                         <span
                           dir="ltr"
-                          className={`text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border ${getBadgeStyle(
+                          className={`text-[9px] font-medium uppercase px-1.5 py-0.5 rounded border ${getBadgeStyle(
                             item
                           )}`}
                         >
@@ -308,7 +311,7 @@ export function NotificationCenter({
                         )}
                       </div>
 
-                      <span dir="ltr" className="text-[10px] text-zinc-500 font-mono shrink-0">
+                      <span dir="ltr" className="text-[10px] text-zinc-500 shrink-0">
                         {formatTime(item.publishedAt)}
                       </span>
                     </div>
@@ -316,21 +319,19 @@ export function NotificationCenter({
                     {/* Notification Title & Body */}
                     <div className="space-y-1">
                       <div
-                        className={`font-medium text-zinc-900 dark:text-zinc-100 break-words ${
-                          isRTLItem
-                            ? 'text-right font-farsi tracking-normal text-xs leading-[1.65]'
-                            : 'leading-snug'
-                        }`}
+                        className={cn(
+                          'text-xs font-medium text-zinc-900 dark:text-zinc-100 break-words leading-snug',
+                          isRTLItem && 'text-right'
+                        )}
                       >
                         {item.title}
                       </div>
                       {item.message && (
                         <p
-                          className={`text-zinc-600 dark:text-zinc-400 break-words whitespace-pre-line ${
-                            isRTLItem
-                              ? 'text-right font-farsi tracking-normal text-[11px] leading-[1.75]'
-                              : 'text-[11px] leading-relaxed'
-                          }`}
+                          className={cn(
+                            'text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400 break-words whitespace-pre-line',
+                            isRTLItem && 'text-right'
+                          )}
                         >
                           {item.message}
                         </p>
@@ -354,9 +355,8 @@ export function NotificationCenter({
                                   <span
                                     dir="ltr"
                                     className={cn(
-                                      'text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
-                                      tagInfo.style,
-                                      language === 'fa' && 'font-farsi text-[8.5px]'
+                                      'text-[9px] font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                      tagInfo.style
                                     )}
                                   >
                                     {tagInfo.label}
@@ -368,7 +368,7 @@ export function NotificationCenter({
                                 {it.version && (
                                   <span
                                     dir="ltr"
-                                    className="text-[9px] font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 rounded shrink-0 mt-0.5"
+                                    className="text-[9px] text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-1.5 py-0.5 rounded shrink-0 mt-0.5"
                                   >
                                     v{it.version}
                                   </span>
@@ -377,7 +377,7 @@ export function NotificationCenter({
                                 <span
                                   className={cn(
                                     'break-words min-w-0 flex-1',
-                                    itemRtl && 'text-right font-farsi'
+                                    itemRtl && 'text-right'
                                   )}
                                 >
                                   {text}
@@ -488,7 +488,7 @@ export function NotificationCenter({
           </div>
 
           {/* Footer: Official Discord Community */}
-          <div dir="ltr" className="p-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/90 dark:bg-zinc-950/90 flex items-center justify-between gap-2 shrink-0">
+          <div className="p-3 border-t border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 flex items-center justify-between gap-2 shrink-0 relative z-10">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-6 h-6 rounded-md bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0 text-zinc-500 dark:text-zinc-400">
                 <DiscordIcon className="w-3.5 h-3.5" />
@@ -497,7 +497,7 @@ export function NotificationCenter({
                 <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">
                   Official Discord Server
                 </div>
-                <div className="text-[10px] text-zinc-500 font-mono truncate">
+                <div className="text-[10px] text-zinc-500 truncate">
                   discord.gg/TYPRXeKPp
                 </div>
               </div>
@@ -512,7 +512,7 @@ export function NotificationCenter({
               <ExternalLink className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
             </Button>
           </div>
-        </motion.div>
+        </FrostedGlass>
       </div>
       )}
     </AnimatePresence>

@@ -8,27 +8,27 @@ import { useLanguage } from '../../lib/i18n';
 export const STATUS_STYLES = {
   Paid: {
     label: 'پرداخت شده',
-    badgeClass: 'bg-emerald-500/10 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-600/30 dark:border-emerald-800/60 ring-1 ring-inset ring-emerald-600/20 backdrop-blur-md hover:bg-emerald-500/15 dark:hover:bg-emerald-950/40',
+    badgeClass: 'bg-emerald-500/10 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-600/30 dark:border-emerald-800/60 ring-1 ring-inset ring-emerald-600/20 hover:bg-emerald-500/15 dark:hover:bg-emerald-950/70',
     dotClass: 'bg-emerald-600 dark:bg-emerald-400',
   },
   Pending: {
     label: 'درحال انتظار',
-    badgeClass: 'bg-amber-500/10 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-600/30 dark:border-amber-800/60 ring-1 ring-inset ring-amber-600/20 backdrop-blur-md hover:bg-amber-500/15 dark:hover:bg-amber-950/40',
+    badgeClass: 'bg-amber-500/10 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-600/30 dark:border-amber-800/60 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-500/15 dark:hover:bg-amber-950/70',
     dotClass: 'bg-amber-600 dark:bg-amber-400',
   },
   Working: {
     label: 'درحال انجام',
-    badgeClass: 'bg-sky-500/10 dark:bg-sky-950/30 text-sky-700 dark:text-sky-400 border border-sky-600/30 dark:border-sky-800/60 ring-1 ring-inset ring-sky-600/20 backdrop-blur-md hover:bg-sky-500/15 dark:hover:bg-sky-950/40',
+    badgeClass: 'bg-sky-500/10 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400 border border-sky-600/30 dark:border-sky-800/60 ring-1 ring-inset ring-sky-600/20 hover:bg-sky-500/15 dark:hover:bg-sky-950/70',
     dotClass: 'bg-sky-600 dark:bg-sky-400',
   },
   'On Hold': {
     label: 'توقف موقت',
-    badgeClass: 'bg-zinc-500/10 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-400 border border-zinc-400/30 dark:border-zinc-800 ring-1 ring-inset ring-zinc-400/20 backdrop-blur-md hover:bg-zinc-500/15 dark:hover:bg-zinc-900/60',
+    badgeClass: 'bg-zinc-500/10 dark:bg-zinc-900/50 text-zinc-700 dark:text-zinc-400 border border-zinc-400/30 dark:border-zinc-800 ring-1 ring-inset ring-zinc-400/20 hover:bg-zinc-500/15 dark:hover:bg-zinc-900/70',
     dotClass: 'bg-zinc-600 dark:bg-zinc-500',
   },
   Failed: {
     label: 'ناموفق',
-    badgeClass: 'bg-rose-500/10 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-600/30 dark:border-rose-800/60 ring-1 ring-inset ring-rose-600/20 backdrop-blur-md hover:bg-rose-500/15 dark:hover:bg-rose-950/40',
+    badgeClass: 'bg-rose-500/10 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 border border-rose-600/30 dark:border-rose-800/60 ring-1 ring-inset ring-rose-600/20 hover:bg-rose-500/15 dark:hover:bg-rose-950/70',
     dotClass: 'bg-rose-600 dark:bg-rose-400',
   },
 };
@@ -43,16 +43,16 @@ export function Badge({ children, className, variant = 'default', size = 'sm' })
   const variants = {
     default: 'bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800',
     subtle: 'bg-zinc-100/60 dark:bg-zinc-900/40 text-zinc-600 dark:text-zinc-400 border border-zinc-200/80 dark:border-zinc-800/60',
-    tag: 'bg-zinc-100 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 font-mono hover:text-zinc-900 dark:hover:text-zinc-200',
-    emerald: 'bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-600/25 dark:border-emerald-800/40 ring-1 ring-inset ring-emerald-600/15 backdrop-blur-md',
-    blue: 'bg-blue-500/10 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-600/25 dark:border-blue-800/40 ring-1 ring-inset ring-blue-600/15 backdrop-blur-md',
-    amber: 'bg-amber-500/10 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-600/25 dark:border-amber-800/40 ring-1 ring-inset ring-amber-600/15 backdrop-blur-md',
+    tag: 'bg-zinc-100 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200',
+    emerald: 'bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-600/25 dark:border-emerald-800/40 ring-1 ring-inset ring-emerald-600/15',
+    blue: 'bg-blue-500/10 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-600/25 dark:border-blue-800/40 ring-1 ring-inset ring-blue-600/15',
+    amber: 'bg-amber-500/10 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-600/25 dark:border-amber-800/40 ring-1 ring-inset ring-amber-600/15',
   };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 font-medium rounded-md tracking-tight leading-none',
+        'inline-flex items-center gap-1 font-medium rounded-md tracking-tight leading-normal',
         variants[variant] || variants.default,
         sizeStyles[size] || sizeStyles.sm,
         className
@@ -63,15 +63,45 @@ export function Badge({ children, className, variant = 'default', size = 'sm' })
   );
 }
 
+export const STATUS_ROW_STYLES = {
+  Paid: {
+    borderClass: 'border-emerald-600/50 dark:border-emerald-500/40 hover:border-emerald-600/75 dark:hover:border-emerald-500/65',
+    bgClass: 'bg-emerald-500/[0.04] dark:bg-emerald-400/[0.05] hover:bg-emerald-500/[0.07] dark:hover:bg-emerald-400/[0.07]',
+    glowClass: 'shadow-[0_0_8px_rgba(16,185,129,0.14)] dark:shadow-[0_0_10px_rgba(52,211,153,0.12)]',
+  },
+  Pending: {
+    borderClass: 'border-amber-600/50 dark:border-amber-500/40 hover:border-amber-600/75 dark:hover:border-amber-500/65',
+    bgClass: 'bg-amber-500/[0.04] dark:bg-amber-400/[0.05] hover:bg-amber-500/[0.07] dark:hover:bg-amber-400/[0.07]',
+    glowClass: 'shadow-[0_0_8px_rgba(245,158,11,0.14)] dark:shadow-[0_0_10px_rgba(251,191,36,0.12)]',
+  },
+  Working: {
+    borderClass: 'border-sky-600/50 dark:border-sky-500/40 hover:border-sky-600/75 dark:hover:border-sky-500/65',
+    bgClass: 'bg-sky-500/[0.04] dark:bg-sky-400/[0.05] hover:bg-sky-500/[0.07] dark:hover:bg-sky-400/[0.07]',
+    glowClass: 'shadow-[0_0_8px_rgba(14,165,233,0.14)] dark:shadow-[0_0_10px_rgba(56,189,248,0.12)]',
+  },
+  'On Hold': {
+    borderClass: 'border-zinc-400/50 dark:border-zinc-600/50 hover:border-zinc-500/75 dark:hover:border-zinc-500/70',
+    bgClass: 'bg-zinc-500/[0.04] dark:bg-zinc-400/[0.05] hover:bg-zinc-500/[0.07] dark:hover:bg-zinc-400/[0.07]',
+    glowClass: 'shadow-[0_0_8px_rgba(161,161,170,0.12)] dark:shadow-[0_0_10px_rgba(113,113,122,0.12)]',
+  },
+  Failed: {
+    borderClass: 'border-rose-600/50 dark:border-rose-500/40 hover:border-rose-600/75 dark:hover:border-rose-500/65',
+    bgClass: 'bg-rose-500/[0.04] dark:bg-rose-400/[0.05] hover:bg-rose-500/[0.07] dark:hover:bg-rose-400/[0.07]',
+    glowClass: 'shadow-[0_0_8px_rgba(244,63,94,0.14)] dark:shadow-[0_0_10px_rgba(251,113,133,0.12)]',
+  },
+};
+
 export function StatusBadge({
   status,
   onClick,
   onSelectStatus,
   className,
   interactive = false,
+  variant = 'row',
 }) {
   const { t, isRtl } = useLanguage();
   const style = STATUS_STYLES[status] || STATUS_STYLES['Paid'];
+  const rowStyle = STATUS_ROW_STYLES[status] || STATUS_ROW_STYLES['Paid'];
   const displayLabel = t('status.' + status, style.label);
   const [isOpen, setIsOpen] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(false);
@@ -150,17 +180,24 @@ export function StatusBadge({
           }}
           title={`${displayLabel} (${t('status.all')})`}
           className={cn(
-            'group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[26px] rounded-md text-[11px] font-medium tracking-wide select-none transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-[0.97] hover:ring-1 hover:ring-zinc-400 dark:hover:ring-zinc-600/60 cursor-pointer',
+            'group inline-flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[26px] rounded-md text-[11px] font-medium tracking-wide select-none transition-all duration-150 active:scale-[0.97] cursor-pointer',
             isRtl && 'font-farsi',
-            style.badgeClass,
+            variant === 'row'
+              ? cn(
+                  'text-zinc-700 dark:text-zinc-300 border backdrop-blur-[2px]',
+                  rowStyle.borderClass,
+                  rowStyle.bgClass,
+                  rowStyle.glowClass
+                )
+              : style.badgeClass,
             className
           )}
         >
-          <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
-          <span className={cn(isRtl ? 'leading-normal font-farsi' : 'leading-none')}>{displayLabel}</span>
+          {variant !== 'row' && <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />}
+          <span className="leading-normal">{displayLabel}</span>
           <ChevronDown
             className={cn(
-              'w-2.5 h-2.5 opacity-50 group-hover:opacity-100 transition-transform duration-150 shrink-0',
+              'w-2.5 h-2.5 text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 opacity-60 group-hover:opacity-100 transition-all duration-150 shrink-0',
               isOpen && 'rotate-180'
             )}
           />
@@ -225,12 +262,19 @@ export function StatusBadge({
       className={cn(
         'inline-flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[26px] rounded-md text-[11px] font-medium tracking-wide select-none',
         isRtl && 'font-farsi',
-        style.badgeClass,
+        variant === 'row'
+          ? cn(
+              'text-zinc-700 dark:text-zinc-300 border backdrop-blur-[2px]',
+              rowStyle.borderClass,
+              rowStyle.bgClass,
+              rowStyle.glowClass
+            )
+          : style.badgeClass,
         className
       )}
     >
-      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />
-      <span className={cn(isRtl ? 'leading-normal font-farsi' : 'leading-none')}>{displayLabel}</span>
+      {variant !== 'row' && <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', style.dotClass)} />}
+      <span className="leading-normal">{displayLabel}</span>
     </span>
   );
 }

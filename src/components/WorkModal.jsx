@@ -9,9 +9,10 @@ import { TeammatesCombobox } from './ui/TeammatesCombobox';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
+import { MoneyDisplay } from './ui/MoneyDisplay';
 import { Kbd } from './ui/Tooltip';
 import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2, Edit2, Plus } from 'lucide-react';
-import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon } from './ui/Icons';
+import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon, TomanIcon } from './ui/Icons';
 import { CategoryModal } from './ui/CategoryModal';
 import { trackerDB } from '../lib/db';
 import { copyTextNative, optimizeImageProof } from '../lib/desktop';
@@ -41,7 +42,7 @@ export function WorkModal({
     {
       value: 'TOMAN',
       label: language === 'fa' ? 'تومان' : 'Toman',
-      icon: <Banknote className="w-3.5 h-3.5" />,
+      icon: <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px]" />,
     },
     {
       value: 'GOLD',
@@ -668,14 +669,14 @@ export function WorkModal({
           <DialogTitle className={cn(isRtl && 'font-farsi')}>
             {editingEntry ? t('work.editTitle') : t('work.addTitle')}
           </DialogTitle>
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
             {editingEntry ? t('work.editBadge') : t('work.newBadge')}
           </span>
         </div>
 
         {!editingEntry && isDraftRestored && (
           <div className="flex items-center gap-1.5 ml-auto mr-1">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/40 text-amber-400 border border-amber-800/40">
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40">
               {t('work.draftRestored')}
             </span>
             <button
@@ -724,7 +725,7 @@ export function WorkModal({
                   <span>{t('work.gamePlatform')} *</span>
                 </span>
                 {fieldErrors.game && (
-                  <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                  <span className="text-[9px] text-rose-400 font-medium">Required</span>
                 )}
               </label>
               <div className="flex items-center gap-1.5">
@@ -770,7 +771,7 @@ export function WorkModal({
             <div>
               <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
                 <span>{t('work.sellerSource')}</span>
-                <span className="text-[9px] font-mono text-zinc-500">{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
+                <span className={cn('text-[9px] text-zinc-500 leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
               </label>
               <SourceCombobox
                 value={formData.source}
@@ -785,7 +786,7 @@ export function WorkModal({
             <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.workTitle')} *</span>
               {fieldErrors.title && (
-                <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                <span className="text-[9px] text-rose-400 font-medium">Required</span>
               )}
             </label>
             <Input
@@ -806,7 +807,7 @@ export function WorkModal({
             <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
               <span>{t('work.dateTime')} *</span>
               {fieldErrors.dateTime && (
-                <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                <span className="text-[9px] text-rose-400 font-medium">Required</span>
               )}
             </label>
             <DateTimePicker
@@ -843,7 +844,7 @@ export function WorkModal({
               </button>
 
               {formData.teamMode && (
-                <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400">
+                <div className={cn('flex items-center gap-1.5 text-[10px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
                   <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
                   <span className="text-zinc-600">•</span>
                   <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
@@ -918,10 +919,10 @@ export function WorkModal({
                     : `${t('work.incomeCurrency')} *`}
                 </span>
                 {fieldErrors.income && (
-                  <span className="text-[9px] font-mono text-rose-400 font-medium">Required</span>
+                  <span className="text-[9px] text-rose-400 font-medium">Required</span>
                 )}
                 {formData.teamMode && (
-                  <span className="text-[9px] font-mono text-zinc-400">
+                  <span className={cn('text-[9px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
                     {formData.teamInputMode === 'pot' ? `÷ ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'سهم' : 'cuts'}` : `× ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'عضو' : 'members'}`}
                   </span>
                 )}
@@ -956,15 +957,15 @@ export function WorkModal({
               {formData.teamMode && formData.teamInputMode === 'pot' && (
                 <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-[11px] space-y-1.5">
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span className="text-zinc-500">{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
-                    <strong className="font-mono text-emerald-300 font-medium">
-                      {formData.income ? `${Number(formData.income).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
+                    <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
+                    <strong className="text-emerald-300 font-medium inline-flex items-center">
+                      {formData.income ? <MoneyDisplay amount={formData.income} currency={formData.currency} /> : '--'}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span className="text-zinc-500">{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
-                    <strong className="font-mono text-amber-300 font-medium">
-                      {formData.pot ? `${Number(formData.pot).toLocaleString()} ${formData.currency === 'TOMAN' ? (language === 'fa' ? 'تومان' : 'TOMAN') : 'GOLD'}` : '--'}
+                    <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
+                    <strong className="text-amber-300 font-medium inline-flex items-center">
+                      {formData.pot ? <MoneyDisplay amount={formData.pot} currency={formData.currency} /> : '--'}
                     </strong>
                   </div>
 
@@ -973,7 +974,7 @@ export function WorkModal({
                     <button
                       type="button"
                       onClick={() => setIsCustomCutsOpen((prev) => !prev)}
-                      className="text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer"
+                      className={cn('text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer leading-normal', isRtl && 'font-farsi')}
                     >
                       {isCustomCutsOpen
                         ? (language === 'fa' ? 'بستن سهم اختصاصی' : 'Hide Custom Cuts')
@@ -982,7 +983,7 @@ export function WorkModal({
                     <button
                       type="button"
                       onClick={handleEqualizeShares}
-                      className="text-[10px] text-amber-400/90 hover:text-amber-300 font-mono transition-colors"
+                      className={cn('text-[10px] text-amber-400/90 hover:text-amber-300 font-medium transition-colors leading-normal', isRtl && 'font-farsi')}
                       title="Reset all shares to exact equal split"
                     >
                       {language === 'fa' ? 'تقسیم مساوی' : 'Equalize Shares'}
@@ -1001,7 +1002,7 @@ export function WorkModal({
                       >
                         {/* You (Host) */}
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] text-zinc-400 font-medium truncate">{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
+                          <span className={cn('text-[10px] text-zinc-400 font-medium truncate leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
                           <NumberStepperInput
                             value={formData.income}
                             onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
@@ -1026,7 +1027,7 @@ export function WorkModal({
                         ))}
 
                         {/* Balance Status Line */}
-                        <div className="pt-1 flex items-center justify-between text-[10px] font-mono">
+                        <div className={cn('pt-1 flex items-center justify-between text-[10px] leading-normal', isRtl && 'font-farsi')}>
                           <span className="text-zinc-500">{language === 'fa' ? 'تخصیص‌یافته:' : 'Allocated:'} {totalAllocated.toLocaleString()}</span>
                           <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-medium'}>
                             {isPotBalanced ? (language === 'fa' ? '✓ تراز شده' : '✓ Balanced') : `${language === 'fa' ? 'باقی‌مانده:' : 'Remaining:'} ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
@@ -1049,25 +1050,25 @@ export function WorkModal({
                     <button
                       type="button"
                       onClick={() => updateFormData({ exchangeRate: '7000' })}
-                      className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                      className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
                       title="Reset to classic default (7,000 T)"
                     >
                       {language === 'fa' ? 'ریست (۷ک ت)' : 'Reset (7k T)'}
                     </button>
                   ) : (
-                    <span className="text-[9px] font-mono text-zinc-500 shrink-0">{language === 'fa' ? 'کلاسیک (۱ گلد)' : 'Classic (1 G)'}</span>
+                    <span className="text-[9px] text-zinc-500 shrink-0">{language === 'fa' ? 'کلاسیک (۱ گلد)' : 'Classic (1 G)'}</span>
                   )
                 ) : Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
                   <button
                     type="button"
                     onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
-                    className="text-[9px] font-mono text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                    className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
                     title="Reset to current navbar rate"
                   >
                     {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
                   </button>
                 ) : (
-                  <span className="text-[9px] font-mono text-zinc-500 shrink-0">
+                  <span className="text-[9px] text-zinc-500 shrink-0">
                     {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
                   </span>
                 )}
@@ -1108,7 +1109,7 @@ export function WorkModal({
 
               {detectedLink ? (
                 <div
-                  className="flex items-center gap-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300 shadow-2xs"
+                  className="flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300 shadow-2xs"
                   dir="ltr"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -1122,7 +1123,7 @@ export function WorkModal({
                   </span>
                 </div>
               ) : (
-                <span className="text-[9px] font-mono text-zinc-500 lowercase">
+                <span className="text-[9px] text-zinc-500 lowercase">
                   Optional
                 </span>
               )}
@@ -1135,7 +1136,7 @@ export function WorkModal({
                 onChange={(e) => updateFormData({ link: e.target.value })}
                 placeholder={t('work.linkPlaceholder')}
                 className={cn(
-                  'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 font-mono text-zinc-900 dark:text-zinc-300 transition-colors',
+                  'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 transition-colors',
                   detectedLink && 'border-zinc-300 dark:border-zinc-700/80 pr-8',
                   isRtl && 'text-left'
                 )}
@@ -1171,7 +1172,7 @@ export function WorkModal({
                   )}
                 </AnimatePresence>
               </div>
-              <span className={cn('text-[10px] font-mono text-zinc-400', isRtl && 'font-farsi')}>
+              <span className={cn('text-[10px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
                 {language === 'fa' ? '⚡ کلید Ctrl+V برای چسباندن اسکرین‌شات' : '⚡ Press Ctrl+V to paste screenshot'}
               </span>
             </div>
@@ -1247,10 +1248,10 @@ export function WorkModal({
           </div>
         </DialogContent>
 
-        {/* Footer with Anchored Status Selector on Left */}
-        <DialogFooter dir="ltr" className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
-          {/* Left: Desaturated Muted Status Selector */}
-          <div className={cn('flex items-center gap-2', isRtl && 'flex-row-reverse')}>
+        {/* Footer with Anchored Status Selector */}
+        <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
+          {/* Status Selector */}
+          <div className="flex items-center gap-2">
             <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
               {t('work.status')}:
             </span>

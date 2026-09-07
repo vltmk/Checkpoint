@@ -18,6 +18,7 @@ import { ContextMenu } from './components/ui/ContextMenu';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { toLocalISOString } from './components/ui/DateTimePicker';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
@@ -50,7 +51,13 @@ import {
   generateLedgerFingerprint,
   openAppAwareUrl,
 } from './lib/desktop';
-import { initTelemetry, incrementLocalWorkCount, flushDailyTelemetry } from './lib/telemetry';
+import {
+  initTelemetry,
+  incrementLocalWorkCount,
+  flushDailyTelemetry,
+  isTelemetryEnabled,
+  setTelemetryEnabled,
+} from './lib/telemetry';
 
 import { useLanguage } from './lib/i18n';
 
@@ -115,6 +122,11 @@ export default function App() {
     return parseNumberSetting(localStorage.getItem('checkpoint_auto_backup_retention'), 5, 0);
   });
 
+  // Anonymous Usage Telemetry (Enabled by default)
+  const [telemetryEnabled, setTelemetryEnabledState] = useState(() => {
+    return parseBooleanSetting(localStorage.getItem('checkpoint_telemetry_enabled'), true);
+  });
+
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('checkpoint_tab') || localStorage.getItem('nodrapay_tab');
@@ -165,6 +177,8 @@ export default function App() {
   const [receiptEntry, setReceiptEntry] = useState(null);
   const [externalTeammateFilter, setExternalTeammateFilter] = useState('');
   const [externalSourceFilter, setExternalSourceFilter] = useState('');
+  const handleClearExternalTeammateFilter = useCallback(() => setExternalTeammateFilter(''), []);
+  const handleClearExternalSourceFilter = useCallback(() => setExternalSourceFilter(''), []);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialScrollSection, setSettingsInitialScrollSection] = useState(null);
@@ -288,6 +302,12 @@ export default function App() {
         const parsedRet = parseNumberSetting(savedAutoBackupRetention, 5, 0);
         setAutoBackupRetention(parsedRet);
         localStorage.setItem('checkpoint_auto_backup_retention', String(parsedRet));
+      }
+      const savedTelemetry = await trackerDB.getSetting('checkpoint_telemetry_enabled', null);
+      if (savedTelemetry !== null) {
+        const val = parseBooleanSetting(savedTelemetry, true);
+        setTelemetryEnabledState(val);
+        localStorage.setItem('checkpoint_telemetry_enabled', String(val));
       }
       const savedTab = await trackerDB.getSetting('checkpoint_tab', null);
       if (savedTab === 'ledger' || savedTab === 'analytics') {
@@ -466,7 +486,6 @@ export default function App() {
       syncFeedsRef.current?.({ silent: true });
       runScheduledAutoBackupRef.current?.();
       initTelemetry();
-      flushDailyTelemetry();
     }, 700);
 
     // Periodic polling every 4 hours for long-running / tray sessions
@@ -578,6 +597,13 @@ export default function App() {
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_retention', String(num));
     } catch (e) {}
+  };
+
+  const handleTelemetryEnabledChange = async (val) => {
+    const boolVal = Boolean(val);
+    setTelemetryEnabledState(boolVal);
+    localStorage.setItem('checkpoint_telemetry_enabled', String(boolVal));
+    await setTelemetryEnabled(boolVal);
   };
 
   const handleThemeChange = async (newTheme) => {
@@ -778,20 +804,39 @@ export default function App() {
 
   // Duplicate Entry
   const handleDuplicateEntry = async (id) => {
-    const original = await trackerDB.getEntry(id);
-    if (!original) return;
+    try {
+      const original = await trackerDB.getEntry(id);
+      if (!original) return;
 
-    const copy = {
-      ...original,
-      id: 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      title: `${original.title} (Copy)`,
-      dateTime: new Date().toISOString().slice(0, 16),
-      status: original.status || 'Pending',
-      updatedAt: new Date().toISOString(),
-    };
+      const newId = 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      const copy = {
+        ...original,
+        id: newId,
+        title: `${original.title} (Copy)`,
+        dateTime: toLocalISOString(new Date()),
+        status: original.status || 'Pending',
+        updatedAt: new Date().toISOString(),
+        proofs: (original.proofs || []).map((p) => ({
+          ...p,
+          id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          entry_id: newId,
+          createdAt: new Date().toISOString(),
+        })),
+      };
 
-    await trackerDB.saveEntry(copy);
-    await reloadEntries();
+      // Optimistic update: immediately show duplicated record in UI
+      setEntries((prev) => [copy, ...prev]);
+      if (activeTab !== 'ledger') {
+        setActiveTab('ledger');
+      }
+
+      await trackerDB.saveEntry(copy);
+      await reloadEntries();
+      incrementLocalWorkCount();
+    } catch (err) {
+      console.error('Failed to duplicate entry:', err);
+      await reloadEntries();
+    }
   };
 
   // Status Change / Flip
@@ -1409,7 +1454,7 @@ export default function App() {
       )}
 
       {/* 3. Main Centered Mini-App Workspace */}
-      <main className="flex-1 h-full min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
+      <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
         {/* Centered Tablet-Width Mini-App Frame */}
         <div className="max-w-4xl mx-auto w-full">
           {isLoading ? (
@@ -1444,9 +1489,9 @@ export default function App() {
                       onBulkExportCsv={handleBulkExportCsv}
                       searchInputRef={searchInputRef}
                       externalTeammateFilter={externalTeammateFilter}
-                      onClearExternalTeammateFilter={() => setExternalTeammateFilter('')}
+                      onClearExternalTeammateFilter={handleClearExternalTeammateFilter}
                       externalSourceFilter={externalSourceFilter}
-                      onClearExternalSourceFilter={() => setExternalSourceFilter('')}
+                      onClearExternalSourceFilter={handleClearExternalSourceFilter}
                       isSelectMode={isSelectMode}
                       onToggleSelectMode={setIsSelectMode}
                       selectedEntryIds={selectedEntryIds}
@@ -1566,6 +1611,8 @@ export default function App() {
         autoBackupRetention={autoBackupRetention}
         onAutoBackupRetentionChange={handleAutoBackupRetentionChange}
         onManualAutoBackup={handleManualAutoBackup}
+        telemetryEnabled={telemetryEnabled}
+        onTelemetryEnabledChange={handleTelemetryEnabledChange}
         theme={currentTheme}
         onThemeChange={handleThemeChange}
         handleThemeChange={handleThemeChange}
@@ -1654,7 +1701,7 @@ export default function App() {
             <DialogTitle>
               {exportConfirm === 'csv' ? 'Export CSV Spreadsheet' : 'Download JSON Backup'}
             </DialogTitle>
-            <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
               {exportConfirm === 'csv' ? 'Alt + E' : 'Alt + B'}
             </span>
           </div>
@@ -1662,20 +1709,20 @@ export default function App() {
 
         <DialogContent className="space-y-3 py-2">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 shrink-0">
               {exportConfirm === 'csv' ? (
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                <FileSpreadsheet className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
               ) : (
-                <Download className="w-4 h-4 text-cyan-400" />
+                <Download className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
               )}
             </div>
-            <div className="space-y-1 text-xs text-zinc-400">
-              <p className="text-zinc-200 font-medium">
+            <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
+              <p className="text-zinc-900 dark:text-zinc-200 font-medium">
                 {exportConfirm === 'csv'
                   ? `Export ${entries.length} records to a formatted .csv spreadsheet?`
                   : `Save a complete backup with ${entries.length} records and proofs?`}
               </p>
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                 {exportConfirm === 'csv'
                   ? 'Compatible with Excel, Google Sheets, and financial apps.'
                   : 'Can be restored anytime in Settings to restore all data.'}

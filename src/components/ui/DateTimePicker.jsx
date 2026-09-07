@@ -13,6 +13,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { FrostedGlass } from './FrostedGlass';
 import { useLanguage, formatShamsiDateTime, toPersianDigits, normalizeDigits } from '../../lib/i18n';
 import {
   SHAMSI_MONTHS,
@@ -465,13 +466,17 @@ export function DateTimePicker({
       {/* Popover with Custom Calendar & Time Picker */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <FrostedGlass
+            as="motion.div"
+            variant="popover"
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
-              'absolute left-0 sm:left-auto right-0 z-50 w-full sm:w-[320px] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 shadow-2xl rounded-xl p-3 space-y-3',
+              'absolute z-50 w-full sm:w-[320px] rounded-xl p-3 space-y-3',
+              isRtl ? 'right-0' : 'left-0',
               dropUp ? 'origin-bottom' : 'origin-top',
               dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
@@ -571,7 +576,7 @@ export function DateTimePicker({
             {/* 2. Interactive Calendar Component */}
             <div className="space-y-2 bg-zinc-900/40 border border-zinc-800/80 rounded-lg p-2">
               {/* Calendar Month & Year Navigation Bar */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between" dir="ltr">
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -611,7 +616,7 @@ export function DateTimePicker({
                     type="button"
                     onClick={() => setViewMode((prev) => (prev === 'years' ? 'days' : 'years'))}
                     className={cn(
-                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 font-mono text-zinc-200 hover:text-zinc-100 transition-colors cursor-pointer',
+                      'px-1.5 py-0.5 rounded hover:bg-zinc-800 font-medium text-zinc-200 hover:text-zinc-100 transition-colors cursor-pointer',
                       viewMode === 'years' && 'bg-zinc-800 text-amber-300 font-medium',
                       calendarType === 'shamsi' && 'font-farsi'
                     )}
@@ -710,7 +715,7 @@ export function DateTimePicker({
                               type="button"
                               onClick={() => handleGregorianDayClick(cell)}
                               className={cn(
-                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative font-mono',
+                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative',
                                 !cell.isCurrentMonth && 'text-zinc-600 hover:text-zinc-400',
                                 cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100',
                                 cell.isWeekend && cell.isCurrentMonth && !isSelected && 'text-rose-300/90',
@@ -776,7 +781,7 @@ export function DateTimePicker({
                         type="button"
                         onClick={() => handleSelectYear(yr)}
                         className={cn(
-                          'py-2 px-1 rounded-md text-xs font-mono font-medium transition-all text-center cursor-pointer border',
+                          'py-2 px-1 rounded-md text-xs font-medium transition-all text-center cursor-pointer border',
                           isCurrent
                             ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-200'
                             : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800'
@@ -819,9 +824,9 @@ export function DateTimePicker({
                       }
                     }}
                     placeholder="12"
-                    className="w-6 bg-transparent text-center text-xs font-mono font-medium text-zinc-200 focus:outline-none focus:text-zinc-100"
+                    className="w-6 bg-transparent text-center text-xs font-medium text-zinc-200 focus:outline-none focus:text-zinc-100"
                   />
-                  <div className="flex flex-col ml-0.5">
+                  <div className="flex flex-col ms-0.5">
                     <button
                       type="button"
                       onClick={() => stepHours(1)}
@@ -839,7 +844,7 @@ export function DateTimePicker({
                   </div>
                 </div>
 
-                <span className="text-zinc-500 font-mono font-medium">:</span>
+                <span className="text-zinc-500 font-medium">:</span>
 
                 {/* Minutes Box */}
                 <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-md px-1 py-0.5">
@@ -860,9 +865,9 @@ export function DateTimePicker({
                       }
                     }}
                     placeholder="00"
-                    className="w-6 bg-transparent text-center text-xs font-mono font-medium text-zinc-200 focus:outline-none focus:text-zinc-100"
+                    className="w-6 bg-transparent text-center text-xs font-medium text-zinc-200 focus:outline-none focus:text-zinc-100"
                   />
-                  <div className="flex flex-col ml-0.5">
+                  <div className="flex flex-col ms-0.5">
                     <button
                       type="button"
                       onClick={() => stepMinutes(1)}
@@ -881,14 +886,14 @@ export function DateTimePicker({
                 </div>
 
                 {/* Minute Quick Rounding Pills */}
-                <div className="flex items-center gap-1 ml-1">
+                <div className="flex items-center gap-1 ms-1">
                   {[0, 15, 30, 45].map((mVal) => (
                     <button
                       key={mVal}
                       type="button"
                       onClick={() => setExactMinutePreset(mVal)}
                       className={cn(
-                        'px-1 py-0.5 rounded text-[9px] font-mono transition-colors border',
+                        'px-1 py-0.5 rounded text-[9px] transition-colors border',
                         parseInt(timeState.minutes, 10) === mVal
                           ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-medium'
                           : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800/80'
@@ -924,7 +929,7 @@ export function DateTimePicker({
                 <span>{t('common.done')}</span>
               </button>
             </div>
-          </motion.div>
+          </FrostedGlass>
         )}
       </AnimatePresence>
     </div>

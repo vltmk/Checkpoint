@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { FrostedGlass } from './FrostedGlass';
 import {
   DiscordIcon,
   TelegramIcon,
@@ -176,24 +177,39 @@ export function ContextMenu({
       const spaceRight = viewportWidth - position.x - padding;
       const spaceLeft = position.x - padding;
 
-      if (menuWidth <= spaceRight) {
-        posX = position.x;
-        originX = 'left';
-        flipLeft = false;
-      } else if (menuWidth <= spaceLeft) {
-        posX = position.x - menuWidth;
-        originX = 'right';
-        flipLeft = true;
-      } else {
-        // Pick direction with more room
-        if (spaceLeft > spaceRight) {
-          posX = Math.max(padding, position.x - menuWidth);
+      if (isRtl) {
+        // In RTL, prefer opening to the left of the cursor
+        if (menuWidth <= spaceLeft) {
+          posX = position.x - menuWidth;
           originX = 'right';
-          flipLeft = true;
-        } else {
-          posX = Math.max(padding, viewportWidth - menuWidth - padding);
+        } else if (menuWidth <= spaceRight) {
+          posX = position.x;
           originX = 'left';
-          flipLeft = false;
+        } else {
+          if (spaceLeft >= spaceRight) {
+            posX = Math.max(padding, position.x - menuWidth);
+            originX = 'right';
+          } else {
+            posX = Math.max(padding, viewportWidth - menuWidth - padding);
+            originX = 'left';
+          }
+        }
+      } else {
+        if (menuWidth <= spaceRight) {
+          posX = position.x;
+          originX = 'left';
+        } else if (menuWidth <= spaceLeft) {
+          posX = position.x - menuWidth;
+          originX = 'right';
+        } else {
+          // Pick direction with more room
+          if (spaceLeft > spaceRight) {
+            posX = Math.max(padding, position.x - menuWidth);
+            originX = 'right';
+          } else {
+            posX = Math.max(padding, viewportWidth - menuWidth - padding);
+            originX = 'left';
+          }
         }
       }
 
@@ -228,12 +244,41 @@ export function ContextMenu({
     posX = Math.min(Math.max(padding, posX), maxPosX);
     posY = Math.min(Math.max(padding, posY), maxPosY);
 
+    // Calculate dedicated submenu clearance based on the clamped main menu position
+    const submenuWidth = 164; // 160px width + 4px gap
+    let shouldFlipSubmenuLeft = false;
+
+    if (isRtl) {
+      // In RTL, natural reading direction is to open to the left of the main menu
+      if (posX - submenuWidth >= padding) {
+        shouldFlipSubmenuLeft = true;
+      } else if (posX + menuWidth + submenuWidth <= viewportWidth - padding) {
+        shouldFlipSubmenuLeft = false;
+      } else {
+        // Pick whichever side has more room
+        shouldFlipSubmenuLeft = (posX - padding) >= (viewportWidth - (posX + menuWidth) - padding);
+      }
+    } else {
+      // In LTR, natural reading direction is to open to the right of the main menu
+      if (posX + menuWidth + submenuWidth <= viewportWidth - padding) {
+        shouldFlipSubmenuLeft = false;
+      } else if (posX - submenuWidth >= padding) {
+        shouldFlipSubmenuLeft = true;
+      } else {
+        // Pick whichever side has more room
+        shouldFlipSubmenuLeft = (posX - padding) > (viewportWidth - (posX + menuWidth) - padding);
+      }
+    }
+
+    // Check if submenus near the bottom need to flip upwards
+    const shouldFlipSubmenuUp = flipUp || (posY + menuHeight + 10 > viewportHeight - padding);
+
     const constrained = menuHeight > viewportHeight - 2 * padding;
     setIsConstrained(constrained);
     setAdjustedPos({ x: posX, y: posY });
     setTransformOrigin(`${originY} ${originX}`);
-    setFlipSubmenuLeft(flipLeft);
-    setFlipSubmenuUp(flipUp);
+    setFlipSubmenuLeft(shouldFlipSubmenuLeft);
+    setFlipSubmenuUp(shouldFlipSubmenuUp);
   }, [isOpen, position.x, position.y, position.rect, targetEntry, selectedCount, isSelectMode, isRtl]);
 
   // Click outside and escape listeners
@@ -336,7 +381,9 @@ export function ContextMenu({
         top: `${adjustedPos.y}px`,
       }}
     >
-      <motion.div
+      <FrostedGlass
+        as="motion.div"
+        variant="menu"
         initial={{ opacity: 0, scale: 0.94 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
@@ -346,7 +393,7 @@ export function ContextMenu({
           maxHeight: isConstrained ? 'calc(100vh - 20px)' : undefined,
         }}
         className={cn(
-          'w-56 p-1 rounded-xl bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200/90 dark:border-zinc-800/80 shadow-[0_12px_32px_-4px_rgba(0,0,0,0.12),0_4px_12px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_36px_-6px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.07)] text-zinc-800 dark:text-zinc-200 text-xs font-medium space-y-0.5',
+          'w-56 p-1 text-zinc-800 dark:text-zinc-200 text-xs font-medium space-y-0.5',
           isConstrained && 'overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.5)_transparent] dark:[scrollbar-color:rgba(113,113,122,0.5)_transparent]'
         )}
       >
@@ -355,9 +402,12 @@ export function ContextMenu({
         {/* ==================================================================== */}
         {showBulkActions ? (
           <>
-            <div className="px-2 py-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/50 mb-0.5">
+            <div className={cn(
+              "px-2 py-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/50 mb-0.5",
+              isRtl && 'font-farsi'
+            )}>
               <span>{t('contextMenu.selectMode')}</span>
-              <span className="font-mono text-zinc-700 dark:text-zinc-300">
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">
                 {selectedCount} {language === 'fa' ? 'مورد' : 'selected'}
               </span>
             </div>
@@ -486,7 +536,7 @@ export function ContextMenu({
               label={t('contextMenu.toggleCurrency')}
               shortcut="T"
               suffix={
-                <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-medium uppercase">
+                <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase">
                   {globalCurrency === 'GOLD' ? 'GOLD' : 'TOMAN'}
                 </span>
               }
@@ -608,7 +658,7 @@ export function ContextMenu({
             />
           </>
         )}
-      </motion.div>
+      </FrostedGlass>
     </div>
   );
 }
@@ -625,17 +675,21 @@ function ContextMenuItem({
   isDestructive = false,
   hasSubmenu = false,
   isSubmenuOpen = false,
-  isRtl = false,
+  isRtl: isRtlProp,
   flipSubmenuLeft = false,
   onClick,
 }) {
+  const { isRtl: isRtlContext } = useLanguage();
+  const isRtl = isRtlProp !== undefined ? isRtlProp : isRtlContext;
+
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
       className={cn(
-        'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-left transition-colors duration-100 cursor-pointer active:scale-[0.98]',
+        'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg transition-colors duration-100 cursor-pointer active:scale-[0.98]',
+        isRtl ? 'text-right font-farsi' : 'text-left',
         isDestructive
           ? 'text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-950/40 focus:bg-rose-50 dark:focus:bg-rose-950/40'
           : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800/80 focus:bg-zinc-100 dark:focus:bg-zinc-800/80',
@@ -647,24 +701,21 @@ function ContextMenuItem({
         <div className="w-4 h-4 flex items-center justify-center shrink-0">
           {isChecked ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : icon}
         </div>
-        <span className={cn('truncate text-xs font-medium', isRtl && 'font-farsi')}>{label}</span>
+        <span className={cn('truncate text-xs font-medium leading-normal', isRtl && 'font-farsi')}>{label}</span>
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
         {suffix}
         {shortcut && (
-          <kbd className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-medium tracking-wider">
+          <kbd
+            dir="ltr"
+            className="isolate px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[10px] text-zinc-500 dark:text-zinc-400 font-medium tracking-wider select-none"
+          >
             {shortcut}
           </kbd>
         )}
         {hasSubmenu &&
-          (isRtl ? (
-            flipSubmenuLeft ? (
-              <ChevronRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
-            ) : (
-              <ChevronLeft className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
-            )
-          ) : flipSubmenuLeft ? (
+          (flipSubmenuLeft ? (
             <ChevronLeft className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
           ) : (
             <ChevronRight className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
@@ -678,21 +729,18 @@ function ContextMenuItem({
  * Flyout Submenu Container with Spring Physics
  */
 function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter, onMouseLeave }) {
-  // Placement positioning
-  const horizontalClass = flipLeft
-    ? isRtl
-      ? 'left-full ml-1'
-      : 'right-full mr-1'
-    : isRtl
-    ? 'right-full mr-1'
-    : 'left-full ml-1';
-
+  // Placement positioning:
+  // When flipLeft is true, the submenu is placed to the LEFT of parent menu ('right-full mr-1')
+  // When flipLeft is false, the submenu is placed to the RIGHT of parent menu ('left-full ml-1')
+  const horizontalClass = flipLeft ? 'right-full mr-1' : 'left-full ml-1';
   const verticalClass = flipUp ? 'bottom-0' : 'top-0';
   const originY = flipUp ? 'bottom' : 'top';
-  const originX = flipLeft ? (isRtl ? 'left' : 'right') : (isRtl ? 'right' : 'left');
+  const originX = flipLeft ? 'right' : 'left';
 
   return (
-    <motion.div
+    <FrostedGlass
+      as="motion.div"
+      variant="menu"
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
@@ -701,13 +749,13 @@ function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={cn(
-        'absolute z-[10000] w-40 p-1 rounded-xl bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200/90 dark:border-zinc-800/80 shadow-[0_12px_32px_-4px_rgba(0,0,0,0.12),0_4px_12px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_16px_36px_-6px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.07)] space-y-0.5',
+        'absolute z-[10000] w-40 p-1 space-y-0.5',
         horizontalClass,
         verticalClass
       )}
     >
       {children}
-    </motion.div>
+    </FrostedGlass>
   );
 }
 

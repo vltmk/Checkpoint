@@ -108,7 +108,7 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent px-3 pr-8 text-xs font-mono text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
+          'w-full h-full bg-transparent px-3 pr-8 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
           inputClassName
         )}
         {...props}

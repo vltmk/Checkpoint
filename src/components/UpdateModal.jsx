@@ -108,10 +108,10 @@ export function UpdateModal({
         {/* Version Comparison Card */}
         <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <div className="space-y-0.5">
-            <span className={cn('text-[10px] text-zinc-500 font-mono uppercase tracking-wider block', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] text-zinc-500 uppercase tracking-wider block', isRtl && 'font-farsi')}>
               {t('update.currentVersion')}
             </span>
-            <span className="text-xs font-mono font-medium text-zinc-600 dark:text-zinc-400">
+            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               v{currentVersion}
             </span>
           </div>
@@ -119,10 +119,10 @@ export function UpdateModal({
           <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800" />
 
           <div className="space-y-0.5 text-right">
-            <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 font-mono uppercase tracking-wider block font-medium', isRtl && 'font-farsi')}>
+            <span className={cn('text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block font-medium', isRtl && 'font-farsi')}>
               {t('update.newVersion')}
             </span>
-            <span className="text-xs font-mono font-medium text-zinc-800 dark:text-zinc-200 flex items-center justify-end gap-1">
+            <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 flex items-center justify-end gap-1">
               <Sparkles className="w-3 h-3 text-emerald-500 dark:text-emerald-400" />
               <span>v{newVersion}</span>
             </span>
@@ -145,7 +145,7 @@ export function UpdateModal({
                 className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/90 text-xs text-zinc-700 dark:text-zinc-300 max-h-48 overflow-y-auto space-y-2 select-text"
               >
                 {notes.summary && (
-                  <p className={cn('text-zinc-700 dark:text-zinc-300 text-[11px] leading-relaxed', isBodyRTL && 'font-farsi text-right')}>
+                  <p className={cn('text-zinc-700 dark:text-zinc-300 text-[11px] leading-relaxed', isBodyRTL && 'text-right')}>
                     {notes.summary}
                   </p>
                 )}
@@ -167,9 +167,8 @@ export function UpdateModal({
                             <span
                               dir="ltr"
                               className={cn(
-                                'text-[9px] font-mono font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
-                                tagInfo.style,
-                                language === 'fa' && 'font-farsi text-[8.5px]'
+                                'text-[9px] font-medium uppercase px-1.5 py-0.5 rounded border shrink-0 mt-0.5 tracking-wider',
+                                tagInfo.style
                               )}
                             >
                               {tagInfo.label}
@@ -178,7 +177,7 @@ export function UpdateModal({
                             <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-600 mt-1.5 shrink-0" />
                           )}
 
-                          <span className={cn('break-words min-w-0 flex-1', itemRtl && 'text-right font-farsi')}>
+                          <span className={cn('break-words min-w-0 flex-1', itemRtl && 'text-right')}>
                             {text}
                           </span>
                         </li>
@@ -187,11 +186,10 @@ export function UpdateModal({
                   </ul>
                 ) : (
                   <div
-                    className={`whitespace-pre-wrap ${
-                      isBodyRTL
-                        ? 'font-farsi text-right tracking-normal leading-[1.75]'
-                        : 'font-sans leading-relaxed'
-                    }`}
+                    className={cn(
+                      'whitespace-pre-wrap leading-relaxed',
+                      isBodyRTL && 'text-right'
+                    )}
                   >
                     {updateInfo?.body || 'Performance enhancements, optimizations, and stability improvements.'}
                   </div>
@@ -204,7 +202,7 @@ export function UpdateModal({
         {/* Download Progress State */}
         {installState === 'downloading' && (
           <div className="space-y-2 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center justify-between text-xs">
               <span className={cn('text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                 <RotateCw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 animate-spin" />
                 <span>{t('update.downloading')}</span>
@@ -220,7 +218,7 @@ export function UpdateModal({
               />
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
+            <div className="flex items-center justify-between text-[10px] text-zinc-500">
               <span>{formatBytes(progress.downloadedBytes)}</span>
               <span>{progress.totalBytes > 0 ? formatBytes(progress.totalBytes) : 'Calculating...'}</span>
             </div>

@@ -19,7 +19,7 @@ import {
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
-import { CheckpointLogo } from './ui/Icons';
+import { CheckpointLogo, TomanIcon } from './ui/Icons';
 import checkpointLogo from '../assets/checkpoint.svg';
 import {
   minimizeWindow,
@@ -28,7 +28,6 @@ import {
   closeWindow,
   hideWindow,
   sendTrayNotification,
-  startDraggingWindow,
   isTauri,
   openExternalUrl,
 } from '../lib/desktop';
@@ -155,13 +154,6 @@ export function Navbar({
     }
   };
 
-  const handleHeaderMouseDown = (e) => {
-    // Only initiate window drag if left button and not clicking an interactive control
-    if (e.button === 0 && !e.target.closest('button, a, input, select, textarea, [data-no-drag]')) {
-      startDraggingWindow();
-    }
-  };
-
   const [isTourGuideDismissed, setIsTourGuideDismissed] = useState(false);
   const showTourGuide = isRateUpdateNeeded && !isTourGuideDismissed && !isRatesOpen;
 
@@ -180,7 +172,6 @@ export function Navbar({
     <header
       dir="ltr"
       data-tauri-drag-region
-      onMouseDown={handleHeaderMouseDown}
       onDoubleClick={handleHeaderDoubleClick}
       className="hidden md:flex h-12 w-full bg-white/95 dark:bg-black/95 border-b border-zinc-200 dark:border-zinc-900 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-700 dark:text-zinc-300 relative cursor-default gap-2"
     >
@@ -198,7 +189,7 @@ export function Navbar({
             CHECKPOINT
           </span>
           {appVersion && (
-            <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors">
+            <span className="hidden xl:inline-block text-[10px] text-zinc-500 px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 group-hover:border-zinc-300 dark:group-hover:border-zinc-700 transition-colors">
               v{appVersion}
             </span>
           )}
@@ -229,7 +220,7 @@ export function Navbar({
               title={`${t('nav.quickAdd')} (Q)`}
               className="add-work-btn-item flex items-center justify-center h-6 px-2 text-xs font-medium text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-zinc-100 dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
             >
-              <span className={cn('text-xs font-medium', isRtl ? 'font-farsi' : 'leading-none')}>
+              <span className="text-xs font-medium leading-normal">
                 {t('nav.quickAdd')}
               </span>
             </button>
@@ -240,7 +231,6 @@ export function Navbar({
       {/* 2. Center: Segmented Sliding Tab Switcher with Draggable Empty Gaps */}
       <div
         data-tauri-drag-region
-        onMouseDown={handleHeaderMouseDown}
         className="flex-1 flex items-center justify-center min-w-0 px-1 h-full cursor-default z-10"
       >
         <div data-no-drag className="bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/90 p-0.5 rounded-lg flex items-center gap-0.5 shadow-inner">
@@ -265,7 +255,7 @@ export function Navbar({
             <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
             {entriesCount > 0 && (
               <span
-                className={`text-[10px] font-mono px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
+                className={`text-[10px] px-1.5 py-0 h-4 inline-flex items-center justify-center leading-none rounded border ${
                   activeTab === 'ledger'
                     ? 'bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 font-medium'
                     : 'bg-zinc-200/50 text-zinc-600 border-zinc-300/60 dark:bg-zinc-900/80 dark:text-zinc-400 dark:border-zinc-800/80'
@@ -327,10 +317,10 @@ export function Navbar({
               }`}
             >
               <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="font-mono font-medium text-[11px] text-zinc-200 inline-flex items-baseline">
+              <span className="font-medium text-[11px] text-zinc-200 inline-flex items-center">
                 1<span className="text-[0.78em] text-zinc-400 font-medium select-none">k</span>
                 <span className="mx-1 text-zinc-500">=</span>
-                {goldRateTOMAN?.toLocaleString()} <span className="text-zinc-400 font-farsi text-[10px] ml-0.5">ت</span>
+                {goldRateTOMAN?.toLocaleString()} <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px] text-zinc-400 inline-block ml-0.5" />
               </span>
               <ChevronDown
                 className={`w-3 h-3 text-zinc-500 transition-transform duration-150 ${
@@ -409,7 +399,7 @@ export function Navbar({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-medium text-zinc-400">
                   <span className={cn('uppercase tracking-wider', isRtl && 'font-farsi')}>{language === 'fa' ? 'نرخ تبدیل گلد' : 'Gold Exchange Ratio'}</span>
-                  <span className="font-mono text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
+                  <span className="text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
                 </div>
                 <NumberStepperInput
                   step={50}
@@ -417,7 +407,7 @@ export function Navbar({
                   onChange={(e) => setTempRateTOMAN(e.target.value)}
                   placeholder="3200"
                   currency="TOMAN"
-                  className="text-xs font-mono h-8"
+                  className="text-xs h-8"
                 />
 
                 {/* Dynamic Quick Presets based on current/typed rate */}
@@ -439,7 +429,7 @@ export function Navbar({
                           key={pr}
                           type="button"
                           onClick={() => setTempRateTOMAN(pr)}
-                          className={`py-1 px-1 rounded text-[10px] font-mono border transition-colors ${
+                          className={`py-1 px-1 rounded text-[10px] border transition-colors ${
                             Number(tempRateTOMAN) === pr
                               ? 'bg-zinc-800 text-amber-300 border-amber-700/80 font-medium'
                               : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-800'
@@ -480,7 +470,7 @@ export function Navbar({
               type="button"
               onClick={onOpenUpdateModal}
               title={`Software Update v${updateInfo.version} Available`}
-              className="h-7 px-2 flex items-center gap-1.5 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/60 hover:text-emerald-100 text-xs font-mono transition-colors shadow-sm cursor-pointer"
+              className="h-7 px-2 flex items-center gap-1.5 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/60 hover:text-emerald-100 text-xs transition-colors shadow-sm cursor-pointer"
             >
               <ArrowUpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span className="font-medium text-[11px]">v{updateInfo.version}</span>
