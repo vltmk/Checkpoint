@@ -26,6 +26,63 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '3.0.2': {
+    date: '2026-09-08',
+    title: {
+      en: "What's New in Checkpoint v3.0.2",
+      fa: 'امکانات و تغییرات نسخه ۳.۰.۲',
+    },
+    summary: {
+      en: 'Team payout calculation mode with pot-based splits, enhanced input autocomplete behaviors, context menu navigation refinements, and UI polishing.',
+      fa: 'حالت محاسبه درآمد تیمی بر پایه پات کل، بهبود رفتار منوهای انتخابی، اصلاح ناوبری منوهای راست‌کلیک و بهینه‌سازی‌های ظاهری.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Team payout calculation mode: toggle between total pot distribution and direct individual income with automated teammate cuts.',
+        },
+        {
+          tag: 'improved',
+          text: 'Disabled intrusive browser autocomplete overlays on source and teammate selection comboboxes.',
+        },
+        {
+          tag: 'improved',
+          text: 'Smoother diagonal cursor navigation across nested context menu flyouts with an invisible hover bridge.',
+        },
+        {
+          tag: 'fix',
+          text: 'Prevented automatic assignment of "Direct Client" default in records and receipts when source is left empty.',
+        },
+        {
+          tag: 'improved',
+          text: 'Refined badge styling, frosted glass borders, and contrast calibration across light and dark modes.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'حالت محاسبه درآمد تیمی: امکان جابجایی بین پات کلی کار و درآمد فردی با محاسبه خودکار سهم هم‌تیمی‌ها.',
+        },
+        {
+          tag: 'improved',
+          text: 'غیرفعال‌سازی تکمیل خودکار مرورگر در منوهای انتخاب منبع و هم‌تیمی‌ها جهت جلوگیری از تداخل گزینه‌ها.',
+        },
+        {
+          tag: 'improved',
+          text: 'ناوبری روان‌تر ماوس روی زیرمنوهای راست‌کلیک با پل حرکتی شناور.',
+        },
+        {
+          tag: 'fix',
+          text: 'جلوگیری از مقداردهی پیش‌فرض "Direct Client" در رکوردها و رسیدها هنگامی که فیلد منبع خالی است.',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود کنتراست و جلوه بصری نشان‌ها و بج‌ها در تم روشن و تاریک.',
+        },
+      ],
+    },
+  },
   '3.0.1': {
     date: '2026-09-07',
     title: {

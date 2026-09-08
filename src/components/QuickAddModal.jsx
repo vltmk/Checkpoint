@@ -20,8 +20,6 @@ const LAST_GAME_KEY = 'checkpoint_quick_last_game';
 const LEGACY_LAST_GAME_KEY = 'vault_quick_last_game';
 const LAST_CUSTOM_GAME_KEY = 'checkpoint_quick_last_custom_game';
 const LEGACY_LAST_CUSTOM_GAME_KEY = 'vault_quick_last_custom_game';
-const LAST_SOURCE_KEY = 'checkpoint_quick_last_source';
-const LEGACY_LAST_SOURCE_KEY = 'vault_quick_last_source';
 const LAST_CURRENCY_KEY = 'checkpoint_quick_last_currency';
 const LEGACY_LAST_CURRENCY_KEY = 'vault_quick_last_currency';
 
@@ -98,6 +96,7 @@ export function QuickAddModal({
 
     setTitle('');
     setPrice('');
+    setSource('');
     setHasTitleError(false);
     setHasGameError(false);
     setHasPriceError(false);
@@ -107,12 +106,15 @@ export function QuickAddModal({
     entryIdRef.current = null;
 
     try {
+      // Purge any legacy cached source key
+      localStorage.removeItem('checkpoint_quick_last_source');
+      localStorage.removeItem('vault_quick_last_source');
+
       const savedGame = localStorage.getItem(LAST_GAME_KEY) || localStorage.getItem(LEGACY_LAST_GAME_KEY);
       const savedCustomGame = localStorage.getItem(LAST_CUSTOM_GAME_KEY) || localStorage.getItem(LEGACY_LAST_CUSTOM_GAME_KEY);
-      const savedSource = localStorage.getItem(LAST_SOURCE_KEY) || localStorage.getItem(LEGACY_LAST_SOURCE_KEY);
       const savedCurrency = localStorage.getItem(LAST_CURRENCY_KEY) || localStorage.getItem(LEGACY_LAST_CURRENCY_KEY);
 
-      const applySticky = (g, cg, s, c) => {
+      const applySticky = (g, cg, c) => {
         if (g) {
           if (g === '__custom__') {
             setGame('__custom__');
@@ -129,10 +131,6 @@ export function QuickAddModal({
           setCustomGameText('');
         }
 
-        if (s) {
-          setSource(s);
-        }
-
         if (c && ['TOMAN', 'GOLD'].includes(c)) {
           setCurrency(c);
         } else {
@@ -140,20 +138,18 @@ export function QuickAddModal({
         }
       };
 
-      applySticky(savedGame, savedCustomGame, savedSource, savedCurrency);
+      applySticky(savedGame, savedCustomGame, savedCurrency);
 
       // Also hydrate missing values from SQLite trackerDB
       Promise.all([
         trackerDB.getSetting(LAST_GAME_KEY, null),
         trackerDB.getSetting(LAST_CUSTOM_GAME_KEY, null),
-        trackerDB.getSetting(LAST_SOURCE_KEY, null),
         trackerDB.getSetting(LAST_CURRENCY_KEY, null),
-      ]).then(([dbGame, dbCustomGame, dbSource, dbCurrency]) => {
+      ]).then(([dbGame, dbCustomGame, dbCurrency]) => {
         const finalGame = savedGame || dbGame;
         const finalCustomGame = savedCustomGame || dbCustomGame;
-        const finalSource = savedSource || dbSource;
         const finalCurrency = savedCurrency || dbCurrency;
-        applySticky(finalGame, finalCustomGame, finalSource, finalCurrency);
+        applySticky(finalGame, finalCustomGame, finalCurrency);
       }).catch(() => {});
     } catch (e) {
       setGame('World of Warcraft');
@@ -249,10 +245,6 @@ export function QuickAddModal({
         localStorage.setItem(LAST_CUSTOM_GAME_KEY, customGameText);
         trackerDB.setSetting(LAST_CUSTOM_GAME_KEY, customGameText).catch(() => {});
       }
-      if (source.trim()) {
-        localStorage.setItem(LAST_SOURCE_KEY, source.trim());
-        trackerDB.setSetting(LAST_SOURCE_KEY, source.trim()).catch(() => {});
-      }
       localStorage.setItem(LAST_CURRENCY_KEY, currency);
       trackerDB.setSetting(LAST_CURRENCY_KEY, currency).catch(() => {});
     } catch (err) {}
@@ -263,7 +255,7 @@ export function QuickAddModal({
       title: title.trim(),
       dateTime: toLocalISOString(new Date()),
       game: selectedGame,
-      source: source.trim() || 'Direct Client',
+      source: source.trim(),
       teamMode: false,
       teammates: [],
       currency,

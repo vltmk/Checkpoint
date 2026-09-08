@@ -152,6 +152,10 @@ export function TeammatesCombobox({
         <input
           ref={inputRef}
           type="text"
+          name="checkpoint_teammate_input"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);

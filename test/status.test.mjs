@@ -8,11 +8,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currencies.js'), 'utf8');
-const i18nCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n.jsx'), 'utf8');
-const badgeCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'Badge.jsx'), 'utf8');
-const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8');
-const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8');
+const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currencies.js'), 'utf8').replace(/\r\n/g, '\n');
+const i18nCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n.jsx'), 'utf8').replace(/\r\n/g, '\n');
+const badgeCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'Badge.jsx'), 'utf8').replace(/\r\n/g, '\n');
+const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8').replace(/\r\n/g, '\n');
+const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 
 test('STATUSES includes Failed in currencies.js', () => {
   assert.ok(currenciesCode.includes("export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold', 'Failed'];"));

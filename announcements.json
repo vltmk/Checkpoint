@@ -1,7 +1,39 @@
 {
   "version": "1.0",
-  "updated_at": "2026-09-07T12:00:00Z",
+  "updated_at": "2026-09-08T00:00:00Z",
   "announcements": [
+    {
+      "id": "2026-09-08-checkpoint-v3-overview-fa",
+      "type": "info",
+      "title": "انتشار نسخه ۳ چک‌پوینت: دسته‌بندی‌های دلخواه، ارتقای عملکرد و رابط کاربری",
+      "message": "نسخه ۳ نرم‌افزار Checkpoint با تمرکز بر سرعت و کارایی، بازطراحی عناصر بصری و افزودن امکانات درخواستی کاربران منتشر شد. در این نسخه می‌توانید دسته‌بندی‌های کاری خود را کاملاً سفارشی‌سازی کنید و از تجربه کاربری سریع‌تر و روان‌تر لذت ببرید.",
+      "items": [
+        {
+          "tag": "new",
+          "text": "دسته‌بندی‌های دلخواه (Custom Categories) با رنگ‌های اختصاصی جهت مدیریت منعطف انواع بازی‌ها و فعالیت‌ها"
+        },
+        {
+          "tag": "improved",
+          "text": "ارتقای چشمگیر عملکرد و بهینه‌سازی سرعت پردازش و پاسخ‌دهی نرم‌افزار (Performance Enhancements)"
+        },
+        {
+          "tag": "improved",
+          "text": "بهبودهای جامع در رابط و تجربه کاربری، تعاملات بصری و انیمیشن‌ها (UI & UX Improvements)"
+        }
+      ],
+      "published_at": "2026-09-08T00:00:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": true,
+      "actions": [
+        {
+          "label": "مشاهده جزئیات نسخه در گیت‌هاب",
+          "url": "https://github.com/vltmk/Checkpoint/releases",
+          "type": "external_link",
+          "variant": "primary"
+        }
+      ]
+    },
     {
       "id": "2026-08-27-checkpoint-free-opensource-fa",
       "type": "success",
@@ -24,7 +56,7 @@
       "published_at": "2026-08-27T18:50:00Z",
       "expires_at": null,
       "dismissible": true,
-      "pinned": true,
+      "pinned": false,
       "actions": [
         {
           "label": "دانلود مستقیم نسخه ویندوز (exe)",

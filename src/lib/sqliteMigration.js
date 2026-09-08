@@ -85,7 +85,7 @@ export async function migrateLegacySqliteData({ mainDb, loadDatabase, now = () =
         `INSERT OR IGNORE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          row.id, row.title, row.game, row.source || 'Direct Client',
+          row.id, row.title, row.game, row.source || '',
           row.teamMode || 0, row.teammates || '[]', row.income || 0,
           row.currency || 'TOMAN', row.exchangeRate || 3200, row.rateUnit || '1k',
           row.status || 'Working', row.dateTime, row.hours || 0,

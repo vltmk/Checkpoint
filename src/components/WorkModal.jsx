@@ -190,7 +190,7 @@ export function WorkModal({
         source: editingEntry.source || '',
         teamMode: Boolean(editingEntry.teamMode || entryTeammates.length > 0),
         teammates: entryTeammates,
-        teamInputMode: editingEntry.pot ? 'pot' : 'income',
+        teamInputMode: editingEntry.teamInputMode || (editingEntry.pot !== null && editingEntry.pot !== undefined ? 'pot' : 'income'),
         pot: initialPot,
         income: editingEntry.income !== undefined && editingEntry.income !== null ? String(editingEntry.income) : '',
         teammateCuts: initialCuts,
@@ -215,13 +215,14 @@ export function WorkModal({
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           const draftTeammates = Array.isArray(parsed.teammates) ? parsed.teammates : [];
+          const draftSource = (parsed.source === 'Direct Client' ? '' : parsed.source) || '';
           setFormData({
             title: parsed.title || '',
             dateTime: parsed.dateTime || toLocalISOString(new Date()),
             game: parsed.game || 'World of Warcraft',
             isCustomGame: Boolean(parsed.isCustomGame),
             customGameText: parsed.customGameText || '',
-            source: parsed.source || '',
+            source: draftSource,
             teamMode: Boolean(parsed.teamMode || draftTeammates.length > 0),
             teammates: draftTeammates,
             teamInputMode: parsed.teamInputMode || 'pot',
@@ -621,9 +622,10 @@ export function WorkModal({
       title: formData.title.trim(),
       dateTime: formData.dateTime,
       game: selectedGame,
-      source: formData.source.trim() || 'Direct Client',
+      source: formData.source ? formData.source.trim() : '',
       teamMode: Boolean(formData.teamMode),
       teammates: formData.teamMode ? formData.teammates : [],
+      teamInputMode: formData.teamMode ? formData.teamInputMode : 'pot',
       pot: finalPot,
       income: userIncomeNum,
       teammateCuts: formData.teamMode ? formData.teammateCuts : {},

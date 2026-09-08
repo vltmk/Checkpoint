@@ -113,6 +113,10 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
         <input
           ref={inputRef}
           type="text"
+          name="checkpoint_job_source"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           value={value}
           onChange={(e) => {
             onChange?.(e.target.value);

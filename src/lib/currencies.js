@@ -245,7 +245,7 @@ ID         = ${receiptId}
 Date       = ${dateStr}
 Game       = ${entry.game || 'World of Warcraft'}
 Title      = ${entry.title || 'Work Record'}
-Source     = ${entry.source || 'Direct Client'}${
+Source     = ${entry.source || '-'}${
     isTeamWork
       ? `\nPot        = ${formattedPot} (${totalShares} Shares)\nYour Share = ${formattedIncome}\nTeam Cuts  = ${teamCutsBreakdown}`
       : `\nAmount     = ${formattedIncome}`

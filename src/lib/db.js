@@ -27,15 +27,19 @@ const STORE_SNAPSHOTS = 'db_snapshots';
 const REQUIRED_WORK_ENTRY_COLUMNS = [
   'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
   'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes', 'link',
+  'pot', 'teamInputMode', 'teammateCuts',
 ];
 
 const WORK_ENTRY_COLUMN_MIGRATIONS = {
-  source: "ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';",
+  source: "ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT '';",
   teamMode: 'ALTER TABLE work_entries ADD COLUMN teamMode INTEGER DEFAULT 0;',
   teammates: "ALTER TABLE work_entries ADD COLUMN teammates TEXT DEFAULT '[]';",
   exchangeRate: 'ALTER TABLE work_entries ADD COLUMN exchangeRate REAL DEFAULT 3200;',
   rateUnit: "ALTER TABLE work_entries ADD COLUMN rateUnit TEXT DEFAULT '1k';",
   link: "ALTER TABLE work_entries ADD COLUMN link TEXT DEFAULT '';",
+  pot: 'ALTER TABLE work_entries ADD COLUMN pot REAL DEFAULT NULL;',
+  teamInputMode: "ALTER TABLE work_entries ADD COLUMN teamInputMode TEXT DEFAULT 'pot';",
+  teammateCuts: "ALTER TABLE work_entries ADD COLUMN teammateCuts TEXT DEFAULT '{}';",
 };
 
 export class StorageDB {
@@ -289,7 +293,7 @@ export class StorageDB {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         game TEXT NOT NULL,
-        source TEXT DEFAULT 'Direct Client',
+        source TEXT DEFAULT '',
         teamMode INTEGER DEFAULT 0,
         teammates TEXT DEFAULT '[]',
         income REAL NOT NULL,
@@ -301,6 +305,9 @@ export class StorageDB {
         hours REAL DEFAULT 0,
         notes TEXT DEFAULT '',
         link TEXT DEFAULT '',
+        pot REAL DEFAULT NULL,
+        teamInputMode TEXT DEFAULT 'pot',
+        teammateCuts TEXT DEFAULT '{}',
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
@@ -526,6 +533,7 @@ export class StorageDB {
         const rows = await this.sqliteDb.select(`
           SELECT 
             w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
+            w.pot, w.teamInputMode, w.teammateCuts,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -546,15 +554,24 @@ export class StorageDB {
             else if (Array.isArray(r.teammates)) parsedTeammates = r.teammates;
           } catch (e) {}
 
+          let parsedTeammateCuts = {};
+          try {
+            if (typeof r.teammateCuts === 'string') parsedTeammateCuts = JSON.parse(r.teammateCuts);
+            else if (r.teammateCuts && typeof r.teammateCuts === 'object') parsedTeammateCuts = r.teammateCuts;
+          } catch (e) {}
+
           return {
             ...r,
-            source: r.source || 'Direct Client',
+            source: r.source || '',
             teamMode: Boolean(r.teamMode),
             teammates: parsedTeammates,
             currency: cur,
             exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
             rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
             link: r.link || '',
+            pot: r.pot !== null && r.pot !== undefined ? Number(r.pot) : null,
+            teamInputMode: r.teamInputMode === 'income' ? 'income' : 'pot',
+            teammateCuts: parsedTeammateCuts,
             proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
           };
         });
@@ -581,13 +598,16 @@ export class StorageDB {
           const defaultRate = isClassic ? 7000 : 3200;
           return {
             ...entry,
-            source: entry.source || 'Direct Client',
+            source: entry.source || '',
             teamMode: Boolean(entry.teamMode),
             teammates: Array.isArray(entry.teammates) ? entry.teammates : [],
             currency: cur,
             exchangeRate: Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate,
             rateUnit: entry.rateUnit || (isClassic ? '1' : '1k'),
             link: entry.link || '',
+            pot: entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null,
+            teamInputMode: entry.teamInputMode === 'income' ? 'income' : 'pot',
+            teammateCuts: entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {},
           };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
@@ -612,7 +632,7 @@ export class StorageDB {
 
         const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
         const defaultRate = isClassic ? 7000 : 3200;
-        entry.source = entry.source || 'Direct Client';
+        entry.source = entry.source || '';
         entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
         entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
         entry.link = entry.link || '';
@@ -624,6 +644,15 @@ export class StorageDB {
           entry.teammates = [];
         }
         entry.teamMode = Boolean(entry.teamMode);
+
+        entry.pot = entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null;
+        entry.teamInputMode = entry.teamInputMode === 'income' ? 'income' : 'pot';
+        try {
+          if (typeof entry.teammateCuts === 'string') entry.teammateCuts = JSON.parse(entry.teammateCuts);
+          else if (!entry.teammateCuts || typeof entry.teammateCuts !== 'object') entry.teammateCuts = {};
+        } catch (e) {
+          entry.teammateCuts = {};
+        }
 
         // Fetch full proofs attachments
         const proofRows = await this.sqliteDb.select(
@@ -652,12 +681,15 @@ export class StorageDB {
           if (!['USD', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
           const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
-          entry.source = entry.source || 'Direct Client';
+          entry.source = entry.source || '';
           entry.teamMode = Boolean(entry.teamMode);
           entry.teammates = Array.isArray(entry.teammates) ? entry.teammates : [];
           entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
           entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
           entry.link = entry.link || '';
+          entry.pot = entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null;
+          entry.teamInputMode = entry.teamInputMode === 'income' ? 'income' : 'pot';
+          entry.teammateCuts = entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {};
         }
         resolve(entry);
       };
@@ -677,15 +709,23 @@ export class StorageDB {
     const defaultRate = isClassic ? 7000 : 3200;
     const finalRate = Number(cleanEntry.exchangeRate) > 0 ? Number(cleanEntry.exchangeRate) : defaultRate;
     const finalUnit = cleanEntry.rateUnit || (isClassic ? '1' : '1k');
-    const finalSource = cleanEntry.source || 'Direct Client';
+    const finalSource = typeof cleanEntry.source === 'string' ? cleanEntry.source.trim() : '';
     const finalLink = typeof cleanEntry.link === 'string' ? cleanEntry.link.trim() : '';
     const teammatesJson = JSON.stringify(cleanEntry.teammates || []);
     const teamModeInt = cleanEntry.teamMode ? 1 : 0;
+    const finalPot = cleanEntry.pot !== null && cleanEntry.pot !== undefined && !Number.isNaN(Number(cleanEntry.pot))
+      ? Number(cleanEntry.pot)
+      : null;
+    const finalTeamInputMode = cleanEntry.teamInputMode === 'income' ? 'income' : 'pot';
+    const teammateCutsJson = JSON.stringify(cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {});
 
     cleanEntry.exchangeRate = finalRate;
     cleanEntry.rateUnit = finalUnit;
     cleanEntry.source = finalSource;
     cleanEntry.link = finalLink;
+    cleanEntry.pot = finalPot;
+    cleanEntry.teamInputMode = finalTeamInputMode;
+    cleanEntry.teammateCuts = cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {};
 
     if (this.isDesktop) {
       if (!this.sqliteDb) {
@@ -694,8 +734,8 @@ export class StorageDB {
 
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -712,6 +752,9 @@ export class StorageDB {
             Number(cleanEntry.hours) || 0,
             cleanEntry.notes || '',
             finalLink,
+            finalPot,
+            finalTeamInputMode,
+            teammateCutsJson,
           ]
         );
 

@@ -107,7 +107,7 @@ export function ReceiptModal({
 تاریخ: ${dateStr} ${timeStr}
 بازی: ${safeEntry.game || 'World of Warcraft'}
 عنوان کار: ${safeEntry.title || 'کار ثبت‌شده'}
-مشتری / سورس: ${safeEntry.source || 'مشتری مستقیم'}${
+مشتری / سورس: ${safeEntry.source || '-'}${
           isTeamWork
             ? `\nپات تیمی: ${formattedPot} (${formatNumber(totalShares)} سهم)\nسهم شما: ${formattedIncome}\nسهم هم‌تیمی‌ها: ${teamCutsBreakdown}`
             : `\n${safeEntry.status === 'Failed' ? 'مبلغ سفارش (پرداخت‌نشده)' : 'مبلغ درآمد'}: ${formattedIncome}`
@@ -121,7 +121,7 @@ Receipt ID: ${receiptId}
 Date: ${dateStr} ${timeStr}
 Game: ${safeEntry.game || 'World of Warcraft'}
 Work Title: ${safeEntry.title || 'Work Record'}
-Job Source: ${safeEntry.source || 'Direct Client'}${
+Job Source: ${safeEntry.source || '-'}${
           isTeamWork
             ? `\nPot: ${formattedPot} (${totalShares} Shares)\nYour Share: ${formattedIncome}\nTeam Cuts: ${teamCutsBreakdown}`
             : `\n${safeEntry.status === 'Failed' ? 'Order Value (Unpaid)' : 'Amount'}: ${formattedIncome}`
@@ -163,7 +163,7 @@ Notes: ${safeEntry.notes || 'None'}
 تاریخ      = ${dateStr}
 بازی       = ${safeEntry.game || 'World of Warcraft'}
 عنوان      = ${safeEntry.title || 'کار ثبت‌شده'}
-سورس       = ${safeEntry.source || 'مشتری مستقیم'}${
+سورس       = ${safeEntry.source || '-'}${
           isTeamWork
             ? `\nپات تیمی   = ${formattedPot} (${formatNumber(totalShares)} سهم)\nسهم شما    = ${formattedIncome}\nسهم تیم    = ${teamCutsBreakdown}`
             : `\n${safeEntry.status === 'Failed' ? 'مبلغ (پرداخت‌نشده)' : 'مبلغ       '} = ${formattedIncome}`
@@ -178,7 +178,7 @@ ID         = ${receiptId}
 Date       = ${dateStr}
 Game       = ${safeEntry.game || 'World of Warcraft'}
 Title      = ${safeEntry.title || 'Work Record'}
-Source     = ${safeEntry.source || 'Direct Client'}${
+Source     = ${safeEntry.source || '-'}${
           isTeamWork
             ? `\nPot        = ${formattedPot} (${totalShares} Shares)\nYour Share = ${formattedIncome}\nTeam Cuts  = ${teamCutsBreakdown}`
             : `\n${safeEntry.status === 'Failed' ? 'Amount (Unpaid)' : 'Amount     '} = ${formattedIncome}`
@@ -391,7 +391,7 @@ Notes      = ${safeEntry.notes || 'None'}
                   </button>
                 ) : (
                   <span className={cn('text-zinc-700 dark:text-zinc-300 font-medium mt-0.5 block leading-normal', isReceiptFa && 'font-farsi')}>
-                    {isReceiptFa ? 'مشتری مستقیم' : 'Direct Client'}
+                    -
                   </span>
                 )}
               </div>

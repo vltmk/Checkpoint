@@ -394,7 +394,9 @@ export function ContextMenu({
         }}
         className={cn(
           'w-56 p-1 text-zinc-800 dark:text-zinc-200 text-xs font-medium space-y-0.5',
-          isConstrained && 'overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.5)_transparent] dark:[scrollbar-color:rgba(113,113,122,0.5)_transparent]'
+          isConstrained
+            ? 'overflow-y-auto overflow-x-hidden [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.5)_transparent] dark:[scrollbar-color:rgba(113,113,122,0.5)_transparent]'
+            : 'overflow-visible'
         )}
       >
         {/* ==================================================================== */}
@@ -736,6 +738,10 @@ function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter
   const verticalClass = flipUp ? 'bottom-0' : 'top-0';
   const originY = flipUp ? 'bottom' : 'top';
   const originX = flipLeft ? 'right' : 'left';
+  // Safe bridge to cover the 4px gap between parent item and flyout
+  const bridgeClass = flipLeft
+    ? "before:content-[''] before:absolute before:top-0 before:bottom-0 before:w-3 before:-right-3 before:pointer-events-auto"
+    : "before:content-[''] before:absolute before:top-0 before:bottom-0 before:w-3 before:-left-3 before:pointer-events-auto";
 
   return (
     <FrostedGlass
@@ -751,7 +757,8 @@ function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter
       className={cn(
         'absolute z-[10000] w-40 p-1 space-y-0.5',
         horizontalClass,
-        verticalClass
+        verticalClass,
+        bridgeClass
       )}
     >
       {children}
