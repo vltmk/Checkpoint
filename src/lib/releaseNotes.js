@@ -26,6 +26,31 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '4.0.1': {
+    date: '2026-09-13',
+    title: {
+      en: "What's New in Checkpoint v4.0.1",
+      fa: 'تغییرات نسخه ۴.۰.۱',
+    },
+    summary: {
+      en: 'Quick patch fixing onboarding role selection dialog dismissal on first launch.',
+      fa: 'پچ سریع برای رفع مشکل بسته نشدن دیالوگ خوش‌آمدگویی انتخاب نقش هنگام شروع کار.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'fix',
+          text: 'Fixed Welcome role onboarding dialog (Booster vs Advertiser) not dismissing immediately upon clicking Get Started.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'fix',
+          text: 'رفع مشکل بسته نشدن فوری پنجره انتخاب نقش اولیه (بوستر / ادورتایزر) پس از فشردن دکمه شروع کار.',
+        },
+      ],
+    },
+  },
   '4.0.0': {
     date: '2026-09-13',
     title: {

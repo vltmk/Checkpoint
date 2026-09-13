@@ -8,7 +8,7 @@ import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import { PROFILES, setActiveProfileId } from '../../lib/profiles';
 
-export function ProfileOnboardingModal({ isOpen, onComplete }) {
+export function ProfileOnboardingModal({ isOpen, onComplete, onSelectRole }) {
   const { language, isRtl } = useLanguage();
   const [selectedRole, setSelectedRole] = useState('booster');
 
@@ -16,7 +16,11 @@ export function ProfileOnboardingModal({ isOpen, onComplete }) {
 
   const handleConfirm = () => {
     setActiveProfileId(selectedRole);
-    onComplete?.(selectedRole);
+    if (onSelectRole) {
+      onSelectRole(selectedRole);
+    } else if (onComplete) {
+      onComplete(selectedRole);
+    }
   };
 
   const ROLES = [

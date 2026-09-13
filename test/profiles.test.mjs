@@ -15,6 +15,15 @@ const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'view
 const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8');
 const receiptCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ReceiptModal.jsx'), 'utf8');
 const settingsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'SettingsModal.jsx'), 'utf8');
+const onboardingCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'ProfileOnboardingModal.jsx'), 'utf8');
+const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
+
+test('ProfileOnboardingModal supports onSelectRole and onComplete dismiss callbacks', () => {
+  assert.ok(onboardingCode.includes('onSelectRole'));
+  assert.ok(onboardingCode.includes('onComplete'));
+  assert.ok(appCode.includes('onSelectRole='));
+  assert.ok(appCode.includes('onComplete='));
+});
 
 test('profiles.js: defines booster and advertiser profiles with correct metadata', () => {
   assert.ok(profilesCode.includes("id: 'booster'"));

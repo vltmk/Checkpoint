@@ -1879,6 +1879,11 @@ export default function App() {
           setIsProfileOnboardingOpen(false);
           handleProfileChange(chosenRole);
         }}
+        onComplete={(chosenRole) => {
+          setProfileOnboardingCompleted(true);
+          setIsProfileOnboardingOpen(false);
+          handleProfileChange(chosenRole);
+        }}
       />
     </div>
   );
