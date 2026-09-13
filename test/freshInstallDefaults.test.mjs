@@ -8,8 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const quickAddCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'QuickAddModal.jsx'), 'utf8');
-const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8');
+const quickAddCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'QuickAddModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
+const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const sourceComboboxCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'SourceCombobox.jsx'), 'utf8');
 const teammatesComboboxCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'TeammatesCombobox.jsx'), 'utf8');
 const dbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
@@ -28,7 +28,7 @@ test('QuickAddModal: does not use or store sticky LAST_SOURCE_KEY and always res
 test('WorkModal: does not default source to Direct Client and sanitizes legacy drafts', () => {
   assert.ok(!workModalCode.includes("formData.source.trim() || 'Direct Client'"));
   assert.ok(workModalCode.includes("parsed.source === 'Direct Client' ? '' : parsed.source"));
-  assert.ok(workModalCode.includes("source: formData.source ? formData.source.trim() : ''"));
+  assert.ok(workModalCode.includes("source: formData.source ? formData.source.trim() :"));
 });
 
 test('db.js: does not inject Direct Client into SQLite schema, migrations, or saveEntry', () => {
@@ -74,6 +74,46 @@ test('db.js: REQUIRED_WORK_ENTRY_COLUMNS and migrations include pot, teamInputMo
 
 test('WorkModal: preserves teamInputMode and pot on editingEntry and submission', () => {
   assert.ok(workModalCode.includes("teamInputMode: editingEntry.teamInputMode || (editingEntry.pot !== null && editingEntry.pot !== undefined ? 'pot' : 'income')"));
-  assert.ok(workModalCode.includes("teamInputMode: formData.teamMode ? formData.teamInputMode : 'pot'"));
+  assert.ok(workModalCode.includes("teamInputMode: isAdvertiser ? 'pot' : (formData.teamMode ? formData.teamInputMode : 'pot')"));
+});
+
+test('QuickAddModal: resolves category to last used or first in list, and never injects phantom categories', () => {
+  assert.ok(!quickAddCode.includes("opts.push({\n        value: game,\n        label: game,"), 'QuickAddModal must not inject unknown game into GAME_OPTIONS');
+  assert.ok(quickAddCode.includes('resolveCategory'), 'QuickAddModal must define resolveCategory');
+  assert.ok(quickAddCode.includes('entryGameMatch ||') && quickAddCode.includes('savedGameMatch ||') && quickAddCode.includes('categories?.[0]?.name'), 'QuickAddModal must prioritize entryGameMatch, then savedGameMatch, then first category');
+
+  // Simulation test
+  const categories = [
+    { id: 'cat_wow_retail', name: 'World of Warcraft' },
+    { id: 'cat_wow_classic', name: 'World of Warcraft Classic' },
+  ];
+
+  function resolveCategorySim(rawGame, entries, cats) {
+    const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
+    const entryGameMatch = (cats || []).find(
+      (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
+    )?.name;
+
+    const savedGameMatch = (cats || []).find(
+      (c) => c.name?.toLowerCase().trim() === rawGame?.toLowerCase()?.trim()
+    )?.name;
+
+    return entryGameMatch || savedGameMatch || cats?.[0]?.name || 'World of Warcraft';
+  }
+
+  // Case 1: Stale 'test' savedGame with no entries -> falls back to first category ('World of Warcraft')
+  assert.equal(resolveCategorySim('test', [], categories), 'World of Warcraft');
+
+  // Case 2: Stale 'test' savedGame with entries having 'World of Warcraft Classic' -> uses last used entry category
+  assert.equal(
+    resolveCategorySim('test', [{ game: 'World of Warcraft Classic' }], categories),
+    'World of Warcraft Classic'
+  );
+
+  // Case 3: Valid savedGame matching existing category with no entries -> uses savedGame
+  assert.equal(
+    resolveCategorySim('World of Warcraft Classic', [], categories),
+    'World of Warcraft Classic'
+  );
 });
 

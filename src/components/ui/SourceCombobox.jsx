@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Plus, X, Bookmark, Check, Store } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Plus, X, Bookmark, Check, Store, Edit2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 import { trackerDB } from '../../lib/db';
+import { Button } from './Button';
 import { FrostedGlass } from './FrostedGlass';
 
 const LEGACY_PRESETS = new Set([
@@ -90,6 +92,57 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
     saveToStorage(updated);
   };
 
+  const [editingSource, setEditingSource] = useState(null);
+  const [editInputVal, setEditInputVal] = useState('');
+  const [confirmModal, setConfirmModal] = useState({ open: false, oldSource: '', newSource: '', count: 0 });
+
+  const startEditSource = (e, src) => {
+    e.stopPropagation();
+    setEditingSource(src);
+    setEditInputVal(src);
+  };
+
+  const handleSaveEdit = async (oldSrc, newSrc) => {
+    const trimmedNew = newSrc.trim();
+    if (!trimmedNew || trimmedNew.toLowerCase() === oldSrc.toLowerCase()) {
+      setEditingSource(null);
+      return;
+    }
+    try {
+      const count = await trackerDB.countEntriesWithSource(oldSrc);
+      if (count > 0) {
+        setConfirmModal({
+          open: true,
+          oldSource: oldSrc,
+          newSource: trimmedNew,
+          count,
+        });
+      } else {
+        applySourceRename(oldSrc, trimmedNew, false);
+      }
+    } catch (e) {
+      applySourceRename(oldSrc, trimmedNew, false);
+    }
+    setEditingSource(null);
+  };
+
+  const applySourceRename = async (oldSrc, newSrc, updateRecords = false) => {
+    if (updateRecords) {
+      try {
+        await trackerDB.renameSourceInEntries(oldSrc, newSrc);
+      } catch (err) {
+        console.error('Failed to rename source in entries:', err);
+      }
+    }
+    const updated = savedSources.map((s) => (s.toLowerCase() === oldSrc.toLowerCase() ? newSrc : s));
+    setSavedSources(updated);
+    saveToStorage(updated);
+    if (value.toLowerCase() === oldSrc.toLowerCase()) {
+      onChange?.(newSrc);
+    }
+    setConfirmModal({ open: false, oldSource: '', newSource: '', count: 0 });
+  };
+
   const handleDeleteSource = (e, srcToDelete) => {
     e.stopPropagation();
     const updated = savedSources.filter((s) => s !== srcToDelete);
@@ -161,7 +214,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
         <FrostedGlass
           variant="popover"
           dir={isRtl ? 'rtl' : 'ltr'}
-          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl p-1.5 space-y-1"
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl p-1.5 space-y-1"
         >
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
@@ -189,6 +242,49 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           ) : filteredSources.length > 0 ? (
             filteredSources.map((src) => {
               const isSelected = value.toLowerCase() === src.toLowerCase();
+              const isEditing = editingSource === src;
+
+              if (isEditing) {
+                return (
+                  <div
+                    key={src}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700"
+                  >
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editInputVal}
+                      onChange={(e) => setEditInputVal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit(src, editInputVal);
+                        if (e.key === 'Escape') setEditingSource(null);
+                      }}
+                      className={cn(
+                        'flex-1 min-w-0 h-6 px-1.5 text-xs rounded bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-750 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-zinc-400',
+                        isRtl && 'font-farsi'
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(src, editInputVal)}
+                      className="p-1 rounded text-emerald-600 dark:text-emerald-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                      title={language === 'fa' ? 'ذخیره نام جدید' : 'Save rename'}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingSource(null)}
+                      className="p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                      title={language === 'fa' ? 'انصراف' : 'Cancel'}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={src}
@@ -205,8 +301,16 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
                     <span className={cn('truncate', isRtl && 'font-farsi')}>{src}</span>
                   </span>
 
-                  <div className="flex items-center gap-1 shrink-0 ms-2" dir="ltr">
-                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />}
+                  <div className="flex items-center gap-0.5 shrink-0 ms-2" dir="ltr">
+                    {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 shrink-0 me-1" />}
+                    <button
+                      type="button"
+                      onClick={(e) => startEditSource(e, src)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-all"
+                      title={language === 'fa' ? `ویرایش نام "${src}"` : `Rename "${src}"`}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => handleDeleteSource(e, src)}
@@ -225,6 +329,60 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
             </div>
           )}
         </FrostedGlass>
+      )}
+
+      {/* Retroactive DB Update Confirmation Modal */}
+      {confirmModal.open && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
+          <FrostedGlass variant="modal" className="w-full max-w-sm rounded-2xl shadow-2xl p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className={cn('text-sm font-semibold text-zinc-900 dark:text-zinc-100', isRtl && 'font-farsi')}>
+                  {language === 'fa' ? 'بروزرسانی رکوردهای قبلی؟' : 'Update Existing Records?'}
+                </h3>
+                <p className={cn('text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
+                  {language === 'fa'
+                    ? `نام سورس از «${confirmModal.oldSource}» به «${confirmModal.newSource}» تغییر کرد. آیا می‌خواهید ${formatNumber(confirmModal.count)} رکورد قبلی نیز به نام جدید بروزرسانی شوند؟`
+                    : `You renamed "${confirmModal.oldSource}" to "${confirmModal.newSource}". Would you like to update ${confirmModal.count} older work record(s) that use this source?`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => setConfirmModal({ open: false, oldSource: '', newSource: '', count: 0 })}
+                className={cn('w-full sm:w-auto', isRtl && 'font-farsi')}
+              >
+                {language === 'fa' ? 'انصراف' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => applySourceRename(confirmModal.oldSource, confirmModal.newSource, false)}
+                className={cn('w-full sm:w-auto', isRtl && 'font-farsi')}
+              >
+                {language === 'fa' ? 'فقط لیست سورس‌ها' : 'Saved List Only'}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="xs"
+                onClick={() => applySourceRename(confirmModal.oldSource, confirmModal.newSource, true)}
+                className={cn('w-full sm:w-auto', isRtl && 'font-farsi')}
+              >
+                {language === 'fa' ? `بروزرسانی همه (${formatNumber(confirmModal.count)})` : `Update All (${confirmModal.count})`}
+              </Button>
+            </div>
+          </FrostedGlass>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Layers,
   BarChart3,
   Plus,
   Zap,
+  Megaphone,
   Settings,
   Bell,
+  ChevronDown,
 } from 'lucide-react';
 import { CheckpointLogo } from './ui/Icons';
-import { openExternalUrl } from '../lib/desktop';
+import { ProfilePopover } from './ui/ProfilePopover';
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
@@ -20,30 +22,52 @@ export function MobileHeader({
   onOpenNotifications,
   unreadNotificationsCount = 0,
   appVersion = '',
+  activeProfileId = 'booster',
+  onProfileChange,
+  boosterEntriesCount = 0,
+  advertiserEntriesCount = 0,
 }) {
-  const { t } = useLanguage();
-  return (
-    <header dir="ltr" className="md:hidden sticky top-0 z-40 w-full bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200 dark:border-zinc-800/80 px-4 py-2.5 flex items-center justify-between safe-top">
-      <button
-        type="button"
-        onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint')}
-        title="Open Checkpoint on GitHub"
-        className="flex items-center gap-2 active:opacity-75 transition-opacity text-left cursor-pointer"
-      >
-        <CheckpointLogo className="w-5 h-5 text-zinc-800 dark:text-zinc-200 shrink-0" />
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-black tracking-wider text-zinc-800 dark:text-zinc-200 uppercase">
-            CHECKPOINT
-          </span>
-          {appVersion && (
-            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
-              v{appVersion}
-            </span>
-          )}
-        </div>
-      </button>
+  const { t, language, isRtl } = useLanguage();
+  const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
 
-      <div className="flex items-center gap-2">
+  return (
+    <header dir="ltr" className="md:hidden sticky top-0 z-40 w-full bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200 dark:border-zinc-800/80 px-3 py-2.5 flex items-center justify-between safe-top">
+      {/* Brand & Profile Popover Trigger */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsProfilePopoverOpen((prev) => !prev)}
+          title="Switch Profile"
+          className="flex items-center gap-1.5 active:opacity-75 transition-opacity text-left cursor-pointer"
+        >
+          <CheckpointLogo className="w-5 h-5 text-zinc-800 dark:text-zinc-200 shrink-0" />
+          <div className="flex items-center gap-1">
+            <span className="text-xs font-black tracking-wider text-zinc-800 dark:text-zinc-200 uppercase">
+              CHECKPOINT
+            </span>
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-medium px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300">
+              {activeProfileId === 'advertiser' ? (
+                <Megaphone className="w-2.5 h-2.5 text-zinc-500" />
+              ) : (
+                <Zap className="w-2.5 h-2.5 text-zinc-500" />
+              )}
+              <ChevronDown className="w-2 h-2 text-zinc-400" />
+            </span>
+          </div>
+        </button>
+
+        <ProfilePopover
+          isOpen={isProfilePopoverOpen}
+          onClose={() => setIsProfilePopoverOpen(false)}
+          activeProfileId={activeProfileId}
+          onProfileChange={onProfileChange}
+          appVersion={appVersion}
+          boosterEntriesCount={boosterEntriesCount}
+          advertiserEntriesCount={advertiserEntriesCount}
+        />
+      </div>
+
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           onClick={onOpenNotifications}
@@ -55,21 +79,24 @@ export function MobileHeader({
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 ring-1 ring-zinc-100 dark:ring-zinc-950" />
           )}
         </button>
-        <button
-          type="button"
-          onClick={onOpenQuickAdd}
-          title="Quick Add Work"
-          className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-700 hover:text-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-100 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
-        >
-          <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
-        </button>
+
+        {activeProfileId === 'booster' && (
+          <button
+            type="button"
+            onClick={onOpenQuickAdd}
+            title="Quick Add Work"
+            className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-700 hover:text-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-100 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
+          >
+            <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
+          </button>
+        )}
 
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
+          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-300 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
         >
-          <span className="text-[11px] font-medium">{globalCurrency}</span>
+          <span className="text-[10px] font-medium">{globalCurrency}</span>
           <Settings className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
         </button>
       </div>
@@ -82,6 +109,7 @@ export function MobileBottomNav({
   onTabChange,
   onOpenWorkModal,
   onOpenQuickAdd,
+  activeProfileId = 'booster',
 }) {
   const { t, isRtl } = useLanguage();
   return (
@@ -99,24 +127,29 @@ export function MobileBottomNav({
           <span className={cn('leading-normal', isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
         </button>
 
-        {/* Center CTA Group: + Add Work & ⚡ Quick Add */}
+        {/* Center CTA Group */}
         <div className="flex items-center gap-1.5 -mt-3">
           <button
             type="button"
             onClick={onOpenWorkModal}
             title={`${t('nav.addWork')} (N)`}
-            className="mobile-add-work-btn flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 text-zinc-100 border border-zinc-800 dark:bg-white dark:text-zinc-900 dark:border-zinc-200 shadow-lg active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer"
+            className={cn(
+              'mobile-add-work-btn flex items-center justify-center rounded-full bg-zinc-900 text-zinc-100 border border-zinc-800 dark:bg-white dark:text-zinc-900 dark:border-zinc-200 shadow-lg active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-800 dark:hover:bg-zinc-100 cursor-pointer',
+              activeProfileId === 'advertiser' ? 'w-11 h-11' : 'w-10 h-10'
+            )}
           >
             <Plus className="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            onClick={onOpenQuickAdd}
-            title={`${t('nav.quickAdd')} (Q)`}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 text-zinc-800 border border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 shadow-sm active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
-          >
-            <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
-          </button>
+          {activeProfileId === 'booster' && (
+            <button
+              type="button"
+              onClick={onOpenQuickAdd}
+              title={`${t('nav.quickAdd')} (Q)`}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 text-zinc-800 border border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 shadow-sm active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+          )}
         </div>
 
         {/* Tab 2: Analytics */}
@@ -136,3 +169,4 @@ export function MobileBottomNav({
 }
 
 export default MobileBottomNav;
+

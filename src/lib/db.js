@@ -17,6 +17,7 @@ import {
   migrateLegacySqliteData as runLegacySqliteMigration,
   SQLITE_MAIN_PATH,
 } from './sqliteMigration';
+import { getActiveProfileId, PROFILES, SHARED_SYNC_SETTING_KEYS } from './profiles';
 
 const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
@@ -27,7 +28,7 @@ const STORE_SNAPSHOTS = 'db_snapshots';
 const REQUIRED_WORK_ENTRY_COLUMNS = [
   'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
   'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes', 'link',
-  'pot', 'teamInputMode', 'teammateCuts',
+  'pot', 'teamInputMode', 'teammateCuts', 'orderId', 'feeRate', 'sourcePaid',
 ];
 
 const WORK_ENTRY_COLUMN_MIGRATIONS = {
@@ -40,6 +41,9 @@ const WORK_ENTRY_COLUMN_MIGRATIONS = {
   pot: 'ALTER TABLE work_entries ADD COLUMN pot REAL DEFAULT NULL;',
   teamInputMode: "ALTER TABLE work_entries ADD COLUMN teamInputMode TEXT DEFAULT 'pot';",
   teammateCuts: "ALTER TABLE work_entries ADD COLUMN teammateCuts TEXT DEFAULT '{}';",
+  orderId: "ALTER TABLE work_entries ADD COLUMN orderId TEXT DEFAULT '';",
+  feeRate: 'ALTER TABLE work_entries ADD COLUMN feeRate REAL DEFAULT NULL;',
+  sourcePaid: 'ALTER TABLE work_entries ADD COLUMN sourcePaid INTEGER DEFAULT 0;',
 };
 
 export class StorageDB {
@@ -47,6 +51,7 @@ export class StorageDB {
     this.sqliteDb = null;
     this.idb = null;
     this.isDesktop = isTauri();
+    this.activeProfile = getActiveProfileId();
     this.storageStatus = {
       driver: this.isDesktop ? 'sqlite' : 'indexeddb',
       state: 'initializing',
@@ -61,6 +66,122 @@ export class StorageDB {
     };
     this.initPromise = this.init();
     this.retryPromise = null;
+  }
+
+  getActiveProfile() {
+    return this.activeProfile || 'booster';
+  }
+
+  getSqliteDbPath() {
+    const profile = PROFILES[this.activeProfile] || PROFILES.booster;
+    return profile.dbPath || SQLITE_MAIN_PATH;
+  }
+
+  getIdbDatabaseName() {
+    return this.activeProfile === 'advertiser' ? 'CheckpointDB_advertiser_v1' : DB_NAME_IDB;
+  }
+
+  async switchProfile(profileId) {
+    if (!PROFILES[profileId] || this.activeProfile === profileId) {
+      return this.getStorageStatus();
+    }
+
+    const previousProfile = this.activeProfile;
+    this.activeProfile = profileId;
+
+    if (this.isDesktop) {
+      if (this.sqliteDb) {
+        try {
+          const oldPath = PROFILES[previousProfile]?.dbPath || SQLITE_MAIN_PATH;
+          await closeSqlitePool(this.sqliteDb, oldPath);
+        } catch (e) {}
+        this.sqliteDb = null;
+      }
+      this.initPromise = this.initDesktopStorage();
+      await this.initPromise;
+    } else {
+      if (this.idb) {
+        try {
+          this.idb.close();
+        } catch (e) {}
+        this.idb = null;
+      }
+      this.initPromise = this.initIndexedDB();
+      await this.initPromise;
+    }
+
+    await this.syncSharedSettings().catch(() => {});
+    return this.getStorageStatus();
+  }
+
+  async syncSharedSettings() {
+    if (typeof localStorage === 'undefined') return;
+    for (const key of SHARED_SYNC_SETTING_KEYS) {
+      const val = localStorage.getItem(key);
+      if (val !== null) {
+        try {
+          const parsed = JSON.parse(val);
+          await this.setSetting(key, parsed);
+        } catch (e) {
+          await this.setSetting(key, val);
+        }
+      }
+    }
+  }
+
+  async getProfileCounts() {
+    await this.initPromise;
+    const counts = { booster: 0, advertiser: 0 };
+    if (this.isDesktop) {
+      try {
+        const Database = (await import('@tauri-apps/plugin-sql')).default;
+        for (const pid of ['booster', 'advertiser']) {
+          const pPath = PROFILES[pid]?.dbPath || SQLITE_MAIN_PATH;
+          if (pid === this.activeProfile && this.sqliteDb) {
+            const res = await this.sqliteDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+            counts[pid] = res?.[0]?.cnt || 0;
+          } else {
+            try {
+              const tempDb = await Database.load(pPath);
+              const res = await tempDb.select('SELECT COUNT(*) as cnt FROM work_entries');
+              counts[pid] = res?.[0]?.cnt || 0;
+              await closeSqlitePool(tempDb, pPath);
+            } catch (e) {
+              counts[pid] = 0;
+            }
+          }
+        }
+      } catch (err) {}
+    } else if (typeof indexedDB !== 'undefined') {
+      try {
+        for (const pid of ['booster', 'advertiser']) {
+          const dbName = PROFILES[pid]?.idbDatabaseName || IDB_MAIN_DATABASE_NAME;
+          counts[pid] = await new Promise((resolve) => {
+            const req = indexedDB.open(dbName, IDB_SCHEMA_VERSION);
+            req.onsuccess = (e) => {
+              const idb = e.target.result;
+              if (!idb.objectStoreNames.contains(IDB_ENTRIES_STORE_NAME)) {
+                idb.close();
+                return resolve(0);
+              }
+              const tx = idb.transaction(IDB_ENTRIES_STORE_NAME, 'readonly');
+              const countReq = tx.objectStore(IDB_ENTRIES_STORE_NAME).count();
+              countReq.onsuccess = () => {
+                const c = countReq.result || 0;
+                idb.close();
+                resolve(c);
+              };
+              countReq.onerror = () => {
+                idb.close();
+                resolve(0);
+              };
+            };
+            req.onerror = () => resolve(0);
+          });
+        }
+      } catch (e) {}
+    }
+    return counts;
   }
 
   async init() {
@@ -91,17 +212,22 @@ export class StorageDB {
     let stage = STORAGE_INITIALIZATION_STAGES.LOAD;
     this.setInitializationStage(stage);
 
+    const dbPath = this.getSqliteDbPath();
+
     try {
       const Database = (await import('@tauri-apps/plugin-sql')).default;
-      this.sqliteDb = await Database.load(SQLITE_MAIN_PATH);
+      this.sqliteDb = await Database.load(dbPath);
 
       stage = STORAGE_INITIALIZATION_STAGES.SCHEMA;
       this.setInitializationStage(stage);
       await this.initSqliteSchema();
 
-      stage = STORAGE_INITIALIZATION_STAGES.LEGACY_MIGRATION;
-      this.setInitializationStage(stage);
-      await this.migrateLegacySqliteData(Database);
+      // Legacy SQLite migration only on the canonical booster DB
+      if (this.activeProfile === 'booster') {
+        stage = STORAGE_INITIALIZATION_STAGES.LEGACY_MIGRATION;
+        this.setInitializationStage(stage);
+        await this.migrateLegacySqliteData(Database);
+      }
       await this.verifySqliteConnection();
 
       stage = STORAGE_INITIALIZATION_STAGES.INTEGRITY_CHECK;
@@ -122,13 +248,17 @@ export class StorageDB {
         lastOperation: 'initialize',
         lastError: null,
       };
+
+      // Sync shared metadata in background
+      this.syncSharedSettings().catch(() => {});
+
       return this.sqliteDb;
     } catch (err) {
       const storageError = this.recordStorageError(err, 'initialize', stage);
       console.warn('Failed to initialize Tauri SQLite:', storageError.safeMessage);
       if (this.sqliteDb) {
         try {
-          await closeSqlitePool(this.sqliteDb, SQLITE_MAIN_PATH);
+          await closeSqlitePool(this.sqliteDb, dbPath);
         } catch (closeErr) {}
       }
       this.sqliteDb = null;
@@ -308,6 +438,9 @@ export class StorageDB {
         pot REAL DEFAULT NULL,
         teamInputMode TEXT DEFAULT 'pot',
         teammateCuts TEXT DEFAULT '{}',
+        orderId TEXT DEFAULT '',
+        feeRate REAL DEFAULT NULL,
+        sourcePaid INTEGER DEFAULT 0,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
@@ -318,6 +451,8 @@ export class StorageDB {
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_datetime ON work_entries(dateTime DESC);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_status ON work_entries(status);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_game ON work_entries(game);`);
+    await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_order_id ON work_entries(orderId);`);
+    await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_source_paid ON work_entries(sourcePaid);`);
 
     // 2. Dedicated proof attachments table (lazy-loaded on demand)
     await this.sqliteDb.execute(`
@@ -490,7 +625,7 @@ export class StorageDB {
     }
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME_IDB, DB_VERSION_IDB);
+      const request = indexedDB.open(this.getIdbDatabaseName(), DB_VERSION_IDB);
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
@@ -533,7 +668,7 @@ export class StorageDB {
         const rows = await this.sqliteDb.select(`
           SELECT 
             w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
-            w.pot, w.teamInputMode, w.teammateCuts,
+            w.pot, w.teamInputMode, w.teammateCuts, w.orderId, w.feeRate, w.sourcePaid,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -572,6 +707,9 @@ export class StorageDB {
             pot: r.pot !== null && r.pot !== undefined ? Number(r.pot) : null,
             teamInputMode: r.teamInputMode === 'income' ? 'income' : 'pot',
             teammateCuts: parsedTeammateCuts,
+            orderId: r.orderId || '',
+            feeRate: r.feeRate !== null && r.feeRate !== undefined && !isNaN(Number(r.feeRate)) ? Number(r.feeRate) : null,
+            sourcePaid: Boolean(r.sourcePaid),
             proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
           };
         });
@@ -608,6 +746,9 @@ export class StorageDB {
             pot: entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null,
             teamInputMode: entry.teamInputMode === 'income' ? 'income' : 'pot',
             teammateCuts: entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {},
+            orderId: entry.orderId || '',
+            feeRate: entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null,
+            sourcePaid: Boolean(entry.sourcePaid),
           };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
@@ -636,6 +777,9 @@ export class StorageDB {
         entry.exchangeRate = Number(entry.exchangeRate) > 0 ? Number(entry.exchangeRate) : defaultRate;
         entry.rateUnit = entry.rateUnit || (isClassic ? '1' : '1k');
         entry.link = entry.link || '';
+        entry.orderId = entry.orderId || '';
+        entry.feeRate = entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null;
+        entry.sourcePaid = Boolean(entry.sourcePaid);
 
         try {
           if (typeof entry.teammates === 'string') entry.teammates = JSON.parse(entry.teammates);
@@ -690,6 +834,9 @@ export class StorageDB {
           entry.pot = entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null;
           entry.teamInputMode = entry.teamInputMode === 'income' ? 'income' : 'pot';
           entry.teammateCuts = entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {};
+          entry.orderId = entry.orderId || '';
+          entry.feeRate = entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null;
+          entry.sourcePaid = Boolean(entry.sourcePaid);
         }
         resolve(entry);
       };
@@ -718,6 +865,11 @@ export class StorageDB {
       : null;
     const finalTeamInputMode = cleanEntry.teamInputMode === 'income' ? 'income' : 'pot';
     const teammateCutsJson = JSON.stringify(cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {});
+    const finalOrderId = typeof cleanEntry.orderId === 'string' ? cleanEntry.orderId.trim() : '';
+    const finalFeeRate = cleanEntry.feeRate !== null && cleanEntry.feeRate !== undefined && !Number.isNaN(Number(cleanEntry.feeRate))
+      ? Number(cleanEntry.feeRate)
+      : null;
+    const finalSourcePaid = cleanEntry.sourcePaid ? 1 : 0;
 
     cleanEntry.exchangeRate = finalRate;
     cleanEntry.rateUnit = finalUnit;
@@ -726,6 +878,9 @@ export class StorageDB {
     cleanEntry.pot = finalPot;
     cleanEntry.teamInputMode = finalTeamInputMode;
     cleanEntry.teammateCuts = cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {};
+    cleanEntry.orderId = finalOrderId;
+    cleanEntry.feeRate = finalFeeRate;
+    cleanEntry.sourcePaid = Boolean(finalSourcePaid);
 
     if (this.isDesktop) {
       if (!this.sqliteDb) {
@@ -734,8 +889,8 @@ export class StorageDB {
 
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, orderId, feeRate, sourcePaid, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -755,6 +910,9 @@ export class StorageDB {
             finalPot,
             finalTeamInputMode,
             teammateCutsJson,
+            finalOrderId,
+            finalFeeRate,
+            finalSourcePaid,
           ]
         );
 
@@ -912,6 +1070,45 @@ export class StorageDB {
     });
   }
 
+  async updateSourcePaid(id, sourcePaid) {
+    await this.initPromise;
+    if (!id) return false;
+    const isPaidInt = sourcePaid ? 1 : 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        await this.sqliteDb.execute(
+          'UPDATE work_entries SET sourcePaid = ?, updated_at = ? WHERE id = ?',
+          [isPaidInt, nowSec, id]
+        );
+        return true;
+      } catch (err) {
+        console.error('SQLite updateSourcePaid error:', err);
+        return false;
+      }
+    }
+
+    // Browser IndexedDB Fallback
+    if (!this.idb) return false;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const entry = getReq.result;
+        if (entry) {
+          entry.sourcePaid = Boolean(sourcePaid);
+          entry.updatedAt = new Date().toISOString();
+          store.put(entry);
+        }
+      };
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  }
+
   async bulkImport(entries) {
     await this.initPromise;
     if (!Array.isArray(entries)) return false;
@@ -960,6 +1157,249 @@ export class StorageDB {
           resolve(true);
         }
       };
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async countEntriesWithSource(source) {
+    await this.initPromise;
+    const clean = typeof source === 'string' ? source.trim() : '';
+    if (!clean) return 0;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const rows = await this.sqliteDb.select(
+          'SELECT COUNT(*) as cnt FROM work_entries WHERE LOWER(source) = LOWER(?)',
+          [clean]
+        );
+        return rows?.[0]?.cnt || 0;
+      } catch (err) {
+        return 0;
+      }
+    }
+
+    if (!this.idb) return 0;
+    return new Promise((resolve) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readonly');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const request = store.openCursor();
+      let count = 0;
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          if (cursor.value.source && cursor.value.source.trim().toLowerCase() === clean.toLowerCase()) {
+            count++;
+          }
+          cursor.continue();
+        } else {
+          resolve(count);
+        }
+      };
+      request.onerror = () => resolve(0);
+    });
+  }
+
+  async renameSourceInEntries(oldSource, newSource) {
+    await this.initPromise;
+    const oldClean = typeof oldSource === 'string' ? oldSource.trim() : '';
+    const newClean = typeof newSource === 'string' ? newSource.trim() : '';
+    if (!oldClean || !newClean || oldClean.toLowerCase() === newClean.toLowerCase()) return 0;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const result = await this.sqliteDb.execute(
+          'UPDATE work_entries SET source = ?, updated_at = strftime("%s", "now") WHERE LOWER(source) = LOWER(?)',
+          [newClean, oldClean]
+        );
+        return result?.rowsAffected ?? 1;
+      } catch (err) {
+        console.error('SQLite renameSourceInEntries error:', err);
+        return 0;
+      }
+    }
+
+    if (!this.idb) return 0;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const request = store.openCursor();
+      let count = 0;
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const entry = cursor.value;
+          if (entry.source && entry.source.trim().toLowerCase() === oldClean.toLowerCase()) {
+            entry.source = newClean;
+            entry.updatedAt = new Date().toISOString();
+            cursor.update(entry);
+            count++;
+          }
+          cursor.continue();
+        } else {
+          resolve(count);
+        }
+      };
+
+      request.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async countEntriesWithTeammate(teammate) {
+    await this.initPromise;
+    const clean = typeof teammate === 'string' ? teammate.trim() : '';
+    if (!clean) return 0;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const rows = await this.sqliteDb.select(
+          'SELECT teammates FROM work_entries WHERE teammates LIKE ?',
+          [`%${clean}%`]
+        );
+        let count = 0;
+        for (const row of rows) {
+          try {
+            const list = typeof row.teammates === 'string' ? JSON.parse(row.teammates) : (row.teammates || []);
+            if (Array.isArray(list) && list.some((t) => typeof t === 'string' && t.trim().toLowerCase() === clean.toLowerCase())) {
+              count++;
+            }
+          } catch (e) {}
+        }
+        return count;
+      } catch (err) {
+        return 0;
+      }
+    }
+
+    if (!this.idb) return 0;
+    return new Promise((resolve) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readonly');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const request = store.openCursor();
+      let count = 0;
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const list = cursor.value.teammates;
+          if (Array.isArray(list) && list.some((t) => typeof t === 'string' && t.trim().toLowerCase() === clean.toLowerCase())) {
+            count++;
+          }
+          cursor.continue();
+        } else {
+          resolve(count);
+        }
+      };
+      request.onerror = () => resolve(0);
+    });
+  }
+
+  async renameTeammateInEntries(oldTeammate, newTeammate) {
+    await this.initPromise;
+    const oldClean = typeof oldTeammate === 'string' ? oldTeammate.trim() : '';
+    const newClean = typeof newTeammate === 'string' ? newTeammate.trim() : '';
+    if (!oldClean || !newClean || oldClean.toLowerCase() === newClean.toLowerCase()) return 0;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const rows = await this.sqliteDb.select(
+          'SELECT id, teammates, teammateCuts FROM work_entries WHERE teammates LIKE ?',
+          [`%${oldClean}%`]
+        );
+        let updatedCount = 0;
+        const nowSec = Math.floor(Date.now() / 1000);
+
+        for (const row of rows) {
+          let list = [];
+          try {
+            list = typeof row.teammates === 'string' ? JSON.parse(row.teammates) : (row.teammates || []);
+          } catch (e) {
+            list = [];
+          }
+          if (!Array.isArray(list)) list = [];
+
+          let matched = false;
+          const updatedList = list.map((tm) => {
+            if (typeof tm === 'string' && tm.trim().toLowerCase() === oldClean.toLowerCase()) {
+              matched = true;
+              return newClean;
+            }
+            return tm;
+          });
+
+          let cuts = {};
+          try {
+            cuts = typeof row.teammateCuts === 'string' ? JSON.parse(row.teammateCuts) : (row.teammateCuts || {});
+          } catch (e) {
+            cuts = {};
+          }
+          if (cuts && typeof cuts === 'object') {
+            for (const key of Object.keys(cuts)) {
+              if (key.trim().toLowerCase() === oldClean.toLowerCase()) {
+                cuts[newClean] = cuts[key];
+                delete cuts[key];
+                matched = true;
+              }
+            }
+          }
+
+          if (matched) {
+            await this.sqliteDb.execute(
+              'UPDATE work_entries SET teammates = ?, teammateCuts = ?, updated_at = ? WHERE id = ?',
+              [JSON.stringify(updatedList), JSON.stringify(cuts), nowSec, row.id]
+            );
+            updatedCount++;
+          }
+        }
+        return updatedCount;
+      } catch (err) {
+        console.error('SQLite renameTeammateInEntries error:', err);
+        return 0;
+      }
+    }
+
+    if (!this.idb) return 0;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const request = store.openCursor();
+      let count = 0;
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const entry = cursor.value;
+          let matched = false;
+          if (Array.isArray(entry.teammates)) {
+            entry.teammates = entry.teammates.map((tm) => {
+              if (typeof tm === 'string' && tm.trim().toLowerCase() === oldClean.toLowerCase()) {
+                matched = true;
+                return newClean;
+              }
+              return tm;
+            });
+          }
+          if (entry.teammateCuts && typeof entry.teammateCuts === 'object') {
+            for (const key of Object.keys(entry.teammateCuts)) {
+              if (key.trim().toLowerCase() === oldClean.toLowerCase()) {
+                entry.teammateCuts[newClean] = entry.teammateCuts[key];
+                delete entry.teammateCuts[key];
+                matched = true;
+              }
+            }
+          }
+          if (matched) {
+            entry.updatedAt = new Date().toISOString();
+            cursor.update(entry);
+            count++;
+          }
+          cursor.continue();
+        } else {
+          resolve(count);
+        }
+      };
+
       request.onerror = (e) => reject(e.target.error);
     });
   }
@@ -1085,12 +1525,14 @@ export class StorageDB {
 
   async autoCreateDailySnapshot() {
     try {
+      const profileId = this.activeProfile || 'booster';
       const today = new Date().toISOString().slice(0, 10);
-      const lastSnapKey = 'checkpoint_last_auto_snapshot_date';
+      const lastSnapKey = `checkpoint_last_auto_snapshot_date_${profileId}`;
       const lastDate = await this.getSetting(lastSnapKey, '');
 
       if (lastDate !== today) {
-        await this.createSnapshot(`Daily Snapshot (${today})`);
+        const roleLabel = profileId === 'advertiser' ? 'Advertiser' : 'Booster';
+        await this.createSnapshot(`${roleLabel} Daily Snapshot (${today})`);
         await this.setSetting(lastSnapKey, today);
       }
     } catch (e) {
@@ -1104,15 +1546,17 @@ export class StorageDB {
       // Get all entries with full proofs
       const entries = await this.getAllEntriesFull();
       const version = await getAppVersion();
+      const profileId = this.activeProfile || 'booster';
       const snapshot = {
         app: 'CHECKPOINT',
+        profile: profileId,
         version: version || '0.0.0',
         timestamp: new Date().toISOString(),
         entries,
       };
 
       const id = 'snap_' + Date.now();
-      const snapName = name || `Backup ${new Date().toLocaleString()}`;
+      const snapName = name || `${profileId === 'advertiser' ? 'Advertiser' : 'Booster'} Backup ${new Date().toLocaleString()}`;
 
       if (this.isDesktop && this.sqliteDb) {
         await this.sqliteDb.execute(

@@ -37,9 +37,10 @@ import {
   Gamepad2,
   Plus,
   Edit2,
+  Zap,
 } from 'lucide-react';
 import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative, openPathNative } from '../lib/desktop';
-import { DiscordIcon, TelegramIcon, TomanIcon } from './ui/Icons';
+import { DiscordIcon, GithubIcon, TomanIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
 import { useTheme } from 'next-themes';
 import { Input } from './ui/Input';
@@ -56,6 +57,8 @@ export function SettingsModal({
   onCurrencyChange,
   categories = [],
   onRefreshCategories,
+  activeProfileId = 'booster',
+  onProfileChange,
   closeToTray = true,
   onCloseToTrayChange,
   minimizeToTray = false,
@@ -86,6 +89,8 @@ export function SettingsModal({
   onThemeChange,
   handleThemeChange,
   initialScrollSection = null,
+  cockpitFluidEnabled = true,
+  onCockpitFluidEnabledChange,
 }) {
   const { language, setLanguage, t, isRtl, formatNumber } = useLanguage();
   const fileInputRef = useRef(null);
@@ -265,6 +270,43 @@ export function SettingsModal({
           accept=".json"
           className="hidden"
         />
+
+        {/* Active Profile & Database Isolation */}
+        <div className="p-3 rounded-xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-base shrink-0">{activeProfileId === 'advertiser' ? '📢' : '⚡'}</span>
+              <div className="min-w-0">
+                <div className={cn('text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 flex-wrap', isRtl && 'font-farsi')}>
+                  <span>{activeProfileId === 'advertiser' ? (language === 'fa' ? 'پروفایل ادورتایزر' : 'Advertiser Profile') : (language === 'fa' ? 'پروفایل بوستر' : 'Booster Profile')}</span>
+                  <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-mono">
+                    {isDesktop ? (activeProfileId === 'advertiser' ? 'checkpoint_advertiser.db' : 'checkpoint.db') : (activeProfileId === 'advertiser' ? 'checkpoint_advertiser' : 'checkpoint_local_db')}
+                  </span>
+                </div>
+                <p className={cn('text-[11px] text-zinc-500 truncate mt-0.5', isRtl && 'font-farsi')}>
+                  {activeProfileId === 'advertiser'
+                    ? (language === 'fa' ? 'سفارشات مشتریان، شناسه سفارش و کارمزدها' : 'Client orders, order IDs, booster payouts & commissions')
+                    : (language === 'fa' ? 'رهگیری بوست‌ها، پات‌های تیمی و درآمدهای شخصی' : 'Boost tracking, team pot splits & personal earnings')}
+                </p>
+              </div>
+            </div>
+
+            {onProfileChange && (
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => {
+                  const nextProfile = activeProfileId === 'advertiser' ? 'booster' : 'advertiser';
+                  onProfileChange(nextProfile);
+                }}
+                className={cn('h-7 px-2.5 text-xs shrink-0 font-medium', isRtl && 'font-farsi')}
+                title="Ctrl+Shift+P"
+              >
+                <span>{activeProfileId === 'advertiser' ? (language === 'fa' ? 'تغییر به بوستر' : 'Switch to Booster') : (language === 'fa' ? 'تغییر به ادورتایزر' : 'Switch to Advertiser')}</span>
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* 0. Language Selector */}
         <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
@@ -456,6 +498,36 @@ export function SettingsModal({
             </div>
           </div>
         )}
+
+        {/* Power Saver */}
+        <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center justify-between">
+            <label className={cn('block text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+              <Zap className="w-3.5 h-3.5 text-zinc-400" />
+              <span>{t('settings.cockpitVisuals')}</span>
+            </label>
+            <span className="text-[10px] font-medium text-zinc-500">
+              {cockpitFluidEnabled ? (language === 'fa' ? 'فعال' : 'Enabled') : (language === 'fa' ? 'غیرفعال' : 'Disabled')}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+            <div className="space-y-0.5 min-w-0">
+              <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+                {t('settings.cockpitFluid')}
+              </div>
+              <div className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
+                {t('settings.cockpitFluidDesc')}
+              </div>
+            </div>
+            <Switch
+              checked={cockpitFluidEnabled}
+              onChange={(val) => onCockpitFluidEnabledChange?.(val)}
+              aria-label={t('settings.cockpitFluid')}
+              className="shrink-0"
+            />
+          </div>
+        </div>
 
         {/* 3. Scheduled Folder Backups (Custom User Directory) */}
         {isDesktop && (
@@ -887,17 +959,17 @@ export function SettingsModal({
               <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300 shrink-0" />
             </button>
 
-            {/* Telegram */}
+            {/* GitHub Releases */}
             <button
               type="button"
-              onClick={() => openExternalUrl('https://t.me/sovrgn0')}
+              onClick={() => openExternalUrl('https://github.com/vltmk/Checkpoint/releases')}
               className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-zinc-100/70 hover:bg-zinc-200/70 dark:bg-zinc-900/60 dark:hover:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors text-left group cursor-pointer"
-              title="Message @sovrgn0 on Telegram"
+              title="View GitHub Releases: https://github.com/vltmk/Checkpoint/releases"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <TelegramIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 shrink-0" />
-                <span className="text-xs font-medium text-zinc-700 group-hover:text-zinc-900 dark:text-zinc-300 dark:group-hover:text-zinc-100">
-                  Telegram
+                <GithubIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-800 dark:text-zinc-400 dark:group-hover:text-zinc-200 shrink-0" />
+                <span className="text-xs font-medium text-zinc-700 group-hover:text-zinc-900 dark:text-zinc-300 dark:group-hover:text-zinc-100 truncate">
+                  GitHub Releases
                 </span>
               </div>
               <ExternalLink className="w-3 h-3 text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500 dark:group-hover:text-zinc-300 shrink-0" />
@@ -984,8 +1056,8 @@ export function SettingsModal({
           </div>
           <p className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
             {isDesktop
-              ? 'Stored securely on this PC in standalone SQLite format.'
-              : 'Stored securely in local client IndexedDB.'}
+              ? `Stored securely on this PC in standalone SQLite format (${activeProfileId === 'advertiser' ? 'checkpoint_advertiser.db' : 'checkpoint.db'}).`
+              : `Stored securely in local client IndexedDB (${activeProfileId === 'advertiser' ? 'checkpoint_advertiser' : 'checkpoint_local_db'}).`}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
@@ -1146,7 +1218,7 @@ export function SettingsModal({
               {t('settings.eraseWarning')}
             </p>
             <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
-              All <strong className="text-zinc-200 font-medium">{formatNumber(entriesCount)}</strong> work entries, earnings records, and screenshot proof attachments will be permanently purged.
+              All <strong className="text-zinc-200 font-medium">{formatNumber(entriesCount)}</strong> work entries, earnings records, and screenshot proof attachments in the active profile (<strong className="text-rose-300">{activeProfileId === 'advertiser' ? (language === 'fa' ? 'ادورتایزر' : 'Advertiser') : (language === 'fa' ? 'بوستر' : 'Booster')}</strong>) will be permanently purged.
             </p>
           </div>
 

@@ -235,7 +235,7 @@ export function generateDiscordReceiptText(entry, { language = 'en', globalCurre
     }
 نرخ تبدیل  = ${formatMoney(effectiveRate, 'TOMAN', false, true)} / ${rateDiscordText}
 وضعیت      = ${STATUS_CONFIG[entry.status]?.label || entry.status || 'پرداخت شده'}
-یادداشت    = ${entry.notes || 'ندارد'}
+توضیحات   = ${entry.notes || 'ندارد'}
 \`\`\``;
   }
 
@@ -252,7 +252,7 @@ Source     = ${entry.source || '-'}${
   }
 Rate       = ${effectiveRate.toLocaleString()} Toman / ${rateDiscordText}
 Status     = ${entry.status || 'Paid'}
-Notes      = ${entry.notes || 'None'}
+Work Description = ${entry.notes || 'None'}
 \`\`\``;
 }
 

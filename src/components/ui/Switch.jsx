@@ -4,16 +4,22 @@ import { cn } from '../../lib/utils';
 export function Switch({
   checked = false,
   onChange,
+  onCheckedChange,
   disabled = false,
   className = '',
   id,
   'aria-label': ariaLabel,
   ...props
 }) {
+  const triggerChange = (newVal) => {
+    onChange?.(newVal);
+    onCheckedChange?.(newVal);
+  };
+
   const handleClick = (e) => {
     e.stopPropagation();
     if (disabled) return;
-    onChange?.(!checked);
+    triggerChange(!checked);
   };
 
   const handleKeyDown = (e) => {
@@ -21,7 +27,7 @@ export function Switch({
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      onChange?.(!checked);
+      triggerChange(!checked);
     }
   };
 

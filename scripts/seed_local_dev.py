@@ -561,10 +561,7 @@ def build_seed_data():
 
     categories = [
         {"id": "cat_wow_retail", "name": "World of Warcraft", "color": "#C68A4C", "icon": None, "isDefault": True},
-        {"id": "cat_wow_classic", "name": "World of Warcraft Classic", "color": "#C68A4C", "icon": None, "isDefault": True},
-        {"id": "cat_diablo_4", "name": "Diablo IV", "color": "#F43F5E", "icon": None, "isDefault": False},
-        {"id": "cat_valorant", "name": "Valorant", "color": "#EA580C", "icon": None, "isDefault": False},
-        {"id": "cat_poe", "name": "Path of Exile", "color": "#8B5CF6", "icon": None, "isDefault": False}
+        {"id": "cat_wow_classic", "name": "World of Warcraft Classic", "color": "#C68A4C", "icon": None, "isDefault": True}
     ]
 
     saved_teammates = ["Vaelin", "Khadgar", "Illidan", "Sylvanas", "Thrall", "Anduin", "Jaina"]

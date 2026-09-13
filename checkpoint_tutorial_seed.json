@@ -18,27 +18,6 @@
       "color": "#C68A4C",
       "icon": null,
       "isDefault": true
-    },
-    {
-      "id": "cat_diablo_4",
-      "name": "Diablo IV",
-      "color": "#F43F5E",
-      "icon": null,
-      "isDefault": false
-    },
-    {
-      "id": "cat_valorant",
-      "name": "Valorant",
-      "color": "#EA580C",
-      "icon": null,
-      "isDefault": false
-    },
-    {
-      "id": "cat_poe",
-      "name": "Path of Exile",
-      "color": "#8B5CF6",
-      "icon": null,
-      "isDefault": false
     }
   ],
   "preferences": {
@@ -74,27 +53,6 @@
         "color": "#C68A4C",
         "icon": null,
         "isDefault": true
-      },
-      {
-        "id": "cat_diablo_4",
-        "name": "Diablo IV",
-        "color": "#F43F5E",
-        "icon": null,
-        "isDefault": false
-      },
-      {
-        "id": "cat_valorant",
-        "name": "Valorant",
-        "color": "#EA580C",
-        "icon": null,
-        "isDefault": false
-      },
-      {
-        "id": "cat_poe",
-        "name": "Path of Exile",
-        "color": "#8B5CF6",
-        "icon": null,
-        "isDefault": false
       }
     ]
   },

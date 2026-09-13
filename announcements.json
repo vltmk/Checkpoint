@@ -1,7 +1,47 @@
 {
   "version": "1.0",
-  "updated_at": "2026-09-08T00:00:00Z",
+  "updated_at": "2026-09-13T00:00:00Z",
   "announcements": [
+    {
+      "id": "2026-09-13-checkpoint-v4-release-fa",
+      "type": "info",
+      "title": "انتشار نسخه ۴ چک‌پوینت: پروفایل‌های کاری، مدیریت هزینه‌ها و بهینه‌سازی گسترده",
+      "message": "نسخه ۴ نرم‌افزار Checkpoint با قابلیت‌ها و بهینه‌سازی‌های اساسی برای ارتقای جریان کاری فریلنسرها و گیمرها منتشر شد.",
+      "items": [
+        {
+          "tag": "new",
+          "text": "افزودن پروفایل Advertiser و Booster"
+        },
+        {
+          "tag": "new",
+          "text": "محاسبه مخارج و هزینه‌ها در کنار ران‌ها"
+        },
+        {
+          "tag": "improved",
+          "text": "بازطراحی «افزودن سریع» برای تسریع کار"
+        },
+        {
+          "tag": "improved",
+          "text": "بهبود UI/UX، سرعت و مصرف منابع"
+        },
+        {
+          "tag": "improved",
+          "text": "بهینه‌سازی برای لپ‌تاپ و دستگاه‌های باتری‌دار"
+        }
+      ],
+      "published_at": "2026-09-13T00:00:00Z",
+      "expires_at": null,
+      "dismissible": true,
+      "pinned": true,
+      "actions": [
+        {
+          "label": "مشاهده جزئیات نسخه در گیت‌هاب",
+          "url": "https://github.com/vltmk/Checkpoint/releases",
+          "type": "external_link",
+          "variant": "primary"
+        }
+      ]
+    },
     {
       "id": "2026-09-08-checkpoint-v3-overview-fa",
       "type": "info",
@@ -24,7 +64,7 @@
       "published_at": "2026-09-08T00:00:00Z",
       "expires_at": null,
       "dismissible": true,
-      "pinned": true,
+      "pinned": false,
       "actions": [
         {
           "label": "مشاهده جزئیات نسخه در گیت‌هاب",

@@ -39,6 +39,7 @@ export const DEFAULT_CATEGORIES = [
     color: DEFAULT_WOW_COLOR,
     icon: null, // Uses built-in retail SVG
     isDefault: true,
+    supportsGold: true,
   },
   {
     id: 'cat_wow_classic',
@@ -46,6 +47,7 @@ export const DEFAULT_CATEGORIES = [
     color: DEFAULT_WOW_COLOR,
     icon: null, // Uses built-in retail/classic SVG
     isDefault: true,
+    supportsGold: true,
   },
 ];
 
@@ -70,9 +72,15 @@ export async function loadCategories() {
     console.warn('Failed to load categories:', err);
   }
 
-  // Ensure default categories are present
+  // Ensure default categories are present and WoW has supportsGold: true
   const existingNames = new Set(list.map((c) => c.name?.toLowerCase().trim()));
-  const merged = [...list];
+  const merged = list.map((c) => {
+    const isWoW = c.name?.toLowerCase().includes('world of warcraft');
+    return {
+      ...c,
+      supportsGold: c.supportsGold !== undefined ? Boolean(c.supportsGold) : isWoW,
+    };
+  });
 
   DEFAULT_CATEGORIES.forEach((def) => {
     if (!existingNames.has(def.name.toLowerCase().trim())) {

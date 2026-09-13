@@ -21,9 +21,27 @@ function fixedStepCount(accumulator, elapsed) {
   return { steps, accumulator: steps === 2 ? 0 : next };
 }
 
+// Battery saver detection via standard Web Battery API
+let isBatterySaver = false;
+if (typeof navigator !== "undefined" && typeof navigator.getBattery === "function") {
+  navigator
+    .getBattery()
+    .then((battery) => {
+      const updateBatteryState = () => {
+        isBatterySaver = !battery.charging || battery.level <= 0.2;
+      };
+      updateBatteryState();
+      battery.addEventListener("chargingchange", updateBatteryState);
+      battery.addEventListener("levelchange", updateBatteryState);
+    })
+    .catch(() => {});
+}
+
 export function createRenderer(options) {
   let disposed = false;
   let isPaused = false;
+  let isSleeping = false;
+  let isFocused = true;
   let gpu = undefined;
   let canvasSurface = undefined;
   let fluid = undefined;
@@ -31,21 +49,71 @@ export function createRenderer(options) {
   let animationFrame = 0;
   let accumulator = 0;
   let previous = 0;
+  let lastRenderTime = 0;
+  let lastInteractionTime = performance.now();
+  let lastBlurTime = 0;
 
   let currentThemeMode = options.themeMode ?? 0.0;
   let currentIsRtl = Boolean(options.isRtl);
   let currentReducedMotion = Boolean(options.reducedMotion);
 
+  const wake = () => {
+    lastInteractionTime = performance.now();
+    if (isSleeping) {
+      isSleeping = false;
+      if (!isPaused && !disposed && !animationFrame) {
+        previous = performance.now();
+        lastRenderTime = performance.now();
+        accumulator = 0;
+        animationFrame = requestAnimationFrame(tick);
+      }
+    }
+  };
+
   const tick = (now) => {
-    if (disposed) return;
-    if (!document.hidden && !isPaused && fluid && input && canvasSurface) {
+    if (disposed || isPaused) return;
+
+    // 1. Inactivity & Window-Blur Auto-Sleep Check
+    if (isFocused) {
+      const idleTimeout = isBatterySaver ? 15000 : 45000;
+      if (now - lastInteractionTime > idleTimeout) {
+        isSleeping = true;
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        return;
+      }
+    } else {
+      // Background / unfocused window: enter tranquil sleep after 5 seconds
+      if (lastBlurTime > 0 && now - lastBlurTime > 5000) {
+        isSleeping = true;
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        return;
+      }
+    }
+
+    // 2. High-Refresh Gaming Monitor Rate Limiter (Cadence Clamping)
+    const targetFps = isBatterySaver ? 30 : 60;
+    const minFrameInterval = 1000 / targetFps - 1.5; // allowance for timer jitter
+    if (lastRenderTime > 0 && now - lastRenderTime < minFrameInterval) {
+      animationFrame = requestAnimationFrame(tick);
+      return;
+    }
+
+    // 3. Fluid Physics & Render Pass
+    if (!document.hidden && fluid && input && canvasSurface) {
+      if (input.active) {
+        lastInteractionTime = now;
+      }
       const fixed = fixedStepCount(accumulator, (now - previous) / 1000);
       accumulator = fixed.accumulator;
       for (let i = 0; i < fixed.steps; i++) {
         stepFluid(fluid, input, currentReducedMotion);
       }
       renderFluid(fluid, canvasSurface);
+      lastRenderTime = now;
     }
+
     previous = now;
     animationFrame = requestAnimationFrame(tick);
   };
@@ -108,7 +176,12 @@ export function createRenderer(options) {
       });
 
       previous = performance.now();
-      animationFrame = requestAnimationFrame(tick);
+      lastRenderTime = performance.now();
+      lastInteractionTime = performance.now();
+
+      if (!isPaused && !isSleeping) {
+        animationFrame = requestAnimationFrame(tick);
+      }
       return true;
     } catch (err) {
       fail(err);
@@ -123,6 +196,7 @@ export function createRenderer(options) {
 
   return {
     ready,
+    wake,
     setThemeMode(themeMode) {
       currentThemeMode = themeMode;
       if (fluid && canvasSurface) {
@@ -136,8 +210,34 @@ export function createRenderer(options) {
     setReducedMotion(reduced) {
       currentReducedMotion = Boolean(reduced);
     },
+    setFocused(focused) {
+      const next = Boolean(focused);
+      if (isFocused === next) return;
+      isFocused = next;
+      if (isFocused) {
+        lastBlurTime = 0;
+        wake();
+      } else {
+        lastBlurTime = performance.now();
+      }
+    },
     setPaused(paused) {
-      isPaused = Boolean(paused);
+      const next = Boolean(paused);
+      if (isPaused === next) return;
+      isPaused = next;
+      if (isPaused) {
+        if (animationFrame) {
+          cancelAnimationFrame(animationFrame);
+          animationFrame = 0;
+        }
+      } else {
+        if (!animationFrame && !disposed && !isSleeping) {
+          previous = performance.now();
+          lastRenderTime = performance.now();
+          accumulator = 0;
+          animationFrame = requestAnimationFrame(tick);
+        }
+      }
     },
     dispose,
   };

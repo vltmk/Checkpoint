@@ -12,6 +12,7 @@ pub fn run() {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
+                let _ = window.emit("checkpoint-window-shown", ());
             }
         }))
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -47,6 +48,7 @@ pub fn run() {
                                 let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                                let _ = window.emit("checkpoint-window-shown", ());
                             }
                         }
                         "quick_add" => {
@@ -54,6 +56,7 @@ pub fn run() {
                                 let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                                let _ = window.emit("checkpoint-window-shown", ());
                                 let _ = window.emit("tray-quick-add", ());
                             }
                         }
@@ -62,6 +65,7 @@ pub fn run() {
                                 let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                                let _ = window.emit("checkpoint-window-shown", ());
                                 let _ = window.emit("tray-settings", ());
                             }
                         }
@@ -79,6 +83,7 @@ pub fn run() {
                                 let _ = window.unminimize();
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                                let _ = window.emit("checkpoint-window-shown", ());
                             }
                         }
                     })

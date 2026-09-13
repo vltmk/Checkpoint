@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { createRenderer } from "./renderer";
 import { cn } from "../../../lib/utils";
+import { subscribeWindowVisibility, subscribeWindowFocus } from "../../../lib/desktop";
 
 /**
  * CockpitFluid
@@ -14,14 +15,17 @@ import { cn } from "../../../lib/utils";
  * - Zero-latency theme switching without device recreation
  * - Zero-layout pointer tracking for high-polling gaming mice (1,000Hz-8,000Hz)
  * - Card-wide pointer event delegation with full pass-through for interactive controls
- * - Offscreen culling via IntersectionObserver
+ * - Offscreen and in-tray zero-overhead culling
+ * - Window blur 5-second fast-sleep and idle auto-settle
+ * - Rate-limited to 60 FPS (30 FPS on battery saver)
  * - Full resource cleanup on unmount
- * - Graceful fallback when WebGPU is unsupported
+ * - Graceful fallback when WebGPU is unsupported or disabled
  */
 export function CockpitFluid({
   isRtl = false,
   containerRef: externalContainerRef,
   className = "",
+  enabled = true,
 }) {
   const localContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -32,6 +36,8 @@ export function CockpitFluid({
   const containerRef = externalContainerRef || localContainerRef;
 
   useEffect(() => {
+    if (!enabled) return;
+
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -92,14 +98,41 @@ export function CockpitFluid({
       }
     });
 
-    // IntersectionObserver for offscreen culling (0% GPU usage when scrolled out)
+    // Lifecycle state management: pause when scrolled offscreen OR when window is hidden/minimized to tray
+    let isIntersecting = true;
+    let isVisible = true;
+
+    const updatePausedState = () => {
+      if (!rendererRef.current) return;
+      const shouldPause = !isIntersecting || !isVisible;
+      rendererRef.current.setPaused(shouldPause);
+    };
+
+    const unlistenVisibility = subscribeWindowVisibility((visible) => {
+      isVisible = visible;
+      updatePausedState();
+    });
+
+    const unlistenFocus = subscribeWindowFocus((focused) => {
+      rendererRef.current?.setFocused(focused);
+    });
+
+    // IntersectionObserver for offscreen culling (0% GPU/CPU usage when scrolled out)
     const observer = new IntersectionObserver(
       ([entry]) => {
-        renderer.setPaused(!entry.isIntersecting);
+        isIntersecting = entry.isIntersecting;
+        updatePausedState();
       },
       { threshold: 0.05 }
     );
     observer.observe(container);
+
+    // Immediate wake up on pointer interaction
+    const handleWake = () => {
+      rendererRef.current?.wake();
+    };
+    container.addEventListener("pointermove", handleWake, { passive: true });
+    container.addEventListener("pointerdown", handleWake, { passive: true });
 
     // prefers-reduced-motion listener
     const handleMotionChange = (e) => {
@@ -115,12 +148,16 @@ export function CockpitFluid({
     return () => {
       resizeObserver.disconnect();
       observer.disconnect();
+      unlistenVisibility();
+      unlistenFocus();
+      container.removeEventListener("pointermove", handleWake);
+      container.removeEventListener("pointerdown", handleWake);
       window.removeEventListener("resize", handleWindowResize);
       mediaQuery.removeEventListener("change", handleMotionChange);
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [containerRef]);
+  }, [containerRef, enabled]);
 
   // Zero-latency theme mode update
   useEffect(() => {
@@ -146,13 +183,13 @@ export function CockpitFluid({
         className
       )}
     >
-      {isSupported ? (
+      {isSupported && enabled ? (
         <canvas
           ref={canvasRef}
           className="block absolute touch-none pointer-events-none max-w-none max-h-none left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         />
       ) : (
-        /* Graceful fallback surface when WebGPU is not available */
+        /* Graceful fallback surface when WebGPU is not available or disabled */
         <div className="absolute inset-0 bg-zinc-100/50 dark:bg-zinc-950/40" />
       )}
     </div>

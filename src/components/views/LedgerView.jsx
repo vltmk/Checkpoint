@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   SlidersHorizontal,
@@ -33,7 +34,7 @@ import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Tooltip, Kbd } from '../ui/Tooltip';
 import { CockpitFluid } from '../ui/fluid/CockpitFluid';
 import { cn } from '../../lib/utils';
-import { openExternalUrl, openAppAwareUrl } from '../../lib/desktop';
+import { openExternalUrl, openAppAwareUrl, copyTextNative } from '../../lib/desktop';
 import { detectAppLink } from '../../lib/appLinks';
 import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon, TomanIcon } from '../ui/Icons';
 import { motion, AnimatePresence } from 'motion/react';
@@ -63,6 +64,84 @@ const TIME_FORMATTER_RTL = new Intl.DateTimeFormat('fa-IR', {
   hour12: true,
 });
 
+function FormattedInlineNotes({ text }) {
+  const [copiedTag, setCopiedTag] = useState(null);
+
+  const handleCopyTag = (e, tag) => {
+    e.stopPropagation();
+    copyTextNative(tag);
+    setCopiedTag(tag);
+    setTimeout(() => setCopiedTag(null), 1600);
+  };
+
+  const mentionsAndTags = useMemo(() => {
+    if (!text || typeof text !== 'string') return [];
+    const regex = /(?:^|(?<=[^\w]))(@[a-zA-Z0-9_]{2,32}\b(?!\.[a-zA-Z]{2,}\b)|#[a-zA-Z0-9_-]{1,32}\b)/g;
+    const matches = [...text.matchAll(regex)].map((m) => m[1]);
+    return matches;
+  }, [text]);
+
+  if (!text) return null;
+
+  // When mentions or tags exist, display ONLY the pills in the ledger work row (per UX rule)
+  if (mentionsAndTags.length > 0) {
+    return (
+      <Tooltip content={text} side="top">
+        <span className="inline-flex items-center gap-1 flex-wrap truncate max-w-[280px]">
+          {mentionsAndTags.map((token, i) => {
+            const isCopied = copiedTag === token;
+            if (token.startsWith('@')) {
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  data-no-row-click="true"
+                  onClick={(e) => handleCopyTag(e, token)}
+                  title={`Click to copy ${token}`}
+                  className={cn(
+                    'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-medium transition-all select-none active:scale-[0.96] cursor-pointer',
+                    isCopied
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                      : 'bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-900/50'
+                  )}
+                >
+                  <span>{token}</span>
+                  {isCopied && <span className="text-[8px] font-bold">✓</span>}
+                </button>
+              );
+            }
+            return (
+              <button
+                key={i}
+                type="button"
+                data-no-row-click="true"
+                onClick={(e) => handleCopyTag(e, token)}
+                title={`Click to copy ${token}`}
+                className={cn(
+                  'inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-medium transition-all select-none active:scale-[0.96] cursor-pointer',
+                  isCopied
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                )}
+              >
+                <span>{token}</span>
+                {isCopied && <span className="text-[8px] font-bold">✓</span>}
+              </button>
+            );
+          })}
+        </span>
+      </Tooltip>
+    );
+  }
+
+  // Fallback: If no mentions or tags exist, display the truncated description in quotes
+  return (
+    <span className="truncate max-w-[180px] text-zinc-500 italic leading-normal">
+      "{text}"
+    </span>
+  );
+}
+
 const LedgerRow = React.memo(function LedgerRow({
   entry,
   isConfirmDeleting,
@@ -89,7 +168,11 @@ const LedgerRow = React.memo(function LedgerRow({
   handleOpenExternalLink,
   handleStatusSelect,
   onOpenEntryContextMenu,
+  activeProfileId = 'booster',
+  onUpdateSourcePaid,
 }) {
+  const [isCopiedOrderId, setIsCopiedOrderId] = useState(false);
+  const isAdvertiser = activeProfileId === 'advertiser';
   const formattedTime = formatRowTime(entry.dateTime);
   const entryCat = getCategoryByName(entry.game, categories);
   const accentColor = entryCat?.color || '#C68A4C';
@@ -234,8 +317,75 @@ const LedgerRow = React.memo(function LedgerRow({
 
             {/* Left: Game Emblem & Details */}
             <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                <GameIcon game={entry.game} categories={categories} className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity" />
+              <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 relative">
+                {isAdvertiser ? (
+                  <>
+                    {/* Normal GameIcon (with subtle emerald checkmark badge if already paid) */}
+                    <div className={cn(
+                      'w-full h-full flex items-center justify-center transition-opacity duration-150',
+                      'group-hover:opacity-0 group-hover:pointer-events-none'
+                    )}>
+                      <div className="relative flex items-center justify-center">
+                        <GameIcon
+                          game={entry.game}
+                          categories={categories}
+                          className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85"
+                        />
+                        {entry.sourcePaid && (
+                          <span
+                            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center ring-1.5 ring-white dark:ring-zinc-950 shadow-xs"
+                            title={language === 'fa' ? 'تسویه شده' : 'Paid'}
+                          >
+                            <Check className="w-2 h-2 stroke-[3]" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Check icon (CheckCircle2) replacing GameIcon upon row hover */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <Tooltip
+                        content={
+                          entry.sourcePaid
+                            ? (language === 'fa' ? 'وجه دریافت شد (کلیک برای تغییر به در انتظار)' : 'Payment received (Click to mark pending)')
+                            : (language === 'fa' ? 'در انتظار دریافت وجه (کلیک برای تایید دریافت)' : 'Awaiting payment (Click to mark received)')
+                        }
+                        side="top"
+                      >
+                        <button
+                          type="button"
+                          data-no-row-click="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateSourcePaid?.(entry.id, !entry.sourcePaid);
+                          }}
+                          className={cn(
+                            'w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 cursor-pointer border',
+                            entry.sourcePaid
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800 shadow-xs'
+                              : 'bg-zinc-100/90 hover:bg-zinc-200/90 text-zinc-400 hover:text-zinc-700 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300 dark:border-zinc-800 shadow-xs'
+                          )}
+                          aria-label={entry.sourcePaid ? 'Mark pending' : 'Mark received'}
+                        >
+                          <CheckCircle2
+                            className={cn(
+                              'w-4 h-4 transition-colors',
+                              entry.sourcePaid
+                                ? 'text-emerald-600 dark:text-emerald-400 fill-emerald-500/20'
+                                : 'text-zinc-400 hover:text-emerald-500 dark:text-zinc-500 dark:hover:text-emerald-400'
+                            )}
+                          />
+                        </button>
+                      </Tooltip>
+                    </div>
+                  </>
+                ) : (
+                  <GameIcon
+                    game={entry.game}
+                    categories={categories}
+                    className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity"
+                  />
+                )}
               </div>
 
               <div className="min-w-0 flex-1 space-y-0.5">
@@ -283,6 +433,39 @@ const LedgerRow = React.memo(function LedgerRow({
                       </button>
                     );
                   })()}
+
+                  {/* Order ID Badge (Clickable with Copy Feedback) */}
+                  {entry.orderId && (
+                    <Tooltip
+                      content={isCopiedOrderId ? (language === 'fa' ? 'کپی شد!' : 'Copied!') : (language === 'fa' ? `کپی شناسه سفارش #${entry.orderId}` : `Click to copy #${entry.orderId}`)}
+                      side="top"
+                    >
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyTextNative(entry.orderId);
+                          setIsCopiedOrderId(true);
+                          setTimeout(() => setIsCopiedOrderId(false), 1600);
+                        }}
+                        className={cn(
+                          'text-[9px] font-mono px-1.5 py-0.5 rounded transition-all border flex items-center gap-1 active:scale-[0.96] cursor-pointer max-w-[130px]',
+                          isCopiedOrderId
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                        )}
+                      >
+                        <span className="text-zinc-400 dark:text-zinc-500 font-semibold">#</span>
+                        <span className="truncate">{entry.orderId}</span>
+                        {isCopiedOrderId ? (
+                          <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <Copy className="w-2.5 h-2.5 opacity-50 shrink-0" />
+                        )}
+                      </button>
+                    </Tooltip>
+                  )}
                   {formattedTime && (
                     <span className="text-[10px] text-zinc-500 flex items-center gap-1 select-none">
                       <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
@@ -297,91 +480,165 @@ const LedgerRow = React.memo(function LedgerRow({
                   {entry.notes && (
                     <>
                       <span>•</span>
-                      <span className="truncate max-w-[180px] text-zinc-500 italic leading-normal">
-                        "{entry.notes}"
-                      </span>
+                      <FormattedInlineNotes text={entry.notes} />
                     </>
                   )}
                 </div>
 
-                {/* Line 3: Interactive Teammate Badges & Team Pot */}
-                {entry.teammates && entry.teammates.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
-                    <span className="text-zinc-500 flex items-center gap-1">
-                      <Users className="w-3 h-3 text-zinc-500" />
-                      <span>Team:</span>
-                    </span>
-
-                    {entry.pot && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 rounded text-[10px] border ring-1 ring-inset inline-flex items-baseline gap-1',
-                        entry.status === 'Failed'
-                          ? 'bg-zinc-100/60 dark:bg-zinc-900/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 ring-transparent line-through decoration-zinc-400 dark:decoration-zinc-600'
-                          : 'bg-amber-500/10 dark:bg-zinc-900/90 text-amber-700 dark:text-amber-300/90 border-amber-600/30 dark:border-amber-800/40 ring-amber-600/20'
-                      )}>
-                        <span>Pot:</span>
-                        <MoneyDisplay amount={entry.pot} currency={entry.currency} />
-                        <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
+                {/* Line 3: Interactive Teammate Badges & Team Pot (or Assigned Boosters & Payouts in Advertiser Mode) */}
+                {isAdvertiser ? (
+                  ((entry.pot && entry.pot > entry.income) || (entry.teammates && entry.teammates.length > 0)) && (
+                    <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[10px]">
+                      {entry.pot && entry.pot > entry.income && (
+                        <span className="text-zinc-500 flex items-center gap-1">
+                          <span>{language === 'fa' ? 'قیمت مشتری:' : 'Client:'}</span>
+                          <strong className="text-zinc-700 dark:text-zinc-300 font-medium">
+                            <MoneyDisplay amount={entry.pot} currency={entry.currency} />
+                          </strong>
+                        </span>
+                      )}
+                      {entry.pot && entry.pot > entry.income && (
+                        <span className="text-zinc-400 dark:text-zinc-600">•</span>
+                      )}
+                      {entry.pot && entry.pot > entry.income && (
+                        <span className="text-zinc-500 flex items-center gap-1">
+                          <span>{language === 'fa' ? 'سهم بوستر:' : 'Booster:'}</span>
+                          <span className="text-zinc-700 dark:text-zinc-300 font-medium">
+                            <MoneyDisplay amount={entry.pot - entry.income} currency={entry.currency} />
+                          </span>
+                        </span>
+                      )}
+                      {entry.teammates && entry.teammates.length > 0 && (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-zinc-500 flex items-center gap-0.5">
+                            <Users className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
+                            <span>{language === 'fa' ? 'بوستر:' : 'Assigned:'}</span>
+                          </span>
+                          {entry.teammates.map((tm) => {
+                            const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                            return (
+                              <button
+                                key={tm}
+                                type="button"
+                                data-no-row-click="true"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTeammateFilter(isMatch ? '' : tm);
+                                }}
+                                title={`Click to filter jobs with ${tm}`}
+                                className={cn(
+                                  'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer',
+                                  isMatch
+                                    ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
+                                    : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                                )}
+                              >
+                                <span>{tm}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  entry.teammates && entry.teammates.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
+                      <span className="text-zinc-500 flex items-center gap-1">
+                        <Users className="w-3 h-3 text-zinc-500" />
+                        <span>Team:</span>
                       </span>
-                    )}
 
-                    {entry.teammates.map((tm) => {
-                      const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
-                      const customCut = entry.teammateCuts && entry.teammateCuts[tm];
-                      return (
-                        <button
-                          key={tm}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setTeammateFilter(isMatch ? '' : tm);
-                          }}
-                          title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
-                            isMatch
-                              ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
-                              : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                          }`}
-                        >
-                          <span>{tm}</span>
-                          {customCut && (
-                            <span className={cn(
-                              'text-[9px] inline-flex items-baseline',
-                              entry.status === 'Failed'
-                                ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
-                                : isMatch
-                                ? 'text-zinc-800 dark:text-zinc-300'
-                                : 'text-zinc-500 dark:text-zinc-400'
-                            )}>
-                              (<MoneyDisplay amount={customCut} currency={entry.currency} />)
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                      {entry.pot && (
+                        <span className={cn(
+                          'px-1.5 py-0.5 rounded text-[10px] border ring-1 ring-inset inline-flex items-baseline gap-1',
+                          entry.status === 'Failed'
+                            ? 'bg-zinc-100/60 dark:bg-zinc-900/40 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-800 ring-transparent line-through decoration-zinc-400 dark:decoration-zinc-600'
+                            : 'bg-amber-500/10 dark:bg-zinc-900/90 text-amber-700 dark:text-amber-300/90 border-amber-600/30 dark:border-amber-800/40 ring-amber-600/20'
+                        )}>
+                          <span>Pot:</span>
+                          <MoneyDisplay amount={entry.pot} currency={entry.currency} />
+                          <span className="text-zinc-500">({entry.teammates.length + 1} shares)</span>
+                        </span>
+                      )}
+
+                      {entry.teammates.map((tm) => {
+                        const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                        const customCut = entry.teammateCuts && entry.teammateCuts[tm];
+                        return (
+                          <button
+                            key={tm}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTeammateFilter(isMatch ? '' : tm);
+                            }}
+                            title={`Click to filter jobs with ${tm}${customCut ? ` (Cut: ${formatMoney(customCut, entry.currency)})` : ''}`}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] ${
+                              isMatch
+                                ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
+                                : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                            }`}
+                          >
+                            <span>{tm}</span>
+                            {customCut && (
+                              <span className={cn(
+                                'text-[9px] inline-flex items-baseline',
+                                entry.status === 'Failed'
+                                  ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                                  : isMatch
+                                  ? 'text-zinc-800 dark:text-zinc-300'
+                                  : 'text-zinc-500 dark:text-zinc-400'
+                              )}>
+                                (<MoneyDisplay amount={customCut} currency={entry.currency} />)
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
             </div>
 
-            {/* Right: Income (Your Cut), External Link, Status, Menu */}
+            {/* Right: Income (Your Cut / Net Profit), External Link, Status, Menu */}
             <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-1 sm:pt-0">
               <div className="text-left sm:text-right">
-                {entry.teamMode && (
+                {isAdvertiser ? (
                   <div className={cn('text-[9px] text-zinc-500 uppercase tracking-wider', isRtl && 'font-farsi')}>
-                    {t('ledger.yourShare', 'Your Share')}
+                    {language === 'fa' ? 'سود خالص' : 'Net Profit'}
+                  </div>
+                ) : (
+                  entry.teamMode && (
+                    <div className={cn('text-[9px] text-zinc-500 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                      {t('ledger.yourShare', 'Your Share')}
+                    </div>
+                  )
+                )}
+                {entry.income < 0 && (
+                  <div className={cn('text-[9px] text-rose-600 dark:text-rose-400 uppercase tracking-wider font-medium', isRtl && 'font-farsi')}>
+                    {t('work.expenseMode', 'Expense')}
                   </div>
                 )}
                 <div className={cn(
                   'text-xs font-medium inline-flex items-center justify-start sm:justify-end',
                   entry.status === 'Failed'
                     ? 'text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400 dark:decoration-zinc-600'
+                    : entry.income < 0
+                    ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                    : isAdvertiser
+                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
                     : 'text-zinc-800 dark:text-zinc-200'
                 )}>
                   <MoneyDisplay amount={entry.income} currency={entry.currency} />
                 </div>
                 {entry.currency !== globalCurrency && (
-                  <div className={cn(entry.status === 'Failed' && 'opacity-60 line-through decoration-zinc-400 dark:decoration-zinc-600')}>
+                  <div className={cn(
+                    entry.status === 'Failed' && 'opacity-60 line-through decoration-zinc-400 dark:decoration-zinc-600',
+                    entry.income < 0 && 'text-rose-600/80 dark:text-rose-400/80',
+                    isAdvertiser && 'text-emerald-600/80 dark:text-emerald-400/80'
+                  )}>
                     <ConvertedSecondaryDisplay
                       amount={entry.income}
                       fromCurrency={entry.currency}
@@ -506,8 +763,12 @@ export function LedgerView({
   confirmDeleteEntryId: controlledConfirmDeleteEntryId,
   onConfirmDeleteChange,
   onOpenEntryContextMenu,
+  cockpitFluidEnabled = true,
+  activeProfileId = 'booster',
+  onUpdateSourcePaid,
 }) {
   const { t, language, isRtl, formatNumber, formatDate } = useLanguage();
+  const isAdvertiser = activeProfileId === 'advertiser';
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currencyFilter, setCurrencyFilter] = useState('');
@@ -515,6 +776,7 @@ export function LedgerView({
   const [hasProofFilter, setHasProofFilter] = useState(false);
   const [teammateFilter, setTeammateFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [settlementFilter, setSettlementFilter] = useState('');
   const [sortOption, setSortOption] = useState('date_desc');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isFiltersPopoverOpen, setIsFiltersPopoverOpen] = useState(false);
@@ -604,9 +866,10 @@ export function LedgerView({
     if (hasProofFilter) count++;
     if (teammateFilter) count++;
     if (sourceFilter) count++;
+    if (isAdvertiser && settlementFilter) count++;
     if (sortOption !== 'date_desc') count++;
     return count;
-  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, sortOption]);
+  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, sortOption]);
 
   const formatRowTime = useCallback(
     (dateTimeStr) => {
@@ -654,7 +917,7 @@ export function LedgerView({
     setConfirmDeleteEntryId(null);
     setIsBulkDeleting(false);
     setIsStatusDropdownOpen(false);
-  }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, sortOption]);
+  }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, settlementFilter, sortOption]);
 
   // Close status dropdown & filters popover on outside click
   useEffect(() => {
@@ -683,13 +946,14 @@ export function LedgerView({
         const matchGame = e.game && e.game.toLowerCase().includes(q);
         const matchSource = e.source && e.source.toLowerCase().includes(q);
         const matchNotes = e.notes && e.notes.toLowerCase().includes(q);
+        const matchOrderId = e.orderId && e.orderId.toLowerCase().includes(q);
         const statusLabel = STATUS_LABELS[e.status] || '';
         const matchStatus =
           (e.status && e.status.toLowerCase().includes(q)) ||
           (statusLabel && statusLabel.toLowerCase().includes(q));
         const matchTeammates = e.teammates && Array.isArray(e.teammates) && e.teammates.some((t) => t.toLowerCase().includes(q));
         const matchDate = (e.dateTime && (e.dateTime.includes(q) || e.dateTime.includes(normQ))) || (shamsiDate && (shamsiDate.includes(q) || shamsiDate.includes(normQ)));
-        return matchTitle || matchGame || matchSource || matchNotes || matchStatus || matchTeammates || matchDate;
+        return matchTitle || matchGame || matchSource || matchNotes || matchOrderId || matchStatus || matchTeammates || matchDate;
       });
     }
 
@@ -723,6 +987,14 @@ export function LedgerView({
       );
     }
 
+    if (isAdvertiser && settlementFilter) {
+      if (settlementFilter === 'received') {
+        list = list.filter((e) => Boolean(e.sourcePaid));
+      } else if (settlementFilter === 'pending') {
+        list = list.filter((e) => !e.sourcePaid);
+      }
+    }
+
     if (sortOption === 'date_desc') {
       list.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
     } else if (sortOption === 'date_asc') {
@@ -740,7 +1012,7 @@ export function LedgerView({
     }
 
     return list;
-  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, sortOption, globalCurrency, rates]);
+  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, sortOption, globalCurrency, rates]);
 
   // Aggregate metrics for compact balance summary
   const metrics = useMemo(() => {
@@ -751,8 +1023,22 @@ export function LedgerView({
     let totalFailed = 0;
     let failedCount = 0;
 
+    let grossVolume = 0;
+    let pendingInflow = 0;
+    let boosterPayouts = 0;
+
     filteredEntries.forEach((e) => {
       const convertedInc = convertEntryCurrency(e, globalCurrency, rates);
+      const grossAmount = e.pot ? convertCurrency(e.pot, e.currency, globalCurrency, rates) : convertedInc;
+      const payoutAmount = Math.max(0, grossAmount - convertedInc);
+
+      if (e.status !== 'Failed') {
+        grossVolume += grossAmount;
+        boosterPayouts += payoutAmount;
+        if (!e.sourcePaid) {
+          pendingInflow += convertedInc;
+        }
+      }
 
       if (e.status === 'Paid') {
         totalPaid += convertedInc;
@@ -784,6 +1070,9 @@ export function LedgerView({
       totalValue,
       completionRate,
       avgRate,
+      grossVolume,
+      pendingInflow,
+      boosterPayouts,
     };
   }, [filteredEntries, globalCurrency, rates]);
 
@@ -1144,6 +1433,7 @@ export function LedgerView({
     setGameFilter('');
     setTeammateFilter('');
     setSourceFilter('');
+    setSettlementFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
     setIsFiltersPopoverOpen(false);
@@ -1185,7 +1475,7 @@ export function LedgerView({
                   {/* Left: Total Earned + Currency Switcher + Filtered Chip */}
                   <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
                     <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 shrink-0', isRtl && 'font-farsi')}>
-                      {t('ledger.totalEarned')}:
+                      {isAdvertiser ? (language === 'fa' ? 'سود خالص' : 'Net Profit') : t('ledger.totalEarned')}:
                     </span>
                     <div className="text-base sm:text-lg font-medium tracking-tight text-zinc-800 dark:text-zinc-200 shrink-0">
                       <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
@@ -1315,7 +1605,7 @@ export function LedgerView({
         className="relative overflow-hidden rounded-2xl bg-zinc-50/70 dark:bg-zinc-950/50 border border-zinc-200/80 dark:border-zinc-800/80 p-5 sm:p-7 shadow-xs mb-6 min-h-[290px]"
       >
         {/* WebGPU Interactive Fluid Background */}
-        <CockpitFluid isRtl={isRtl} containerRef={cockpitHeroRef} />
+        <CockpitFluid isRtl={isRtl} containerRef={cockpitHeroRef} enabled={cockpitFluidEnabled} />
 
         {/* Optical Text Scrim: Soft vertical gradient for high legibility over vibrant fluid dyes */}
         <div className="absolute inset-0 bg-gradient-to-b from-white/65 via-white/20 to-white/70 dark:from-zinc-950/70 dark:via-zinc-950/25 dark:to-zinc-950/85 pointer-events-none rounded-[inherit]" />
@@ -1324,7 +1614,7 @@ export function LedgerView({
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn('text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-                {t('ledger.totalEarned')}
+                {isAdvertiser ? (language === 'fa' ? 'سود خالص کل' : 'Total Net Profit') : t('ledger.totalEarned')}
               </span>
 
               {/* Currency Switcher Pill */}
@@ -1450,35 +1740,71 @@ export function LedgerView({
 
           {/* Spacious Cockpit Metric Tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
-              </div>
-              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
-                {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
-              </div>
-            </div>
+            {isAdvertiser ? (
+              <>
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'سفارشات تکمیل شده' : 'Orders Completed'}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
+                    {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+                  </div>
+                </div>
 
-            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                <Clock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
-              </div>
-              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26} />
-              </div>
-            </div>
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'در انتظار دریافت' : 'Pending Inflow'}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                    <MoneyDisplay amount={metrics.pendingInflow} currency={globalCurrency} compact={true} iconSize={26} />
+                  </div>
+                </div>
 
-            <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
-              <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                <TrendingUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
-              </div>
-              <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26} />
-              </div>
-            </div>
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <Users className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'سهم بوسترها' : 'Booster Payouts'}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                    <MoneyDisplay amount={metrics.boosterPayouts} currency={globalCurrency} compact={true} iconSize={26} />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
+                    {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <Clock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                    <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26} />
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
+                    <TrendingUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
+                    <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26} />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -1638,6 +1964,7 @@ export function LedgerView({
                           setHasProofFilter(false);
                           setTeammateFilter('');
                           setSourceFilter('');
+                          setSettlementFilter('');
                           setSortOption('date_desc');
                         }}
                         className="text-[10px] text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 underline"
@@ -1692,6 +2019,55 @@ export function LedgerView({
                       })}
                     </div>
                   </div>
+
+                  {/* 1.5. Source Settlement Filter (Advertiser Mode) */}
+                  {isAdvertiser && (
+                    <div className="space-y-1.5">
+                      <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
+                        {language === 'fa' ? 'تسویه مبدا (دریافت وجه)' : 'Client Settlement'}
+                      </label>
+                      <div className="grid grid-cols-3 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95',
+                            settlementFilter === ''
+                              ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          {t('status.all')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('received')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            settlementFilter === 'received'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 shadow-xs'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>{language === 'fa' ? 'دریافت شده' : 'Received'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('pending')}
+                          className={cn(
+                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            settlementFilter === 'pending'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60 shadow-xs'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                          <span>{language === 'fa' ? 'در انتظار' : 'Pending'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* 2. Currency Filter */}
                   <div className="space-y-1.5">
@@ -1834,7 +2210,7 @@ export function LedgerView({
       {filteredEntries.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800/80 p-12 text-center space-y-3">
           <p className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>
-            {searchQuery || statusFilter || currencyFilter || gameFilter || hasProofFilter || teammateFilter || sourceFilter
+            {searchQuery || statusFilter || currencyFilter || gameFilter || hasProofFilter || teammateFilter || sourceFilter || settlementFilter
               ? t('ledger.noJobsMatch')
               : t('ledger.emptyDesc')}
           </p>
@@ -1843,7 +2219,7 @@ export function LedgerView({
               <Plus className="w-3.5 h-3.5" />
               <span>{t('nav.addWork')}</span>
             </Button>
-            {Boolean(searchQuery || statusFilter || currencyFilter || gameFilter || hasProofFilter || teammateFilter || sourceFilter) && (
+            {Boolean(searchQuery || statusFilter || currencyFilter || gameFilter || hasProofFilter || teammateFilter || sourceFilter || settlementFilter) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -1898,7 +2274,7 @@ export function LedgerView({
                         isRtl && 'font-farsi'
                       )}
                     >
-                      {t('ledger.dayTotal')}:
+                      {isAdvertiser ? (language === 'fa' ? 'سود روز:' : 'Day Profit:') : `${t('ledger.dayTotal')}:`}
                     </span>
                     <strong
                       className={cn(
@@ -1959,6 +2335,8 @@ export function LedgerView({
                       handleOpenExternalLink={handleOpenExternalLink}
                       handleStatusSelect={handleStatusSelect}
                       onOpenEntryContextMenu={onOpenEntryContextMenu}
+                      activeProfileId={activeProfileId}
+                      onUpdateSourcePaid={onUpdateSourcePaid}
                     />
                   ))}
                 </div>
@@ -2032,279 +2410,285 @@ export function LedgerView({
         </div>
       )}
 
-      {/* 6. Multi-Day Income Calculator Floating Bottom Bar (Hidden when items are selected) */}
-      <AnimatePresence>
-        {selectedDaysSummary && selectedDaysSummary.daysCount > 0 && selectedEntryIds.size === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
-            exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            dir={isRtl ? 'rtl' : 'ltr'}
-            className={cn(
-              'fixed bottom-20 md:bottom-8 left-1/2 z-[90] bg-white/95 dark:bg-zinc-950/85 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/90 shadow-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
-              isRtl && 'font-farsi'
-            )}
-          >
-            <div className="flex items-center gap-3 min-w-0 shrink-0">
-              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200 dark:bg-zinc-900/90 dark:text-zinc-200 dark:border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
-                {formatNumber(selectedDaysSummary.daysCount)} {selectedDaysSummary.daysCount === 1 ? t('ledger.day') : t('ledger.days')}
-              </span>
-
-              <div className="flex items-center gap-2 min-w-0 shrink-0">
-                <span className={cn('text-zinc-500 dark:text-zinc-400 text-xs hidden sm:inline', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-900 dark:text-zinc-200 font-medium text-base sm:text-lg tracking-tight shrink-0 inline-flex items-center">
-                  <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
-                </strong>
-                <span className={cn('text-[11px] text-zinc-500 dark:text-zinc-500 shrink-0', isRtl && 'font-farsi')}>
-                  ({formatNumber(selectedDaysSummary.totalJobs)} {selectedDaysSummary.totalJobs === 1 ? t('ledger.job') : t('ledger.jobs')})
+      {/* 6. Multi-Day Income Calculator Floating Bottom Bar (Rendered into document.body to avoid parent scroll clipping) */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {selectedDaysSummary && selectedDaysSummary.daysCount > 0 && selectedEntryIds.size === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
+              exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              dir={isRtl ? 'rtl' : 'ltr'}
+              className={cn(
+                'fixed bottom-20 md:bottom-8 left-1/2 z-[95] bg-white/95 dark:bg-zinc-950/90 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/90 shadow-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
+                isRtl && 'font-farsi'
+              )}
+            >
+              <div className="flex items-center gap-3 min-w-0 shrink-0">
+                <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200 dark:bg-zinc-900/90 dark:text-zinc-200 dark:border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
+                  {formatNumber(selectedDaysSummary.daysCount)} {selectedDaysSummary.daysCount === 1 ? t('ledger.day') : t('ledger.days')}
                 </span>
-              </div>
-            </div>
 
-            {/* Right Group with Standalone Vertical Divider */}
-            <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
-              <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-800/90 shrink-0" />
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
-                    navigator.clipboard.writeText(formatted);
-                    setIsSumCopied(true);
-                    setTimeout(() => setIsSumCopied(false), 2000);
-                  }}
-                  title={t('ledger.copyTooltip')}
-                  className={cn(`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
-                    isSumCopied
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent hover:border-zinc-200 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:border-zinc-700'
-                  }`, isRtl && 'font-farsi')}
-                >
-                  {isSumCopied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-in zoom-in-50 duration-150" />
-                      <span className="hidden sm:inline font-medium text-emerald-700 dark:text-emerald-300">{t('ledger.copied')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
-                      <span className="hidden sm:inline">{t('ledger.copySum')}</span>
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    setSelectedDayKeys(new Set());
-                    setIsSumCopied(false);
-                  }}
-                  title={t('ledger.clearSelection')}
-                  className={cn('h-8 px-2 text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors', isRtl && 'font-farsi')}
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t('common.cancel')}</span>
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 7. Comprehensive Floating Bulk Actions Bar */}
-      <AnimatePresence>
-        {selectedEntryIds.size > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
-            exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            dir={isRtl ? 'rtl' : 'ltr'}
-            className={cn(
-              'fixed bottom-20 md:bottom-8 left-1/2 z-[95] bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800/90 shadow-2xl ring-1 ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2 sm:py-2.5 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
-              isRtl && 'font-farsi'
-            )}
-          >
-            {/* Left: Count Badge & Live Converted Total Income Sum */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
-              <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
-                {formatNumber(selectedEntryIds.size)} <span className="hidden xs:inline">{t('ledger.selected')}</span>
-              </span>
-
-              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-                <span className={cn('text-zinc-400 text-xs', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
-                <strong className="text-zinc-200 font-medium text-xs sm:text-sm tracking-tight shrink-0 inline-flex items-center">
-                  <MoneyDisplay amount={bulkMetrics.totalSum} currency={globalCurrency} />
-                </strong>
-                {globalCurrency !== 'GOLD' ? (
-                  <span dir="ltr" className="text-[10px] sm:text-[11px] text-amber-400/80 shrink-0 select-none">
-                    (~{Math.round(bulkMetrics.totalSum / (goldRateTOMAN / 1000)).toLocaleString()} G)
+                <div className="flex items-center gap-2 min-w-0 shrink-0">
+                  <span className={cn('text-zinc-500 dark:text-zinc-400 text-xs hidden sm:inline', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
+                  <strong className="text-zinc-900 dark:text-zinc-200 font-medium text-base sm:text-lg tracking-tight shrink-0 inline-flex items-center">
+                    <MoneyDisplay amount={selectedDaysSummary.totalIncome} currency={globalCurrency} />
+                  </strong>
+                  <span className={cn('text-[11px] text-zinc-500 dark:text-zinc-500 shrink-0', isRtl && 'font-farsi')}>
+                    ({formatNumber(selectedDaysSummary.totalJobs)} {selectedDaysSummary.totalJobs === 1 ? t('ledger.job') : t('ledger.jobs')})
                   </span>
-                ) : (
-                  <span dir={isRtl ? 'rtl' : 'ltr'} className={cn('text-[10px] sm:text-[11px] text-zinc-400 shrink-0 select-none', isRtl && 'font-farsi')}>
-                    (~{formatMoney(Math.round(bulkMetrics.totalSum * (goldRateTOMAN / 1000)), 'TOMAN')})
-                  </span>
-                )}
+                </div>
               </div>
-            </div>
 
-            {/* Middle: Mixed Status Breakdown Pill (XL Screens Only) */}
-            <div className={cn('hidden xl:flex items-center gap-1 text-[10px] text-zinc-400 px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-800/60 shrink-0', isRtl && 'font-farsi')}>
-              {bulkMetrics.paid > 0 && <span className="text-emerald-400 font-medium">{formatNumber(bulkMetrics.paid)} {t('status.Paid')}</span>}
-              {bulkMetrics.paid > 0 && (bulkMetrics.pending > 0 || bulkMetrics.working > 0 || bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.pending > 0 && <span className="text-amber-400 font-medium">{formatNumber(bulkMetrics.pending)} {t('status.Pending')}</span>}
-              {bulkMetrics.pending > 0 && (bulkMetrics.working > 0 || bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.working > 0 && <span className="text-cyan-400 font-medium">{formatNumber(bulkMetrics.working)} {t('status.Working')}</span>}
-              {bulkMetrics.working > 0 && (bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.onHold > 0 && <span className="text-zinc-500 font-medium">{formatNumber(bulkMetrics.onHold)} {t('status.On Hold')}</span>}
-              {bulkMetrics.onHold > 0 && bulkMetrics.failed > 0 && <span className="text-zinc-600">•</span>}
-              {bulkMetrics.failed > 0 && <span className="text-rose-400 font-medium">{formatNumber(bulkMetrics.failed)} {t('status.Failed')}</span>}
-            </div>
+              {/* Right Group with Standalone Vertical Divider */}
+              <div className="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+                <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-800/90 shrink-0" />
 
-            {/* Right: Actions with Standalone Clean Vertical Divider */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {/* Standalone Vertical Divider with Safe Margins */}
-              <div className="h-5 w-px bg-zinc-800/90 shrink-0" />
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                {/* 1. Bulk Status Changer Dropdown */}
-                <div className="relative">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <Button
                     variant="ghost"
                     size="xs"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsStatusDropdownOpen((prev) => !prev);
+                    onClick={() => {
+                      const formatted = formatMoney(selectedDaysSummary.totalIncome, globalCurrency);
+                      navigator.clipboard.writeText(formatted);
+                      setIsSumCopied(true);
+                      setTimeout(() => setIsSumCopied(false), 2000);
                     }}
-                    title={t('ledger.bulkStatus')}
-                    className={cn('h-7 px-2 text-[11px] gap-1.5 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm shrink-0 flex items-center', isRtl && 'font-farsi')}
+                    title={t('ledger.copyTooltip')}
+                    className={cn(`h-8 px-2.5 text-xs gap-1.5 border transition-all duration-200 ${
+                      isSumCopied
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80'
+                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border-transparent hover:border-zinc-200 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:border-zinc-700'
+                    }`, isRtl && 'font-farsi')}
                   >
-                    <div className="flex items-center -space-x-1 shrink-0 rtl:space-x-reverse" aria-hidden="true">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-zinc-950" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 ring-1 ring-zinc-950" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-zinc-950" />
-                    </div>
-                    <span>{t('ledger.bulkStatus')}</span>
-                    <ChevronDown className={cn('w-3 h-3 text-zinc-400 shrink-0 transition-transform duration-150', isStatusDropdownOpen && 'rotate-180 text-zinc-200')} />
+                    {isSumCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-in zoom-in-50 duration-150" />
+                        <span className="hidden sm:inline font-medium text-emerald-700 dark:text-emerald-300">{t('ledger.copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                        <span className="hidden sm:inline">{t('ledger.copySum')}</span>
+                      </>
+                    )}
                   </Button>
 
-                  {isStatusDropdownOpen && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      dir={isRtl ? 'rtl' : 'ltr'}
-                      className={cn(
-                        'absolute bottom-full mb-1.5 w-36 bg-zinc-950/95 backdrop-blur-xl border border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[110] text-xs animate-in fade-in zoom-in-95 duration-100',
-                        isRtl ? 'right-0' : 'left-0'
-                      )}
-                    >
-                      {STATUSES.map((st) => (
-                        <button
-                          key={st}
-                          type="button"
-                          onClick={() => {
-                            onBulkUpdateStatus?.(Array.from(selectedEntryIds), st);
-                            setIsStatusDropdownOpen(false);
-                          }}
-                          className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100 text-start transition-colors"
-                        >
-                          <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              st === 'Paid'
-                                ? 'bg-emerald-400'
-                                : st === 'Working'
-                                ? 'bg-cyan-400'
-                                : st === 'Pending'
-                                ? 'bg-amber-400'
-                                : st === 'Failed'
-                                ? 'bg-rose-400'
-                                : 'bg-zinc-500'
-                            }`}
-                          />
-                        </button>
-                      ))}
-                    </div>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      setSelectedDayKeys(new Set());
+                      setIsSumCopied(false);
+                    }}
+                    title={t('ledger.clearSelection')}
+                    className={cn('h-8 px-2 text-xs text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 gap-1 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors', isRtl && 'font-farsi')}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{t('common.cancel')}</span>
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* 7. Comprehensive Floating Bulk Actions Bar (Rendered into document.body to avoid parent scroll clipping) */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {selectedEntryIds.size > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
+              exit={{ opacity: 0, y: 28, x: '-50%', scale: 0.96 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              dir={isRtl ? 'rtl' : 'ltr'}
+              className={cn(
+                'fixed bottom-20 md:bottom-8 left-1/2 z-[100] bg-white/95 dark:bg-zinc-950/95 text-zinc-900 dark:text-zinc-100 backdrop-blur-2xl border border-zinc-200 dark:border-zinc-800/90 shadow-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/50 rounded-2xl px-5 sm:px-6 py-2 sm:py-2.5 flex items-center gap-3 sm:gap-4 max-w-[calc(100vw-2rem)] max-w-4xl justify-between',
+                isRtl && 'font-farsi'
+              )}
+            >
+              {/* Left: Count Badge & Live Converted Total Income Sum */}
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
+                <span className={cn('text-[11px] font-medium px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-800 border border-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700/80 shrink-0', isRtl && 'font-farsi')}>
+                  {formatNumber(selectedEntryIds.size)} <span className="hidden xs:inline">{t('ledger.selected')}</span>
+                </span>
+
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
+                  <span className={cn('text-zinc-500 dark:text-zinc-400 text-xs', isRtl && 'font-farsi')}>{t('ledger.sum')}:</span>
+                  <strong className="text-zinc-900 dark:text-zinc-200 font-medium text-xs sm:text-sm tracking-tight shrink-0 inline-flex items-center">
+                    <MoneyDisplay amount={bulkMetrics.totalSum} currency={globalCurrency} />
+                  </strong>
+                  {globalCurrency !== 'GOLD' ? (
+                    <span dir="ltr" className="text-[10px] sm:text-[11px] text-amber-500 dark:text-amber-400/80 shrink-0 select-none">
+                      (~{Math.round(bulkMetrics.totalSum / (goldRateTOMAN / 1000)).toLocaleString()} G)
+                    </span>
+                  ) : (
+                    <span dir={isRtl ? 'rtl' : 'ltr'} className={cn('text-[10px] sm:text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0 select-none', isRtl && 'font-farsi')}>
+                      (~{formatMoney(Math.round(bulkMetrics.totalSum * (goldRateTOMAN / 1000)), 'TOMAN')})
+                    </span>
                   )}
                 </div>
+              </div>
 
-                {/* 2. Bulk CSV Export Button */}
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => onBulkExportCsv?.(Array.from(selectedEntryIds))}
-                  title={t('ledger.bulkCsvTooltip', t('ledger.bulkCsv'))}
-                  className={cn('h-7 px-2 text-[11px] gap-1 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/80 border border-zinc-800/80 shadow-sm flex items-center shrink-0', isRtl && 'font-farsi')}
-                >
-                  <Download className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                  <span>{t('ledger.bulkCsv')}</span>
-                </Button>
+              {/* Middle: Mixed Status Breakdown Pill (XL Screens Only) */}
+              <div className={cn('hidden xl:flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/60 shrink-0', isRtl && 'font-farsi')}>
+                {bulkMetrics.paid > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatNumber(bulkMetrics.paid)} {t('status.Paid')}</span>}
+                {bulkMetrics.paid > 0 && (bulkMetrics.pending > 0 || bulkMetrics.working > 0 || bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-400 dark:text-zinc-600">•</span>}
+                {bulkMetrics.pending > 0 && <span className="text-amber-600 dark:text-amber-400 font-medium">{formatNumber(bulkMetrics.pending)} {t('status.Pending')}</span>}
+                {bulkMetrics.pending > 0 && (bulkMetrics.working > 0 || bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-400 dark:text-zinc-600">•</span>}
+                {bulkMetrics.working > 0 && <span className="text-cyan-600 dark:text-cyan-400 font-medium">{formatNumber(bulkMetrics.working)} {t('status.Working')}</span>}
+                {bulkMetrics.working > 0 && (bulkMetrics.onHold > 0 || bulkMetrics.failed > 0) && <span className="text-zinc-400 dark:text-zinc-600">•</span>}
+                {bulkMetrics.onHold > 0 && <span className="text-zinc-500 font-medium">{formatNumber(bulkMetrics.onHold)} {t('status.On Hold')}</span>}
+                {bulkMetrics.onHold > 0 && bulkMetrics.failed > 0 && <span className="text-zinc-400 dark:text-zinc-600">•</span>}
+                {bulkMetrics.failed > 0 && <span className="text-rose-600 dark:text-rose-400 font-medium">{formatNumber(bulkMetrics.failed)} {t('status.Failed')}</span>}
+              </div>
 
-                {/* 3. In-Line Morphing Delete (N) Confirmation */}
-                {!isBulkDeleting ? (
+              {/* Right: Actions with Standalone Clean Vertical Divider */}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                {/* Standalone Vertical Divider with Safe Margins */}
+                <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-800/90 shrink-0" />
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* 1. Bulk Status Changer Dropdown */}
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsStatusDropdownOpen((prev) => !prev);
+                      }}
+                      title={t('ledger.bulkStatus')}
+                      className={cn('h-7 px-2 text-[11px] gap-1.5 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 dark:border-zinc-800/80 border shadow-sm shrink-0 flex items-center', isRtl && 'font-farsi')}
+                    >
+                      <div className="flex items-center -space-x-1 shrink-0 rtl:space-x-reverse" aria-hidden="true">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-white dark:ring-zinc-950" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 ring-1 ring-white dark:ring-zinc-950" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ring-1 ring-white dark:ring-zinc-950" />
+                      </div>
+                      <span>{t('ledger.bulkStatus')}</span>
+                      <ChevronDown className={cn('w-3 h-3 text-zinc-400 shrink-0 transition-transform duration-150', isStatusDropdownOpen && 'rotate-180 text-zinc-600 dark:text-zinc-200')} />
+                    </Button>
+
+                    {isStatusDropdownOpen && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        dir={isRtl ? 'rtl' : 'ltr'}
+                        className={cn(
+                          'absolute bottom-full mb-1.5 w-36 bg-white/95 dark:bg-zinc-950/95 text-zinc-800 dark:text-zinc-200 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-lg p-1 space-y-0.5 z-[110] text-xs animate-in fade-in zoom-in-95 duration-100',
+                          isRtl ? 'right-0' : 'left-0'
+                        )}
+                      >
+                        {STATUSES.map((st) => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => {
+                              onBulkUpdateStatus?.(Array.from(selectedEntryIds), st);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 text-start transition-colors"
+                          >
+                            <span className={cn(isRtl && 'font-farsi')}>{t('status.' + st, STATUS_LABELS[st] || st)}</span>
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                st === 'Paid'
+                                  ? 'bg-emerald-400'
+                                  : st === 'Working'
+                                  ? 'bg-cyan-400'
+                                  : st === 'Pending'
+                                  ? 'bg-amber-400'
+                                  : st === 'Failed'
+                                  ? 'bg-rose-400'
+                                  : 'bg-zinc-500'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Bulk CSV Export Button */}
                   <Button
                     variant="ghost"
                     size="xs"
-                    onClick={() => setIsBulkDeleting(true)}
-                    title={`${t('ledger.bulkDelete')} (${formatNumber(selectedEntryIds.size)})`}
-                    className={cn('h-7 px-2 text-[11px] gap-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/60 transition-colors shrink-0', isRtl && 'font-farsi')}
+                    onClick={() => onBulkExportCsv?.(Array.from(selectedEntryIds))}
+                    title={t('ledger.bulkCsvTooltip', t('ledger.bulkCsv'))}
+                    className={cn('h-7 px-2 text-[11px] gap-1 text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 dark:border-zinc-800/80 border shadow-sm flex items-center shrink-0', isRtl && 'font-farsi')}
                   >
-                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t('ledger.bulkDelete')}</span>
+                    <Download className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                    <span>{t('ledger.bulkCsv')}</span>
                   </Button>
-                ) : (
-                  <div className="flex items-center gap-1 p-0.5 bg-rose-950/60 border border-rose-900/90 rounded-md animate-in fade-in zoom-in-95 duration-150 h-7 shrink-0">
-                    <span className={cn('text-[10px] font-medium text-rose-300 px-1 whitespace-nowrap', isRtl && 'font-farsi')}>
-                      {t('ledger.delete')} {formatNumber(selectedEntryIds.size)}?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsBulkDeleting(false)}
-                      className={cn('h-5 px-1.5 rounded text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 flex items-center', isRtl && 'font-farsi')}
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onBulkDelete?.(Array.from(selectedEntryIds));
-                        setSelectedEntryIds(new Set());
-                        setIsBulkDeleting(false);
-                        setIsSelectMode(false);
-                        setLastSelectedId(null);
-                      }}
-                      className={cn('h-5 px-1.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-zinc-100 font-medium shadow-sm flex items-center', isRtl && 'font-farsi')}
-                    >
-                      {t('common.confirm')}
-                    </button>
-                  </div>
-                )}
 
-                {/* 4. Clear / Deselect Button */}
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => {
-                    setSelectedEntryIds(new Set());
-                    setIsBulkDeleting(false);
-                    setIsStatusDropdownOpen(false);
-                    setIsSelectMode(false);
-                    setLastSelectedId(null);
-                  }}
-                  title={`${t('ledger.bulkClear')} (Esc)`}
-                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/80 rounded-md shrink-0 flex items-center justify-center"
-                >
-                  <X className="w-3.5 h-3.5 shrink-0" />
-                </Button>
+                  {/* 3. In-Line Morphing Delete (N) Confirmation */}
+                  {!isBulkDeleting ? (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setIsBulkDeleting(true)}
+                      title={`${t('ledger.bulkDelete')} (${formatNumber(selectedEntryIds.size)})`}
+                      className={cn('h-7 px-2 text-[11px] gap-1 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/60 transition-colors shrink-0', isRtl && 'font-farsi')}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>{t('ledger.bulkDelete')}</span>
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1 p-0.5 bg-rose-50 border-rose-200 dark:bg-rose-950/60 dark:border-rose-900/90 border rounded-md animate-in fade-in zoom-in-95 duration-150 h-7 shrink-0">
+                      <span className={cn('text-[10px] font-medium text-rose-700 dark:text-rose-300 px-1 whitespace-nowrap', isRtl && 'font-farsi')}>
+                        {t('ledger.delete')} {formatNumber(selectedEntryIds.size)}?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsBulkDeleting(false)}
+                        className={cn('h-5 px-1.5 rounded text-[10px] text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800/60 flex items-center', isRtl && 'font-farsi')}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onBulkDelete?.(Array.from(selectedEntryIds));
+                          setSelectedEntryIds(new Set());
+                          setIsBulkDeleting(false);
+                          setIsSelectMode(false);
+                          setLastSelectedId(null);
+                        }}
+                        className={cn('h-5 px-1.5 rounded text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-medium shadow-sm flex items-center', isRtl && 'font-farsi')}
+                      >
+                        {t('common.confirm')}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 4. Clear / Deselect Button */}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      setSelectedEntryIds(new Set());
+                      setIsBulkDeleting(false);
+                      setIsStatusDropdownOpen(false);
+                      setIsSelectMode(false);
+                      setLastSelectedId(null);
+                    }}
+                    title={`${t('ledger.bulkClear')} (Esc)`}
+                    className="h-7 w-7 p-0 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 rounded-md shrink-0 flex items-center justify-center"
+                  >
+                    <X className="w-3.5 h-3.5 shrink-0" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

@@ -150,7 +150,7 @@ export function NotificationCenter({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/45 dark:bg-black/55 backdrop-blur-[2px]"
+          className="fixed inset-0 bg-black/20 dark:bg-black/30 backdrop-blur-[1px]"
           aria-hidden="true"
         />
 
@@ -174,7 +174,7 @@ export function NotificationCenter({
           data-no-drag
         >
           {/* Header */}
-          <div className="px-4 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 shrink-0 space-y-2.5 relative z-10">
+          <div className="px-4 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25 shrink-0 space-y-2.5 relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300">

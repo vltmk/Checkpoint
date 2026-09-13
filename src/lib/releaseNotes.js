@@ -26,6 +26,63 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '4.0.0': {
+    date: '2026-09-13',
+    title: {
+      en: "What's New in Checkpoint v4.0.0",
+      fa: 'امکانات و تغییرات نسخه ۴.۰.۰',
+    },
+    summary: {
+      en: 'Major upgrade introducing Advertiser and Booster profiles, expense tracking, redesigned Quick Add, UI/UX polish, and battery/power optimizations for laptops.',
+      fa: 'ارتقای بزرگ با افزودن پروفایل‌های Advertiser و Booster، محاسبه هزینه‌ها در کنار ران‌ها، بازطراحی ثبت سریع و بهینه‌سازی مصرف باتری.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Added Advertiser and Booster dedicated profiles with isolated databases and role-tailored workflows.',
+        },
+        {
+          tag: 'new',
+          text: 'Expense tracking alongside runs with automated net profit calculations.',
+        },
+        {
+          tag: 'improved',
+          text: 'Redesigned Quick Add dialog for streamlined and lightning-fast logging.',
+        },
+        {
+          tag: 'improved',
+          text: 'Comprehensive UI/UX enhancements, increased responsiveness, and reduced resource footprint.',
+        },
+        {
+          tag: 'improved',
+          text: 'Hardware and power optimizations specifically tailored for laptops and battery-powered devices.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'افزودن پروفایل Advertiser و Booster',
+        },
+        {
+          tag: 'new',
+          text: 'محاسبه مخارج و هزینه‌ها در کنار ران‌ها',
+        },
+        {
+          tag: 'improved',
+          text: 'بازطراحی «افزودن سریع» برای تسریع کار',
+        },
+        {
+          tag: 'improved',
+          text: 'بهبود UI/UX، سرعت و مصرف منابع',
+        },
+        {
+          tag: 'improved',
+          text: 'بهینه‌سازی برای لپ‌تاپ و دستگاه‌های باتری‌دار',
+        },
+      ],
+    },
+  },
   '3.0.2': {
     date: '2026-09-08',
     title: {

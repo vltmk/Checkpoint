@@ -1,6 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useLanguage } from '../../lib/i18n';
 
 export function NumberStepperInput({
   value,
@@ -16,6 +17,7 @@ export function NumberStepperInput({
   required = false,
   ...props
 }) {
+  const { isRtl } = useLanguage();
   const holdTimeoutRef = useRef(null);
   const holdIntervalRef = useRef(null);
 
@@ -73,7 +75,7 @@ export function NumberStepperInput({
   return (
     <div
       className={cn(
-        'relative flex items-center w-full h-9 rounded-lg bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500',
+        'relative flex items-center w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
@@ -84,20 +86,25 @@ export function NumberStepperInput({
         value={value}
         onChange={(e) => {
           // Convert Persian/Arabic digits to English digits
-          let val = e.target.value
+          let raw = e.target.value
             .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
             .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
           
-          // Remove commas and spaces
-          val = val.replace(/,/g, '').replace(/\\s/g, '');
-          
-          // Only allow digits, minus sign (at start), and one decimal point
-          val = val.replace(/(?!^)-/g, ''); // only allow - at start
-          val = val.replace(/[^0-9.-]/g, '');
+          const hasMinus = raw.includes('-');
+          const hasPlus = raw.includes('+');
+
+          // Remove commas, spaces, and signs for magnitude normalization
+          let val = raw.replace(/,/g, '').replace(/\s/g, '').replace(/[^0-9.]/g, '');
           
           const parts = val.split('.');
           if (parts.length > 2) {
-            val = parts[0] + '.' + parts.slice(1).join('').replace(/\\./g, '');
+            val = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
+          }
+
+          if (hasMinus) {
+            val = '-' + val;
+          } else if (hasPlus) {
+            val = '+' + val;
           }
           
           e.target.value = val;
@@ -108,14 +115,22 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent px-3 pr-8 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
+          'w-full h-full bg-transparent px-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
+          isRtl ? 'pl-8 pr-3 text-right' : 'pr-8 pl-3 text-left',
           inputClassName
         )}
         {...props}
       />
 
       {/* Stacked Incremental Stepper Chevrons */}
-      <div className="absolute right-1 top-1 bottom-1 w-5 flex flex-col items-center justify-between border-l border-zinc-200 dark:border-zinc-800/80 pl-0.5">
+      <div
+        className={cn(
+          'absolute top-1 bottom-1 w-5 flex flex-col items-center justify-between',
+          isRtl
+            ? 'left-1 border-r border-zinc-200 dark:border-zinc-800/80 pr-0.5'
+            : 'right-1 border-l border-zinc-200 dark:border-zinc-800/80 pl-0.5'
+        )}
+      >
         <button
           type="button"
           tabIndex={-1}
@@ -125,7 +140,7 @@ export function NumberStepperInput({
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-t text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="flex-1 w-full flex items-center justify-center rounded-t text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           title={`Increment (+${effectiveStep.toLocaleString()})`}
         >
           <ChevronUp className="w-3 h-3 stroke-[2.5]" />
@@ -139,7 +154,7 @@ export function NumberStepperInput({
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(-effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-b text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="flex-1 w-full flex items-center justify-center rounded-b text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
           title={`Decrement (-${effectiveStep.toLocaleString()})`}
         >
           <ChevronDown className="w-3 h-3 stroke-[2.5]" />

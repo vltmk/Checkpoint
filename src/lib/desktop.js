@@ -3,17 +3,146 @@
  * Gracefully falls back when running in browser mode.
  */
 
-import { trackerDB } from './db';
-import { detectAppLink } from './appLinks';
+import { detectAppLink } from './appLinks.js';
 
 export const isTauri = () => {
   return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__);
 };
 
 /**
+ * Window Lifecycle & State Tracker
+ */
+let _isWindowVisible = true;
+let _isWindowFocused = typeof document !== 'undefined' ? (document.hasFocus ? document.hasFocus() : true) : true;
+const _visibilityListeners = new Set();
+const _focusListeners = new Set();
+let _lifecycleInitialized = false;
+
+export function isWindowVisible() {
+  return _isWindowVisible;
+}
+
+export function isWindowFocused() {
+  return _isWindowFocused;
+}
+
+export function setWindowVisibility(visible) {
+  const next = Boolean(visible);
+  if (_isWindowVisible === next) return;
+  _isWindowVisible = next;
+  for (const cb of _visibilityListeners) {
+    try {
+      cb(_isWindowVisible);
+    } catch (e) {
+      console.error('Error in visibility listener callback:', e);
+    }
+  }
+}
+
+export function setWindowFocus(focused) {
+  const next = Boolean(focused);
+  if (_isWindowFocused === next) return;
+  _isWindowFocused = next;
+  for (const cb of _focusListeners) {
+    try {
+      cb(_isWindowFocused);
+    } catch (e) {
+      console.error('Error in focus listener callback:', e);
+    }
+  }
+}
+
+export function subscribeWindowVisibility(callback) {
+  initWindowLifecycle();
+  _visibilityListeners.add(callback);
+  try {
+    callback(_isWindowVisible);
+  } catch (e) {
+    console.error('Error in initial visibility callback:', e);
+  }
+  return () => {
+    _visibilityListeners.delete(callback);
+  };
+}
+
+export function subscribeWindowFocus(callback) {
+  initWindowLifecycle();
+  _focusListeners.add(callback);
+  try {
+    callback(_isWindowFocused);
+  } catch (e) {
+    console.error('Error in initial focus callback:', e);
+  }
+  return () => {
+    _focusListeners.delete(callback);
+  };
+}
+
+export function initWindowLifecycle() {
+  if (_lifecycleInitialized) return;
+  _lifecycleInitialized = true;
+
+  if (typeof document !== 'undefined') {
+    _isWindowVisible = !document.hidden;
+    _isWindowFocused = document.hasFocus ? document.hasFocus() : true;
+
+    document.addEventListener('visibilitychange', () => {
+      setWindowVisibility(!document.hidden);
+    });
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', () => {
+      setWindowVisibility(true);
+      setWindowFocus(true);
+    });
+    window.addEventListener('blur', () => {
+      setWindowFocus(false);
+    });
+  }
+
+  if (isTauri()) {
+    import('@tauri-apps/api/event').then(({ listen }) => {
+      listen('checkpoint-window-shown', () => {
+        setWindowVisibility(true);
+        setWindowFocus(true);
+      }).catch(() => {});
+
+      listen('tauri://focus', () => {
+        setWindowVisibility(true);
+        setWindowFocus(true);
+      }).catch(() => {});
+
+      listen('tauri://blur', () => {
+        setWindowFocus(false);
+      }).catch(() => {});
+
+      listen('tauri://resize', async () => {
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const win = getCurrentWindow();
+          if (win && win.isMinimized) {
+            const min = await win.isMinimized();
+            if (min) {
+              setWindowVisibility(false);
+              setWindowFocus(false);
+            } else if (win.isVisible) {
+              const vis = await win.isVisible();
+              setWindowVisibility(vis);
+            }
+          }
+        } catch (_) {}
+      }).catch(() => {});
+    }).catch(() => {});
+  }
+}
+
+/**
  * Window Controls
  */
 export async function minimizeWindow() {
+  setWindowVisibility(false);
+  setWindowFocus(false);
   if (!isTauri()) return;
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -67,6 +196,8 @@ export async function closeWindow() {
 }
 
 export async function hideWindow() {
+  setWindowVisibility(false);
+  setWindowFocus(false);
   if (!isTauri()) return;
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -82,6 +213,8 @@ export async function hideWindow() {
 }
 
 export async function showWindow() {
+  setWindowVisibility(true);
+  setWindowFocus(true);
   if (!isTauri()) return;
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -100,6 +233,7 @@ export async function isTrayNotificationSent() {
   const local = localStorage.getItem('checkpoint_tray_notified');
   if (local === 'true') return true;
   try {
+    const { trackerDB } = await import('./db.js');
     const dbVal = await trackerDB.getSetting('checkpoint_tray_notified', null);
     if (dbVal === 'true' || dbVal === true) {
       localStorage.setItem('checkpoint_tray_notified', 'true');
@@ -112,6 +246,7 @@ export async function isTrayNotificationSent() {
 export async function setTrayNotificationSent() {
   localStorage.setItem('checkpoint_tray_notified', 'true');
   try {
+    const { trackerDB } = await import('./db.js');
     await trackerDB.setSetting('checkpoint_tray_notified', 'true');
   } catch (e) {}
 }
@@ -119,6 +254,7 @@ export async function setTrayNotificationSent() {
 export async function resetTrayNotificationFlag() {
   localStorage.removeItem('checkpoint_tray_notified');
   try {
+    const { trackerDB } = await import('./db.js');
     await trackerDB.setSetting('checkpoint_tray_notified', 'false');
   } catch (e) {}
 }
@@ -372,6 +508,30 @@ export async function copyTextNative(text) {
     }
   }
   return false;
+}
+
+/**
+ * Native & Web Text Clipboard reader helper
+ */
+export async function readTextNative() {
+  if (isTauri()) {
+    try {
+      const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+      const text = await readText();
+      if (typeof text === 'string') return text;
+    } catch (e) {
+      console.warn('Native clipboard readText failed, using browser fallback:', e);
+    }
+  }
+
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    try {
+      return await navigator.clipboard.readText();
+    } catch (e) {
+      console.error('Clipboard read error:', e);
+    }
+  }
+  return '';
 }
 
 /**

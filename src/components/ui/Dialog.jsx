@@ -53,7 +53,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/45 dark:bg-black/55 backdrop-blur-[2px]"
+            className="fixed inset-0 bg-black/20 dark:bg-black/30 backdrop-blur-[1px]"
           />
 
           {/* Frosted Glass Dialog Container */}
@@ -84,7 +84,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/40 dark:bg-zinc-950/40 relative z-10',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-10',
         className
       )}
     >
@@ -121,7 +121,7 @@ export function DialogFooter({ children, className }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/40 dark:bg-zinc-950/40 relative z-10',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-10',
         className
       )}
     >

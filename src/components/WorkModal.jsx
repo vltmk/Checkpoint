@@ -11,7 +11,7 @@ import { DateTimePicker, toLocalISOString } from './ui/DateTimePicker';
 import { GameIcon } from './ui/GameIcon';
 import { MoneyDisplay } from './ui/MoneyDisplay';
 import { Kbd } from './ui/Tooltip';
-import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2, Edit2, Plus } from 'lucide-react';
+import { AlertTriangle, Copy, UploadCloud, X, Check, Banknote, Coins, Users, Link2, Edit2, Plus, Hash, Megaphone } from 'lucide-react';
 import { DiscordIcon, TelegramIcon, SteamIcon, GoogleSheetsIcon, GithubIcon, TomanIcon } from './ui/Icons';
 import { CategoryModal } from './ui/CategoryModal';
 import { trackerDB } from '../lib/db';
@@ -19,6 +19,7 @@ import { copyTextNative, optimizeImageProof } from '../lib/desktop';
 import { detectAppLink } from '../lib/appLinks';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { cn } from '../lib/utils';
+import { ADVERTISER_LAST_FEE_KEY } from '../lib/profiles';
 
 const DRAFT_KEY = 'checkpoint_work_draft';
 const LEGACY_DRAFT_KEY = 'vault_work_draft';
@@ -32,7 +33,9 @@ export function WorkModal({
   goldRateTOMAN = 3200,
   onOpenLightbox,
   categories = [],
+  entries = [],
   onRefreshCategories,
+  activeProfileId = 'booster',
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [fieldErrors, setFieldErrors] = useState({ title: false, game: false, dateTime: false, income: false });
@@ -58,6 +61,7 @@ export function WorkModal({
     { value: 'On Hold', label: t('status.On Hold') },
     { value: 'Failed', label: t('status.Failed') },
   ];
+  const [entryType, setEntryType] = useState('income'); // 'income' | 'expense'
   const [formData, setFormData] = useState({
     title: '',
     dateTime: '',
@@ -65,6 +69,9 @@ export function WorkModal({
     isCustomGame: false,
     customGameText: '',
     source: '',
+    orderId: '',
+    feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+    sourcePaid: false,
     teamMode: false,
     teammates: [],
     teamInputMode: 'pot', // 'pot' | 'income'
@@ -81,6 +88,31 @@ export function WorkModal({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
 
+  const activeCategorySupportsGold = useMemo(() => {
+    const activeGameName = formData.isCustomGame ? formData.customGameText : formData.game;
+    if (!activeGameName) return true;
+    const cat = (categories || []).find(
+      (c) => c.name?.toLowerCase().trim() === activeGameName.toLowerCase().trim()
+    );
+    if (cat && cat.supportsGold !== undefined) {
+      return Boolean(cat.supportsGold);
+    }
+    return activeGameName.toLowerCase().includes('world of warcraft');
+  }, [formData.game, formData.isCustomGame, formData.customGameText, categories]);
+
+  const availableCurrencyOptions = useMemo(() => {
+    if (activeCategorySupportsGold) {
+      return CURRENCY_OPTIONS;
+    }
+    return CURRENCY_OPTIONS.filter((c) => c.value !== 'GOLD');
+  }, [activeCategorySupportsGold, language]);
+
+  useEffect(() => {
+    if (!activeCategorySupportsGold && formData.currency === 'GOLD') {
+      setFormData((prev) => ({ ...prev, currency: 'TOMAN' }));
+    }
+  }, [activeCategorySupportsGold, formData.currency]);
+
   const GAME_OPTIONS = useMemo(() => {
     const opts = (categories || []).map((cat) => ({
       value: cat.name,
@@ -96,8 +128,9 @@ export function WorkModal({
       ),
     }));
 
-    // If current selected game is not in categories and not custom, include it
+    // If editing an existing entry whose game is not in categories, include it
     if (
+      editingEntry &&
       formData.game &&
       !opts.some((o) => o.value.toLowerCase() === formData.game.toLowerCase()) &&
       formData.game !== '__custom__'
@@ -181,18 +214,30 @@ export function WorkModal({
           ? { ...editingEntry.teammateCuts }
           : {};
 
+      const isExpense = editingEntry.income !== undefined && editingEntry.income !== null && Number(editingEntry.income) < 0;
+      setEntryType(isExpense ? 'expense' : 'income');
+
+      const isAdvertiser = activeProfileId === 'advertiser';
+
       setFormData({
         title: editingEntry.title || '',
         dateTime: editingEntry.dateTime || toLocalISOString(new Date()),
         game: editingEntry.game || 'World of Warcraft',
         isCustomGame: !isStandardGame && Boolean(editingEntry.game),
         customGameText: isStandardGame ? '' : editingEntry.game || '',
-        source: editingEntry.source || '',
-        teamMode: Boolean(editingEntry.teamMode || entryTeammates.length > 0),
-        teammates: entryTeammates,
+        source: editingEntry.source !== undefined && editingEntry.source !== null
+          ? editingEntry.source
+          : '',
+        orderId: editingEntry.orderId || '',
+        feeRate: editingEntry.feeRate !== undefined && editingEntry.feeRate !== null
+          ? String(editingEntry.feeRate)
+          : (typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15'),
+        sourcePaid: Boolean(editingEntry.sourcePaid),
+        teamMode: !isExpense && Boolean(editingEntry.teamMode || entryTeammates.length > 0),
+        teammates: isExpense ? [] : entryTeammates,
         teamInputMode: editingEntry.teamInputMode || (editingEntry.pot !== null && editingEntry.pot !== undefined ? 'pot' : 'income'),
         pot: initialPot,
-        income: editingEntry.income !== undefined && editingEntry.income !== null ? String(editingEntry.income) : '',
+        income: editingEntry.income !== undefined && editingEntry.income !== null ? String(Math.abs(Number(editingEntry.income))) : '',
         teammateCuts: initialCuts,
         currency: entryCur,
         exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
@@ -210,19 +255,34 @@ export function WorkModal({
         }).catch(() => {});
       }
     } else {
+      const isAdvertiser = activeProfileId === 'advertiser';
+      const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
+      const entryCategoryMatch = (categories || []).find(
+        (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
+      )?.name;
+      const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
+
       try {
         const savedDraft = localStorage.getItem(DRAFT_KEY) || localStorage.getItem(LEGACY_DRAFT_KEY);
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           const draftTeammates = Array.isArray(parsed.teammates) ? parsed.teammates : [];
           const draftSource = (parsed.source === 'Direct Client' ? '' : parsed.source) || '';
+          const draftCategoryMatch = (categories || []).find(
+            (c) => c.name?.toLowerCase().trim() === parsed.game?.toLowerCase()?.trim()
+          )?.name;
+          const gameToUse = draftCategoryMatch || (parsed.isCustomGame ? (parsed.game || defaultGame) : defaultGame);
+
           setFormData({
             title: parsed.title || '',
             dateTime: parsed.dateTime || toLocalISOString(new Date()),
-            game: parsed.game || 'World of Warcraft',
+            game: gameToUse,
             isCustomGame: Boolean(parsed.isCustomGame),
             customGameText: parsed.customGameText || '',
-            source: draftSource,
+            source: draftSource || '',
+            orderId: parsed.orderId || '',
+            feeRate: parsed.feeRate || (typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15'),
+            sourcePaid: Boolean(parsed.sourcePaid),
             teamMode: Boolean(parsed.teamMode || draftTeammates.length > 0),
             teammates: draftTeammates,
             teamInputMode: parsed.teamInputMode || 'pot',
@@ -238,13 +298,17 @@ export function WorkModal({
           setIsDraftRestored(Boolean(parsed.title || parsed.income || parsed.pot || parsed.notes || parsed.source || parsed.link || draftTeammates.length > 0));
         } else {
           setIsDraftRestored(false);
+          setEntryType('income');
           setFormData({
             title: '',
             dateTime: toLocalISOString(new Date()),
-            game: 'World of Warcraft',
+            game: defaultGame,
             isCustomGame: false,
             customGameText: '',
             source: '',
+            orderId: '',
+            feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+            sourcePaid: false,
             teamMode: false,
             teammates: [],
             teamInputMode: 'pot',
@@ -264,7 +328,7 @@ export function WorkModal({
       }
     }
     setFieldErrors({ title: false, game: false, dateTime: false, income: false });
-  }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN]);
+  }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN, activeProfileId, categories, entries]);
 
   const updateFormData = (patch) => {
     if (saveError) setSaveError(null);
@@ -292,17 +356,27 @@ export function WorkModal({
     trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
   };
 
+  const isAdvertiser = activeProfileId === 'advertiser';
+
   const handleClearDraft = () => {
     clearPersistedDraft();
     setIsDraftRestored(false);
     setFieldErrors({ title: false, game: false, dateTime: false, income: false });
+    const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
+    const entryCategoryMatch = (categories || []).find(
+      (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
+    )?.name;
+    const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
     setFormData({
       title: '',
       dateTime: toLocalISOString(new Date()),
-      game: 'World of Warcraft',
+      game: defaultGame,
       isCustomGame: false,
       customGameText: '',
       source: '',
+      orderId: '',
+      feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+      sourcePaid: false,
       teamMode: false,
       teammates: [],
       teamInputMode: 'pot',
@@ -318,11 +392,147 @@ export function WorkModal({
     setProofs([]);
   };
 
+  // Advertiser Financial Handlers
+  const handleAdvertiserClientPriceChange = (valStr) => {
+    const clean = normalizeDigits(valStr).replace(/[-+]/g, '');
+    const clientPrice = parseFloat(clean);
+    const rate = parseFloat(formData.feeRate);
+
+    if (!isNaN(clientPrice) && clientPrice >= 0) {
+      const feePct = !isNaN(rate) && rate >= 0 ? rate : 15;
+      const myProfit = Math.round((clientPrice * (feePct / 100)) * 100) / 100;
+      const boosterPayout = Math.max(0, Math.round((clientPrice - myProfit) * 100) / 100);
+      const boosterCount = (formData.teammates || []).length;
+      const cuts = {};
+      if (boosterCount > 0) {
+        const eachBoosterCut = Math.round((boosterPayout / boosterCount) * 100) / 100;
+        formData.teammates.forEach((b) => {
+          cuts[b] = String(eachBoosterCut);
+        });
+      }
+      updateFormData({
+        pot: clean,
+        income: String(myProfit),
+        teammateCuts: cuts,
+      });
+    } else {
+      updateFormData({
+        pot: clean,
+        income: '',
+        teammateCuts: {},
+      });
+    }
+  };
+
+  const handleAdvertiserFeeRateChange = (newRateStr) => {
+    const cleanRate = normalizeDigits(newRateStr).replace(/[^0-9.]/g, '');
+    const rate = parseFloat(cleanRate);
+    try {
+      localStorage.setItem(ADVERTISER_LAST_FEE_KEY, cleanRate);
+    } catch (e) {}
+
+    const clientPrice = parseFloat(formData.pot);
+    if (!isNaN(clientPrice) && clientPrice >= 0 && !isNaN(rate) && rate >= 0) {
+      const myProfit = Math.round((clientPrice * (rate / 100)) * 100) / 100;
+      const boosterPayout = Math.max(0, Math.round((clientPrice - myProfit) * 100) / 100);
+      const boosterCount = (formData.teammates || []).length;
+      const cuts = {};
+      if (boosterCount > 0) {
+        const eachBoosterCut = Math.round((boosterPayout / boosterCount) * 100) / 100;
+        formData.teammates.forEach((b) => {
+          cuts[b] = String(eachBoosterCut);
+        });
+      }
+      updateFormData({
+        feeRate: cleanRate,
+        income: String(myProfit),
+        teammateCuts: cuts,
+      });
+    } else {
+      updateFormData({ feeRate: cleanRate });
+    }
+  };
+
+  const handleAdvertiserNetProfitChange = (valStr) => {
+    const clean = normalizeDigits(valStr).replace(/[-+]/g, '');
+    const myProfit = parseFloat(clean);
+    const clientPrice = parseFloat(formData.pot);
+
+    if (!isNaN(clientPrice) && clientPrice > 0 && !isNaN(myProfit) && myProfit >= 0) {
+      const calculatedRate = Math.round(((myProfit / clientPrice) * 100) * 10) / 10;
+      const boosterPayout = Math.max(0, Math.round((clientPrice - myProfit) * 100) / 100);
+      const boosterCount = (formData.teammates || []).length;
+      const cuts = {};
+      if (boosterCount > 0) {
+        const eachBoosterCut = Math.round((boosterPayout / boosterCount) * 100) / 100;
+        formData.teammates.forEach((b) => {
+          cuts[b] = String(eachBoosterCut);
+        });
+      }
+      updateFormData({
+        income: clean,
+        feeRate: String(calculatedRate),
+        teammateCuts: cuts,
+      });
+    } else {
+      updateFormData({ income: clean });
+    }
+  };
+
+  const handleAdvertiserBoosterPayoutChange = (valStr) => {
+    const clean = normalizeDigits(valStr).replace(/[-+]/g, '');
+    const totalPayout = parseFloat(clean);
+    const clientPrice = parseFloat(formData.pot);
+
+    if (!isNaN(clientPrice) && clientPrice >= 0 && !isNaN(totalPayout) && totalPayout >= 0) {
+      const myProfit = Math.max(0, Math.round((clientPrice - totalPayout) * 100) / 100);
+      const calculatedRate = clientPrice > 0 ? Math.round(((myProfit / clientPrice) * 100) * 10) / 10 : 0;
+      const boosterCount = (formData.teammates || []).length;
+      const cuts = {};
+      if (boosterCount > 0) {
+        const eachBoosterCut = Math.round((totalPayout / boosterCount) * 100) / 100;
+        formData.teammates.forEach((b) => {
+          cuts[b] = String(eachBoosterCut);
+        });
+      }
+      updateFormData({
+        income: String(myProfit),
+        feeRate: String(calculatedRate),
+        teammateCuts: cuts,
+      });
+    }
+  };
+
   // Team Share Calculations
   const totalTeamMembers = 1 + (formData.teammates ? formData.teammates.length : 0);
 
   const handlePotChange = (newPotStr) => {
-    const cleanStr = normalizeDigits(newPotStr);
+    let cleanStr = normalizeDigits(newPotStr);
+    const hasMinus = cleanStr.includes('-');
+    const hasPlus = cleanStr.includes('+');
+
+    if (hasMinus) {
+      if (entryType !== 'expense') {
+        setEntryType('expense');
+      }
+      cleanStr = cleanStr.replace(/[-+]/g, '');
+      updateFormData({
+        teamMode: false,
+        teammates: [],
+        teammateCuts: {},
+        income: cleanStr,
+        pot: '',
+      });
+      return;
+    }
+
+    if (hasPlus) {
+      if (entryType !== 'income') {
+        setEntryType('income');
+      }
+      cleanStr = cleanStr.replace(/[-+]/g, '');
+    }
+
     const potNum = parseFloat(cleanStr);
     if (!isNaN(potNum) && potNum >= 0 && totalTeamMembers > 0) {
       const equalShare = Math.round((potNum / totalTeamMembers) * 100) / 100;
@@ -343,7 +553,32 @@ export function WorkModal({
   };
 
   const handleIncomeChange = (newIncomeStr) => {
-    const cleanStr = normalizeDigits(newIncomeStr);
+    let cleanStr = normalizeDigits(newIncomeStr);
+    const hasMinus = cleanStr.includes('-');
+    const hasPlus = cleanStr.includes('+');
+
+    if (hasMinus) {
+      if (entryType !== 'expense') {
+        setEntryType('expense');
+      }
+      cleanStr = cleanStr.replace(/[-+]/g, '');
+      updateFormData({
+        teamMode: false,
+        teammates: [],
+        teammateCuts: {},
+        income: cleanStr,
+        pot: '',
+      });
+      return;
+    }
+
+    if (hasPlus) {
+      if (entryType !== 'income') {
+        setEntryType('income');
+      }
+      cleanStr = cleanStr.replace(/[-+]/g, '');
+    }
+
     const incNum = parseFloat(cleanStr);
     if (formData.teamMode) {
       if (!isNaN(incNum) && incNum >= 0) {
@@ -367,6 +602,24 @@ export function WorkModal({
   };
 
   const handleTeammatesChange = (newTeammates) => {
+    if (isAdvertiser) {
+      const clientPrice = parseFloat(formData.pot) || 0;
+      const myProfit = parseFloat(formData.income) || 0;
+      const totalPayout = Math.max(0, Math.round((clientPrice - myProfit) * 100) / 100);
+      const cuts = {};
+      if (newTeammates.length > 0) {
+        const eachBoosterCut = Math.round((totalPayout / newTeammates.length) * 100) / 100;
+        newTeammates.forEach((b) => {
+          cuts[b] = formData.teammateCuts?.[b] || String(eachBoosterCut);
+        });
+      }
+      updateFormData({
+        teammates: newTeammates,
+        teammateCuts: cuts,
+      });
+      return;
+    }
+
     const newCount = 1 + newTeammates.length;
     let nextPot = formData.pot;
     let nextIncome = formData.income;
@@ -400,7 +653,21 @@ export function WorkModal({
   };
 
   const handleCustomCutChange = (memberKey, cutValue) => {
-    const cleanCut = normalizeDigits(cutValue);
+    let cleanCut = normalizeDigits(cutValue);
+    if (cleanCut.includes('-')) {
+      if (entryType !== 'expense') {
+        setEntryType('expense');
+      }
+      cleanCut = cleanCut.replace(/[-+]/g, '');
+      updateFormData({
+        teamMode: false,
+        teammates: [],
+        teammateCuts: {},
+        income: cleanCut,
+        pot: '',
+      });
+      return;
+    }
     if (memberKey === '__user__') {
       const updatedIncome = cleanCut;
       const userCutNum = parseFloat(updatedIncome) || 0;
@@ -591,9 +858,9 @@ export function WorkModal({
     const titleMissing = !formData.title.trim();
     const gameMissing = !selectedGame.trim();
     const dateMissing = !formData.dateTime;
-    const activeAmount = formData.teamMode && formData.teamInputMode === 'pot'
-      ? formData.pot
-      : formData.income;
+    const activeAmount = isAdvertiser
+      ? (formData.pot || formData.income)
+      : (formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income);
     const amountNumber = Number(activeAmount);
     const incomeMissing = String(activeAmount ?? '').trim() === '' || !Number.isFinite(amountNumber) || amountNumber < 0;
 
@@ -612,23 +879,30 @@ export function WorkModal({
 
     const rateNum = parseFloat(formData.exchangeRate) || (isClassic ? 7000 : goldRateTOMAN || 3200);
     const userIncomeNum = parseFloat(formData.income) || 0;
-    const finalPot = formData.teamMode
-      ? parseFloat(formData.pot) || (userIncomeNum * totalTeamMembers)
-      : null;
+    const signedIncome = entryType === 'expense' ? -Math.abs(userIncomeNum) : Math.abs(userIncomeNum);
+    const finalPot = isAdvertiser
+      ? (formData.pot ? parseFloat(formData.pot) || 0 : null)
+      : (entryType !== 'expense' && formData.teamMode
+        ? parseFloat(formData.pot) || (userIncomeNum * totalTeamMembers)
+        : null);
 
     entryIdRef.current ||= editingEntry?.id || 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
     const entryToSave = {
       id: entryIdRef.current,
+      entryType: entryType,
       title: formData.title.trim(),
       dateTime: formData.dateTime,
       game: selectedGame,
       source: formData.source ? formData.source.trim() : '',
-      teamMode: Boolean(formData.teamMode),
-      teammates: formData.teamMode ? formData.teammates : [],
-      teamInputMode: formData.teamMode ? formData.teamInputMode : 'pot',
+      orderId: isAdvertiser ? (formData.orderId ? formData.orderId.trim() : '') : '',
+      feeRate: isAdvertiser ? (parseFloat(formData.feeRate) || null) : null,
+      sourcePaid: isAdvertiser ? Boolean(formData.sourcePaid) : false,
+      teamMode: entryType === 'expense' ? false : (isAdvertiser ? ((formData.teammates || []).length > 0) : Boolean(formData.teamMode)),
+      teammates: entryType === 'expense' ? [] : (formData.teammates || []),
+      teamInputMode: isAdvertiser ? 'pot' : (formData.teamMode ? formData.teamInputMode : 'pot'),
       pot: finalPot,
-      income: userIncomeNum,
-      teammateCuts: formData.teamMode ? formData.teammateCuts : {},
+      income: signedIncome,
+      teammateCuts: entryType === 'expense' ? {} : (isAdvertiser || formData.teamMode ? (formData.teammateCuts || {}) : {}),
       currency: formData.currency,
       exchangeRate: rateNum,
       rateUnit: isClassic ? '1' : '1k',
@@ -666,7 +940,42 @@ export function WorkModal({
   return (
     <>
       <Dialog open={isOpen} onClose={isSaving ? undefined : onClose} maxWidth="max-w-xl">
-      <DialogHeader onClose={isSaving ? undefined : onClose}>
+      <DialogHeader
+        onClose={isSaving ? undefined : onClose}
+        actions={
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[11px]" dir="ltr">
+            <button
+              type="button"
+              onClick={() => setEntryType('income')}
+              className={cn(
+                "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-medium transition-colors flex items-center gap-1.5 border",
+                entryType === 'income'
+                  ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs border-zinc-200/80 dark:border-transparent"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 border-transparent"
+              )}
+            >
+              <span className="font-bold">+</span>
+              <span>{t('work.incomeMode', 'Income (+)')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEntryType('expense');
+                updateFormData({ teamMode: false, teammates: [], teammateCuts: {} });
+              }}
+              className={cn(
+                "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-medium transition-colors flex items-center gap-1.5 border",
+                entryType === 'expense'
+                  ? "bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-xs border-zinc-200/80 dark:border-transparent"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 border-transparent"
+              )}
+            >
+              <span className="font-bold">−</span>
+              <span>{t('work.expenseMode', 'Expense / Debt (-)')}</span>
+            </button>
+          </div>
+        }
+      >
         <div className="flex items-center gap-2">
           <DialogTitle className={cn(isRtl && 'font-farsi')}>
             {editingEntry ? t('work.editTitle') : t('work.addTitle')}
@@ -772,36 +1081,85 @@ export function WorkModal({
 
             <div>
               <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                <span>{t('work.sellerSource')}</span>
+                <span>{isAdvertiser ? (language === 'fa' ? 'سورس / کانال مشتری' : 'Channel / Source') : t('work.sellerSource')}</span>
                 <span className={cn('text-[9px] text-zinc-500 leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
               </label>
               <SourceCombobox
                 value={formData.source}
                 onChange={(val) => updateFormData({ source: val })}
-                placeholder={language === 'fa' ? 'مثال: سورس، دیسکورد مشتری...' : 'e.g. Enter seller, broker, or client...'}
+                placeholder={isAdvertiser ? (language === 'fa' ? 'مثال: Personal, G2G, FunPay یا مشتری...' : 'e.g. Personal, G2G, FunPay, Client...') : (language === 'fa' ? 'مثال: سورس، دیسکورد مشتری...' : 'e.g. Enter seller, broker, or client...')}
               />
             </div>
           </div>
 
-          {/* Row 2: Work Title */}
-          <div>
-            <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-              <span>{t('work.workTitle')} *</span>
-              {fieldErrors.title && (
-                <span className="text-[9px] text-rose-400 font-medium">Required</span>
+          {/* Row 2: Work Title & Order ID (2-column layout in Advertiser mode) */}
+          <div className={cn(isAdvertiser && 'grid grid-cols-1 sm:grid-cols-2 gap-3')}>
+            {/* Col 1: Work Title */}
+            <div>
+              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isAdvertiser && 'h-4 leading-none', isRtl && 'font-farsi')}>
+                <span>{t('work.workTitle')} *</span>
+                {fieldErrors.title && (
+                  <span className="text-[9px] text-rose-400 font-medium">Required</span>
+                )}
+              </label>
+              <Input
+                ref={titleInputRef}
+                required
+                value={formData.title}
+                onChange={(e) => updateFormData({ title: e.target.value })}
+                placeholder={entryType === 'expense' ? (language === 'fa' ? 'مثال: خرید بوست، خرید گلد، کمیسیون...' : 'e.g. Boost / Carry bought, Gold Purchase, Commission...') : t('work.titlePlaceholder')}
+                className={cn(
+                  'h-9 transition-colors',
+                  fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+                )}
+              />
+              {entryType === 'expense' && (
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  <span className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                    {language === 'fa' ? 'عناوین سریع:' : 'Quick tags:'}
+                  </span>
+                  {[
+                    { en: 'Boost / Carry', fa: 'خرید بوست' },
+                    { en: 'Gold Purchase', fa: 'خرید گلد' },
+                    { en: 'Gear / Token', fa: 'توکن / گیر' },
+                    { en: 'Commission', fa: 'کمیسیون' },
+                  ].map((chip) => (
+                    <button
+                      key={chip.en}
+                      type="button"
+                      onClick={() => updateFormData({ title: language === 'fa' ? chip.fa : chip.en })}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
+                    >
+                      {language === 'fa' ? chip.fa : chip.en}
+                    </button>
+                  ))}
+                </div>
               )}
-            </label>
-            <Input
-              ref={titleInputRef}
-              required
-              value={formData.title}
-              onChange={(e) => updateFormData({ title: e.target.value })}
-              placeholder={t('work.titlePlaceholder')}
-              className={cn(
-                'transition-colors',
-                fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
-              )}
-            />
+            </div>
+
+            {/* Col 2: Order ID (Advertiser only) */}
+            {isAdvertiser && (
+              <div>
+                <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between h-4 leading-none', isRtl && 'font-farsi')}>
+                  <span className="flex items-center gap-1">
+                    <Hash className="w-3 h-3 text-zinc-400" />
+                    <span>{language === 'fa' ? 'شناسه سفارش' : 'Order ID'}</span>
+                  </span>
+                  <span className="text-[9px] text-zinc-500 font-normal">
+                    {language === 'fa' ? 'اختیاری' : 'Optional'}
+                  </span>
+                </label>
+                <div className="relative" dir="ltr">
+                  <Input
+                    value={formData.orderId}
+                    onChange={(e) => updateFormData({ orderId: e.target.value })}
+                    placeholder={language === 'fa' ? 'مثال: #ORD-98234...' : 'e.g. #ORD-98234...'}
+                    className="font-mono text-xs pl-7 h-9 text-left"
+                  />
+                  <Hash className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Row 3: Date & Time */}
@@ -821,268 +1179,435 @@ export function WorkModal({
             />
           </div>
 
-          {/* Row 4: Team / Split Mode Toggle */}
-          <div className="pt-2 border-t border-zinc-800/80 space-y-3">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  const nextTeamMode = !formData.teamMode;
-                  updateFormData({ teamMode: nextTeamMode });
-                }}
-                className={cn(`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
-                  formData.teamMode
-                    ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-medium shadow-sm'
-                    : 'bg-zinc-900/60 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                }`, isRtl && 'font-farsi')}
-              >
-                <Users className="w-3.5 h-3.5 text-zinc-400" />
-                <span>{t('work.teamMode')}</span>
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ml-1 ${
-                    formData.teamMode ? 'bg-emerald-400' : 'bg-zinc-600'
-                  }`}
-                />
-              </button>
-
-              {formData.teamMode && (
-                <div className={cn('flex items-center gap-1.5 text-[10px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
-                  <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
-                  <span className="text-zinc-600">•</span>
-                  <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
+          {/* Row 4: Assigned Booster(s) (Advertiser) vs Team Mode (Booster) */}
+          {isAdvertiser ? (
+            entryType === 'income' && (
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+                    <Users className="w-3.5 h-3.5 text-zinc-400" />
+                    <span>{language === 'fa' ? 'بوستر(ها)ی مجری' : 'Assigned Booster(s)'}</span>
+                  </label>
+                  <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
+                    {formData.teammates?.length > 0
+                      ? `${formatNumber(formData.teammates.length)} ${language === 'fa' ? 'بوستر انتخاب شده' : 'booster(s)'}`
+                      : (language === 'fa' ? 'اختیاری (در صورت تخصیص)' : 'Optional (unassigned if empty)')}
+                  </span>
                 </div>
-              )}
-            </div>
-
-            <AnimatePresence>
-              {formData.teamMode && (
-                <motion.div
-                  initial={{ opacity: 0, transform: 'translateY(-4px)' }}
-                  animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                  exit={{ opacity: 0, transform: 'translateY(-4px)' }}
-                  transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-                  className="space-y-2.5 pt-1 border-t border-zinc-800/60 relative z-40"
-                >
-                  <div>
-                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
-                      {t('work.teammatesCrew')}
-                    </label>
-                    <TeammatesCombobox
-                      value={formData.teammates}
-                      onChange={handleTeammatesChange}
-                      placeholder={language === 'fa' ? 'نام هم‌تیمی را وارد کرده و Enter بزنید...' : 'Type teammate username and press Enter...'}
+                <TeammatesCombobox
+                  value={formData.teammates}
+                  onChange={handleTeammatesChange}
+                  placeholder={language === 'fa' ? 'نام بوستر را وارد کرده و Enter بزنید...' : 'Type booster username and press Enter...'}
+                />
+              </div>
+            )
+          ) : (
+            entryType === 'income' && (
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextTeamMode = !formData.teamMode;
+                      updateFormData({ teamMode: nextTeamMode });
+                    }}
+                    className={cn(`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                      formData.teamMode
+                        ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 font-medium shadow-sm'
+                        : 'bg-zinc-100/70 dark:bg-zinc-900/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800'
+                    }`, isRtl && 'font-farsi')}
+                  >
+                    <Users className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                    <span>{t('work.teamMode')}</span>
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ml-1 ${
+                        formData.teamMode ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-600'
+                      }`}
                     />
-                  </div>
+                  </button>
 
-                  {/* Mode Selector: Input Pot vs Input My Cut */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className={cn('text-[10px] uppercase font-medium text-zinc-400', isRtl && 'font-farsi')}>
-                      {language === 'fa' ? 'مبنای محاسبه:' : 'Calculation Target:'}
-                    </span>
-                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
-                      <button
-                        type="button"
-                        onClick={() => updateFormData({ teamInputMode: 'pot' })}
-                        className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                          formData.teamInputMode === 'pot'
-                            ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                            : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                        }`}
-                      >
-                        {language === 'fa' ? 'پات کل' : 'Pot'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateFormData({ teamInputMode: 'income' })}
-                        className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                          formData.teamInputMode === 'income'
-                            ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                            : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                        }`}
-                      >
-                        {language === 'fa' ? 'سهم من' : 'My Cut'}
-                      </button>
+                  {formData.teamMode && (
+                    <div className={cn('flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
+                      <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
+                      <span className="text-zinc-400 dark:text-zinc-600">•</span>
+                      <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
+                    </div>
+                  )}
+                </div>
+
+                <AnimatePresence>
+                  {formData.teamMode && (
+                    <motion.div
+                      initial={{ opacity: 0, transform: 'translateY(-4px)' }}
+                      animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                      exit={{ opacity: 0, transform: 'translateY(-4px)' }}
+                      transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                      className="space-y-2.5 pt-1 border-t border-zinc-200 dark:border-zinc-800/60 relative z-40"
+                    >
+                      <div>
+                        <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1', isRtl && 'font-farsi')}>
+                          {t('work.teammatesCrew')}
+                        </label>
+                        <TeammatesCombobox
+                          value={formData.teammates}
+                          onChange={handleTeammatesChange}
+                          placeholder={language === 'fa' ? 'نام هم‌تیمی را وارد کرده و Enter بزنید...' : 'Type teammate username and press Enter...'}
+                        />
+                      </div>
+
+                      {/* Mode Selector: Input Pot vs Input My Cut */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                          {language === 'fa' ? 'مبنای محاسبه:' : 'Calculation Target:'}
+                        </span>
+                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
+                          <button
+                            type="button"
+                            onClick={() => updateFormData({ teamInputMode: 'pot' })}
+                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                              formData.teamInputMode === 'pot'
+                                ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
+                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            {language === 'fa' ? 'پات کل' : 'Pot'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateFormData({ teamInputMode: 'income' })}
+                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                              formData.teamInputMode === 'income'
+                                ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
+                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            }`}
+                          >
+                            {language === 'fa' ? 'سهم من' : 'My Cut'}
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          )}
+
+          {/* Row 5: Financial Engine */}
+          {isAdvertiser ? (
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                {/* Client Gross Price Input */}
+                <div className={activeCategorySupportsGold ? 'sm:col-span-7' : 'sm:col-span-12'}>
+                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                    <span>{language === 'fa' ? 'مبلغ ناخالص مشتری (Client Price) *' : 'Client Price (Gross) *'}</span>
+                    {fieldErrors.income && (
+                      <span className="text-[9px] text-rose-400 font-medium">Required</span>
+                    )}
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="w-[125px] shrink-0">
+                      <Select
+                        value={formData.currency}
+                        onChange={(val) => updateFormData({ currency: val })}
+                        options={availableCurrencyOptions}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <NumberStepperInput
+                        value={formData.pot}
+                        onChange={(e) => handleAdvertiserClientPriceChange(e.target.value)}
+                        currency={formData.currency}
+                        placeholder={formData.currency === 'GOLD' ? '10,000' : '100,000'}
+                        required
+                      />
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Row 5: Income / Pot & Currency and Rate */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start pt-1 border-t border-zinc-800/60">
-            <div className="sm:col-span-7">
-              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                <span>
-                  {formData.teamMode
-                    ? formData.teamInputMode === 'pot'
-                      ? (language === 'fa' ? 'مجموع پات *' : 'Pot *')
-                      : (language === 'fa' ? 'سهم من *' : 'My Cut *')
-                    : `${t('work.incomeCurrency')} *`}
-                </span>
-                {fieldErrors.income && (
-                  <span className="text-[9px] text-rose-400 font-medium">Required</span>
-                )}
-                {formData.teamMode && (
-                  <span className={cn('text-[9px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
-                    {formData.teamInputMode === 'pot' ? `÷ ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'سهم' : 'cuts'}` : `× ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'عضو' : 'members'}`}
-                  </span>
-                )}
-              </label>
-
-              <div className="flex gap-2">
-                <div className="w-[125px] shrink-0">
-                  <Select
-                    value={formData.currency}
-                    onChange={(val) => updateFormData({ currency: val })}
-                    options={CURRENCY_OPTIONS}
-                  />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <NumberStepperInput
-                    value={formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income}
-                    onChange={(e) => {
-                      if (formData.teamMode && formData.teamInputMode === 'pot') {
-                        handlePotChange(e.target.value);
-                      } else {
-                        handleIncomeChange(e.target.value);
-                      }
-                    }}
-                    currency={formData.currency}
-                    placeholder={formData.currency === 'GOLD' ? '10,000' : '100,000'}
-                    required
-                  />
-                </div>
+
+                {/* Exchange Rate if Gold is supported */}
+                {activeCategorySupportsGold && (
+                  <div className="sm:col-span-5">
+                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                      <span className="truncate">{t('work.exchangeRate')}</span>
+                      {Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
+                        <button
+                          type="button"
+                          onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
+                          className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                        >
+                          {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
+                        </button>
+                      ) : (
+                        <span className="text-[9px] text-zinc-500 shrink-0">
+                          {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
+                        </span>
+                      )}
+                    </label>
+                    <NumberStepperInput
+                      value={formData.exchangeRate}
+                      onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
+                      step={50}
+                      placeholder={String(goldRateTOMAN || 3200)}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Team Split Live Indicator (Visible only when 'Pot' mode is selected) */}
-              {formData.teamMode && formData.teamInputMode === 'pot' && (
-                <div className="mt-2 p-2 rounded-lg bg-zinc-900/60 border border-zinc-800 text-[11px] space-y-1.5">
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
-                    <strong className="text-emerald-300 font-medium inline-flex items-center">
+              {/* Commission Rate Presets & Custom Stepper */}
+              <div className="p-3 rounded-xl border bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                    {language === 'fa' ? 'درصد کارمزد شما (Fee %):' : 'Your Commission Rate:'}
+                  </span>
+                  <div className="flex items-center gap-1" dir="ltr">
+                    {['10', '15', '20', '25', '30'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleAdvertiserFeeRateChange(preset)}
+                        className={cn(
+                          'px-2 py-0.5 rounded text-[10px] font-medium border transition-colors',
+                          formData.feeRate === preset
+                            ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-transparent shadow-xs'
+                            : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                        )}
+                      >
+                        {preset}%
+                      </button>
+                    ))}
+                    <div className="w-16 ml-1">
+                      <Input
+                        type="text"
+                        value={formData.feeRate}
+                        onChange={(e) => handleAdvertiserFeeRateChange(e.target.value)}
+                        className="h-6 text-[11px] font-mono text-center px-1"
+                        placeholder="%"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Net Profit & Booster Payout Live Breakdown */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-200 dark:border-zinc-800/80">
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80">
+                    <span className={cn('block text-[9px] uppercase tracking-wider text-zinc-400 mb-0.5', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'سود خالص شما (Net Profit):' : 'Your Net Profit:'}
+                    </span>
+                    <strong className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                       {formData.income ? <MoneyDisplay amount={formData.income} currency={formData.currency} /> : '--'}
                     </strong>
                   </div>
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
-                    <strong className="text-amber-300 font-medium inline-flex items-center">
-                      {formData.pot ? <MoneyDisplay amount={formData.pot} currency={formData.currency} /> : '--'}
+                  <div className="p-2 rounded-lg bg-white dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-800/80">
+                    <span className={cn('block text-[9px] uppercase tracking-wider text-zinc-400 mb-0.5', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'سهم پرداختی بوستر (Payout):' : 'Booster Payout:'}
+                    </span>
+                    <strong className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      {formData.pot && formData.income
+                        ? <MoneyDisplay amount={Math.max(0, (parseFloat(formData.pot) || 0) - (parseFloat(formData.income) || 0))} currency={formData.currency} />
+                        : '--'}
                     </strong>
                   </div>
+                </div>
 
-                  {/* Toggle Custom Cuts Breakdown */}
-                  <div className="pt-1 flex items-center justify-between border-t border-zinc-800/60">
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomCutsOpen((prev) => !prev)}
-                      className={cn('text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer leading-normal', isRtl && 'font-farsi')}
-                    >
-                      {isCustomCutsOpen
-                        ? (language === 'fa' ? 'بستن سهم اختصاصی' : 'Hide Custom Cuts')
-                        : (language === 'fa' ? 'تنظیم سهم اختصاصی هم‌تیمی‌ها' : 'Edit Individual Cuts (Custom Split)')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleEqualizeShares}
-                      className={cn('text-[10px] text-amber-400/90 hover:text-amber-300 font-medium transition-colors leading-normal', isRtl && 'font-farsi')}
-                      title="Reset all shares to exact equal split"
-                    >
-                      {language === 'fa' ? 'تقسیم مساوی' : 'Equalize Shares'}
-                    </button>
+                {/* Assigned Boosters Individual Breakdown if > 1 booster */}
+                {formData.teammates?.length > 1 && (
+                  <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800/60">
+                    <span className={cn('block text-[10px] text-zinc-400 font-medium', isRtl && 'font-farsi')}>
+                      {language === 'fa' ? 'تقسیم سهم بین بوسترها:' : 'Payout per Booster:'}
+                    </span>
+                    {formData.teammates.map((b) => (
+                      <div key={b} className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-600 dark:text-zinc-400 text-[11px]">{b}:</span>
+                        <span className="font-mono text-zinc-800 dark:text-zinc-200 text-[11px]">
+                          <MoneyDisplay amount={formData.teammateCuts?.[b] || '0'} currency={formData.currency} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                <div className={activeCategorySupportsGold ? 'sm:col-span-7' : 'sm:col-span-12'}>
+                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                    <span>
+                      {entryType === 'expense'
+                        ? (language === 'fa' ? 'مبلغ هزینه / بدهی *' : 'Expense / Debt Amount *')
+                        : formData.teamMode
+                        ? formData.teamInputMode === 'pot'
+                          ? (language === 'fa' ? 'مجموع پات *' : 'Pot *')
+                          : (language === 'fa' ? 'سهم من *' : 'My Cut *')
+                        : `${t('work.incomeCurrency')} *`}
+                    </span>
+                    {fieldErrors.income && (
+                      <span className="text-[9px] text-rose-400 font-medium">Required</span>
+                    )}
+                    {entryType === 'income' && formData.teamMode && (
+                      <span className={cn('text-[9px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
+                        {formData.teamInputMode === 'pot' ? `÷ ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'سهم' : 'cuts'}` : `× ${formatNumber(totalTeamMembers)} ${language === 'fa' ? 'عضو' : 'members'}`}
+                      </span>
+                    )}
+                  </label>
+
+                  <div className="flex gap-2">
+                    <div className="w-[125px] shrink-0">
+                      <Select
+                        value={formData.currency}
+                        onChange={(val) => updateFormData({ currency: val })}
+                        options={availableCurrencyOptions}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <NumberStepperInput
+                        value={formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income}
+                        onChange={(e) => {
+                          if (formData.teamMode && formData.teamInputMode === 'pot') {
+                            handlePotChange(e.target.value);
+                          } else {
+                            handleIncomeChange(e.target.value);
+                          }
+                        }}
+                        currency={formData.currency}
+                        placeholder={formData.currency === 'GOLD' ? '10,000' : '100,000'}
+                        required
+                      />
+                    </div>
                   </div>
 
-                  {/* Expandable Custom Cuts Table with Checkpoint NumberStepperInput */}
-                  <AnimatePresence>
-                    {isCustomCutsOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, transform: 'translateY(-4px)' }}
-                        animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                        exit={{ opacity: 0, transform: 'translateY(-4px)' }}
-                        transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-                        className="space-y-1.5 pt-1.5 overflow-hidden"
-                      >
-                        {/* You (Host) */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={cn('text-[10px] text-zinc-400 font-medium truncate leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
-                          <NumberStepperInput
-                            value={formData.income}
-                            onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
-                            currency={formData.currency}
-                            className="w-32 h-7"
-                            placeholder="0"
-                          />
-                        </div>
+                  {/* Team Split Live Indicator (Visible only when 'Pot' mode is selected) */}
+                  {entryType === 'income' && formData.teamMode && formData.teamInputMode === 'pot' && (
+                    <div className="mt-2 p-2 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[11px] space-y-1.5">
+                      <div className="flex items-center justify-between text-zinc-700 dark:text-zinc-300">
+                        <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'سهم خالص شما:' : 'Your Share:'}</span>
+                        <strong className="text-emerald-600 dark:text-emerald-300 font-medium inline-flex items-center">
+                          {formData.income ? <MoneyDisplay amount={formData.income} currency={formData.currency} /> : '--'}
+                        </strong>
+                      </div>
+                      <div className="flex items-center justify-between text-zinc-700 dark:text-zinc-300">
+                        <span className={cn('text-zinc-500 leading-normal inline-flex items-center', isRtl && 'font-farsi')}>{language === 'fa' ? 'پات کل:' : 'Pot:'}</span>
+                        <strong className="text-amber-600 dark:text-amber-300 font-medium inline-flex items-center">
+                          {formData.pot ? <MoneyDisplay amount={formData.pot} currency={formData.currency} /> : '--'}
+                        </strong>
+                      </div>
 
-                        {/* Each Teammate */}
-                        {formData.teammates.map((tm) => (
-                          <div key={tm} className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-zinc-400 font-medium truncate">{tm}:</span>
-                            <NumberStepperInput
-                              value={formData.teammateCuts?.[tm] || ''}
-                              onChange={(e) => handleCustomCutChange(tm, e.target.value)}
-                              currency={formData.currency}
-                              className="w-32 h-7"
-                              placeholder="0"
-                            />
-                          </div>
-                        ))}
+                      {/* Toggle Custom Cuts Breakdown */}
+                      <div className="pt-1 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-800/60">
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomCutsOpen((prev) => !prev)}
+                          className={cn('text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 underline cursor-pointer leading-normal', isRtl && 'font-farsi')}
+                        >
+                          {isCustomCutsOpen
+                            ? (language === 'fa' ? 'بستن سهم اختصاصی' : 'Hide Custom Cuts')
+                            : (language === 'fa' ? 'تنظیم سهم اختصاصی هم‌تیمی‌ها' : 'Edit Individual Cuts (Custom Split)')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleEqualizeShares}
+                          className={cn('text-[10px] text-amber-600 dark:text-amber-400/90 hover:text-amber-700 dark:hover:text-amber-300 font-medium transition-colors leading-normal', isRtl && 'font-farsi')}
+                          title="Reset all shares to exact equal split"
+                        >
+                          {language === 'fa' ? 'تقسیم مساوی' : 'Equalize Shares'}
+                        </button>
+                      </div>
 
-                        {/* Balance Status Line */}
-                        <div className={cn('pt-1 flex items-center justify-between text-[10px] leading-normal', isRtl && 'font-farsi')}>
-                          <span className="text-zinc-500">{language === 'fa' ? 'تخصیص‌یافته:' : 'Allocated:'} {totalAllocated.toLocaleString()}</span>
-                          <span className={isPotBalanced ? 'text-emerald-400' : 'text-amber-400 font-medium'}>
-                            {isPotBalanced ? (language === 'fa' ? '✓ تراز شده' : '✓ Balanced') : `${language === 'fa' ? 'باقی‌مانده:' : 'Remaining:'} ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
-                          </span>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      {/* Expandable Custom Cuts Table with Checkpoint NumberStepperInput */}
+                      <AnimatePresence>
+                        {isCustomCutsOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, transform: 'translateY(-4px)' }}
+                            animate={{ opacity: 1, transform: 'translateY(0px)' }}
+                            exit={{ opacity: 0, transform: 'translateY(-4px)' }}
+                            transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                            className="space-y-1.5 pt-1.5 overflow-hidden"
+                          >
+                            {/* You (Host) */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={cn('text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
+                              <NumberStepperInput
+                                value={formData.income}
+                                onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
+                                currency={formData.currency}
+                                className="w-32 h-7"
+                                placeholder="0"
+                              />
+                            </div>
+
+                            {/* Each Teammate */}
+                            {formData.teammates.map((tm) => (
+                              <div key={tm} className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate">{tm}:</span>
+                                <NumberStepperInput
+                                  value={formData.teammateCuts?.[tm] || ''}
+                                  onChange={(e) => handleCustomCutChange(tm, e.target.value)}
+                                  currency={formData.currency}
+                                  className="w-32 h-7"
+                                  placeholder="0"
+                                />
+                              </div>
+                            ))}
+
+                            {/* Balance Status Line */}
+                            <div className={cn('pt-1 flex items-center justify-between text-[10px] leading-normal', isRtl && 'font-farsi')}>
+                              <span className="text-zinc-500">{language === 'fa' ? 'تخصیص‌یافته:' : 'Allocated:'} {totalAllocated.toLocaleString()}</span>
+                              <span className={isPotBalanced ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400 font-medium'}>
+                                {isPotBalanced ? (language === 'fa' ? '✓ تراز شده' : '✓ Balanced') : `${language === 'fa' ? 'باقی‌مانده:' : 'Remaining:'} ${potRemainder > 0 ? `+${potRemainder.toLocaleString()}` : potRemainder.toLocaleString()}`}
+                              </span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="sm:col-span-5">
-              <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                <span className="truncate">
-                  {t('work.exchangeRate')}
-                </span>
-                {isClassic ? (
-                  Number(formData.exchangeRate) !== 7000 ? (
-                    <button
-                      type="button"
-                      onClick={() => updateFormData({ exchangeRate: '7000' })}
-                      className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
-                      title="Reset to classic default (7,000 T)"
-                    >
-                      {language === 'fa' ? 'ریست (۷ک ت)' : 'Reset (7k T)'}
-                    </button>
-                  ) : (
-                    <span className="text-[9px] text-zinc-500 shrink-0">{language === 'fa' ? 'کلاسیک (۱ گلد)' : 'Classic (1 G)'}</span>
-                  )
-                ) : Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
-                  <button
-                    type="button"
-                    onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
-                    className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
-                    title="Reset to current navbar rate"
-                  >
-                    {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
-                  </button>
-                ) : (
-                  <span className="text-[9px] text-zinc-500 shrink-0">
-                    {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
-                  </span>
+                {activeCategorySupportsGold && (
+                  <div className="sm:col-span-5">
+                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
+                      <span className="truncate">
+                        {t('work.exchangeRate')}
+                      </span>
+                      {isClassic ? (
+                        Number(formData.exchangeRate) !== 7000 ? (
+                          <button
+                            type="button"
+                            onClick={() => updateFormData({ exchangeRate: '7000' })}
+                            className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                            title="Reset to classic default (7,000 T)"
+                          >
+                            {language === 'fa' ? 'ریست (۷ک ت)' : 'Reset (7k T)'}
+                          </button>
+                        ) : (
+                          <span className="text-[9px] text-zinc-500 shrink-0">{language === 'fa' ? 'کلاسیک (۱ گلد)' : 'Classic (1 G)'}</span>
+                        )
+                      ) : Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
+                        <button
+                          type="button"
+                          onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
+                          className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                          title="Reset to current navbar rate"
+                        >
+                          {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
+                        </button>
+                      ) : (
+                        <span className="text-[9px] text-zinc-500 shrink-0">
+                          {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
+                        </span>
+                      )}
+                    </label>
+                    <NumberStepperInput
+                      value={formData.exchangeRate}
+                      onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
+                      step={isClassic ? 100 : 50}
+                      placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
+                    />
+                  </div>
                 )}
-              </label>
-              <NumberStepperInput
-                value={formData.exchangeRate}
-                onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
-                step={isClassic ? 100 : 50}
-                placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
-              />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Row 6: Notes */}
           <div>
@@ -1189,8 +1714,8 @@ export function WorkModal({
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
                 isDragOver
-                  ? 'border-zinc-400 bg-zinc-900'
-                  : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/60'
+                  ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
+                  : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
               }`}
             >
               <input
@@ -1208,8 +1733,8 @@ export function WorkModal({
               />
               <div className="flex flex-col items-center justify-center gap-1">
                 <UploadCloud className="w-4 h-4 text-zinc-500" />
-                <div className={cn('text-xs text-zinc-300', isRtl && 'font-farsi')}>
-                  <span className="font-medium text-zinc-100">{t('work.clickUpload')}</span>
+                <div className={cn('text-xs text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{t('work.clickUpload')}</span>
                 </div>
                 <div className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
                   {language === 'fa' ? 'یا مستقیماً با Ctrl+V از Snipping Tool تصویر را بچسبانید' : <>Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool</>}
@@ -1222,7 +1747,7 @@ export function WorkModal({
                 {proofs.map((proof, idx) => (
                   <div
                     key={proof.id || idx}
-                    className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900"
+                    className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
                   >
                     <img
                       src={proof.data}
@@ -1251,7 +1776,7 @@ export function WorkModal({
         </DialogContent>
 
         {/* Footer with Anchored Status Selector */}
-        <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-800/80 bg-zinc-950">
+        <DialogFooter className="flex items-center justify-between gap-3 px-5 py-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25">
           {/* Status Selector */}
           <div className="flex items-center gap-2">
             <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500', isRtl && 'font-farsi')}>
@@ -1263,7 +1788,7 @@ export function WorkModal({
                 value={formData.status}
                 onChange={(val) => updateFormData({ status: val })}
                 options={STATUS_OPTIONS}
-                className="h-7 text-xs bg-zinc-900/60 border-zinc-800/80 text-zinc-400 focus:text-zinc-200 opacity-80 hover:opacity-100"
+                className="h-7 text-xs bg-white dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800/80 text-zinc-700 dark:text-zinc-400 focus:text-zinc-900 dark:focus:text-zinc-200 opacity-90 hover:opacity-100"
               />
             </div>
           </div>

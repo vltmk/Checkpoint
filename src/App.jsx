@@ -19,6 +19,13 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { toLocalISOString } from './components/ui/DateTimePicker';
+import { ProfileOnboardingModal } from './components/ui/ProfileOnboardingModal';
+import {
+  getActiveProfileId,
+  setActiveProfileId,
+  isProfileOnboardingCompleted,
+  setProfileOnboardingCompleted,
+} from './lib/profiles';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
@@ -90,6 +97,11 @@ export default function App() {
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Dual-Profile Architecture ('booster' | 'advertiser')
+  const [activeProfileId, setActiveProfileIdState] = useState(() => getActiveProfileId());
+  const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(() => !isProfileOnboardingCompleted());
+  const [profileCounts, setProfileCounts] = useState({ booster: 0, advertiser: 0 });
+
   // Desktop Tray & Window Preferences
   const [closeToTray, setCloseToTray] = useState(() => {
     return parseBooleanSetting(localStorage.getItem('checkpoint_close_to_tray'), true);
@@ -107,6 +119,11 @@ export default function App() {
   useEffect(() => {
     minimizeToTrayRef.current = minimizeToTray;
   }, [minimizeToTray]);
+
+  // Cockpit Fluid Simulation (Enabled by default)
+  const [cockpitFluidEnabled, setCockpitFluidEnabled] = useState(() => {
+    return parseBooleanSetting(localStorage.getItem('checkpoint_fluid_enabled'), true);
+  });
 
   // Automated Scheduled Backups to Custom Directory (Disabled by default)
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
@@ -281,6 +298,12 @@ export default function App() {
         setMinimizeToTray(val);
         localStorage.setItem('checkpoint_minimize_to_tray', String(val));
       }
+      const savedFluid = await trackerDB.getSetting('checkpoint_fluid_enabled', null);
+      if (savedFluid !== null) {
+        const val = parseBooleanSetting(savedFluid, true);
+        setCockpitFluidEnabled(val);
+        localStorage.setItem('checkpoint_fluid_enabled', String(val));
+      }
       const savedAutoBackupEnabled = await trackerDB.getSetting('checkpoint_auto_backup_enabled', null);
       if (savedAutoBackupEnabled !== null) {
         const val = parseBooleanSetting(savedAutoBackupEnabled, false);
@@ -319,6 +342,9 @@ export default function App() {
         setTheme(savedTheme);
         localStorage.setItem('checkpoint_theme', savedTheme);
       }
+      trackerDB.getProfileCounts?.().then((counts) => {
+        if (counts) setProfileCounts(counts);
+      }).catch(() => {});
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
     } finally {
@@ -335,10 +361,50 @@ export default function App() {
     try {
       const all = await trackerDB.getAllEntries();
       setEntries(all);
+      trackerDB.getProfileCounts?.().then((counts) => {
+        if (counts) setProfileCounts(counts);
+      }).catch(() => {});
     } catch (err) {
       console.error('Failed to reload entries:', err);
     }
   }, []);
+
+  // Profile Switching & Background Synchronization
+  const handleProfileChange = useCallback(async (newProfileId) => {
+    if (newProfileId === activeProfileId) return;
+    setActiveProfileId(newProfileId);
+    setActiveProfileIdState(newProfileId);
+    setIsLoading(true);
+    try {
+      await trackerDB.switchProfile(newProfileId);
+      const freshEntries = await trackerDB.getAllEntries();
+      setEntries(freshEntries);
+      refreshCategories().catch(() => {});
+      trackerDB.getProfileCounts?.().then((counts) => {
+        if (counts) setProfileCounts(counts);
+      }).catch(() => {});
+    } catch (e) {
+      console.error('Failed to switch profile:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeProfileId, refreshCategories]);
+
+  const handleSwitchProfileToggle = useCallback(() => {
+    const next = activeProfileId === 'booster' ? 'advertiser' : 'booster';
+    handleProfileChange(next);
+  }, [activeProfileId, handleProfileChange]);
+
+  useEffect(() => {
+    const handleProfileEvent = (e) => {
+      const targetId = e?.detail?.profileId;
+      if (targetId && targetId !== activeProfileId) {
+        handleProfileChange(targetId);
+      }
+    };
+    window.addEventListener('checkpoint:profile-changed', handleProfileEvent);
+    return () => window.removeEventListener('checkpoint:profile-changed', handleProfileEvent);
+  }, [activeProfileId, handleProfileChange]);
 
   // Calculate unread notification count
   const unreadNotificationsCount = useMemo(() => {
@@ -560,6 +626,15 @@ export default function App() {
     localStorage.setItem('checkpoint_minimize_to_tray', String(boolVal));
     try {
       await trackerDB.setSetting('checkpoint_minimize_to_tray', String(boolVal));
+    } catch (e) {}
+  };
+
+  const handleCockpitFluidEnabledChange = async (val) => {
+    const boolVal = parseBooleanSetting(val, true);
+    setCockpitFluidEnabled(boolVal);
+    localStorage.setItem('checkpoint_fluid_enabled', String(boolVal));
+    try {
+      await trackerDB.setSetting('checkpoint_fluid_enabled', String(boolVal));
     } catch (e) {}
   };
 
@@ -856,6 +931,16 @@ export default function App() {
     };
 
     await trackerDB.saveEntry(updated);
+    await reloadEntries();
+  };
+
+  // Update Source Paid (Advertiser Dual-Settlement)
+  const handleUpdateSourcePaid = async (id, sourcePaid) => {
+    const val = sourcePaid ? 1 : 0;
+    setEntries((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, sourcePaid: val, updatedAt: new Date().toISOString() } : e))
+    );
+    await trackerDB.updateSourcePaid(id, val);
     await reloadEntries();
   };
 
@@ -1280,6 +1365,7 @@ export default function App() {
     handleOpenWorkModal,
     handleTabChange,
     searchInputRef,
+    handleSwitchProfileToggle,
   };
 
   useEffect(() => {
@@ -1330,6 +1416,13 @@ export default function App() {
           setIsShortcutsOpen(false);
           return;
         }
+      }
+
+      // Ctrl + Shift + P: Quick Profile Toggle (Booster <-> Advertiser)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.code === 'KeyP' || e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        state.handleSwitchProfileToggle?.();
+        return;
       }
 
       // Ctrl + F (Focus Search in Ledger)
@@ -1394,8 +1487,10 @@ export default function App() {
       }
 
       if (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q') {
-        e.preventDefault();
-        setIsQuickAddOpen(true);
+        if (activeProfileId === 'booster') {
+          e.preventDefault();
+          setIsQuickAddOpen(true);
+        }
       } else if (e.code === 'KeyN' || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         state.handleOpenWorkModal?.();
@@ -1410,7 +1505,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeProfileId]);
 
   return (
     <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
@@ -1438,6 +1533,10 @@ export default function App() {
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        activeProfileId={activeProfileId}
+        onProfileChange={handleProfileChange}
+        boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? entries.length : 0)}
+        advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? entries.length : 0)}
       />
 
       {/* 2. Mobile Top Header (Only on Web viewports) */}
@@ -1450,6 +1549,10 @@ export default function App() {
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
           onOpenNotifications={() => setIsNotificationCenterOpen(true)}
           unreadNotificationsCount={unreadNotificationsCount}
+          activeProfileId={activeProfileId}
+          onProfileChange={handleProfileChange}
+          boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? entries.length : 0)}
+          advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? entries.length : 0)}
         />
       )}
 
@@ -1500,6 +1603,9 @@ export default function App() {
                       confirmDeleteEntryId={confirmDeleteEntryId}
                       onConfirmDeleteChange={setConfirmDeleteEntryId}
                       onOpenEntryContextMenu={handleOpenEntryContextMenu}
+                      cockpitFluidEnabled={cockpitFluidEnabled}
+                      activeProfileId={activeProfileId}
+                      onUpdateSourcePaid={handleUpdateSourcePaid}
                     />
                   )}
 
@@ -1508,6 +1614,7 @@ export default function App() {
                       entries={entries}
                       globalCurrency={globalCurrency}
                       goldRateTOMAN={goldRateTOMAN}
+                      activeProfileId={activeProfileId}
                     />
                   )}
                 </ErrorBoundary>
@@ -1524,6 +1631,7 @@ export default function App() {
           onTabChange={handleTabChange}
           onOpenWorkModal={() => handleOpenWorkModal()}
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          activeProfileId={activeProfileId}
         />
       )}
 
@@ -1540,7 +1648,9 @@ export default function App() {
         goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
         categories={categories}
+        entries={entries}
         onRefreshCategories={refreshCategories}
+        activeProfileId={activeProfileId}
       />
 
       <QuickAddModal
@@ -1550,6 +1660,7 @@ export default function App() {
         globalCurrency={globalCurrency}
         goldRateTOMAN={goldRateTOMAN}
         categories={categories}
+        entries={entries}
         onRefreshCategories={refreshCategories}
       />
 
@@ -1562,6 +1673,7 @@ export default function App() {
         entry={receiptEntry}
         globalCurrency={globalCurrency}
         onOpenLightbox={handleOpenLightbox}
+        activeProfileId={activeProfileId}
         onFilterTeammate={(name) => {
           setIsReceiptModalOpen(false);
           setReceiptEntry(null);
@@ -1587,6 +1699,8 @@ export default function App() {
         onCurrencyChange={handleCurrencyChange}
         categories={categories}
         onRefreshCategories={refreshCategories}
+        activeProfileId={activeProfileId}
+        onProfileChange={handleProfileChange}
         closeToTray={closeToTray}
         onCloseToTrayChange={handleCloseToTrayChange}
         minimizeToTray={minimizeToTray}
@@ -1616,6 +1730,8 @@ export default function App() {
         theme={currentTheme}
         onThemeChange={handleThemeChange}
         handleThemeChange={handleThemeChange}
+        cockpitFluidEnabled={cockpitFluidEnabled}
+        onCockpitFluidEnabledChange={handleCockpitFluidEnabledChange}
       />
 
       {/* Context Menu (Apple-grade floating spring menu) */}
@@ -1754,6 +1870,16 @@ export default function App() {
           </Button>
         </DialogFooter>
       </Dialog>
+
+      {/* Apple-style First Launch Role Onboarding Dialog */}
+      <ProfileOnboardingModal
+        isOpen={isProfileOnboardingOpen}
+        onSelectRole={(chosenRole) => {
+          setProfileOnboardingCompleted(true);
+          setIsProfileOnboardingOpen(false);
+          handleProfileChange(chosenRole);
+        }}
+      />
     </div>
   );
 }

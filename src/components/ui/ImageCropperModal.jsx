@@ -308,14 +308,14 @@ export function ImageCropperModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/45 dark:bg-black/55 backdrop-blur-[2px] animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
       <FrostedGlass
         variant="modal"
         className="w-full max-w-[380px] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 relative z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25 relative z-10">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             <span>{t('categories.editImage', 'Edit Image')}</span>

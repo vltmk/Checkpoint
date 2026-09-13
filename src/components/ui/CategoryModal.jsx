@@ -8,6 +8,7 @@ import {
   Gamepad2,
   Check,
   Palette,
+  Coins,
 } from 'lucide-react';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -25,7 +26,7 @@ import wowIcon from '../../assets/world-of-warcraft-retail.svg';
 export function CategoryModal({
   isOpen,
   onClose,
-  category = null, // if editing existing category: { id, name, color, icon, isDefault }
+  category = null, // if editing existing category: { id, name, color, icon, isDefault, supportsGold }
   onSave, // (updatedCategory) => void
 }) {
   const { t, language, isRtl } = useLanguage();
@@ -33,6 +34,7 @@ export function CategoryModal({
   const [color, setColor] = useState(DEFAULT_WOW_COLOR);
   const [icon, setIcon] = useState(null); // base64 data URL
   const [suggestedColor, setSuggestedColor] = useState(null);
+  const [supportsGold, setSupportsGold] = useState(false);
   const [nameError, setNameError] = useState('');
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [cropperInputImage, setCropperInputImage] = useState(null);
@@ -47,11 +49,17 @@ export function CategoryModal({
         setColor(category.color || DEFAULT_WOW_COLOR);
         setIcon(category.icon || null);
         setSuggestedColor(null);
+        setSupportsGold(
+          category.supportsGold !== undefined
+            ? Boolean(category.supportsGold)
+            : Boolean(category.name?.toLowerCase().includes('world of warcraft'))
+        );
       } else {
         setName('');
         setColor(DEFAULT_WOW_COLOR);
         setIcon(null);
         setSuggestedColor(null);
+        setSupportsGold(false);
       }
       setNameError('');
       setIsCropperOpen(false);
@@ -121,6 +129,7 @@ export function CategoryModal({
         color: color || DEFAULT_WOW_COLOR,
         icon: icon || null,
         isDefault: category?.isDefault || false,
+        supportsGold: Boolean(supportsGold),
       };
 
       const updatedList = await addOrUpdateCategory(catObj, category?.name || null);
@@ -141,14 +150,14 @@ export function CategoryModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45 dark:bg-black/55 backdrop-blur-[2px] animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
         <FrostedGlass
           variant="modal"
           className="w-full max-w-[440px] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/40 dark:bg-zinc-950/40 relative z-10">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25 relative z-10">
             <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <Gamepad2 className="w-4 h-4 text-zinc-500" />
               <span>
@@ -328,6 +337,36 @@ export function CategoryModal({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Row 3: Gold Currency & Conversion Toggle */}
+            <div className="pt-2.5 pb-0.5 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-3">
+              <div>
+                <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer select-none">
+                  <Coins className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{t('categories.supportsGold', 'Enable in-game Gold & conversion rate')}</span>
+                </label>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-normal">
+                  {t('categories.supportsGoldDesc', 'Allow recording in Gold with live conversion rates for this category')}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={supportsGold}
+                onClick={() => setSupportsGold((prev) => !prev)}
+                className={cn(
+                  'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-100',
+                  supportsGold ? 'bg-amber-500' : 'bg-zinc-200 dark:bg-zinc-800'
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
+                    supportsGold ? 'translate-x-4 rtl:-translate-x-4' : 'translate-x-0'
+                  )}
+                />
+              </button>
             </div>
 
             {/* Action Buttons */}
