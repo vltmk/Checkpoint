@@ -13,6 +13,7 @@ export function TeammatesCombobox({
   value = [],
   onChange,
   placeholder = 'Add teammate name and press Enter...',
+  prefixIcon = null,
 }) {
   const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -181,6 +182,11 @@ export function TeammatesCombobox({
         onClick={() => inputRef.current?.focus()}
         className="min-h-[38px] w-full p-1.5 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 flex flex-wrap items-center gap-1.5 transition-all duration-150 cursor-text"
       >
+        {prefixIcon && value.length === 0 && (
+          <span className="shrink-0 flex items-center justify-center text-zinc-400 dark:text-zinc-500 ps-1 pe-0.5">
+            {prefixIcon}
+          </span>
+        )}
         {/* Active Teammate Chips */}
         {value.map((name, idx) => (
           <span

@@ -17,13 +17,13 @@ import {
   ArrowUpCircle,
   Zap,
   Megaphone,
+  Calculator,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { Kbd } from './ui/Tooltip';
 import { CheckpointLogo, TomanIcon } from './ui/Icons';
 import { ProfilePopover } from './ui/ProfilePopover';
-import checkpointLogo from '../assets/checkpoint.svg';
 import {
   minimizeWindow,
   toggleMaximizeWindow,
@@ -38,6 +38,8 @@ import {
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
+// OrderCalculatorPopover right-side drawer integration (toggled via onToggleCalculator & isCalculatorOpen)
+
 export function Navbar({
   activeTab = 'ledger',
   onTabChange,
@@ -48,7 +50,6 @@ export function Navbar({
   closeToTray = true,
   minimizeToTray = false,
   onOpenWorkModal,
-  onOpenQuickAdd,
   onOpenSettings,
   entriesCount = 0,
   appVersion = '',
@@ -60,6 +61,13 @@ export function Navbar({
   onProfileChange,
   boosterEntriesCount = 0,
   advertiserEntriesCount = 0,
+  isCalculatorOpen = false,
+  onToggleCalculator,
+  onCloseCalculator,
+  usdRateTOMAN = 95000,
+  eurRateUSD = 1.08,
+  onSaveRates,
+  onTransferFromCalculator,
 }) {
   const { t, formatNumber, isRtl, language } = useLanguage();
   const isDesktop = isTauri();
@@ -230,45 +238,15 @@ export function Navbar({
         <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800/80 pointer-events-none" />
 
         <div data-no-drag className="flex items-center">
-          {activeProfileId === 'booster' ? (
-            <div className="add-work-double-btn inline-flex items-center rounded-lg bg-zinc-900 text-zinc-100 dark:bg-white dark:text-zinc-900 p-0.5 shadow-sm border border-zinc-800 dark:border-zinc-200 select-none">
-              {/* Primary Add Work (Left Side) */}
-              <button
-                type="button"
-                onClick={() => onOpenWorkModal?.()}
-                title={`${t('nav.addWork')} (N)`}
-                className="add-work-btn-item flex items-center gap-1.5 h-6 px-2.5 text-xs font-medium text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-zinc-100 dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none"
-              >
-                <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span className={cn('hidden lg:inline', isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
-              </button>
-
-              {/* Subtle vertical hairline divider */}
-              <div className="add-work-btn-divider h-3.5 w-px bg-zinc-700 dark:bg-zinc-200 my-auto mx-0.5" />
-
-              {/* Quick Add Lightning (Right Side) */}
-              <button
-                type="button"
-                onClick={() => onOpenQuickAdd?.()}
-                title={`${t('nav.quickAdd')} (Q)`}
-                className="add-work-btn-item flex items-center justify-center h-6 px-2 text-xs font-medium text-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 active:bg-zinc-700 dark:hover:bg-zinc-100 dark:active:bg-zinc-200 rounded-md transition-all cursor-pointer select-none gap-1"
-              >
-                <span className="text-xs font-medium leading-normal">
-                  {t('nav.quickAdd')}
-                </span>
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onOpenWorkModal?.()}
-              title={`${t('nav.addWork')} (N)`}
-              className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-zinc-900 text-zinc-100 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-95 text-xs font-medium shadow-sm border border-zinc-800 dark:border-zinc-200 transition-all cursor-pointer select-none"
-            >
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onOpenWorkModal?.()}
+            title={`${t('nav.addWork')} (N)`}
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-zinc-900 text-zinc-100 dark:bg-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-95 text-xs font-medium shadow-sm border border-zinc-800 dark:border-zinc-200 transition-all cursor-pointer select-none"
+          >
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span className={cn(isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
+          </button>
         </div>
       </div>
 
@@ -350,169 +328,189 @@ export function Navbar({
           </div>
         )}
 
-        {/* Action Controls: Gold Ratio, Notifications & Settings */}
+        {/* Action Controls: Gold Ratio / Calculator, Notifications & Settings */}
         <div className="flex items-center gap-0.5 pl-1 border-l border-zinc-200 dark:border-zinc-800/80" data-no-drag>
-          {/* Dedicated Gold Ratio Icon-Only Button & Popover */}
-          <div className="relative" ref={ratesDropdownRef} data-no-drag>
-            <button
-              type="button"
-              onClick={() => {
-                recordRateInteraction();
-                setIsTourGuideDismissed(true);
-                setTempRateTOMAN(goldRateTOMAN);
-                setIsRatesOpen((prev) => !prev);
-              }}
-              title={
-                language === 'fa'
-                  ? `نرخ تبدیل گلد: ۱k = ${goldRateTOMAN?.toLocaleString()} تومان`
-                  : `Gold Ratio: 1k = ${goldRateTOMAN?.toLocaleString()} Toman`
-              }
-              aria-label="Configure Gold Ratio"
-              className={cn(
-                'relative p-1.5 rounded-md transition-colors cursor-pointer select-none',
-                isRatesOpen
-                  ? 'bg-zinc-200 dark:bg-zinc-800 text-amber-600 dark:text-amber-400'
-                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-900'
-              )}
-            >
-              <Coins className={cn('w-3.5 h-3.5', isRatesOpen ? 'text-amber-600 dark:text-amber-400' : 'text-amber-500/90 dark:text-amber-400/90')} />
-              {isRateUpdateNeeded && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-black" />
-              )}
-            </button>
+          {activeProfileId === 'advertiser' ? (
+            /* Dedicated Order Calculator Icon Button & Popover for Advertisers */
+            <div className="relative" data-no-drag>
+              <button
+                type="button"
+                onClick={onToggleCalculator}
+                title={language === 'fa' ? 'ماشین حساب سفارشات ادورتایزر (Q)' : 'Order Calculator (Q)'}
+                aria-label="Order Calculator"
+                className={cn(
+                  'relative p-1.5 rounded-md transition-colors cursor-pointer select-none',
+                  isCalculatorOpen
+                    ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-900'
+                )}
+              >
+                <Calculator className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            /* Dedicated Gold Ratio Icon-Only Button & Popover for Boosters */
+            <div className="relative" ref={ratesDropdownRef} data-no-drag>
+              <button
+                type="button"
+                onClick={() => {
+                  recordRateInteraction();
+                  setIsTourGuideDismissed(true);
+                  setTempRateTOMAN(goldRateTOMAN);
+                  setIsRatesOpen((prev) => !prev);
+                }}
+                title={
+                  language === 'fa'
+                    ? `نرخ تبدیل گلد: ۱k = ${goldRateTOMAN?.toLocaleString()} تومان`
+                    : `Gold Ratio: 1k = ${goldRateTOMAN?.toLocaleString()} Toman`
+                }
+                aria-label="Configure Gold Ratio"
+                className={cn(
+                  'relative p-1.5 rounded-md transition-colors cursor-pointer select-none',
+                  isRatesOpen
+                    ? 'bg-zinc-200 dark:bg-zinc-800 text-amber-600 dark:text-amber-400'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-900'
+                )}
+              >
+                <Coins className={cn('w-3.5 h-3.5', isRatesOpen ? 'text-amber-600 dark:text-amber-400' : 'text-amber-500/90 dark:text-amber-400/90')} />
+                {isRateUpdateNeeded && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-black" />
+                )}
+              </button>
 
-            {/* Launch One-Step Tour Guide Floating Card */}
-            <AnimatePresence>
-              {showTourGuide && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
+              {/* Launch One-Step Tour Guide Floating Card */}
+              <AnimatePresence>
+                {showTourGuide && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    data-no-drag
+                    dir={isRtl ? 'rtl' : 'ltr'}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    className="absolute top-full right-0 mt-2.5 w-72 p-3.5 bg-zinc-900/98 backdrop-blur-2xl border border-zinc-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.08)] ring-1 ring-zinc-700/50 rounded-xl space-y-2.5 z-50 text-zinc-200"
+                  >
+                    {/* Little triangle pointing to the Gold Ratio button */}
+                    <div className="absolute -top-1.5 right-3 w-3 h-3 bg-zinc-900 border-t border-l border-zinc-700/80 rotate-45 pointer-events-none" />
+
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-amber-950/70 border border-amber-800/70 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                        <Coins className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className={cn('text-xs font-medium text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
+                          {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
+                        </h4>
+                        <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
+                          {language === 'fa' ? 'تبدیل زنده محاسبات دفتر کل' : 'Live ledger conversions'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
+                      {language === 'fa'
+                        ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها و محاسبات روزانه تغییر دهید.'
+                        : 'Click this button anytime to adjust your gold conversion rate for all entries and totals.'}
+                    </p>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-end pt-1.5 border-t border-zinc-800">
+                      <Button
+                        variant="primary"
+                        size="xs"
+                        onClick={handleDismissTour}
+                        className={cn(
+                          'h-7 px-3.5 text-xs font-medium bg-zinc-200 text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-sm active:scale-95 leading-none',
+                          isRtl && 'font-farsi'
+                        )}
+                      >
+                        <span className="inline-flex items-center justify-center leading-none">
+                          {language === 'fa' ? 'متوجه شدم' : 'Got it'}
+                        </span>
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Dedicated Gold Ratio Popover Menu */}
+              {isRatesOpen && (
+                <div
                   data-no-drag
                   dir={isRtl ? 'rtl' : 'ltr'}
                   onMouseDown={(e) => e.stopPropagation()}
                   onDoubleClick={(e) => e.stopPropagation()}
-                  className="absolute top-full right-0 mt-2.5 w-72 p-3.5 bg-zinc-900/98 backdrop-blur-2xl border border-zinc-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.08)] ring-1 ring-zinc-700/50 rounded-xl space-y-2.5 z-50 text-zinc-200"
+                  className="absolute top-full mt-1.5 right-0 left-auto w-64 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50"
                 >
-                  {/* Little triangle pointing to the Gold Ratio button */}
-                  <div className="absolute -top-1.5 right-3 w-3 h-3 bg-zinc-900 border-t border-l border-zinc-700/80 rotate-45 pointer-events-none" />
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-amber-950/70 border border-amber-800/70 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
-                      <Coins className="w-3.5 h-3.5" />
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
+                      <span className={cn('uppercase tracking-wider', isRtl && 'font-farsi')}>{language === 'fa' ? 'نرخ تبدیل گلد' : 'Gold Exchange Ratio'}</span>
+                      <span className="text-zinc-400 dark:text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
                     </div>
-                    <div>
-                      <h4 className={cn('text-xs font-medium text-zinc-100 uppercase tracking-wider', isRtl && 'font-farsi')}>
-                        {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
-                      </h4>
-                      <p className={cn('text-[10px] text-zinc-400', isRtl && 'font-farsi')}>
-                        {language === 'fa' ? 'تبدیل زنده محاسبات دفتر کل' : 'Live ledger conversions'}
-                      </p>
-                    </div>
-                  </div>
+                    <NumberStepperInput
+                      step={50}
+                      value={tempRateTOMAN}
+                      onChange={(e) => setTempRateTOMAN(e.target.value)}
+                      placeholder="3200"
+                      currency="TOMAN"
+                      className="text-xs h-8"
+                    />
 
-                  <p className={cn('text-[11px] text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
-                    {language === 'fa'
-                      ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها و محاسبات روزانه تغییر دهید.'
-                      : 'Click this button anytime to adjust your gold conversion rate for all entries and totals.'}
-                  </p>
+                    {/* Dynamic Quick Presets based on current/typed rate */}
+                    {(() => {
+                      const currentNum = Number(tempRateTOMAN) || Number(goldRateTOMAN) || 3200;
+                      const base = Math.max(100, Math.round(currentNum / 100) * 100);
+                      const presets = Array.from(
+                        new Set([
+                          Math.max(100, base - 200),
+                          base,
+                          base + 200,
+                          base + 500,
+                        ])
+                      );
+                      return (
+                        <div className="grid grid-cols-4 gap-1 pt-1" dir="ltr">
+                          {presets.map((pr) => (
+                            <button
+                              key={pr}
+                              type="button"
+                              onClick={() => setTempRateTOMAN(pr)}
+                              className={`py-1 px-1 rounded text-[10px] border transition-colors ${
+                                Number(tempRateTOMAN) === pr
+                                  ? 'bg-amber-50 dark:bg-zinc-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/80 font-medium'
+                                  : 'bg-zinc-50 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                              }`}
+                            >
+                              {pr >= 1000 ? (
+                                <>
+                                  {(pr / 1000).toFixed(1)}
+                                  <span className="text-[0.78em] text-zinc-400 dark:text-zinc-500 font-medium">k</span>
+                                </>
+                              ) : (
+                                pr
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center justify-end pt-1.5 border-t border-zinc-800">
                     <Button
                       variant="primary"
                       size="xs"
-                      onClick={handleDismissTour}
-                      className={cn(
-                        'h-7 px-3.5 text-xs font-medium bg-zinc-200 text-zinc-900 hover:bg-zinc-100 cursor-pointer shadow-sm active:scale-95 leading-none',
-                        isRtl && 'font-farsi'
-                      )}
+                      onClick={handleSaveRate}
+                      className={cn('w-full justify-center h-7 text-xs gap-1.5 mt-2', isRtl && 'font-farsi')}
                     >
-                      <span className="inline-flex items-center justify-center leading-none">
-                        {language === 'fa' ? 'متوجه شدم' : 'Got it'}
-                      </span>
+                      <Check className="w-3 h-3" />
+                      <span>{language === 'fa' ? 'ذخیره نرخ تبدیل' : 'Save Gold Ratio'}</span>
                     </Button>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Dedicated Gold Ratio Popover Menu */}
-            {isRatesOpen && (
-              <div
-                data-no-drag
-                dir={isRtl ? 'rtl' : 'ltr'}
-                onMouseDown={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => e.stopPropagation()}
-                className="absolute top-full mt-1.5 right-0 left-auto w-64 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl space-y-3 z-50"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
-                    <span className={cn('uppercase tracking-wider', isRtl && 'font-farsi')}>{language === 'fa' ? 'نرخ تبدیل گلد' : 'Gold Exchange Ratio'}</span>
-                    <span className="text-zinc-400 dark:text-zinc-500">{language === 'fa' ? 'تومان / ۱,۰۰۰ گلد' : 'Toman / 1,000 G'}</span>
-                  </div>
-                  <NumberStepperInput
-                    step={50}
-                    value={tempRateTOMAN}
-                    onChange={(e) => setTempRateTOMAN(e.target.value)}
-                    placeholder="3200"
-                    currency="TOMAN"
-                    className="text-xs h-8"
-                  />
-
-                  {/* Dynamic Quick Presets based on current/typed rate */}
-                  {(() => {
-                    const currentNum = Number(tempRateTOMAN) || Number(goldRateTOMAN) || 3200;
-                    const base = Math.max(100, Math.round(currentNum / 100) * 100);
-                    const presets = Array.from(
-                      new Set([
-                        Math.max(100, base - 200),
-                        base,
-                        base + 200,
-                        base + 500,
-                      ])
-                    );
-                    return (
-                      <div className="grid grid-cols-4 gap-1 pt-1" dir="ltr">
-                        {presets.map((pr) => (
-                          <button
-                            key={pr}
-                            type="button"
-                            onClick={() => setTempRateTOMAN(pr)}
-                            className={`py-1 px-1 rounded text-[10px] border transition-colors ${
-                              Number(tempRateTOMAN) === pr
-                                ? 'bg-amber-50 dark:bg-zinc-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/80 font-medium'
-                                : 'bg-zinc-50 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                            }`}
-                          >
-                            {pr >= 1000 ? (
-                              <>
-                                {(pr / 1000).toFixed(1)}
-                                <span className="text-[0.78em] text-zinc-400 dark:text-zinc-500 font-medium">k</span>
-                              </>
-                            ) : (
-                              pr
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
-
-                  <Button
-                    variant="primary"
-                    size="xs"
-                    onClick={handleSaveRate}
-                    className={cn('w-full justify-center h-7 text-xs gap-1.5 mt-2', isRtl && 'font-farsi')}
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>{language === 'fa' ? 'ذخیره نرخ تبدیل' : 'Save Gold Ratio'}</span>
-                  </Button>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <button
             type="button"

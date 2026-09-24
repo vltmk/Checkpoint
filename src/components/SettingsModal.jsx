@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Dialog,
@@ -91,8 +91,10 @@ export function SettingsModal({
   initialScrollSection = null,
   cockpitFluidEnabled = true,
   onCockpitFluidEnabledChange,
+  ledgerDateFormat = 'relative',
+  onLedgerDateFormatChange,
 }) {
-  const { language, setLanguage, t, isRtl, formatNumber } = useLanguage();
+  const { language, setLanguage, t, isRtl, formatNumber, getDatePatternPreview, ledgerDateFormatOptions } = useLanguage();
   const fileInputRef = useRef(null);
   const [snapshots, setSnapshots] = useState([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState('');
@@ -159,6 +161,24 @@ export function SettingsModal({
       icon: <Coins className="w-3.5 h-3.5" />,
     },
   ];
+
+  const dateFormatOptions = useMemo(() => {
+    const list = ledgerDateFormatOptions || [
+      { id: 'relative', labelEn: 'Relative (Today, Yesterday)', labelFa: 'نسبی (امروز، دیروز)' },
+      { id: 'yyyy-mm-dd', labelEn: 'YYYY-MM-DD', labelFa: 'سال-ماه-روز' },
+      { id: 'dd-mm-yyyy', labelEn: 'DD/MM/YYYY', labelFa: 'روز/ماه/سال' },
+      { id: 'mm-dd-yyyy', labelEn: 'MM/DD/YYYY', labelFa: 'ماه/روز/سال' },
+      { id: 'month-d-yyyy', labelEn: 'Month D, YYYY', labelFa: 'نام ماه و روز، سال' },
+    ];
+    return list.map((opt) => {
+      const preview = getDatePatternPreview?.(opt.id) || '';
+      const baseLabel = language === 'fa' ? opt.labelFa : opt.labelEn;
+      return {
+        value: opt.id,
+        label: preview ? `${baseLabel} (${preview})` : baseLabel,
+      };
+    });
+  }, [ledgerDateFormatOptions, getDatePatternPreview, language]);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -350,6 +370,28 @@ export function SettingsModal({
                 onCurrencyChange?.(val);
               }}
               options={currencyOptions}
+              className="h-8 text-xs bg-white dark:bg-zinc-950/80"
+            />
+          </div>
+        </div>
+
+        {/* 1.2. Ledger Date Format Preference */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+          <div className="space-y-0.5 min-w-0 pe-1">
+            <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+              {t('settings.ledgerDateFormat')}
+            </label>
+            <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
+              {t('settings.ledgerDateFormatDesc')}
+            </p>
+          </div>
+          <div className="w-full sm:w-60 shrink-0">
+            <Select
+              value={ledgerDateFormat}
+              onChange={(val) => {
+                onLedgerDateFormatChange?.(val);
+              }}
+              options={dateFormatOptions}
               className="h-8 text-xs bg-white dark:bg-zinc-950/80"
             />
           </div>

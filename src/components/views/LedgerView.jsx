@@ -170,8 +170,10 @@ const LedgerRow = React.memo(function LedgerRow({
   onOpenEntryContextMenu,
   activeProfileId = 'booster',
   onUpdateSourcePaid,
+  onUpdateBoosterPaid,
 }) {
   const [isCopiedOrderId, setIsCopiedOrderId] = useState(false);
+  const [isCopiedLink, setIsCopiedLink] = useState(false);
   const isAdvertiser = activeProfileId === 'advertiser';
   const formattedTime = formatRowTime(entry.dateTime);
   const entryCat = getCategoryByName(entry.game, categories);
@@ -485,62 +487,115 @@ const LedgerRow = React.memo(function LedgerRow({
                   )}
                 </div>
 
-                {/* Line 3: Interactive Teammate Badges & Team Pot (or Assigned Boosters & Payouts in Advertiser Mode) */}
+                {/* Line 3: Interactive Settlement Pills, Payouts & Teammate Badges in Advertiser Mode */}
                 {isAdvertiser ? (
-                  ((entry.pot && entry.pot > entry.income) || (entry.teammates && entry.teammates.length > 0)) && (
-                    <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[10px]">
-                      {entry.pot && entry.pot > entry.income && (
-                        <span className="text-zinc-500 flex items-center gap-1">
-                          <span>{language === 'fa' ? 'قیمت مشتری:' : 'Client:'}</span>
-                          <strong className="text-zinc-700 dark:text-zinc-300 font-medium">
-                            <MoneyDisplay amount={entry.pot} currency={entry.currency} />
-                          </strong>
-                        </span>
-                      )}
-                      {entry.pot && entry.pot > entry.income && (
-                        <span className="text-zinc-400 dark:text-zinc-600">•</span>
-                      )}
-                      {entry.pot && entry.pot > entry.income && (
-                        <span className="text-zinc-500 flex items-center gap-1">
-                          <span>{language === 'fa' ? 'سهم بوستر:' : 'Booster:'}</span>
-                          <span className="text-zinc-700 dark:text-zinc-300 font-medium">
-                            <MoneyDisplay amount={entry.pot - entry.income} currency={entry.currency} />
-                          </span>
-                        </span>
-                      )}
-                      {entry.teammates && entry.teammates.length > 0 && (
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-zinc-500 flex items-center gap-0.5">
-                            <Users className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
-                            <span>{language === 'fa' ? 'بوستر:' : 'Assigned:'}</span>
-                          </span>
-                          {entry.teammates.map((tm) => {
-                            const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
-                            return (
-                              <button
-                                key={tm}
-                                type="button"
-                                data-no-row-click="true"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setTeammateFilter(isMatch ? '' : tm);
-                                }}
-                                title={`Click to filter jobs with ${tm}`}
-                                className={cn(
-                                  'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer',
-                                  isMatch
-                                    ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
-                                    : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                                )}
-                              >
-                                <span>{tm}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                  <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[10px]">
+                    {/* Dual 1-Click Settlement Status Pills */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* 1. Client Paid (Inflow) */}
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdateSourcePaid?.(entry.id, !entry.sourcePaid);
+                        }}
+                        title={
+                          entry.sourcePaid
+                            ? (language === 'fa' ? 'وجه مشتری دریافت شد (کلیک برای لغو)' : 'Client paid (Click to mark unpaid)')
+                            : (language === 'fa' ? 'در انتظار پرداخت مشتری (کلیک برای تایید دریافت)' : 'Client unpaid (Click to mark paid)')
+                        }
+                        className={cn(
+                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1 transition-all active:scale-95 cursor-pointer select-none',
+                          entry.sourcePaid
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                        )}
+                      >
+                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', entry.sourcePaid ? 'bg-emerald-500' : 'bg-amber-400')} />
+                        <span>{language === 'fa' ? (entry.sourcePaid ? 'مشتری: تسویه' : 'مشتری: طلب') : (entry.sourcePaid ? 'Client Paid' : 'Client Due')}</span>
+                      </button>
+
+                      {/* 2. Booster Paid (Outflow) */}
+                      <button
+                        type="button"
+                        data-no-row-click="true"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdateBoosterPaid?.(entry.id, !entry.boosterPaid);
+                        }}
+                        title={
+                          entry.boosterPaid
+                            ? (language === 'fa' ? 'سهم بوستر پرداخت شد (کلیک برای لغو)' : 'Booster settled (Click to mark unpaid)')
+                            : (language === 'fa' ? 'بدهی جاری به بوستر (کلیک برای تسویه با بوستر)' : 'Booster unpaid (Click to mark settled)')
+                        }
+                        className={cn(
+                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1 transition-all active:scale-95 cursor-pointer select-none',
+                          entry.boosterPaid
+                            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                            : 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                        )}
+                      >
+                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', entry.boosterPaid ? 'bg-blue-500' : 'bg-rose-400')} />
+                        <span>{language === 'fa' ? (entry.boosterPaid ? 'بوستر: تسویه' : 'بوستر: بدهی') : (entry.boosterPaid ? 'Booster Paid' : 'Booster Due')}</span>
+                      </button>
                     </div>
-                  )
+
+                    {entry.pot && entry.pot > entry.income && (
+                      <span className="text-zinc-400 dark:text-zinc-600">•</span>
+                    )}
+
+                    {entry.pot && entry.pot > entry.income && (
+                      <span className="text-zinc-500 flex items-center gap-1">
+                        <span>{language === 'fa' ? 'قیمت مشتری:' : 'Client:'}</span>
+                        <strong className="text-zinc-700 dark:text-zinc-300 font-medium">
+                          <MoneyDisplay amount={entry.pot} currency={entry.currency} />
+                        </strong>
+                      </span>
+                    )}
+                    {entry.pot && entry.pot > entry.income && (
+                      <span className="text-zinc-400 dark:text-zinc-600">•</span>
+                    )}
+                    {entry.pot && entry.pot > entry.income && (
+                      <span className="text-zinc-500 flex items-center gap-1">
+                        <span>{language === 'fa' ? 'سهم بوستر:' : 'Booster:'}</span>
+                        <span className="text-zinc-700 dark:text-zinc-300 font-medium">
+                          <MoneyDisplay amount={entry.pot - entry.income} currency={entry.currency} />
+                        </span>
+                      </span>
+                    )}
+                    {entry.teammates && entry.teammates.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="text-zinc-500 flex items-center gap-0.5">
+                          <Users className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
+                          <span>{language === 'fa' ? 'بوستر:' : 'Assigned:'}</span>
+                        </span>
+                        {entry.teammates.map((tm) => {
+                          const isMatch = teammateFilter.toLowerCase() === tm.toLowerCase();
+                          return (
+                            <button
+                              key={tm}
+                              type="button"
+                              data-no-row-click="true"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTeammateFilter(isMatch ? '' : tm);
+                              }}
+                              title={`Click to filter jobs with ${tm}`}
+                              className={cn(
+                                'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer',
+                                isMatch
+                                  ? 'bg-zinc-200 text-zinc-800 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-sm'
+                                  : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                              )}
+                            >
+                              <span>{tm}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   entry.teammates && entry.teammates.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
@@ -676,8 +731,15 @@ const LedgerRow = React.memo(function LedgerRow({
                     <Tooltip
                       content={
                         <div className="max-w-[260px] space-y-0.5 text-left rtl:text-right">
-                          <div className="font-medium text-zinc-800 dark:text-zinc-200">{tooltipLabel}</div>
+                          <div className={cn("font-medium", isCopiedLink ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-800 dark:text-zinc-200")}>
+                            {isCopiedLink ? t('ledger.copiedLink', 'Copied link to clipboard!') : tooltipLabel}
+                          </div>
                           <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">{entry.link}</div>
+                          {!isCopiedLink && (
+                            <div className="text-[9px] text-zinc-400 dark:text-zinc-500 font-normal">
+                              {t('ledger.openLinkHint', 'Left-click to open • Right-click to copy')}
+                            </div>
+                          )}
                         </div>
                       }
                       side="top"
@@ -690,10 +752,26 @@ const LedgerRow = React.memo(function LedgerRow({
                           e.stopPropagation();
                           handleOpenExternalLink(entry.link);
                         }}
-                        title={tooltipLabel}
-                        className="w-[26px] h-[26px] flex items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-800/60 shrink-0"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          copyTextNative(entry.link);
+                          setIsCopiedLink(true);
+                          setTimeout(() => setIsCopiedLink(false), 1200);
+                        }}
+                        title={isCopiedLink ? t('ledger.copiedLink', 'Copied link to clipboard!') : tooltipLabel}
+                        className={cn(
+                          'w-[26px] h-[26px] flex items-center justify-center rounded-md transition-all border shrink-0',
+                          isCopiedLink
+                            ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800'
+                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-800/60 active:scale-[0.95]'
+                        )}
                       >
-                        <IconComponent className="w-3.5 h-3.5" />
+                        {isCopiedLink ? (
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        ) : (
+                          <IconComponent className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </Tooltip>
                   );
@@ -741,6 +819,8 @@ export function LedgerView({
   globalCurrency = 'TOMAN',
   onCurrencyChange,
   goldRateTOMAN = 3200,
+  usdRateTOMAN = 95000,
+  eurRateUSD = 1.08,
   onOpenWorkModal,
   onOpenReceipt,
   onOpenLightbox,
@@ -766,8 +846,10 @@ export function LedgerView({
   cockpitFluidEnabled = true,
   activeProfileId = 'booster',
   onUpdateSourcePaid,
+  onUpdateBoosterPaid,
+  ledgerDateFormat = 'relative',
 }) {
-  const { t, language, isRtl, formatNumber, formatDate } = useLanguage();
+  const { t, language, isRtl, formatNumber, formatDate, formatLedgerGroupDate } = useLanguage();
   const isAdvertiser = activeProfileId === 'advertiser';
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -777,6 +859,7 @@ export function LedgerView({
   const [teammateFilter, setTeammateFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [settlementFilter, setSettlementFilter] = useState('');
+  const [dateRangeFilter, setDateRangeFilter] = useState('');
   const [sortOption, setSortOption] = useState('date_desc');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [isFiltersPopoverOpen, setIsFiltersPopoverOpen] = useState(false);
@@ -784,6 +867,7 @@ export function LedgerView({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDayKeys, setSelectedDayKeys] = useState(new Set());
   const [isSumCopied, setIsSumCopied] = useState(false);
+  const [isDiscordBatchCopied, setIsDiscordBatchCopied] = useState(false);
 
   // Bulk Actions & Single Delete In-Line Confirmation States
   const [selectedEntryIdsLocal, setSelectedEntryIdsLocal] = useState(new Set());
@@ -801,8 +885,8 @@ export function LedgerView({
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   const rates = useMemo(
-    () => ({ goldRateTOMAN }),
-    [goldRateTOMAN]
+    () => ({ goldRateTOMAN, usdRateTOMAN, eurRateUSD }),
+    [goldRateTOMAN, usdRateTOMAN, eurRateUSD]
   );
 
   // Extract game categories with job counts (only games present in entries)
@@ -867,9 +951,10 @@ export function LedgerView({
     if (teammateFilter) count++;
     if (sourceFilter) count++;
     if (isAdvertiser && settlementFilter) count++;
+    if (dateRangeFilter) count++;
     if (sortOption !== 'date_desc') count++;
     return count;
-  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, sortOption]);
+  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, dateRangeFilter, sortOption]);
 
   const formatRowTime = useCallback(
     (dateTimeStr) => {
@@ -909,7 +994,7 @@ export function LedgerView({
     }
   }, [externalSourceFilter, onClearExternalSourceFilter]);
 
-  // Reset page & selections when filter criteria changes
+  // Reset page & selections when filter criteria or active profile changes
   useEffect(() => {
     setCurrentPage(1);
     setSelectedDayKeys(new Set());
@@ -917,7 +1002,7 @@ export function LedgerView({
     setConfirmDeleteEntryId(null);
     setIsBulkDeleting(false);
     setIsStatusDropdownOpen(false);
-  }, [searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, settlementFilter, sortOption]);
+  }, [activeProfileId, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, settlementFilter, dateRangeFilter, sortOption]);
 
   // Close status dropdown & filters popover on outside click
   useEffect(() => {
@@ -992,6 +1077,38 @@ export function LedgerView({
         list = list.filter((e) => Boolean(e.sourcePaid));
       } else if (settlementFilter === 'pending') {
         list = list.filter((e) => !e.sourcePaid);
+      } else if (settlementFilter === 'booster_due') {
+        list = list.filter((e) => !e.boosterPaid);
+      } else if (settlementFilter === 'booster_paid') {
+        list = list.filter((e) => Boolean(e.boosterPaid));
+      }
+    }
+
+    if (dateRangeFilter) {
+      const now = new Date();
+      if (dateRangeFilter === 'today') {
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        list = list.filter((e) => new Date(e.dateTime || 0).getTime() >= startOfToday);
+      } else if (dateRangeFilter === 'yesterday') {
+        const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
+        const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        list = list.filter((e) => {
+          const t = new Date(e.dateTime || 0).getTime();
+          return t >= startOfYesterday && t < endOfYesterday;
+        });
+      } else if (dateRangeFilter === 'week') {
+        const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
+        list = list.filter((e) => new Date(e.dateTime || 0).getTime() >= startOfWeek);
+      } else if (dateRangeFilter === 'month') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        list = list.filter((e) => new Date(e.dateTime || 0).getTime() >= startOfMonth);
+      } else if (dateRangeFilter === 'last_month') {
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        list = list.filter((e) => {
+          const t = new Date(e.dateTime || 0).getTime();
+          return t >= startOfLastMonth && t < endOfLastMonth;
+        });
       }
     }
 
@@ -1012,7 +1129,7 @@ export function LedgerView({
     }
 
     return list;
-  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, sortOption, globalCurrency, rates]);
+  }, [entries, searchQuery, statusFilter, currencyFilter, gameFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, dateRangeFilter, sortOption, globalCurrency, rates]);
 
   // Aggregate metrics for compact balance summary
   const metrics = useMemo(() => {
@@ -1106,12 +1223,20 @@ export function LedgerView({
     return () => scrollContainer.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Pagination calculation
+  // Pagination calculation & auto-clamping
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedEntries = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const safePage = Math.min(currentPage, totalPages);
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
     return filteredEntries.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredEntries, currentPage]);
+  }, [filteredEntries, currentPage, totalPages]);
 
   // Auto-switch page if confirmDeleteEntryId is on a different page
   useEffect(() => {
@@ -1325,29 +1450,19 @@ export function LedgerView({
 
   // Daily Date Grouping with Day Subtotals
   const dateGroups = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toDateString();
-    const yesterday = new Date(now.getTime() - 86400000);
-    const yesterdayStr = yesterday.toDateString();
-
     const groupsMap = new Map();
 
     paginatedEntries.forEach((entry) => {
       const d = new Date(entry.dateTime);
       let groupTitle = t('ledger.earlier');
       if (!isNaN(d.getTime())) {
-        const dStr = d.toDateString();
-        if (dStr === todayStr) {
-          groupTitle = t('ledger.today');
-        } else if (dStr === yesterdayStr) {
-          groupTitle = t('ledger.yesterday');
-        } else {
-          groupTitle = formatDate(d, {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-          });
-        }
+        groupTitle = formatLedgerGroupDate
+          ? formatLedgerGroupDate(d, ledgerDateFormat)
+          : formatDate(d, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            });
       }
 
       if (!groupsMap.has(groupTitle)) {
@@ -1363,7 +1478,7 @@ export function LedgerView({
       );
       return { groupTitle, groupItems, dayTotal };
     });
-  }, [paginatedEntries, globalCurrency, rates, t, formatDate]);
+  }, [paginatedEntries, globalCurrency, rates, t, formatLedgerGroupDate, ledgerDateFormat, formatDate]);
 
   // Multi-day calculation summary
   const selectedDaysSummary = useMemo(() => {
@@ -1434,6 +1549,7 @@ export function LedgerView({
     setTeammateFilter('');
     setSourceFilter('');
     setSettlementFilter('');
+    setDateRangeFilter('');
     setHasProofFilter(false);
     setSortOption('date_desc');
     setIsFiltersPopoverOpen(false);
@@ -1443,10 +1559,63 @@ export function LedgerView({
     setIsBulkDeleting(false);
   };
 
-  const hasAdvancedFilters = Boolean(searchQuery.trim() || gameFilter || sortOption !== 'date_desc');
-
   const handleStatusSelect = (entry, nextStatus) => {
     onFlipStatus?.(entry.id, entry.status, nextStatus);
+  };
+
+  const handleCopyDiscordBatch = async () => {
+    if (selectedEntriesList.length === 0) return;
+    const isFa = language === 'fa';
+    const now = new Date();
+    const dateStr = isFa
+      ? formatShamsiDate(now, { month: 'long', day: 'numeric', year: 'numeric' })
+      : now.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+
+    const totalSumFormatted = formatMoney(bulkMetrics.totalSum, globalCurrency, false, isFa);
+
+    const itemsText = selectedEntriesList.map((entry, idx) => {
+      const entryCur = entry.currency && entry.currency !== 'DEFAULT' ? entry.currency : globalCurrency;
+      const amountStr = formatMoney(entry.income || 0, entryCur, false, isFa);
+      const orderIdPart = entry.orderId ? `#${entry.orderId} | ` : '';
+      const st = STATUS_CONFIG[entry.status]?.label || entry.status || 'Paid';
+      const sourcePart = entry.source ? ` [${entry.source}]` : '';
+
+      if (isAdvertiser) {
+        const clientPrice = entry.pot || entry.income || 0;
+        const formattedClient = formatMoney(clientPrice, entryCur, false, isFa);
+        const payout = Math.max(0, (entry.pot || 0) - (entry.income || 0));
+        const payoutStr = payout > 0 ? ` (Payout: ${formatMoney(payout, entryCur, false, isFa)})` : '';
+        return `${idx + 1}. ${orderIdPart}${entry.title || 'Order'}${sourcePart} | ${formattedClient} | ${st}${payoutStr}`;
+      }
+
+      const teamPart = entry.teammates && entry.teammates.length > 0 ? ` (@${entry.teammates.join(', @')})` : '';
+      return `${idx + 1}. ${orderIdPart}${entry.title || 'Job'}${sourcePart} | ${amountStr} | ${st}${teamPart}`;
+    }).join('\n');
+
+    let md = '';
+    if (isFa) {
+      md = `\`\`\`ini
+[ گزارش دسته‌ای چک‌پوینت - CHECKPOINT ]
+تاریخ        = ${dateStr}
+تعداد کارها   = ${selectedEntriesList.length}
+مجموع کل     = ${totalSumFormatted}
+----------------------------------------
+${itemsText}
+\`\`\``;
+    } else {
+      md = `\`\`\`ini
+[ CHECKPOINT - BATCH SUMMARY ]
+Date         = ${dateStr}
+Jobs Count   = ${selectedEntriesList.length}
+Total Sum    = ${totalSumFormatted}
+----------------------------------------
+${itemsText}
+\`\`\``;
+    }
+
+    await copyTextNative(md);
+    setIsDiscordBatchCopied(true);
+    setTimeout(() => setIsDiscordBatchCopied(false), 2000);
   };
 
   return (
@@ -1487,7 +1656,7 @@ export function LedgerView({
                         type="button"
                         onClick={() => onCurrencyChange?.('TOMAN')}
                         title="Display in Toman"
-                        className={`relative isolate flex items-center justify-center px-1.5 py-0.5 rounded-md text-[10px] transition-colors ${
+                        className={`relative isolate flex items-center justify-center h-6 min-w-[38px] px-2 rounded-md text-[10px] transition-colors ${
                           globalCurrency === 'TOMAN'
                             ? 'text-zinc-800 dark:text-zinc-200 font-medium'
                             : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -1500,13 +1669,17 @@ export function LedgerView({
                             transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                           />
                         )}
-                        <TomanIcon className="w-[22px] h-[22px] min-w-[22px] min-h-[22px] text-emerald-500 dark:text-emerald-400" />
+                        <TomanIcon className="w-4 h-4 min-w-[16px] min-h-[16px] text-emerald-500 dark:text-emerald-400" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onCurrencyChange?.('GOLD')}
                         title="Display in Gold"
-                        className="relative isolate flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] transition-colors"
+                        className={`relative isolate flex items-center justify-center h-6 min-w-[38px] px-2 rounded-md text-[10px] transition-colors ${
+                          globalCurrency === 'GOLD'
+                            ? 'text-zinc-800 dark:text-zinc-200 font-medium'
+                            : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                        }`}
                       >
                         {globalCurrency === 'GOLD' && (
                           <motion.div
@@ -1515,7 +1688,7 @@ export function LedgerView({
                             transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                           />
                         )}
-                        <span className="font-semibold tracking-wider text-[10px] text-amber-600 dark:text-amber-400">GOLD</span>
+                        <span className="font-semibold tracking-wider text-[10px] text-amber-600 dark:text-amber-400 leading-none">GOLD</span>
                       </button>
                     </div>
 
@@ -1623,7 +1796,7 @@ export function LedgerView({
                   type="button"
                   onClick={() => onCurrencyChange?.('TOMAN')}
                   title="Display in Toman (Press T to toggle)"
-                  className={`relative isolate flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] transition-colors ${
+                  className={`relative isolate flex items-center justify-center h-8 min-w-[50px] px-2.5 rounded-md text-[11px] transition-colors ${
                     globalCurrency === 'TOMAN'
                       ? 'text-zinc-800 dark:text-zinc-200 font-medium'
                       : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -1642,7 +1815,11 @@ export function LedgerView({
                   type="button"
                   onClick={() => onCurrencyChange?.('GOLD')}
                   title="Display in Gold (Press T to toggle)"
-                  className="relative isolate flex items-center justify-center px-2.5 py-0.5 rounded-md text-[11px] transition-colors"
+                  className={`relative isolate flex items-center justify-center h-8 min-w-[50px] px-2.5 rounded-md text-[11px] transition-colors ${
+                    globalCurrency === 'GOLD'
+                      ? 'text-zinc-800 dark:text-zinc-200 font-medium'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  }`}
                 >
                   {globalCurrency === 'GOLD' && (
                     <motion.div
@@ -1651,7 +1828,7 @@ export function LedgerView({
                       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                     />
                   )}
-                  <span className="font-semibold tracking-wider text-[11px] text-amber-600 dark:text-amber-400">GOLD</span>
+                  <span className="font-semibold tracking-wider text-[11px] text-amber-600 dark:text-amber-400 leading-none">GOLD</span>
                 </button>
               </div>
 
@@ -2020,18 +2197,18 @@ export function LedgerView({
                     </div>
                   </div>
 
-                  {/* 1.5. Source Settlement Filter (Advertiser Mode) */}
+                  {/* 1.5. Source & Booster Settlement Filter (Advertiser Mode) */}
                   {isAdvertiser && (
                     <div className="space-y-1.5">
                       <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
-                        {language === 'fa' ? 'تسویه مبدا (دریافت وجه)' : 'Client Settlement'}
+                        {language === 'fa' ? 'فیلتر وضعیت تسویه' : 'Settlement Status'}
                       </label>
-                      <div className="grid grid-cols-3 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <div className="grid grid-cols-2 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
                         <button
                           type="button"
                           onClick={() => setSettlementFilter('')}
                           className={cn(
-                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95',
+                            'py-1 px-1.5 rounded text-[11px] font-medium transition-colors text-center active:scale-95 col-span-2',
                             settlementFilter === ''
                               ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent'
                               : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -2041,29 +2218,55 @@ export function LedgerView({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSettlementFilter('received')}
-                          className={cn(
-                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
-                            settlementFilter === 'received'
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 shadow-xs'
-                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                          )}
-                        >
-                          <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>{language === 'fa' ? 'دریافت شده' : 'Received'}</span>
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => setSettlementFilter('pending')}
                           className={cn(
-                            'py-1 rounded text-[11px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            'py-1 px-1.5 rounded text-[10px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
                             settlementFilter === 'pending'
                               ? 'bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60 shadow-xs'
                               : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                           )}
                         >
-                          <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-                          <span>{language === 'fa' ? 'در انتظار' : 'Pending'}</span>
+                          <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span className="truncate">{language === 'fa' ? 'طلب از مشتری' : 'Client Due'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('booster_due')}
+                          className={cn(
+                            'py-1 px-1.5 rounded text-[10px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            settlementFilter === 'booster_due'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-300 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60 shadow-xs'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          <Clock className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                          <span className="truncate">{language === 'fa' ? 'بدهی به بوستر' : 'Booster Due'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('received')}
+                          className={cn(
+                            'py-1 px-1.5 rounded text-[10px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            settlementFilter === 'received'
+                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60 shadow-xs'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="truncate">{language === 'fa' ? 'تسویه مشتری' : 'Client Paid'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSettlementFilter('booster_paid')}
+                          className={cn(
+                            'py-1 px-1.5 rounded text-[10px] font-medium transition-colors text-center active:scale-95 flex items-center justify-center gap-1',
+                            settlementFilter === 'booster_paid'
+                              ? 'bg-blue-50 text-blue-800 border border-blue-300 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60 shadow-xs'
+                              : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          )}
+                        >
+                          <Check className="w-2.5 h-2.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span className="truncate">{language === 'fa' ? 'تسویه بوستر' : 'Booster Paid'}</span>
                         </button>
                       </div>
                     </div>
@@ -2184,6 +2387,40 @@ export function LedgerView({
                       </div>
                     </div>
                   )}
+
+                  {/* 5.5. Date Range Presets */}
+                  <div className="space-y-1.5">
+                    <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
+                      {t('ledger.dateRange', 'Date Range')}
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      {[
+                        { id: '', label: t('ledger.dateRangeAll', 'All Time') },
+                        { id: 'today', label: t('ledger.dateRangeToday', 'Today') },
+                        { id: 'yesterday', label: t('ledger.dateRangeYesterday', 'Yesterday') },
+                        { id: 'week', label: t('ledger.dateRangeThisWeek', 'This Week') },
+                        { id: 'month', label: t('ledger.dateRangeThisMonth', 'This Month') },
+                        { id: 'last_month', label: t('ledger.dateRangeLastMonth', 'Last Month') },
+                      ].map((preset) => {
+                        const isCurrent = dateRangeFilter === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => setDateRangeFilter(preset.id)}
+                            className={cn(
+                              'py-1 px-1 rounded text-[10px] font-medium transition-colors text-center active:scale-95 truncate',
+                              isCurrent
+                                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent font-medium'
+                                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            )}
+                          >
+                            <span className={cn(isRtl && 'font-farsi')}>{preset.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   {/* 6. Sort Dropdown */}
                   <div className="space-y-1.5">
@@ -2337,6 +2574,7 @@ export function LedgerView({
                       onOpenEntryContextMenu={onOpenEntryContextMenu}
                       activeProfileId={activeProfileId}
                       onUpdateSourcePaid={onUpdateSourcePaid}
+                      onUpdateBoosterPaid={onUpdateBoosterPaid}
                     />
                   ))}
                 </div>
@@ -2624,6 +2862,27 @@ export function LedgerView({
                   >
                     <Download className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                     <span>{t('ledger.bulkCsv')}</span>
+                  </Button>
+
+                  {/* 2.5. Bulk Discord Markdown Export Button */}
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleCopyDiscordBatch}
+                    title={t('ledger.bulkDiscordTooltip', 'Copy selected jobs as Discord Markdown')}
+                    className={cn('h-7 px-2 text-[11px] gap-1 border shadow-sm flex items-center shrink-0 transition-colors', isDiscordBatchCopied ? 'text-emerald-700 bg-emerald-50 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80' : 'text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border-zinc-200 dark:text-zinc-300 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80 dark:border-zinc-800/80', isRtl && 'font-farsi')}
+                  >
+                    {isDiscordBatchCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>{t('ledger.copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>{t('ledger.bulkDiscord', 'Discord')}</span>
+                      </>
+                    )}
                   </Button>
 
                   {/* 3. In-Line Morphing Delete (N) Confirmation */}

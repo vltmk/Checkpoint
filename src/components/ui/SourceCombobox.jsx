@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, Plus, X, Bookmark, Check, Store, Edit2, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
@@ -19,9 +20,10 @@ const LEGACY_PRESETS = new Set([
 const SAVED_SOURCES_KEY = 'checkpoint_user_saved_sources_v2';
 const LEGACY_SAVED_SOURCES_KEY = 'vault_user_saved_sources_v2';
 
-export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter seller, broker, or client...' }) {
+export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter seller, broker, or client...', prefixIcon = null }) {
   const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [savedSources, setSavedSources] = useState(() => {
     try {
       // Purge old preset key from localStorage
@@ -56,6 +58,47 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
+  // Measure vertical boundary on open to prevent rendering behind modal footer or viewport overflow
+  useLayoutEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const el = containerRef.current;
+    const scrollParent = el.closest('.overflow-y-auto, [role="dialog"]');
+
+    const checkDropUp = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const dropdownHeight = 224; // max-h-56 (14rem)
+      const padding = 12;
+
+      const boundaryBottom = scrollParent
+        ? scrollParent.getBoundingClientRect().bottom - padding
+        : window.innerHeight - padding;
+      const boundaryTop = scrollParent
+        ? scrollParent.getBoundingClientRect().top + padding
+        : padding;
+
+      const spaceBelow = boundaryBottom - rect.bottom;
+      const spaceAbove = rect.top - boundaryTop;
+
+      // If available space below is less than dropdown height and space above is greater, flip to dropUp
+      setDropUp(spaceBelow < dropdownHeight && spaceAbove > spaceBelow);
+    };
+
+    checkDropUp();
+    window.addEventListener('resize', checkDropUp);
+    if (scrollParent) {
+      scrollParent.addEventListener('scroll', checkDropUp);
+    }
+
+    return () => {
+      window.removeEventListener('resize', checkDropUp);
+      if (scrollParent) {
+        scrollParent.removeEventListener('scroll', checkDropUp);
+      }
+    };
+  }, [isOpen]);
+
   const saveToStorage = (sourcesList) => {
     try {
       localStorage.setItem(SAVED_SOURCES_KEY, JSON.stringify(sourcesList));
@@ -63,16 +106,35 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
     } catch (e) {}
   };
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape key with propagation stopped to protect parent modals
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        setIsOpen(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('touchstart', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen]);
 
   const handleSelectSource = (src) => {
     onChange?.(src);
@@ -163,6 +225,11 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
     <div ref={containerRef} className={cn('relative w-full', isOpen && 'z-50')}>
       {/* Input Field with Dropdown Toggle & Save Bookmark Button */}
       <div className="relative flex items-center w-full">
+        {prefixIcon && (
+          <div className={cn('absolute flex items-center justify-center shrink-0 z-10 text-zinc-400 dark:text-zinc-500 pointer-events-auto', isRtl ? 'right-2.5' : 'left-2.5')}>
+            {prefixIcon}
+          </div>
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -178,10 +245,28 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           onFocus={() => {
             if (savedSources.length > 0) setIsOpen(true);
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              if (isOpen) {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsOpen(false);
+              }
+            } else if (e.key === 'Enter') {
+              if (isOpen && filteredSources.length > 0 && trimmedValue) {
+                const exactMatch = filteredSources.find((s) => s.toLowerCase() === trimmedValue.toLowerCase());
+                handleSelectSource(exactMatch || filteredSources[0]);
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }
+          }}
           placeholder={placeholder}
           className={cn(
             'w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
-            isRtl ? 'pr-3 pl-16 font-farsi' : 'pl-3 pr-16'
+            isRtl
+              ? (prefixIcon ? 'pr-8 pl-16 font-farsi' : 'pr-3 pl-16 font-farsi')
+              : (prefixIcon ? 'pl-8 pr-16' : 'pl-3 pr-16')
           )}
         />
 
@@ -210,12 +295,21 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
       </div>
 
       {/* Dropdown Menu */}
-      {isOpen && (
-        <FrostedGlass
-          variant="popover"
-          dir={isRtl ? 'rtl' : 'ltr'}
-          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-xl p-1.5 space-y-1"
-        >
+      <AnimatePresence>
+        {isOpen && (
+          <FrostedGlass
+            as="motion.div"
+            variant="popover"
+            initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
+            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className={cn(
+              'absolute left-0 right-0 z-50 max-h-56 overflow-y-auto rounded-xl p-1.5 space-y-1',
+              dropUp ? 'bottom-full mb-1.5 origin-bottom' : 'top-full mt-1.5 origin-top'
+            )}
+          >
           {/* Option to save new source if not already saved */}
           {trimmedValue && !isAlreadySaved && (
             <button
@@ -330,6 +424,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
           )}
         </FrostedGlass>
       )}
+      </AnimatePresence>
 
       {/* Retroactive DB Update Confirmation Modal */}
       {confirmModal.open && typeof document !== 'undefined' && createPortal(

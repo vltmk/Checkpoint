@@ -64,6 +64,102 @@ export function formatShamsiDateTime(dateInput, options = {}) {
 }
 
 /**
+ * Visual Date Format Presets for Ledger Grouping
+ */
+export const LEDGER_DATE_FORMAT_OPTIONS = [
+  { id: 'relative', labelKey: 'settings.dateFormat.relative', labelEn: 'Relative (Today, Yesterday)', labelFa: 'نسبی (امروز، دیروز)' },
+  { id: 'yyyy-mm-dd', labelKey: 'settings.dateFormat.yyyyMmDd', labelEn: 'YYYY-MM-DD', labelFa: 'سال-ماه-روز' },
+  { id: 'dd-mm-yyyy', labelKey: 'settings.dateFormat.ddMmYyyy', labelEn: 'DD/MM/YYYY', labelFa: 'روز/ماه/سال' },
+  { id: 'mm-dd-yyyy', labelKey: 'settings.dateFormat.mmDdYyyy', labelEn: 'MM/DD/YYYY', labelFa: 'ماه/روز/سال' },
+  { id: 'month-d-yyyy', labelKey: 'settings.dateFormat.monthDYyyy', labelEn: 'Month D, YYYY', labelFa: 'نام ماه و روز، سال' },
+];
+
+export function formatLedgerGroupDate(dateInput, formatId = 'relative', language = 'en', t) {
+  if (!dateInput) return '';
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+  if (isNaN(d?.getTime())) return String(dateInput);
+
+  if (!formatId || formatId === 'relative') {
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const yesterday = new Date(now.getTime() - 86400000);
+    const yesterdayStr = yesterday.toDateString();
+    const dStr = d.toDateString();
+
+    if (dStr === todayStr) {
+      return t ? t('ledger.today') : (language === 'fa' ? 'امروز' : 'Today');
+    }
+    if (dStr === yesterdayStr) {
+      return t ? t('ledger.yesterday') : (language === 'fa' ? 'دیروز' : 'Yesterday');
+    }
+    if (language === 'fa') {
+      return formatShamsiDate(d, { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  const isFa = language === 'fa';
+
+  if (isFa) {
+    try {
+      const parts = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(d);
+
+      const year = parts.find((p) => p.type === 'year')?.value || '';
+      const month = parts.find((p) => p.type === 'month')?.value || '';
+      const day = parts.find((p) => p.type === 'day')?.value || '';
+
+      switch (formatId) {
+        case 'yyyy-mm-dd':
+          return `${year}/${month}/${day}`;
+        case 'dd-mm-yyyy':
+          return `${day}/${month}/${year}`;
+        case 'mm-dd-yyyy':
+          return `${month}/${day}/${year}`;
+        case 'month-d-yyyy':
+          return formatShamsiDate(d, { year: 'numeric', month: 'long', day: 'numeric' });
+        default:
+          return `${year}/${month}/${day}`;
+      }
+    } catch (e) {
+      return formatShamsiDate(d);
+    }
+  } else {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+
+    switch (formatId) {
+      case 'yyyy-mm-dd':
+        return `${year}-${month}-${day}`;
+      case 'dd-mm-yyyy':
+        return `${day}/${month}/${year}`;
+      case 'mm-dd-yyyy':
+        return `${month}/${day}/${year}`;
+      case 'month-d-yyyy':
+        return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      default:
+        return `${year}-${month}-${day}`;
+    }
+  }
+}
+
+export function getDatePatternPreview(formatId, language = 'en', t) {
+  const now = new Date();
+  if (formatId === 'relative') {
+    const rel = t ? t('ledger.today') : (language === 'fa' ? 'امروز' : 'Today');
+    const sub = language === 'fa' 
+      ? formatShamsiDate(now, { month: 'short', day: 'numeric' })
+      : now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${rel} (${sub})`;
+  }
+  return formatLedgerGroupDate(now, formatId, language, t);
+}
+
+/**
  * Translations Dictionary (EN & FA)
  */
 export const TRANSLATIONS = {
@@ -166,6 +262,18 @@ export const TRANSLATIONS = {
     'ledger.clearSelection': 'Clear day selection',
     'ledger.deselectDayTitle': 'Click to deselect earnings',
     'ledger.selectDayTitle': 'Click to select and sum earnings',
+    'ledger.dateRange': 'Date Range',
+    'ledger.dateRangeAll': 'All Time',
+    'ledger.dateRangeToday': 'Today',
+    'ledger.dateRangeYesterday': 'Yesterday',
+    'ledger.dateRangeThisWeek': 'This Week',
+    'ledger.dateRangeThisMonth': 'This Month',
+    'ledger.dateRangeLastMonth': 'Last Month',
+    'ledger.bulkDiscord': 'Discord',
+    'ledger.bulkDiscordTooltip': 'Copy selected jobs as Discord Markdown',
+    'ledger.undoDelete': 'Undo',
+    'ledger.singleDeleted': 'Job deleted',
+    'ledger.multiDeleted': '{count} jobs deleted',
 
     // Analytics View
     'analytics.title': 'Analytics & Velocity',
@@ -310,6 +418,18 @@ export const TRANSLATIONS = {
     'settings.currencyDesc': 'Primary currency for dashboard metrics and charts',
     'settings.defaultCurrency': 'Default Display Currency',
     'settings.defaultCurrencyDesc': 'Primary currency for dashboard metrics and charts',
+    'settings.ledgerDateFormat': 'Ledger Date Format',
+    'settings.ledgerDateFormatDesc': 'Visual format for daily grouping headers in the ledger',
+    'settings.dateFormat.relative': 'Relative (Today, Yesterday)',
+    'settings.dateFormat.yyyyMmDd': 'YYYY-MM-DD',
+    'settings.dateFormat.ddMmYyyy': 'DD/MM/YYYY',
+    'settings.dateFormat.mmDdYyyy': 'MM/DD/YYYY',
+    'settings.dateFormat.monthDYyyy': 'Month D, YYYY',
+    'quickAdd.dungeons': 'Seasonal Dungeons',
+    'quickAdd.clearDungeons': 'Clear',
+    'quickAdd.multiDungeon': 'Multi-Dungeon',
+    'ledger.copiedLink': 'Copied link to clipboard!',
+    'ledger.openLinkHint': 'Left-click to open • Right-click to copy',
     'settings.desktopTray': 'Desktop Window & System Tray',
     'settings.systemTray': 'System Tray',
     'settings.closeToTray': 'Close to System Tray',
@@ -596,6 +716,18 @@ export const TRANSLATIONS = {
     'ledger.clearSelection': 'لغو انتخاب روزها',
     'ledger.deselectDayTitle': 'برای لغو انتخاب درآمد کلیک کنید',
     'ledger.selectDayTitle': 'برای انتخاب و محاسبه مجموع درآمد کلیک کنید',
+    'ledger.dateRange': 'بازه زمانی',
+    'ledger.dateRangeAll': 'همه زمان‌ها',
+    'ledger.dateRangeToday': 'امروز',
+    'ledger.dateRangeYesterday': 'دیروز',
+    'ledger.dateRangeThisWeek': 'این هفته',
+    'ledger.dateRangeThisMonth': 'این ماه',
+    'ledger.dateRangeLastMonth': 'ماه گذشته',
+    'ledger.bulkDiscord': 'دیسکورد',
+    'ledger.bulkDiscordTooltip': 'کپی کارهای انتخابی برای دیسکورد',
+    'ledger.undoDelete': 'بازگردانی',
+    'ledger.singleDeleted': 'کار حذف شد',
+    'ledger.multiDeleted': '{count} کار حذف شد',
 
     // Analytics View
     'analytics.title': 'تحلیل و نمودار درآمد',
@@ -822,6 +954,18 @@ export const TRANSLATIONS = {
     'settings.activeProfile': 'پروفایل فعال',
     'settings.switchProfile': 'تغییر پروفایل',
     'settings.database': 'دیتابیس فعال',
+    'settings.ledgerDateFormat': 'فرمت تاریخ سرستون‌های دفتر کار',
+    'settings.ledgerDateFormatDesc': 'نحوه نمایش تاریخ گروه‌بندی روزانه در دفتر کار',
+    'settings.dateFormat.relative': 'نسبی (امروز، دیروز)',
+    'settings.dateFormat.yyyyMmDd': 'سال-ماه-روز (YYYY-MM-DD)',
+    'settings.dateFormat.ddMmYyyy': 'روز/ماه/سال (DD/MM/YYYY)',
+    'settings.dateFormat.mmDdYyyy': 'ماه/روز/سال (MM/DD/YYYY)',
+    'settings.dateFormat.monthDYyyy': 'نام ماه و روز، سال',
+    'quickAdd.dungeons': 'دانجن‌های فعال فصل',
+    'quickAdd.clearDungeons': 'پاک کردن',
+    'quickAdd.multiDungeon': 'چندین دانجن',
+    'ledger.copiedLink': 'لینک در کلیپ‌بورد کپی شد!',
+    'ledger.openLinkHint': 'کلیک برای باز کردن • راست‌کلیک برای کپی',
 
     // Notification Center
     'notifications.title': 'اعلانات و رویدادها',
@@ -1042,6 +1186,9 @@ export function LanguageProvider({ children }) {
       formatNumber,
       formatDate,
       formatDateTime,
+      formatLedgerGroupDate: (d, fmtId) => formatLedgerGroupDate(d, fmtId, language, t),
+      getDatePatternPreview: (fmtId) => getDatePatternPreview(fmtId, language, t),
+      ledgerDateFormatOptions: LEDGER_DATE_FORMAT_OPTIONS,
       toPersianDigits,
       normalizeDigits,
     }),

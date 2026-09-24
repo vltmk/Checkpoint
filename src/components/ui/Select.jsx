@@ -15,10 +15,12 @@ export function Select({
   disabled = false,
   dropUp = false,
   align = 'auto', // 'auto' | 'start' | 'end' | 'left' | 'right'
+  prefixIcon = null,
 }) {
   const { isRtl } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [effectiveAlign, setEffectiveAlign] = useState(isRtl ? 'right' : 'left');
+  const [effectiveDropUp, setEffectiveDropUp] = useState(dropUp);
   const containerRef = useRef(null);
   const popoverRef = useRef(null);
 
@@ -34,6 +36,7 @@ export function Select({
 
     // Check boundary of closest dialog/modal if inside one, or window viewport
     const dialogEl = el.closest('.overflow-hidden, [role="dialog"]');
+    const scrollParent = el.closest('.overflow-y-auto, [role="dialog"]');
     const boundaryLeft = dialogEl ? dialogEl.getBoundingClientRect().left + padding : padding;
     const boundaryRight = dialogEl ? dialogEl.getBoundingClientRect().right - padding : window.innerWidth - padding;
 
@@ -61,7 +64,20 @@ export function Select({
     }
 
     setEffectiveAlign(targetAlign);
-  }, [isOpen, align, isRtl]);
+
+    // Dynamic vertical collision detection
+    const boundaryBottom = scrollParent
+      ? scrollParent.getBoundingClientRect().bottom - padding
+      : window.innerHeight - padding;
+    const boundaryTop = scrollParent
+      ? scrollParent.getBoundingClientRect().top + padding
+      : padding;
+    const popoverHeight = 256;
+    const spaceBelow = boundaryBottom - rect.bottom;
+    const spaceAbove = rect.top - boundaryTop;
+
+    setEffectiveDropUp(dropUp || (spaceBelow < popoverHeight && spaceAbove > spaceBelow));
+  }, [isOpen, align, isRtl, dropUp]);
 
   // Normalize options to object format
   const normalizedOptions = useMemo(() => {
@@ -121,18 +137,21 @@ export function Select({
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         setIsOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isOpen]);
 
@@ -206,10 +225,11 @@ export function Select({
         )}
       >
         <div className="flex items-center gap-2 min-w-0 truncate">
+          {prefixIcon && <span className="shrink-0 flex items-center justify-center text-zinc-400 dark:text-zinc-500">{prefixIcon}</span>}
           {selectedOption ? (
             <>
               {selectedOption.flag && <span className="text-sm">{selectedOption.flag}</span>}
-              {selectedOption.icon && <span className="shrink-0 text-zinc-400 flex items-center justify-center">{selectedOption.icon}</span>}
+              {!prefixIcon && selectedOption.icon && <span className="shrink-0 text-zinc-400 flex items-center justify-center">{selectedOption.icon}</span>}
               <span className="truncate text-zinc-800 dark:text-zinc-200">{renderScaledText(selectedOption.label)}</span>
             </>
           ) : (
@@ -231,20 +251,20 @@ export function Select({
             as="motion.div"
             variant="popover"
             ref={popoverRef}
-            initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
+            initial={{ opacity: 0, y: effectiveDropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
+            exit={{ opacity: 0, y: effectiveDropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
             dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
               'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto p-1',
-              dropUp ? 'origin-bottom' : 'origin-top',
+              effectiveDropUp ? 'origin-bottom' : 'origin-top',
               // Boundary and alignment handling
               effectiveAlign === 'left'
                 ? 'left-0 right-auto'
                 : 'right-0 left-auto',
               isRtl ? 'text-right font-farsi' : 'text-left',
-              dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+              effectiveDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
             )}
           >
             {groups ? (

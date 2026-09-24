@@ -1,7 +1,26 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
-export const Input = React.forwardRef(({ className, type = 'text', ...props }, ref) => {
+export const Input = React.forwardRef(({ className, type = 'text', prefixIcon = null, containerClassName, ...props }, ref) => {
+  if (prefixIcon) {
+    return (
+      <div className={cn('relative flex items-center w-full', containerClassName)}>
+        <div className="absolute left-2.5 rtl:left-auto rtl:right-2.5 text-zinc-400 dark:text-zinc-500 flex items-center justify-center shrink-0 z-10 pointer-events-auto">
+          {prefixIcon}
+        </div>
+        <input
+          type={type}
+          ref={ref}
+          className={cn(
+            'w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 pl-8 rtl:pl-3 rtl:pr-8 pr-3 text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
+            className
+          )}
+          {...props}
+        />
+      </div>
+    );
+  }
+
   return (
     <input
       type={type}

@@ -20,7 +20,7 @@ function unlockBodyScroll() {
   }
 }
 
-export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl' }) {
+export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl', floatingActions = null }) {
   const shouldReduceMotion = useReducedMotion();
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -57,23 +57,37 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
           />
 
           {/* Frosted Glass Dialog Container */}
-          <FrostedGlass
-            as="motion.div"
-            variant="modal"
-            initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
-            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-            role="dialog"
-            aria-modal="true"
-            className={cn(
-              'relative z-10 w-full my-0 sm:my-auto max-h-[92vh] flex flex-col',
-              maxWidth,
-              className
+          <div className={cn('relative z-10 w-full my-0 sm:my-auto flex justify-center items-center', maxWidth)}>
+            <FrostedGlass
+              as="motion.div"
+              variant="modal"
+              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+              animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+              role="dialog"
+              aria-modal="true"
+              className={cn(
+                'relative z-10 w-full max-h-[92vh] flex flex-col',
+                className
+              )}
+            >
+              {children}
+            </FrostedGlass>
+
+            {floatingActions && (
+              <motion.div
+                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+                animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+                transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                className="absolute -right-12 sm:-right-14 top-0 z-30 flex flex-col pointer-events-auto"
+                dir="ltr"
+              >
+                {floatingActions}
+              </motion.div>
             )}
-          >
-            {children}
-          </FrostedGlass>
+          </div>
         </div>
       )}
     </AnimatePresence>
@@ -84,7 +98,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-10',
+        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-20',
         className
       )}
     >
@@ -114,7 +128,7 @@ export function DialogTitle({ children, className }) {
 }
 
 export function DialogContent({ children, className }) {
-  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1 relative z-10', className)}>{children}</div>;
+  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1 relative z-20', className)}>{children}</div>;
 }
 
 export function DialogFooter({ children, className }) {

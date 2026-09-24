@@ -7,7 +7,7 @@ import { SplashScreen } from './components/ui/SplashScreen';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
 import { WorkModal } from './components/WorkModal';
-import { QuickAddModal } from './components/QuickAddModal';
+import { OrderCalculatorPopover } from './components/OrderCalculatorPopover';
 import { ReceiptModal } from './components/ReceiptModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
@@ -20,6 +20,7 @@ import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { toLocalISOString } from './components/ui/DateTimePicker';
 import { ProfileOnboardingModal } from './components/ui/ProfileOnboardingModal';
+import { UndoToast } from './components/ui/UndoToast';
 import {
   getActiveProfileId,
   setActiveProfileId,
@@ -101,6 +102,9 @@ export default function App() {
   const [activeProfileId, setActiveProfileIdState] = useState(() => getActiveProfileId());
   const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(() => !isProfileOnboardingCompleted());
   const [profileCounts, setProfileCounts] = useState({ booster: 0, advertiser: 0 });
+  const [isSwitchingProfile, setIsSwitchingProfile] = useState(false);
+  const profileSwitchSeqRef = useRef(0);
+  const isSwitchingProfileRef = useRef(false);
 
   // Desktop Tray & Window Preferences
   const [closeToTray, setCloseToTray] = useState(() => {
@@ -144,6 +148,22 @@ export default function App() {
     return parseBooleanSetting(localStorage.getItem('checkpoint_telemetry_enabled'), true);
   });
 
+  // Ledger Group Date Format ('relative' | 'yyyy-mm-dd' | 'dd-mm-yyyy' | 'mm-dd-yyyy' | 'month-d-yyyy')
+  const [ledgerDateFormat, setLedgerDateFormatState] = useState(() => {
+    return parseStringSetting(
+      localStorage.getItem('checkpoint_ledger_date_format'),
+      'relative',
+      ['relative', 'yyyy-mm-dd', 'dd-mm-yyyy', 'mm-dd-yyyy', 'month-d-yyyy']
+    );
+  });
+
+  const handleLedgerDateFormatChange = useCallback((newFmt) => {
+    setLedgerDateFormatState(newFmt);
+    try {
+      localStorage.setItem('checkpoint_ledger_date_format', newFmt);
+    } catch (e) {}
+  }, []);
+
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
     const saved = localStorage.getItem('checkpoint_tab') || localStorage.getItem('nodrapay_tab');
@@ -168,6 +188,21 @@ export default function App() {
     return parseNumberSetting(saved, 3200, 1);
   });
 
+  // USD Exchange Rate in Toman (default 95,000 Toman per 1 USD)
+  const [usdRateTOMAN, setUsdRateTOMAN] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_usd_rate_toman');
+    return parseNumberSetting(saved, 95000, 1);
+  });
+
+  // EUR Exchange Rate in USD (default 1.08 USD per 1 EUR)
+  const [eurRateUSD, setEurRateUSD] = useState(() => {
+    const saved = localStorage.getItem('checkpoint_eur_rate_usd');
+    return parseNumberSetting(saved, 1.08, 0.01);
+  });
+
+  // Order Calculator State
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
   // Categories & Games State
   const [categories, setCategories] = useState([]);
 
@@ -187,7 +222,6 @@ export default function App() {
 
   // Modals State
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
 
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -215,6 +249,7 @@ export default function App() {
   const [selectedEntryIds, setSelectedEntryIds] = useState(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
+  const [undoDeleteState, setUndoDeleteState] = useState({ isOpen: false, items: [], count: 0 });
 
   const [lightboxData, setLightboxData] = useState({
     isOpen: false,
@@ -285,6 +320,18 @@ export default function App() {
         const parsedRate = parseNumberSetting(savedRate, 3200, 1);
         setGoldRateTOMAN(parsedRate);
         localStorage.setItem('checkpoint_gold_rate_toman', String(parsedRate));
+      }
+      const savedUsdRate = await trackerDB.getSetting('checkpoint_usd_rate_toman', null);
+      if (savedUsdRate !== null) {
+        const parsedUsd = parseNumberSetting(savedUsdRate, 95000, 1);
+        setUsdRateTOMAN(parsedUsd);
+        localStorage.setItem('checkpoint_usd_rate_toman', String(parsedUsd));
+      }
+      const savedEurRate = await trackerDB.getSetting('checkpoint_eur_rate_usd', null);
+      if (savedEurRate !== null) {
+        const parsedEur = parseNumberSetting(savedEurRate, 1.08, 0.01);
+        setEurRateUSD(parsedEur);
+        localStorage.setItem('checkpoint_eur_rate_usd', String(parsedEur));
       }
       const savedCloseToTray = await trackerDB.getSetting('checkpoint_close_to_tray', null);
       if (savedCloseToTray !== null) {
@@ -371,22 +418,44 @@ export default function App() {
 
   // Profile Switching & Background Synchronization
   const handleProfileChange = useCallback(async (newProfileId) => {
-    if (newProfileId === activeProfileId) return;
+    if (!newProfileId || newProfileId === activeProfileId) return;
+
+    const seq = ++profileSwitchSeqRef.current;
+    isSwitchingProfileRef.current = true;
+    setIsSwitchingProfile(true);
+
     setActiveProfileId(newProfileId);
     setActiveProfileIdState(newProfileId);
-    setIsLoading(true);
+
     try {
       await trackerDB.switchProfile(newProfileId);
+      if (profileSwitchSeqRef.current !== seq) return;
+
       const freshEntries = await trackerDB.getAllEntries();
+      if (profileSwitchSeqRef.current !== seq) return;
+
       setEntries(freshEntries);
       refreshCategories().catch(() => {});
+
+      // Restore profile-specific preferred currency if configured
+      const savedProfileCurrency = localStorage.getItem(`checkpoint_currency_${newProfileId}`);
+      if (savedProfileCurrency && (savedProfileCurrency === 'TOMAN' || savedProfileCurrency === 'GOLD')) {
+        setGlobalCurrency(savedProfileCurrency);
+        localStorage.setItem('checkpoint_currency', savedProfileCurrency);
+      }
+
       trackerDB.getProfileCounts?.().then((counts) => {
-        if (counts) setProfileCounts(counts);
+        if (counts && profileSwitchSeqRef.current === seq) {
+          setProfileCounts(counts);
+        }
       }).catch(() => {});
     } catch (e) {
       console.error('Failed to switch profile:', e);
     } finally {
-      setIsLoading(false);
+      if (profileSwitchSeqRef.current === seq) {
+        setIsSwitchingProfile(false);
+        isSwitchingProfileRef.current = false;
+      }
     }
   }, [activeProfileId, refreshCategories]);
 
@@ -398,7 +467,7 @@ export default function App() {
   useEffect(() => {
     const handleProfileEvent = (e) => {
       const targetId = e?.detail?.profileId;
-      if (targetId && targetId !== activeProfileId) {
+      if (targetId && targetId !== activeProfileId && !isSwitchingProfileRef.current) {
         handleProfileChange(targetId);
       }
     };
@@ -747,6 +816,9 @@ export default function App() {
     const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (newCurr === 'USD' ? 'TOMAN' : newCurr);
     setGlobalCurrency(cur);
     localStorage.setItem('checkpoint_currency', cur);
+    if (activeProfileId) {
+      localStorage.setItem(`checkpoint_currency_${activeProfileId}`, cur);
+    }
     trackerDB.setSetting('checkpoint_currency', cur);
   };
 
@@ -755,6 +827,32 @@ export default function App() {
     setGoldRateTOMAN(r);
     localStorage.setItem('checkpoint_gold_rate_toman', String(r));
     trackerDB.setSetting('checkpoint_gold_rate_toman', String(r));
+  };
+
+  const handleUsdRateTOMANChange = (newRate) => {
+    const r = Number(newRate) || 95000;
+    setUsdRateTOMAN(r);
+    localStorage.setItem('checkpoint_usd_rate_toman', String(r));
+    trackerDB.setSetting('checkpoint_usd_rate_toman', String(r));
+  };
+
+  const handleEurRateUSDChange = (newRate) => {
+    const r = Number(newRate) || 1.08;
+    setEurRateUSD(r);
+    localStorage.setItem('checkpoint_eur_rate_usd', String(r));
+    trackerDB.setSetting('checkpoint_eur_rate_usd', String(r));
+  };
+
+  const handleSaveRates = (newRates) => {
+    if (newRates?.goldRateTOMAN !== undefined) {
+      handleGoldRateTOMANChange(newRates.goldRateTOMAN);
+    }
+    if (newRates?.usdRateTOMAN !== undefined) {
+      handleUsdRateTOMANChange(newRates.usdRateTOMAN);
+    }
+    if (newRates?.eurRateUSD !== undefined) {
+      handleEurRateUSDChange(newRates.eurRateUSD);
+    }
   };
 
   // Save Entry (Create / Edit)
@@ -770,29 +868,55 @@ export default function App() {
     }
   };
 
-  // Quick Add Save Entry
-  const handleSaveQuickEntry = async (entryData) => {
-    await trackerDB.saveEntry(entryData);
-    setIsQuickAddOpen(false);
-    await reloadEntries();
-    handleTabChange('ledger');
-    incrementLocalWorkCount();
-  };
-
   // Delete Single Entry (Called after in-line confirmation)
   const handleDeleteEntry = async (id) => {
+    const itemToDelete = entries.find((e) => e.id === id);
     setEntries((prev) => prev.filter((e) => e.id !== id));
     await trackerDB.deleteEntry(id);
     await reloadEntries();
+
+    if (itemToDelete) {
+      setUndoDeleteState({
+        isOpen: true,
+        items: [itemToDelete],
+        count: 1,
+      });
+    }
   };
 
   // Bulk Delete Entries
   const handleBulkDelete = async (ids) => {
     if (!ids || ids.length === 0) return;
     const idSet = new Set(ids);
+    const itemsToDelete = entries.filter((e) => idSet.has(e.id));
     setEntries((prev) => prev.filter((e) => !idSet.has(e.id)));
     await trackerDB.bulkDeleteEntries(ids);
     await reloadEntries();
+
+    if (itemsToDelete.length > 0) {
+      setUndoDeleteState({
+        isOpen: true,
+        items: itemsToDelete,
+        count: itemsToDelete.length,
+      });
+    }
+  };
+
+  // Undo Delete (Restores deleted entries)
+  const handleUndoDelete = async () => {
+    const { items } = undoDeleteState;
+    if (!items || items.length === 0) return;
+
+    setUndoDeleteState({ isOpen: false, items: [], count: 0 });
+
+    try {
+      for (const item of items) {
+        await trackerDB.saveEntry(item);
+      }
+      await reloadEntries();
+    } catch (e) {
+      console.error('Failed to undo delete:', e);
+    }
   };
 
   // Bulk Update Status
@@ -943,6 +1067,38 @@ export default function App() {
     await trackerDB.updateSourcePaid(id, val);
     await reloadEntries();
   };
+
+  // Update Booster Paid (Advertiser Dual-Settlement)
+  const handleUpdateBoosterPaid = async (id, boosterPaid) => {
+    const val = boosterPaid ? 1 : 0;
+    setEntries((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, boosterPaid: val, updatedAt: new Date().toISOString() } : e))
+    );
+    await trackerDB.updateBoosterPaid(id, val);
+    await reloadEntries();
+  };
+
+  // Transfer Calculated Order Data to WorkModal
+  const handleTransferFromCalculator = useCallback((calcData) => {
+    const isMultiBooster = calcData?.boosterCount > 1;
+    const partialEntry = {
+      pot: String(calcData?.clientPrice || ''),
+      clientPrice: calcData?.clientPrice,
+      income: String(calcData?.income || ''),
+      feeRate: String(calcData?.feeRate || '15'),
+      feeType: calcData?.feeType || 'percent',
+      platformFee: calcData?.platformFeePct || 0,
+      currency: calcData?.currency || 'USD',
+      sourcePaid: false,
+      boosterPaid: false,
+      notes: isMultiBooster
+        ? `Booster Pool: ${calcData.boosterPool} (${calcData.boosterCount}x @ ${calcData.perBoosterCut})`
+        : '',
+    };
+    setEditingEntry(partialEntry);
+    setIsWorkModalOpen(true);
+    setIsCalculatorOpen(false);
+  }, []);
 
   // Modal Openers
   const handleOpenWorkModal = async (entry = null) => {
@@ -1249,10 +1405,6 @@ export default function App() {
     handleOpenWorkModal();
   }, [activeTab]);
 
-  const handleContextQuickAdd = useCallback(() => {
-    setIsQuickAddOpen(true);
-  }, []);
-
   const handleContextToggleSelectMode = useCallback(() => {
     if (activeTab !== 'ledger') {
       setActiveTab('ledger');
@@ -1284,12 +1436,17 @@ export default function App() {
   }, []);
 
   const handleContextCopyDiscord = useCallback(
-    async (entry) => {
+    async (entry, receiptMode = null) => {
       if (!entry) return;
-      const text = generateDiscordReceiptText(entry, { language, globalCurrency });
+      const text = generateDiscordReceiptText(entry, {
+        language,
+        globalCurrency,
+        activeProfileId,
+        receiptMode,
+      });
       await copyTextNative(text);
     },
-    [language, globalCurrency]
+    [language, globalCurrency, activeProfileId]
   );
 
   const handleContextBulkMarkPaid = useCallback(async () => {
@@ -1358,7 +1515,7 @@ export default function App() {
     isUpdateModalOpen,
     exportConfirm,
     isWorkModalOpen,
-    isQuickAddOpen,
+    isCalculatorOpen,
     isReceiptModalOpen,
     isSettingsOpen,
     isShortcutsOpen,
@@ -1382,6 +1539,10 @@ export default function App() {
           setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
         }
+        if (state.isCalculatorOpen) {
+          setIsCalculatorOpen(false);
+          return;
+        }
         if (state.isNotificationCenterOpen) {
           setIsNotificationCenterOpen(false);
           return;
@@ -1397,10 +1558,6 @@ export default function App() {
         if (state.isWorkModalOpen) {
           setIsWorkModalOpen(false);
           setEditingEntry(null);
-          return;
-        }
-        if (state.isQuickAddOpen) {
-          setIsQuickAddOpen(false);
           return;
         }
         if (state.isReceiptModalOpen) {
@@ -1438,7 +1595,7 @@ export default function App() {
       const isAnyModalOpen =
         state.contextMenuState?.isOpen ||
         state.isWorkModalOpen ||
-        state.isQuickAddOpen ||
+        state.isCalculatorOpen ||
         state.isReceiptModalOpen ||
         state.isSettingsOpen ||
         state.isShortcutsOpen ||
@@ -1487,9 +1644,9 @@ export default function App() {
       }
 
       if (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q') {
-        if (activeProfileId === 'booster') {
-          e.preventDefault();
-          setIsQuickAddOpen(true);
+        e.preventDefault();
+        if (activeProfileId === 'advertiser') {
+          setIsCalculatorOpen((prev) => !prev);
         }
       } else if (e.code === 'KeyN' || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -1522,10 +1679,16 @@ export default function App() {
         onCurrencyChange={handleCurrencyChange}
         goldRateTOMAN={goldRateTOMAN}
         onGoldRateTOMANChange={handleGoldRateTOMANChange}
+        usdRateTOMAN={usdRateTOMAN}
+        eurRateUSD={eurRateUSD}
+        onSaveRates={handleSaveRates}
+        isCalculatorOpen={isCalculatorOpen}
+        onToggleCalculator={() => setIsCalculatorOpen((prev) => !prev)}
+        onCloseCalculator={() => setIsCalculatorOpen(false)}
+        onTransferFromCalculator={handleTransferFromCalculator}
         closeToTray={closeToTray}
         minimizeToTray={minimizeToTray}
         onOpenWorkModal={handleOpenWorkModal}
-        onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         entriesCount={entries.length}
         appVersion={appVersion}
@@ -1546,7 +1709,7 @@ export default function App() {
           appVersion={appVersion}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenWorkModal={handleOpenWorkModal}
-          onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          onOpenCalculator={() => setIsCalculatorOpen((prev) => !prev)}
           onOpenNotifications={() => setIsNotificationCenterOpen(true)}
           unreadNotificationsCount={unreadNotificationsCount}
           activeProfileId={activeProfileId}
@@ -1567,11 +1730,11 @@ export default function App() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
+                key={`${activeTab}-${activeProfileId}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.08, ease: [0.23, 1, 0.32, 1] }}
+                transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
               >
                 <ErrorBoundary>
                   {activeTab === 'ledger' && (
@@ -1581,6 +1744,8 @@ export default function App() {
                       globalCurrency={globalCurrency}
                       onCurrencyChange={handleCurrencyChange}
                       goldRateTOMAN={goldRateTOMAN}
+                      usdRateTOMAN={usdRateTOMAN}
+                      eurRateUSD={eurRateUSD}
                       onOpenWorkModal={handleOpenWorkModal}
                       onOpenReceipt={handleOpenReceipt}
                       onOpenLightbox={handleOpenLightbox}
@@ -1606,6 +1771,8 @@ export default function App() {
                       cockpitFluidEnabled={cockpitFluidEnabled}
                       activeProfileId={activeProfileId}
                       onUpdateSourcePaid={handleUpdateSourcePaid}
+                      onUpdateBoosterPaid={handleUpdateBoosterPaid}
+                      ledgerDateFormat={ledgerDateFormat}
                     />
                   )}
 
@@ -1614,6 +1781,8 @@ export default function App() {
                       entries={entries}
                       globalCurrency={globalCurrency}
                       goldRateTOMAN={goldRateTOMAN}
+                      usdRateTOMAN={usdRateTOMAN}
+                      eurRateUSD={eurRateUSD}
                       activeProfileId={activeProfileId}
                     />
                   )}
@@ -1630,10 +1799,23 @@ export default function App() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onOpenWorkModal={() => handleOpenWorkModal()}
-          onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          onOpenCalculator={() => setIsCalculatorOpen((prev) => !prev)}
           activeProfileId={activeProfileId}
         />
       )}
+
+      {/* Root Order Calculator Sliding Drawer */}
+      <OrderCalculatorPopover
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        rates={{
+          goldRateTOMAN,
+          usdRateTOMAN,
+          eurRateUSD,
+        }}
+        onSaveRates={handleSaveRates}
+        onTransferToWorkModal={handleTransferFromCalculator}
+      />
 
       {/* Modals & Dialogs */}
       <WorkModal
@@ -1651,17 +1833,9 @@ export default function App() {
         entries={entries}
         onRefreshCategories={refreshCategories}
         activeProfileId={activeProfileId}
-      />
-
-      <QuickAddModal
-        isOpen={isQuickAddOpen}
-        onClose={() => setIsQuickAddOpen(false)}
-        onSave={handleSaveQuickEntry}
-        globalCurrency={globalCurrency}
-        goldRateTOMAN={goldRateTOMAN}
-        categories={categories}
-        entries={entries}
-        onRefreshCategories={refreshCategories}
+        usdRateTOMAN={usdRateTOMAN}
+        eurRateUSD={eurRateUSD}
+        onSaveRates={handleSaveRates}
       />
 
       <ReceiptModal
@@ -1732,6 +1906,8 @@ export default function App() {
         handleThemeChange={handleThemeChange}
         cockpitFluidEnabled={cockpitFluidEnabled}
         onCockpitFluidEnabledChange={handleCockpitFluidEnabledChange}
+        ledgerDateFormat={ledgerDateFormat}
+        onLedgerDateFormatChange={handleLedgerDateFormatChange}
       />
 
       {/* Context Menu (Apple-grade floating spring menu) */}
@@ -1746,9 +1922,9 @@ export default function App() {
         }
         isSelectMode={isSelectMode}
         globalCurrency={globalCurrency}
+        activeProfileId={activeProfileId}
         theme={currentTheme}
         onAddWork={handleContextAddWork}
-        onQuickAdd={handleContextQuickAdd}
         onToggleSelectMode={handleContextToggleSelectMode}
         onToggleCurrency={handleContextToggleCurrency}
         onExport={handleContextExport}
@@ -1884,6 +2060,14 @@ export default function App() {
           setIsProfileOnboardingOpen(false);
           handleProfileChange(chosenRole);
         }}
+      />
+
+      {/* Transient Floating Undo Delete Safety Net Toast */}
+      <UndoToast
+        isOpen={undoDeleteState.isOpen}
+        count={undoDeleteState.count}
+        onUndo={handleUndoDelete}
+        onDismiss={() => setUndoDeleteState({ isOpen: false, items: [], count: 0 })}
       />
     </div>
   );

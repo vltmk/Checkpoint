@@ -56,6 +56,8 @@ export function AnalyticsView({
   entries = [],
   globalCurrency = 'TOMAN',
   goldRateTOMAN = 3200,
+  usdRateTOMAN = 95000,
+  eurRateUSD = 1.08,
   activeProfileId = 'booster',
 }) {
   const { t, language, isRtl, formatNumber } = useLanguage();
@@ -102,8 +104,8 @@ export function AnalyticsView({
   };
 
   const rates = useMemo(
-    () => ({ goldRateTOMAN }),
-    [goldRateTOMAN]
+    () => ({ goldRateTOMAN, usdRateTOMAN, eurRateUSD }),
+    [goldRateTOMAN, usdRateTOMAN, eurRateUSD]
   );
 
   // Filter entries according to active timeframe window
@@ -169,7 +171,7 @@ export function AnalyticsView({
         if (!e.sourcePaid) {
           pendingInflow += inc;
         }
-        if (e.status !== 'Paid') {
+        if (!e.boosterPaid) {
           pendingOutflow += boosterPayout;
         }
 

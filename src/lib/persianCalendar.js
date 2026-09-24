@@ -3,6 +3,47 @@
  * Zero-dependency, pure mathematical conversion algorithms.
  */
 
+/**
+ * Digit Conversion Helpers
+ */
+export function toPersianDigits(input) {
+  if (input === null || input === undefined || input === '') return '';
+  const str = String(input);
+  const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  return str.replace(/[0-9]/g, (w) => persianDigits[+w]);
+}
+
+export function normalizeDigits(input) {
+  if (!input) return '';
+  const str = String(input);
+  return str
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
+}
+
+/**
+ * Solar Hijri (Shamsi) Date & Time Formatters
+ */
+export function formatShamsiDate(dateInput, options = {}) {
+  if (!dateInput) return '';
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+  if (isNaN(d?.getTime())) return String(dateInput);
+
+  const defaultOptions = {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    ...options,
+  };
+
+  try {
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', defaultOptions).format(d);
+  } catch (e) {
+    return d.toLocaleDateString();
+  }
+}
+
+
 // Month Names
 export const SHAMSI_MONTHS = [
   'فروردین',

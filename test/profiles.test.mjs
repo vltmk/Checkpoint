@@ -82,3 +82,56 @@ test('SettingsModal.jsx: displays active profile badge and isolated database nam
   assert.ok(settingsCode.includes("checkpoint_advertiser.db"));
   assert.ok(settingsCode.includes("checkpoint.db"));
 });
+
+test('db.js & profiles: two-way settlement columns and methods', () => {
+  assert.ok(dbCode.includes("updateBoosterPaid(id, boosterPaid)"));
+  assert.ok(dbCode.includes("boosterPaid: 'ALTER TABLE work_entries ADD COLUMN boosterPaid INTEGER DEFAULT 0;'"));
+  assert.ok(dbCode.includes("feeType: \"ALTER TABLE work_entries ADD COLUMN feeType TEXT DEFAULT 'percent';\""));
+  assert.ok(dbCode.includes("platformFee: 'ALTER TABLE work_entries ADD COLUMN platformFee REAL DEFAULT 0;'"));
+  assert.ok(profilesCode.includes("checkpoint_usd_rate_toman"));
+  assert.ok(profilesCode.includes("checkpoint_eur_rate_usd"));
+});
+
+test('WorkModal & LedgerView: dual settlement and feeType support', () => {
+  assert.ok(workModalCode.includes("boosterPaid"));
+  assert.ok(workModalCode.includes("feeType"));
+  assert.ok(workModalCode.includes("platformFee"));
+  assert.ok(ledgerCode.includes("onUpdateBoosterPaid"));
+  assert.ok(ledgerCode.includes("boosterPaid"));
+  assert.ok(ledgerCode.includes("booster_due"));
+  assert.ok(ledgerCode.includes("booster_paid"));
+});
+
+test('Navbar.jsx & App.jsx: advertiser order calculator topbar integration', () => {
+  const navbarCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'Navbar.jsx'), 'utf8');
+  assert.ok(navbarCode.includes("OrderCalculatorPopover"));
+  assert.ok(navbarCode.includes("isCalculatorOpen"));
+  assert.ok(navbarCode.includes("onToggleCalculator"));
+  assert.ok(appCode.includes("handleTransferFromCalculator"));
+  assert.ok(appCode.includes("handleUpdateBoosterPaid"));
+  assert.ok(appCode.includes("isCalculatorOpen"));
+});
+
+test('db.js & App.jsx: cached connection persistence and smooth profile transitions', () => {
+  // Connection caching in db.js
+  assert.ok(dbCode.includes('this.sqliteDbs = {};'));
+  assert.ok(dbCode.includes('this.idbDbs = {};'));
+  assert.ok(dbCode.includes('this.sqliteDbs[targetProfile] = db;'));
+  assert.ok(dbCode.includes('this._switchPromise'));
+
+  // Ensure switchProfile and getProfileCounts never close pools
+  assert.ok(!dbCode.includes('await closeSqlitePool(this.sqliteDb, oldPath)'));
+  assert.ok(!dbCode.includes('await closeSqlitePool(tempDb, pPath)'));
+
+  // App.jsx sequence tracking and dedicated switching state
+  assert.ok(appCode.includes('profileSwitchSeqRef'));
+  assert.ok(appCode.includes('isSwitchingProfile'));
+  assert.ok(appCode.includes('profileSwitchSeqRef.current !== seq'));
+
+  // LedgerView pagination boundary and reset safety
+  assert.ok(ledgerCode.includes('activeProfileId, searchQuery, statusFilter'));
+  assert.ok(ledgerCode.includes('currentPage > totalPages'));
+  assert.ok(ledgerCode.includes('Math.min(currentPage, totalPages)'));
+});
+
+

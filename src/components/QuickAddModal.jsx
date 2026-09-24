@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { toLocalISOString } from './ui/DateTimePicker';
 import { TomanIcon } from './ui/Icons';
-import { convertCurrency, formatMoney } from '../lib/currencies';
+import { convertCurrency, formatMoney, sanitizePriceInput } from '../lib/currencies';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { trackerDB } from '../lib/db';
 import { copyTextNative } from '../lib/desktop';
@@ -43,6 +43,16 @@ const RUN_PRESETS = [1, 2, 4, 8];
 const RAID_DIFFICULTIES = ['Normal', 'Heroic', 'Mythic'];
 const RAID_TYPES = ['Full Clear', 'Specific Bosses', 'Awakened'];
 const LEVEL_PRESETS = ['80-90', '70-80', '1-90', '1-80', '1-70', 'Custom'];
+const SEASONAL_DUNGEONS = [
+  'Murder Row',
+  'The Blinding Vale',
+  'Temple of Sethraliss',
+  "King's Rest",
+  'Den of Nalorakk',
+  'Voidscar Arena',
+  'Ruby Life Pools',
+  'Altar of Fangs',
+];
 
 export function QuickAddModal({
   isOpen,
@@ -74,6 +84,7 @@ export function QuickAddModal({
   // Template builder state
   const [keyLevel, setKeyLevel] = useState(10);
   const [runs, setRuns] = useState(1);
+  const [selectedDungeons, setSelectedDungeons] = useState([]);
   const [raidDiff, setRaidDiff] = useState('Heroic');
   const [raidType, setRaidType] = useState('Full Clear');
   const [lvlPreset, setLvlPreset] = useState('80-90');
@@ -120,7 +131,13 @@ export function QuickAddModal({
   useEffect(() => {
     const activeGame = isCustomGame ? (customGameText || 'Game') : (game || 'World of Warcraft');
     if (activityTab === 'mythic') {
-      setTitle(`${activeGame} Mythic+${keyLevel} [${runs}x]`);
+      if (selectedDungeons.length === 1) {
+        setTitle(`${activeGame} ${selectedDungeons[0]} +${keyLevel} [${runs}x]`);
+      } else if (selectedDungeons.length >= 2) {
+        setTitle(`${activeGame} ${language === 'fa' ? 'چندین دانجن' : 'Multi-Dungeon'} +${keyLevel} [${runs}x]`);
+      } else {
+        setTitle(`${activeGame} Mythic+${keyLevel} [${runs}x]`);
+      }
     } else if (activityTab === 'raid') {
       setTitle(`${activeGame} ${raidDiff} Raid [${raidType}]`);
     } else if (activityTab === 'levelup') {
@@ -131,6 +148,7 @@ export function QuickAddModal({
     activityTab,
     keyLevel,
     runs,
+    selectedDungeons,
     raidDiff,
     raidType,
     lvlPreset,
@@ -140,7 +158,23 @@ export function QuickAddModal({
     game,
     isCustomGame,
     customGameText,
+    language,
   ]);
+
+  const handleToggleDungeon = (dungeon) => {
+    setSelectedDungeons((prev) => {
+      const exists = prev.includes(dungeon);
+      const next = exists ? prev.filter((d) => d !== dungeon) : [...prev, dungeon];
+      if (!exists && next.length >= 2 && runs === 1) {
+        setRuns(next.length);
+      }
+      return next;
+    });
+  };
+
+  const handleClearDungeons = () => {
+    setSelectedDungeons([]);
+  };
 
   const GAME_OPTIONS = useMemo(() => {
     const opts = (categories || []).map((cat) => ({
@@ -176,6 +210,7 @@ export function QuickAddModal({
     setTitle('');
     setPrice('');
     setSource('');
+    setSelectedDungeons([]);
     setHasTitleError(false);
     setHasGameError(false);
     setHasPriceError(false);
@@ -357,6 +392,11 @@ export function QuickAddModal({
     } catch (err) {}
 
     entryIdRef.current ||= 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    let finalNotes = '';
+    if (activityTab === 'mythic' && selectedDungeons.length >= 2) {
+      finalNotes = (language === 'fa' ? 'دانجن‌ها: ' : 'Dungeons: ') + selectedDungeons.join(', ');
+    }
+
     const entryToSave = {
       id: entryIdRef.current,
       title: title.trim(),
@@ -370,7 +410,7 @@ export function QuickAddModal({
       exchangeRate: rateNum,
       rateUnit: isClassic ? '1' : '1k',
       status: 'Pending',
-      notes: '',
+      notes: finalNotes,
       proofs: [],
       updatedAt: new Date().toISOString(),
     };
@@ -420,7 +460,7 @@ export function QuickAddModal({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} noValidate>
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} noValidate className="flex flex-col flex-1 min-h-0">
           <DialogContent className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
             {saveError && (
               <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
@@ -559,6 +599,49 @@ export function QuickAddModal({
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Seasonal Active Dungeons Multi-Select */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
+                      <span>{t('quickAdd.dungeons', 'Seasonal Dungeons')}</span>
+                      {selectedDungeons.length > 0 && (
+                        <span className="text-[10px] text-zinc-800 dark:text-zinc-200 font-semibold lowercase">
+                          ({selectedDungeons.length})
+                        </span>
+                      )}
+                    </span>
+                    {selectedDungeons.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearDungeons}
+                        className="text-[10px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline cursor-pointer"
+                      >
+                        {t('quickAdd.clearDungeons', 'Clear')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {SEASONAL_DUNGEONS.map((dungeon) => {
+                      const isSelected = selectedDungeons.includes(dungeon);
+                      return (
+                        <button
+                          key={dungeon}
+                          type="button"
+                          onClick={() => handleToggleDungeon(dungeon)}
+                          className={cn(
+                            'h-7 px-2.5 rounded-md text-xs font-medium transition-colors cursor-pointer border',
+                            isSelected
+                              ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 border-transparent shadow-xs font-semibold'
+                              : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-750 border-zinc-200 dark:border-zinc-700/60'
+                          )}
+                        >
+                          {dungeon}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -814,34 +897,34 @@ export function QuickAddModal({
 
                 {/* Currency Selector (Scoped: only if category supports gold) */}
                 {activeCategorySupportsGold ? (
-                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-md">
+                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-0.5 rounded-md">
                     <button
                       type="button"
                       onClick={() => setCurrency('TOMAN')}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                      className={`flex items-center justify-center gap-1.5 h-7 min-w-[56px] px-2.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                         currency === 'TOMAN'
-                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border border-transparent'
                       }`}
                     >
-                      <TomanIcon className="w-[20px] h-[20px] min-w-[20px] min-h-[20px]" />
+                      <TomanIcon className="w-3.5 h-3.5 min-w-[14px] min-h-[14px]" />
                       <span>{language === 'fa' ? 'تومان' : 'Toman'}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCurrency('GOLD')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                      className={`flex items-center justify-center h-7 min-w-[56px] px-2.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
                         currency === 'GOLD'
-                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-semibold shadow-xs border border-zinc-200/80 dark:border-transparent'
+                          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border border-transparent'
                       }`}
                     >
-                      Gold
+                      <span>Gold</span>
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300">
-                    <TomanIcon className="w-[18px] h-[18px]" />
+                  <div className="flex items-center gap-1.5 h-7 px-2.5 rounded text-[10px] font-medium bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300">
+                    <TomanIcon className="w-3.5 h-3.5 min-w-[14px] min-h-[14px]" />
                     <span>{language === 'fa' ? 'تومان' : 'Toman'}</span>
                   </div>
                 )}
@@ -853,13 +936,20 @@ export function QuickAddModal({
                     type="text"
                     inputMode="decimal"
                     value={price}
+                    onPaste={(e) => {
+                      const clipboard = e.clipboardData?.getData('text');
+                      if (clipboard) {
+                        const cleaned = sanitizePriceInput(clipboard);
+                        if (cleaned) {
+                          e.preventDefault();
+                          setPrice(cleaned);
+                          if (hasPriceError) setHasPriceError(false);
+                          if (saveError) setSaveError(null);
+                        }
+                      }
+                    }}
                     onChange={(e) => {
-                      let val = normalizeDigits(e.target.value)
-                        .replace(/,/g, '').replace(/\s/g, '')
-                        .replace(/(?!^)-/g, '')
-                        .replace(/[^0-9.-]/g, '');
-                      const parts = val.split('.');
-                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
+                      let val = sanitizePriceInput(e.target.value);
                       setPrice(val);
                       if (hasPriceError) setHasPriceError(false);
                       if (saveError) setSaveError(null);

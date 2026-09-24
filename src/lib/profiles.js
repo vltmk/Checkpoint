@@ -52,6 +52,8 @@ export const SHARED_SYNC_SETTING_KEYS = [
   'checkpoint_user_saved_sources_v2',
   'checkpoint_saved_teammates_v1',
   'checkpoint_gold_rate_toman',
+  'checkpoint_usd_rate_toman',
+  'checkpoint_eur_rate_usd',
   'checkpoint_currency',
 ];
 

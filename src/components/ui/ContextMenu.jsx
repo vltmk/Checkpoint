@@ -58,9 +58,9 @@ export function ContextMenu({
   isTargetInSelection = false,
   isSelectMode = false,
   globalCurrency = 'TOMAN',
+  activeProfileId = 'booster',
   theme = 'dark',
   onAddWork,
-  onQuickAdd,
   onToggleSelectMode,
   onToggleCurrency,
   onExport,
@@ -91,6 +91,10 @@ export function ContextMenu({
   const [isConstrained, setIsConstrained] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState(null); // null | 'theme' | 'language'
   const submenuTimeoutRef = useRef(null);
+  const themeTriggerRef = useRef(null);
+  const languageTriggerRef = useRef(null);
+  const [submenuAnchor, setSubmenuAnchor] = useState({ top: 0, height: 28 });
+  const [measuredMenuWidth, setMeasuredMenuWidth] = useState(224);
 
   // Clear hover timeouts on unmount
   useEffect(() => {
@@ -107,9 +111,11 @@ export function ContextMenu({
     }
 
     const el = menuRef.current;
+    const menuEl = el?.querySelector('.checkpoint-frosted-menu');
     // Measure actual DOM dimensions if available, with realistic fallback
-    const menuWidth = el?.offsetWidth || 224;
+    const menuWidth = menuEl?.offsetWidth || el?.offsetWidth || 224;
     const menuHeight = el?.offsetHeight || (targetEntry ? 280 : 340);
+    setMeasuredMenuWidth(menuWidth);
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -312,11 +318,30 @@ export function ContextMenu({
   }, [isOpen, onClose]);
 
   // Submenu Hover Intent Handlers with 100ms Triangle Safe Zone
+  const updateSubmenuAnchor = useCallback((name) => {
+    const triggerEl = name === 'theme' ? themeTriggerRef.current : name === 'language' ? languageTriggerRef.current : null;
+    if (triggerEl && menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const triggerRect = triggerEl.getBoundingClientRect();
+      setSubmenuAnchor({
+        top: triggerRect.top - menuRect.top,
+        height: triggerRect.height,
+      });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (activeSubmenu) {
+      updateSubmenuAnchor(activeSubmenu);
+    }
+  }, [activeSubmenu, updateSubmenuAnchor]);
+
   const handleSubmenuTriggerMouseEnter = (name) => {
     if (submenuTimeoutRef.current) {
       clearTimeout(submenuTimeoutRef.current);
       submenuTimeoutRef.current = null;
     }
+    updateSubmenuAnchor(name);
     setActiveSubmenu(name);
   };
 
@@ -449,15 +474,32 @@ export function ContextMenu({
             {/* Section 1: Receipts, Discord MD & External Links */}
             <ContextMenuItem
               icon={<Receipt className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('ledger.clientReceipt', 'Client Receipt')}
+              label={activeProfileId === 'advertiser' ? (language === 'fa' ? 'مشاهده فاکتور / رسید' : 'View Order Receipt') : t('ledger.clientReceipt', 'Client Receipt')}
               onClick={() => executeAction(() => onViewReceipt?.(targetEntry))}
             />
 
-            <ContextMenuItem
-              icon={<DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-              label={t('contextMenu.copyDiscord')}
-              onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry))}
-            />
+            {activeProfileId === 'advertiser' ? (
+              <>
+                <ContextMenuItem
+                  icon={<DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
+                  label={language === 'fa' ? 'رسید مشتری (دیسکورد)' : 'Client Receipt (Discord)'}
+                  onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry, 'client'))}
+                />
+                {targetEntry.teammates && targetEntry.teammates.length > 0 && (
+                  <ContextMenuItem
+                    icon={<DiscordIcon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
+                    label={language === 'fa' ? 'فیش تسویه بوستر (دیسکورد)' : 'Booster Payout Slip (Discord)'}
+                    onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry, 'booster'))}
+                  />
+                )}
+              </>
+            ) : (
+              <ContextMenuItem
+                icon={<DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
+                label={t('contextMenu.copyDiscord')}
+                onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry))}
+              />
+            )}
 
             {targetEntry.link && (
               <ContextMenuItem
@@ -511,13 +553,6 @@ export function ContextMenu({
             />
 
             <ContextMenuItem
-              icon={<Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
-              label={t('contextMenu.quickAdd')}
-              shortcut="Q"
-              onClick={() => executeAction(onQuickAdd)}
-            />
-
-            <ContextMenuItem
               icon={<CheckSquare className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
               label={t('contextMenu.selectMode')}
               shortcut="S"
@@ -563,6 +598,7 @@ export function ContextMenu({
 
             {/* Theme Submenu Trigger */}
             <div
+              ref={themeTriggerRef}
               className="relative"
               onMouseEnter={() => handleSubmenuTriggerMouseEnter('theme')}
               onMouseLeave={handleSubmenuTriggerMouseLeave}
@@ -581,35 +617,11 @@ export function ContextMenu({
                 isRtl={isRtl}
                 flipSubmenuLeft={flipSubmenuLeft}
               />
-
-              <AnimatePresence>
-                {activeSubmenu === 'theme' && (
-                  <SubmenuFlyout
-                    isRtl={isRtl}
-                    flipLeft={flipSubmenuLeft}
-                    flipUp={flipSubmenuUp}
-                    onMouseEnter={handleSubmenuMouseEnter}
-                    onMouseLeave={handleSubmenuMouseLeave}
-                  >
-                    <ContextMenuItem
-                      icon={<Moon className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />}
-                      label={t('contextMenu.themeDark')}
-                      isChecked={theme === 'dark'}
-                      onClick={() => executeAction(() => onThemeChange?.('dark'))}
-                    />
-                    <ContextMenuItem
-                      icon={<Sun className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
-                      label={t('contextMenu.themeLight')}
-                      isChecked={theme === 'light'}
-                      onClick={() => executeAction(() => onThemeChange?.('light'))}
-                    />
-                  </SubmenuFlyout>
-                )}
-              </AnimatePresence>
             </div>
 
             {/* Language Submenu Trigger */}
             <div
+              ref={languageTriggerRef}
               className="relative"
               onMouseEnter={() => handleSubmenuTriggerMouseEnter('language')}
               onMouseLeave={handleSubmenuTriggerMouseLeave}
@@ -622,31 +634,6 @@ export function ContextMenu({
                 isRtl={isRtl}
                 flipSubmenuLeft={flipSubmenuLeft}
               />
-
-              <AnimatePresence>
-                {activeSubmenu === 'language' && (
-                  <SubmenuFlyout
-                    isRtl={isRtl}
-                    flipLeft={flipSubmenuLeft}
-                    flipUp={flipSubmenuUp}
-                    onMouseEnter={handleSubmenuMouseEnter}
-                    onMouseLeave={handleSubmenuMouseLeave}
-                  >
-                    <ContextMenuItem
-                      icon={<span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">EN</span>}
-                      label={t('contextMenu.langEn')}
-                      isChecked={language === 'en'}
-                      onClick={() => executeAction(() => onLanguageChange?.('en'))}
-                    />
-                    <ContextMenuItem
-                      icon={<span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-farsi">فا</span>}
-                      label={t('contextMenu.langFa')}
-                      isChecked={language === 'fa'}
-                      onClick={() => executeAction(() => onLanguageChange?.('fa'))}
-                    />
-                  </SubmenuFlyout>
-                )}
-              </AnimatePresence>
             </div>
 
             <MenuDivider />
@@ -661,6 +648,55 @@ export function ContextMenu({
           </>
         )}
       </FrostedGlass>
+
+      {/* Flyout Submenu rendered as sibling to ensure independent Backdrop Root */}
+      <AnimatePresence>
+        {activeSubmenu && (
+          <SubmenuFlyout
+            isRtl={isRtl}
+            flipLeft={flipSubmenuLeft}
+            flipUp={flipSubmenuUp}
+            anchorTop={submenuAnchor.top}
+            anchorHeight={submenuAnchor.height}
+            mainMenuWidth={measuredMenuWidth}
+            onMouseEnter={handleSubmenuMouseEnter}
+            onMouseLeave={handleSubmenuMouseLeave}
+          >
+            {activeSubmenu === 'theme' && (
+              <>
+                <ContextMenuItem
+                  icon={<Moon className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />}
+                  label={t('contextMenu.themeDark')}
+                  isChecked={theme === 'dark'}
+                  onClick={() => executeAction(() => onThemeChange?.('dark'))}
+                />
+                <ContextMenuItem
+                  icon={<Sun className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
+                  label={t('contextMenu.themeLight')}
+                  isChecked={theme === 'light'}
+                  onClick={() => executeAction(() => onThemeChange?.('light'))}
+                />
+              </>
+            )}
+            {activeSubmenu === 'language' && (
+              <>
+                <ContextMenuItem
+                  icon={<span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300">EN</span>}
+                  label={t('contextMenu.langEn')}
+                  isChecked={language === 'en'}
+                  onClick={() => executeAction(() => onLanguageChange?.('en'))}
+                />
+                <ContextMenuItem
+                  icon={<span className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 font-farsi">فا</span>}
+                  label={t('contextMenu.langFa')}
+                  isChecked={language === 'fa'}
+                  onClick={() => executeAction(() => onLanguageChange?.('fa'))}
+                />
+              </>
+            )}
+          </SubmenuFlyout>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -730,12 +766,17 @@ function ContextMenuItem({
 /**
  * Flyout Submenu Container with Spring Physics
  */
-function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter, onMouseLeave }) {
-  // Placement positioning:
-  // When flipLeft is true, the submenu is placed to the LEFT of parent menu ('right-full mr-1')
-  // When flipLeft is false, the submenu is placed to the RIGHT of parent menu ('left-full ml-1')
-  const horizontalClass = flipLeft ? 'right-full mr-1' : 'left-full ml-1';
-  const verticalClass = flipUp ? 'bottom-0' : 'top-0';
+function SubmenuFlyout({
+  children,
+  isRtl,
+  flipLeft,
+  flipUp = false,
+  anchorTop = 0,
+  anchorHeight = 28,
+  mainMenuWidth = 224,
+  onMouseEnter,
+  onMouseLeave,
+}) {
   const originY = flipUp ? 'bottom' : 'top';
   const originX = flipLeft ? 'right' : 'left';
   // Safe bridge to cover the 4px gap between parent item and flyout
@@ -743,21 +784,29 @@ function SubmenuFlyout({ children, isRtl, flipLeft, flipUp = false, onMouseEnter
     ? "before:content-[''] before:absolute before:top-0 before:bottom-0 before:w-3 before:-right-3 before:pointer-events-auto"
     : "before:content-[''] before:absolute before:top-0 before:bottom-0 before:w-3 before:-left-3 before:pointer-events-auto";
 
+  const submenuWidth = 160;
+  const leftPos = flipLeft ? -(submenuWidth + 4) : mainMenuWidth + 4;
+  const submenuHeight = 68;
+  const topPos = flipUp ? Math.max(0, anchorTop + anchorHeight - submenuHeight) : anchorTop;
+
   return (
     <FrostedGlass
       as="motion.div"
       variant="menu"
+      dir={isRtl ? 'rtl' : 'ltr'}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ type: 'spring', bounce: 0, duration: 0.14 }}
-      style={{ transformOrigin: `${originY} ${originX}` }}
+      style={{
+        transformOrigin: `${originY} ${originX}`,
+        left: `${leftPos}px`,
+        top: `${topPos}px`,
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       className={cn(
-        'absolute z-[10000] w-40 p-1 space-y-0.5',
-        horizontalClass,
-        verticalClass,
+        'absolute z-[10000] w-40 p-1 space-y-0.5 text-zinc-800 dark:text-zinc-200 text-xs font-medium',
         bridgeClass
       )}
     >

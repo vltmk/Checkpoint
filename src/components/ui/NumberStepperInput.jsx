@@ -2,6 +2,7 @@ import React, { useRef, useCallback } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
+import { sanitizePriceInput } from '../../lib/currencies';
 
 export function NumberStepperInput({
   value,
@@ -15,6 +16,7 @@ export function NumberStepperInput({
   currency = 'TOMAN',
   disabled = false,
   required = false,
+  prefixIcon = null,
   ...props
 }) {
   const { isRtl } = useLanguage();
@@ -80,10 +82,29 @@ export function NumberStepperInput({
         className
       )}
     >
+      {prefixIcon && (
+        <div className="flex items-center shrink-0 pl-2.5 rtl:pl-0 rtl:pr-2.5 text-zinc-400 dark:text-zinc-500 z-10 pointer-events-auto">
+          {prefixIcon}
+        </div>
+      )}
       <input
         type="text"
         inputMode="decimal"
         value={value}
+        onPaste={(e) => {
+          const clipboard = e.clipboardData?.getData('text');
+          if (clipboard) {
+            const cleaned = sanitizePriceInput(clipboard);
+            if (cleaned) {
+              e.preventDefault();
+              e.target.value = cleaned;
+              onChange?.(e);
+              props.onPaste?.(e);
+              return;
+            }
+          }
+          props.onPaste?.(e);
+        }}
         onChange={(e) => {
           // Convert Persian/Arabic digits to English digits
           let raw = e.target.value
@@ -93,13 +114,8 @@ export function NumberStepperInput({
           const hasMinus = raw.includes('-');
           const hasPlus = raw.includes('+');
 
-          // Remove commas, spaces, and signs for magnitude normalization
-          let val = raw.replace(/,/g, '').replace(/\s/g, '').replace(/[^0-9.]/g, '');
-          
-          const parts = val.split('.');
-          if (parts.length > 2) {
-            val = parts[0] + '.' + parts.slice(1).join('').replace(/\./g, '');
-          }
+          // Normalize commas, dots, multipliers, and formatting
+          let val = sanitizePriceInput(raw).replace(/[-+]/g, '');
 
           if (hasMinus) {
             val = '-' + val;
@@ -115,8 +131,10 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent px-3 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
-          isRtl ? 'pl-8 pr-3 text-right' : 'pr-8 pl-3 text-left',
+          'w-full h-full bg-transparent flex-1 min-w-0 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
+          prefixIcon
+            ? (isRtl ? 'pr-2 pl-8 text-right' : 'pl-2 pr-8 text-left')
+            : (isRtl ? 'pl-8 pr-3 text-right' : 'pr-8 pl-3 text-left'),
           inputClassName
         )}
         {...props}

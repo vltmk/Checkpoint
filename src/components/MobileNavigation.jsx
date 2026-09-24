@@ -8,6 +8,7 @@ import {
   Settings,
   Bell,
   ChevronDown,
+  Calculator,
 } from 'lucide-react';
 import { CheckpointLogo } from './ui/Icons';
 import { ProfilePopover } from './ui/ProfilePopover';
@@ -18,7 +19,7 @@ export function MobileHeader({
   globalCurrency = 'TOMAN',
   onOpenSettings,
   onOpenWorkModal,
-  onOpenQuickAdd,
+  onOpenCalculator,
   onOpenNotifications,
   unreadNotificationsCount = 0,
   appVersion = '',
@@ -80,14 +81,14 @@ export function MobileHeader({
           )}
         </button>
 
-        {activeProfileId === 'booster' && (
+        {activeProfileId === 'advertiser' && (
           <button
             type="button"
-            onClick={onOpenQuickAdd}
-            title="Quick Add Work"
+            onClick={onOpenCalculator}
+            title={language === 'fa' ? 'ماشین حساب سفارشات (Q)' : 'Order Calculator (Q)'}
             className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-700 hover:text-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-100 active:scale-[0.97] transition-transform duration-150 ease-out cursor-pointer"
           >
-            <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Calculator className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
         )}
 
@@ -108,10 +109,10 @@ export function MobileBottomNav({
   activeTab = 'ledger',
   onTabChange,
   onOpenWorkModal,
-  onOpenQuickAdd,
+  onOpenCalculator,
   activeProfileId = 'booster',
 }) {
-  const { t, isRtl } = useLanguage();
+  const { t, isRtl, language } = useLanguage();
   return (
     <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 border-t border-zinc-200 dark:border-zinc-800/80 px-4 py-1.5 safe-bottom">
       <div className="flex items-center justify-around max-w-sm mx-auto">
@@ -140,14 +141,14 @@ export function MobileBottomNav({
           >
             <Plus className="w-5 h-5" />
           </button>
-          {activeProfileId === 'booster' && (
+          {activeProfileId === 'advertiser' && (
             <button
               type="button"
-              onClick={onOpenQuickAdd}
-              title={`${t('nav.quickAdd')} (Q)`}
+              onClick={onOpenCalculator}
+              title={language === 'fa' ? 'ماشین حساب سفارشات (Q)' : 'Order Calculator (Q)'}
               className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 text-zinc-800 border border-zinc-300 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700 shadow-sm active:scale-[0.97] transition-transform duration-150 ease-out hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
             >
-              <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Calculator className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
           )}
         </div>

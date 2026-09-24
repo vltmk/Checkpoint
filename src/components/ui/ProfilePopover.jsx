@@ -43,7 +43,6 @@ export function ProfilePopover({
 
   const handleSelect = (profileId) => {
     if (profileId !== activeProfileId) {
-      setActiveProfileId(profileId);
       onProfileChange?.(profileId);
     }
     onClose?.();

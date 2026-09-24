@@ -26,6 +26,71 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '4.1.0': {
+    date: '2026-09-24',
+    title: {
+      en: "What's New in Checkpoint v4.1.0",
+      fa: 'امکانات و تغییرات نسخه ۴.۱.۰',
+    },
+    summary: {
+      en: 'Order Calculator popover, deletion undo safety net, smart price sanitizer, date range filters, and workflow QoL enhancements.',
+      fa: 'ماشین‌حساب سفارشات، قابلیت بازگردانی (Undo) حذف کارها، پاک‌سازی هوشمند ورودی‌های قیمت، فیلتر بازه زمانی و بهینه‌سازی‌های عملکردی.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Integrated Order Calculator popover with platform fee presets (G2G, FunPay, PlayerAuctions, etc.), advertiser margins, booster cuts, and reverse quoting.',
+        },
+        {
+          tag: 'new',
+          text: 'Deletion Undo safety net toast allowing instant recovery of accidentally deleted entries.',
+        },
+        {
+          tag: 'new',
+          text: 'Smart price input sanitizer supporting Persian/Arabic digits, dot/comma thousand separators, and k/m multiplier suffixes.',
+        },
+        {
+          tag: 'new',
+          text: 'Date range preset filtering in Ledger (Today, Yesterday, This Week, This Month, etc.) and batch Discord receipt export.',
+        },
+        {
+          tag: 'improved',
+          text: 'Quick Add level-up bracket support for level 90 cap in World of Warcraft.',
+        },
+        {
+          tag: 'improved',
+          text: 'Refined brand iconography and desktop application icon assets across all platforms.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'ماشین‌حساب هوشمند ثبت سفارش با کارمزد پلتفرم‌ها (G2G و غیره)، درصد ادورتایزر و بوستر و محاسبه معکوس قیمت.',
+        },
+        {
+          tag: 'new',
+          text: 'پیام بازگردانی (Undo) هنگام حذف رکوردها جهت جلوگیری از خطای ناخواسته.',
+        },
+        {
+          tag: 'new',
+          text: 'پاک‌سازی و تشخیص هوشمند ورودی‌های قیمت شامل اعداد فارسی، جداکننده‌ها و ضرایب k و m.',
+        },
+        {
+          tag: 'new',
+          text: 'فیلتر بازه زمانی پیشرفته در دفتر کل و خروجی دسته‌ای دیسکورد.',
+        },
+        {
+          tag: 'improved',
+          text: 'پشتیبانی از لول ۹۰ در براکت‌های لول‌آپ World of Warcraft.',
+        },
+        {
+          tag: 'improved',
+          text: 'به‌روزرسانی آیکون‌های برنامه و نشان‌های بصری در تمامی پلتفرم‌ها.',
+        },
+      ],
+    },
+  },
   '4.0.1': {
     date: '2026-09-13',
     title: {

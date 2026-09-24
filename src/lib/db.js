@@ -29,6 +29,7 @@ const REQUIRED_WORK_ENTRY_COLUMNS = [
   'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
   'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes', 'link',
   'pot', 'teamInputMode', 'teammateCuts', 'orderId', 'feeRate', 'sourcePaid',
+  'feeType', 'boosterPaid', 'platformFee',
 ];
 
 const WORK_ENTRY_COLUMN_MIGRATIONS = {
@@ -44,12 +45,17 @@ const WORK_ENTRY_COLUMN_MIGRATIONS = {
   orderId: "ALTER TABLE work_entries ADD COLUMN orderId TEXT DEFAULT '';",
   feeRate: 'ALTER TABLE work_entries ADD COLUMN feeRate REAL DEFAULT NULL;',
   sourcePaid: 'ALTER TABLE work_entries ADD COLUMN sourcePaid INTEGER DEFAULT 0;',
+  feeType: "ALTER TABLE work_entries ADD COLUMN feeType TEXT DEFAULT 'percent';",
+  boosterPaid: 'ALTER TABLE work_entries ADD COLUMN boosterPaid INTEGER DEFAULT 0;',
+  platformFee: 'ALTER TABLE work_entries ADD COLUMN platformFee REAL DEFAULT 0;',
 };
 
 export class StorageDB {
   constructor() {
     this.sqliteDb = null;
+    this.sqliteDbs = {};
     this.idb = null;
+    this.idbDbs = {};
     this.isDesktop = isTauri();
     this.activeProfile = getActiveProfileId();
     this.storageStatus = {
@@ -66,6 +72,7 @@ export class StorageDB {
     };
     this.initPromise = this.init();
     this.retryPromise = null;
+    this._switchPromise = null;
   }
 
   getActiveProfile() {
@@ -77,41 +84,88 @@ export class StorageDB {
     return profile.dbPath || SQLITE_MAIN_PATH;
   }
 
+  getSqliteDbPathForProfile(profileId) {
+    const pid = profileId || this.activeProfile || 'booster';
+    const profile = PROFILES[pid] || PROFILES.booster;
+    return profile.dbPath || SQLITE_MAIN_PATH;
+  }
+
   getIdbDatabaseName() {
     return this.activeProfile === 'advertiser' ? 'CheckpointDB_advertiser_v1' : DB_NAME_IDB;
   }
 
+  getIdbDatabaseNameForProfile(profileId) {
+    const pid = profileId || this.activeProfile || 'booster';
+    return pid === 'advertiser' ? 'CheckpointDB_advertiser_v1' : DB_NAME_IDB;
+  }
+
   async switchProfile(profileId) {
-    if (!PROFILES[profileId] || this.activeProfile === profileId) {
+    if (!PROFILES[profileId]) {
       return this.getStorageStatus();
     }
 
-    const previousProfile = this.activeProfile;
-    this.activeProfile = profileId;
+    // Serialize profile switching to eliminate concurrent switch race conditions
+    const currentSwitch = (async () => {
+      if (this._switchPromise) {
+        try {
+          await this._switchPromise;
+        } catch (e) {}
+      }
 
-    if (this.isDesktop) {
-      if (this.sqliteDb) {
-        try {
-          const oldPath = PROFILES[previousProfile]?.dbPath || SQLITE_MAIN_PATH;
-          await closeSqlitePool(this.sqliteDb, oldPath);
-        } catch (e) {}
-        this.sqliteDb = null;
+      if (this.activeProfile === profileId && (this.isDesktop ? this.sqliteDb : this.idb)) {
+        return this.getStorageStatus();
       }
-      this.initPromise = this.initDesktopStorage();
-      await this.initPromise;
-    } else {
-      if (this.idb) {
-        try {
-          this.idb.close();
-        } catch (e) {}
-        this.idb = null;
+
+      this.activeProfile = profileId;
+
+      if (this.isDesktop) {
+        if (this.sqliteDbs[profileId]) {
+          this.sqliteDb = this.sqliteDbs[profileId];
+          this.storageStatus = {
+            ...this.storageStatus,
+            driver: 'sqlite',
+            state: 'ready',
+            initializationState: 'ready',
+            initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
+            initializationError: null,
+            lastOperation: 'switch_profile',
+            lastError: null,
+          };
+        } else {
+          this.initPromise = this.initDesktopStorage(profileId);
+          await this.initPromise;
+        }
+      } else {
+        if (this.idbDbs[profileId]) {
+          this.idb = this.idbDbs[profileId];
+          this.storageStatus = {
+            ...this.storageStatus,
+            driver: 'indexeddb',
+            state: 'ready',
+            initializationState: 'ready',
+            initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
+            initializationError: null,
+            lastOperation: 'switch_profile',
+            lastError: null,
+          };
+        } else {
+          this.initPromise = this.initIndexedDB(profileId);
+          await this.initPromise;
+        }
       }
-      this.initPromise = this.initIndexedDB();
-      await this.initPromise;
+
+      await this.syncSharedSettings().catch(() => {});
+      return this.getStorageStatus();
+    })();
+
+    this._switchPromise = currentSwitch;
+    try {
+      return await currentSwitch;
+    } finally {
+      if (this._switchPromise === currentSwitch) {
+        this._switchPromise = null;
+      }
     }
-
-    await this.syncSharedSettings().catch(() => {});
-    return this.getStorageStatus();
   }
 
   async syncSharedSettings() {
@@ -134,18 +188,22 @@ export class StorageDB {
     const counts = { booster: 0, advertiser: 0 };
     if (this.isDesktop) {
       try {
-        const Database = (await import('@tauri-apps/plugin-sql')).default;
         for (const pid of ['booster', 'advertiser']) {
-          const pPath = PROFILES[pid]?.dbPath || SQLITE_MAIN_PATH;
-          if (pid === this.activeProfile && this.sqliteDb) {
-            const res = await this.sqliteDb.select('SELECT COUNT(*) as cnt FROM work_entries');
-            counts[pid] = res?.[0]?.cnt || 0;
+          if (this.sqliteDbs[pid]) {
+            try {
+              const res = await this.sqliteDbs[pid].select('SELECT COUNT(*) as cnt FROM work_entries');
+              counts[pid] = res?.[0]?.cnt || 0;
+            } catch (e) {
+              counts[pid] = 0;
+            }
           } else {
             try {
-              const tempDb = await Database.load(pPath);
-              const res = await tempDb.select('SELECT COUNT(*) as cnt FROM work_entries');
-              counts[pid] = res?.[0]?.cnt || 0;
-              await closeSqlitePool(tempDb, pPath);
+              // Pre-warm into cache without closing the pool
+              const db = await this.initDesktopStorage(pid);
+              if (db) {
+                const res = await db.select('SELECT COUNT(*) as cnt FROM work_entries');
+                counts[pid] = res?.[0]?.cnt || 0;
+              }
             } catch (e) {
               counts[pid] = 0;
             }
@@ -155,29 +213,19 @@ export class StorageDB {
     } else if (typeof indexedDB !== 'undefined') {
       try {
         for (const pid of ['booster', 'advertiser']) {
-          const dbName = PROFILES[pid]?.idbDatabaseName || IDB_MAIN_DATABASE_NAME;
-          counts[pid] = await new Promise((resolve) => {
-            const req = indexedDB.open(dbName, IDB_SCHEMA_VERSION);
-            req.onsuccess = (e) => {
-              const idb = e.target.result;
-              if (!idb.objectStoreNames.contains(IDB_ENTRIES_STORE_NAME)) {
-                idb.close();
-                return resolve(0);
-              }
-              const tx = idb.transaction(IDB_ENTRIES_STORE_NAME, 'readonly');
-              const countReq = tx.objectStore(IDB_ENTRIES_STORE_NAME).count();
-              countReq.onsuccess = () => {
-                const c = countReq.result || 0;
-                idb.close();
-                resolve(c);
-              };
-              countReq.onerror = () => {
-                idb.close();
+          const db = this.idbDbs[pid] || (await this.initIndexedDB(pid).catch(() => null));
+          if (db && db.objectStoreNames.contains(STORE_ENTRIES)) {
+            counts[pid] = await new Promise((resolve) => {
+              try {
+                const tx = db.transaction(STORE_ENTRIES, 'readonly');
+                const countReq = tx.objectStore(STORE_ENTRIES).count();
+                countReq.onsuccess = () => resolve(countReq.result || 0);
+                countReq.onerror = () => resolve(0);
+              } catch (e) {
                 resolve(0);
-              };
-            };
-            req.onerror = () => resolve(0);
-          });
+              }
+            });
+          }
         }
       } catch (e) {}
     }
@@ -208,60 +256,93 @@ export class StorageDB {
     }
   }
 
-  async initDesktopStorage() {
-    let stage = STORAGE_INITIALIZATION_STAGES.LOAD;
-    this.setInitializationStage(stage);
+  async initDesktopStorage(profileId = null) {
+    const targetProfile = profileId || this.activeProfile || 'booster';
 
-    const dbPath = this.getSqliteDbPath();
+    // If already cached and open, switch/return directly
+    if (this.sqliteDbs[targetProfile]) {
+      if (targetProfile === this.activeProfile) {
+        this.sqliteDb = this.sqliteDbs[targetProfile];
+      }
+      return this.sqliteDbs[targetProfile];
+    }
+
+    let stage = STORAGE_INITIALIZATION_STAGES.LOAD;
+    if (targetProfile === this.activeProfile) {
+      this.setInitializationStage(stage);
+    }
+
+    const dbPath = this.getSqliteDbPathForProfile(targetProfile);
 
     try {
       const Database = (await import('@tauri-apps/plugin-sql')).default;
-      this.sqliteDb = await Database.load(dbPath);
+      const db = await Database.load(dbPath);
+
+      // Temporarily bind this.sqliteDb to db so schema and verification methods operate on it
+      const prevActiveDb = this.sqliteDb;
+      this.sqliteDb = db;
 
       stage = STORAGE_INITIALIZATION_STAGES.SCHEMA;
-      this.setInitializationStage(stage);
+      if (targetProfile === this.activeProfile) {
+        this.setInitializationStage(stage);
+      }
       await this.initSqliteSchema();
 
       // Legacy SQLite migration only on the canonical booster DB
-      if (this.activeProfile === 'booster') {
+      if (targetProfile === 'booster') {
         stage = STORAGE_INITIALIZATION_STAGES.LEGACY_MIGRATION;
-        this.setInitializationStage(stage);
+        if (targetProfile === this.activeProfile) {
+          this.setInitializationStage(stage);
+        }
         await this.migrateLegacySqliteData(Database);
       }
       await this.verifySqliteConnection();
 
       stage = STORAGE_INITIALIZATION_STAGES.INTEGRITY_CHECK;
-      this.setInitializationStage(stage);
+      if (targetProfile === this.activeProfile) {
+        this.setInitializationStage(stage);
+      }
       await this.verifySqliteIntegrity();
 
       stage = STORAGE_INITIALIZATION_STAGES.WRITABILITY_CHECK;
-      this.setInitializationStage(stage);
+      if (targetProfile === this.activeProfile) {
+        this.setInitializationStage(stage);
+      }
       await this.verifySqliteWritability();
 
-      this.storageStatus = {
-        ...this.storageStatus,
-        driver: 'sqlite',
-        state: 'ready',
-        initializationState: 'ready',
-        initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
-        initializationError: null,
-        lastOperation: 'initialize',
-        lastError: null,
-      };
+      this.sqliteDbs[targetProfile] = db;
+      if (targetProfile === this.activeProfile) {
+        this.sqliteDb = db;
+        this.storageStatus = {
+          ...this.storageStatus,
+          driver: 'sqlite',
+          state: 'ready',
+          initializationState: 'ready',
+          initializationStage: STORAGE_INITIALIZATION_STAGES.READY,
+          initializationError: null,
+          lastOperation: 'initialize',
+          lastError: null,
+        };
+      } else {
+        this.sqliteDb = prevActiveDb;
+      }
 
       // Sync shared metadata in background
       this.syncSharedSettings().catch(() => {});
 
-      return this.sqliteDb;
+      return db;
     } catch (err) {
       const storageError = this.recordStorageError(err, 'initialize', stage);
-      console.warn('Failed to initialize Tauri SQLite:', storageError.safeMessage);
+      console.warn('Failed to initialize Tauri SQLite for profile', targetProfile, storageError.safeMessage);
       if (this.sqliteDb) {
         try {
           await closeSqlitePool(this.sqliteDb, dbPath);
         } catch (closeErr) {}
       }
-      this.sqliteDb = null;
+      delete this.sqliteDbs[targetProfile];
+      if (targetProfile === this.activeProfile) {
+        this.sqliteDb = null;
+      }
       return null;
     }
   }
@@ -441,6 +522,9 @@ export class StorageDB {
         orderId TEXT DEFAULT '',
         feeRate REAL DEFAULT NULL,
         sourcePaid INTEGER DEFAULT 0,
+        feeType TEXT DEFAULT 'percent',
+        boosterPaid INTEGER DEFAULT 0,
+        platformFee REAL DEFAULT 0,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now'))
       );
@@ -453,6 +537,7 @@ export class StorageDB {
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_game ON work_entries(game);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_order_id ON work_entries(orderId);`);
     await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_source_paid ON work_entries(sourcePaid);`);
+    await this.sqliteDb.execute(`CREATE INDEX IF NOT EXISTS idx_entries_booster_paid ON work_entries(boosterPaid);`);
 
     // 2. Dedicated proof attachments table (lazy-loaded on demand)
     await this.sqliteDb.execute(`
@@ -619,13 +704,22 @@ export class StorageDB {
    * 2. IndexedDB Driver Implementation (Browser Fallback)
    * ========================================================================= */
 
-  async initIndexedDB() {
+  async initIndexedDB(profileId = null) {
     if (typeof window === 'undefined' || !window.indexedDB) {
       return null;
     }
 
+    const targetProfile = profileId || this.activeProfile || 'booster';
+    if (this.idbDbs[targetProfile]) {
+      if (targetProfile === this.activeProfile) {
+        this.idb = this.idbDbs[targetProfile];
+      }
+      return this.idbDbs[targetProfile];
+    }
+
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.getIdbDatabaseName(), DB_VERSION_IDB);
+      const dbName = this.getIdbDatabaseNameForProfile(targetProfile);
+      const request = indexedDB.open(dbName, DB_VERSION_IDB);
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
@@ -644,12 +738,16 @@ export class StorageDB {
       };
 
       request.onsuccess = (event) => {
-        this.idb = event.target.result;
-        resolve(this.idb);
+        const db = event.target.result;
+        this.idbDbs[targetProfile] = db;
+        if (targetProfile === this.activeProfile) {
+          this.idb = db;
+        }
+        resolve(db);
       };
 
       request.onerror = (event) => {
-        console.error('IndexedDB open error:', event.target.error);
+        console.error('IndexedDB open error for profile', targetProfile, event.target.error);
         reject(event.target.error);
       };
     });
@@ -668,7 +766,7 @@ export class StorageDB {
         const rows = await this.sqliteDb.select(`
           SELECT 
             w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
-            w.pot, w.teamInputMode, w.teammateCuts, w.orderId, w.feeRate, w.sourcePaid,
+            w.pot, w.teamInputMode, w.teammateCuts, w.orderId, w.feeRate, w.sourcePaid, w.feeType, w.boosterPaid, w.platformFee,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -679,7 +777,7 @@ export class StorageDB {
         return rows.map((r) => {
           let cur = r.currency;
           if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
+          if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
           const isClassic = r.rateUnit === '1' || r.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
 
@@ -710,6 +808,9 @@ export class StorageDB {
             orderId: r.orderId || '',
             feeRate: r.feeRate !== null && r.feeRate !== undefined && !isNaN(Number(r.feeRate)) ? Number(r.feeRate) : null,
             sourcePaid: Boolean(r.sourcePaid),
+            feeType: r.feeType || 'percent',
+            boosterPaid: Boolean(r.boosterPaid),
+            platformFee: r.platformFee !== null && r.platformFee !== undefined ? Number(r.platformFee) : 0,
             proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
           };
         });
@@ -731,7 +832,7 @@ export class StorageDB {
         const normalized = results.map((entry) => {
           let cur = entry.currency;
           if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
+          if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
           const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
           return {
@@ -749,6 +850,9 @@ export class StorageDB {
             orderId: entry.orderId || '',
             feeRate: entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null,
             sourcePaid: Boolean(entry.sourcePaid),
+            feeType: entry.feeType || 'percent',
+            boosterPaid: Boolean(entry.boosterPaid),
+            platformFee: entry.platformFee !== null && entry.platformFee !== undefined ? Number(entry.platformFee) : 0,
           };
         });
         normalized.sort((a, b) => new Date(b.dateTime || 0) - new Date(a.dateTime || 0));
@@ -870,6 +974,11 @@ export class StorageDB {
       ? Number(cleanEntry.feeRate)
       : null;
     const finalSourcePaid = cleanEntry.sourcePaid ? 1 : 0;
+    const finalFeeType = cleanEntry.feeType === 'flat' ? 'flat' : 'percent';
+    const finalBoosterPaid = cleanEntry.boosterPaid ? 1 : 0;
+    const finalPlatformFee = cleanEntry.platformFee !== null && cleanEntry.platformFee !== undefined && !Number.isNaN(Number(cleanEntry.platformFee))
+      ? Number(cleanEntry.platformFee)
+      : 0;
 
     cleanEntry.exchangeRate = finalRate;
     cleanEntry.rateUnit = finalUnit;
@@ -881,6 +990,9 @@ export class StorageDB {
     cleanEntry.orderId = finalOrderId;
     cleanEntry.feeRate = finalFeeRate;
     cleanEntry.sourcePaid = Boolean(finalSourcePaid);
+    cleanEntry.feeType = finalFeeType;
+    cleanEntry.boosterPaid = Boolean(finalBoosterPaid);
+    cleanEntry.platformFee = finalPlatformFee;
 
     if (this.isDesktop) {
       if (!this.sqliteDb) {
@@ -889,8 +1001,8 @@ export class StorageDB {
 
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, orderId, feeRate, sourcePaid, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, orderId, feeRate, sourcePaid, feeType, boosterPaid, platformFee, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -913,6 +1025,9 @@ export class StorageDB {
             finalOrderId,
             finalFeeRate,
             finalSourcePaid,
+            finalFeeType,
+            finalBoosterPaid,
+            finalPlatformFee,
           ]
         );
 
@@ -1099,6 +1214,45 @@ export class StorageDB {
         const entry = getReq.result;
         if (entry) {
           entry.sourcePaid = Boolean(sourcePaid);
+          entry.updatedAt = new Date().toISOString();
+          store.put(entry);
+        }
+      };
+
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  async updateBoosterPaid(id, boosterPaid) {
+    await this.initPromise;
+    if (!id) return false;
+    const isPaidInt = boosterPaid ? 1 : 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        await this.sqliteDb.execute(
+          'UPDATE work_entries SET boosterPaid = ?, updated_at = ? WHERE id = ?',
+          [isPaidInt, nowSec, id]
+        );
+        return true;
+      } catch (err) {
+        console.error('SQLite updateBoosterPaid error:', err);
+        return false;
+      }
+    }
+
+    // Browser IndexedDB Fallback
+    if (!this.idb) return false;
+    return new Promise((resolve, reject) => {
+      const transaction = this.idb.transaction([STORE_ENTRIES], 'readwrite');
+      const store = transaction.objectStore(STORE_ENTRIES);
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const entry = getReq.result;
+        if (entry) {
+          entry.boosterPaid = Boolean(boosterPaid);
           entry.updatedAt = new Date().toISOString();
           store.put(entry);
         }

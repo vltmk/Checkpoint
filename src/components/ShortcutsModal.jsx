@@ -13,8 +13,9 @@ export function ShortcutsModal({ isOpen, onClose }) {
     {
       group: language === 'fa' ? 'عملیات و ثبت' : 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: language === 'fa' ? 'افزودن کار (کامل)' : 'Add work record (Full)' },
-        { keys: ['Q'], desc: language === 'fa' ? 'ثبت سریع کار' : 'Quick add work record' },
+        { keys: ['N'], desc: language === 'fa' ? 'افزودن کار' : 'Add work record' },
+        { keys: ['Q'], desc: language === 'fa' ? 'ماشین حساب سفارشات (ادورتایزر)' : 'Order calculator (Advertiser)' },
+        { keys: ['Ctrl', 'Shift', 'P'], desc: language === 'fa' ? 'جابجایی سریع پروفایل (بوستر / ادورتایزر)' : 'Quick profile switch (Booster ⇄ Advertiser)' },
         { keys: ['Ctrl', 'V'], desc: language === 'fa' ? 'چسباندن اسکرین‌شات از کلیپ‌بورد' : 'Paste screenshot proof into modal' },
         { keys: ['C'], desc: language === 'fa' ? 'کپی اسکرین‌شات رسید (در پنجره رسید)' : 'Copy receipt screenshot (in Receipt view)' },
         { keys: ['Esc'], desc: language === 'fa' ? 'بستن پنجره‌ها یا لغو انتخاب' : 'Close dialogs, cancel confirmation, or clear selection' },
@@ -33,7 +34,7 @@ export function ShortcutsModal({ isOpen, onClose }) {
       items: [
         { keys: ['1'], desc: language === 'fa' ? 'رفتن به تب دفتر (Ledger)' : 'Jump to Ledger tab' },
         { keys: ['2'], desc: language === 'fa' ? 'رفتن به تب آمار (Analytics)' : 'Jump to Analytics tab' },
-        { keys: ['/'], desc: language === 'fa' ? 'فوکوس روی نوار جستجو' : 'Focus search bar' },
+        { keys: ['/'], desc: language === 'fa' ? 'فوکوس روی نوار جستجو (یا Ctrl+F)' : 'Focus search bar (or Ctrl+F)' },
         { keys: ['?'], desc: language === 'fa' ? 'نمایش کلیدهای میانبر' : 'Open shortcuts cheat sheet' },
       ],
     },

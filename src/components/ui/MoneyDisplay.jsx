@@ -16,19 +16,27 @@ export function MoneyDisplay({
 }) {
   const { language } = useLanguage();
   const isGold = currency === 'GOLD' || currency === 'WOW_GOLD';
-  const usePersianDigits = language === 'fa' && !isGold;
+  const isUSD = currency === 'USD';
+  const isEUR = currency === 'EUR';
+  const isFiatSymbol = isUSD || isEUR;
+  const usePersianDigits = language === 'fa' && !isGold && !isFiatSymbol;
   const { amount: formattedNum, magnitude, unit } = formatMoneyParts(amount, currency, compact, usePersianDigits);
 
   return (
     <span
-      dir={isGold ? 'ltr' : undefined}
+      dir={isGold || isFiatSymbol ? 'ltr' : undefined}
       className={cn(
         'inline-flex items-center gap-1 tracking-tight',
-        isGold && '[direction:ltr]',
+        (isGold || isFiatSymbol) && '[direction:ltr]',
         className
       )}
     >
       {prefix && <span className="text-zinc-500 font-normal mr-0.5 inline-flex items-center leading-none">{prefix}</span>}
+      {isFiatSymbol && unit && (
+        <span className={cn('text-[0.9em] font-medium text-zinc-500 dark:text-zinc-400 select-none leading-none mr-0.5', unitClassName)}>
+          {unit}
+        </span>
+      )}
       <span dir="ltr" className="inline-flex items-center [direction:ltr]">
         <span className="leading-none">{formattedNum}</span>
         {magnitude && (
@@ -37,7 +45,7 @@ export function MoneyDisplay({
           </span>
         )}
       </span>
-      {unit && (
+      {unit && !isFiatSymbol && (
         isGold ? (
           <span
             className={cn(

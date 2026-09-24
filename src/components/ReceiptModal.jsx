@@ -593,7 +593,7 @@ Work Description = ${currentSafeEntry.notes || 'None'}
           ref={receiptCardRef}
           dir={isReceiptFa ? 'rtl' : 'ltr'}
           className={cn(
-            'print-receipt-container rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 p-5 sm:p-6 space-y-5 relative',
+            'print-receipt-container rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 p-5 sm:p-6 space-y-5 relative select-text cursor-auto',
             isReceiptFa && 'font-farsi'
           )}
         >
