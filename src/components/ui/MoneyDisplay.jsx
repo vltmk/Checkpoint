@@ -87,8 +87,9 @@ export function ConvertedSecondaryDisplay({
   showRateLabel = false,
   className = '',
 }) {
-  const from = fromCurrency === 'WOW_GOLD' ? 'GOLD' : (fromCurrency === 'USD' ? 'TOMAN' : fromCurrency);
-  const to = targetCurrency === 'WOW_GOLD' ? 'GOLD' : (targetCurrency === 'USD' ? 'TOMAN' : targetCurrency);
+  const normalizeCur = (c) => (c === 'WOW_GOLD' ? 'GOLD' : (c || 'TOMAN'));
+  const from = normalizeCur(fromCurrency);
+  const to = normalizeCur(targetCurrency);
 
   if (from === to) return null;
 

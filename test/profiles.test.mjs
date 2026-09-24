@@ -134,4 +134,44 @@ test('db.js & App.jsx: cached connection persistence and smooth profile transiti
   assert.ok(ledgerCode.includes('Math.min(currentPage, totalPages)'));
 });
 
+test('EUR currency preservation: db.js, WorkModal, and NumberStepperInput support EUR without coercion to TOMAN', () => {
+  const updatedDbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
+  const updatedWorkModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8');
+  const updatedStepperCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'NumberStepperInput.jsx'), 'utf8');
+  const updatedMoneyDisplayCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'MoneyDisplay.jsx'), 'utf8');
+
+  // Verify db.js allows EUR in saveEntry and getEntry
+  assert.ok(
+    updatedDbCode.includes("if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'TOMAN';"),
+    'db.js saveEntry must include EUR in allowed currencies'
+  );
+  assert.ok(
+    updatedDbCode.includes("if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';"),
+    'db.js getEntry must include EUR in allowed currencies'
+  );
+
+  // Verify WorkModal preserves EUR and remembers profile currency
+  assert.ok(
+    updatedWorkModalCode.includes('checkpoint_work_last_currency_'),
+    'WorkModal must persist last used currency per profile'
+  );
+  assert.ok(
+    updatedWorkModalCode.includes("formData.currency === 'USD' || formData.currency === 'EUR'"),
+    'WorkModal must allow decimals for EUR and USD'
+  );
+
+  // Verify NumberStepperInput allows decimals for EUR
+  assert.ok(
+    updatedStepperCode.includes("currency === 'USD' || currency === 'EUR'"),
+    'NumberStepperInput must enable decimal support for EUR and USD'
+  );
+
+  // Verify MoneyDisplay normalizes without clobbering USD
+  assert.ok(
+    !updatedMoneyDisplayCode.includes("fromCurrency === 'USD' ? 'TOMAN'"),
+    'MoneyDisplay should not force fromCurrency USD to TOMAN'
+  );
+});
+
+
 

@@ -334,6 +334,17 @@ export function WorkModal({
       )?.name;
       const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
 
+      const savedProfileCurrency = typeof localStorage !== 'undefined'
+        ? localStorage.getItem(`checkpoint_work_last_currency_${activeProfileId}`)
+        : null;
+      const latestEntryCurrency = entries?.find((e) => e?.currency)?.currency;
+      const validProfileCur = (savedProfileCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(savedProfileCurrency))
+        ? savedProfileCurrency
+        : (latestEntryCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(latestEntryCurrency))
+        ? latestEntryCurrency
+        : null;
+      const defaultCur = validProfileCur || globalCurrency || 'TOMAN';
+
       try {
         const savedDraft = localStorage.getItem(DRAFT_KEY) || localStorage.getItem(LEGACY_DRAFT_KEY);
         if (savedDraft) {
@@ -364,7 +375,7 @@ export function WorkModal({
             pot: parsed.pot || '',
             income: parsed.income || '',
             teammateCuts: parsed.teammateCuts || {},
-            currency: parsed.currency || globalCurrency || 'TOMAN',
+            currency: parsed.currency || defaultCur,
             exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
             notes: parsed.notes || '',
@@ -394,7 +405,7 @@ export function WorkModal({
             pot: '',
             income: '',
             teammateCuts: {},
-            currency: globalCurrency || 'TOMAN',
+            currency: defaultCur,
             exchangeRate: String(goldRateTOMAN || 3200),
             status: 'Pending',
             notes: '',
@@ -417,6 +428,12 @@ export function WorkModal({
     if (patch.game || patch.customGameText) setFieldErrors((prev) => ({ ...prev, game: false }));
     if (patch.dateTime) setFieldErrors((prev) => ({ ...prev, dateTime: false }));
     if (patch.income !== undefined || patch.pot !== undefined) setFieldErrors((prev) => ({ ...prev, income: false }));
+    if (patch.currency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(patch.currency)) {
+      try {
+        localStorage.setItem(`checkpoint_work_last_currency_${activeProfileId}`, patch.currency);
+        trackerDB.setSetting(`checkpoint_work_last_currency_${activeProfileId}`, patch.currency).catch(() => {});
+      } catch (e) {}
+    }
     setFormData((prev) => {
       const next = { ...prev, ...patch };
       if (!editingEntry) {
@@ -448,6 +465,16 @@ export function WorkModal({
       (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
     )?.name;
     const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
+    const savedProfileCurrency = typeof localStorage !== 'undefined'
+      ? localStorage.getItem(`checkpoint_work_last_currency_${activeProfileId}`)
+      : null;
+    const latestEntryCurrency = entries?.find((e) => e?.currency)?.currency;
+    const validProfileCur = (savedProfileCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(savedProfileCurrency))
+      ? savedProfileCurrency
+      : (latestEntryCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(latestEntryCurrency))
+      ? latestEntryCurrency
+      : null;
+    const defaultCur = validProfileCur || globalCurrency || 'TOMAN';
     setFormData({
       title: '',
       dateTime: toLocalISOString(new Date()),
@@ -464,7 +491,7 @@ export function WorkModal({
       pot: '',
       income: '',
       teammateCuts: {},
-      currency: globalCurrency || 'TOMAN',
+      currency: defaultCur,
       exchangeRate: String(goldRateTOMAN || 3200),
       status: 'Pending',
       notes: '',
@@ -557,7 +584,7 @@ export function WorkModal({
   };
 
   const handleAdvertiserNetProfitChange = (valStr) => {
-    const clean = sanitizePriceInput(valStr).replace(/[-+]/g, '');
+    const clean = sanitizePriceInput(valStr, { allowDecimals: formData.currency === 'USD' || formData.currency === 'EUR' }).replace(/[-+]/g, '');
     const myProfit = parseFloat(clean);
     const clientPrice = parseFloat(formData.pot);
 
@@ -583,7 +610,7 @@ export function WorkModal({
   };
 
   const handleAdvertiserBoosterPayoutChange = (valStr) => {
-    const clean = sanitizePriceInput(valStr).replace(/[-+]/g, '');
+    const clean = sanitizePriceInput(valStr, { allowDecimals: formData.currency === 'USD' || formData.currency === 'EUR' }).replace(/[-+]/g, '');
     const totalPayout = parseFloat(clean);
     const clientPrice = parseFloat(formData.pot);
 
@@ -610,7 +637,7 @@ export function WorkModal({
   const totalTeamMembers = 1 + (formData.teammates ? formData.teammates.length : 0);
 
   const handlePotChange = (newPotStr) => {
-    let cleanStr = sanitizePriceInput(newPotStr);
+    let cleanStr = sanitizePriceInput(newPotStr, { allowDecimals: formData.currency === 'USD' || formData.currency === 'EUR' });
     const hasMinus = cleanStr.includes('-');
     const hasPlus = cleanStr.includes('+');
 
@@ -656,7 +683,7 @@ export function WorkModal({
   };
 
   const handleIncomeChange = (newIncomeStr) => {
-    let cleanStr = sanitizePriceInput(newIncomeStr);
+    let cleanStr = sanitizePriceInput(newIncomeStr, { allowDecimals: formData.currency === 'USD' || formData.currency === 'EUR' });
     const hasMinus = cleanStr.includes('-');
     const hasPlus = cleanStr.includes('+');
 
@@ -756,7 +783,7 @@ export function WorkModal({
   };
 
   const handleCustomCutChange = (memberKey, cutValue) => {
-    let cleanCut = sanitizePriceInput(cutValue);
+    let cleanCut = sanitizePriceInput(cutValue, { allowDecimals: formData.currency === 'USD' || formData.currency === 'EUR' });
     if (cleanCut.includes('-')) {
       if (entryType !== 'expense') {
         setEntryType('expense');
@@ -1028,6 +1055,12 @@ export function WorkModal({
     setSaveError(null);
     setDiagnosticsCopied(false);
     try {
+      if (formData.currency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(formData.currency)) {
+        try {
+          localStorage.setItem(`checkpoint_work_last_currency_${activeProfileId}`, formData.currency);
+          trackerDB.setSetting(`checkpoint_work_last_currency_${activeProfileId}`, formData.currency).catch(() => {});
+        } catch (e) {}
+      }
       await onSave(entryToSave);
       if (!editingEntry) {
         clearPersistedDraft();

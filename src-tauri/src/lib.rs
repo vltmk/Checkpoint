@@ -34,6 +34,10 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&show_i, &quick_add_i, &settings_i, &sep, &quit_i])?;
 
             if let Some(icon) = app.default_window_icon() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_icon(icon.clone());
+                }
+
                 let _tray = TrayIconBuilder::new()
                     .icon(icon.clone())
                     .tooltip("CHECKPOINT — High-Density Freelance Ledger")

@@ -30,7 +30,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
-import { checkForUpdate, getAppVersion } from './lib/updater';
+import { checkForUpdate, getAppVersion, getStaticAppVersion } from './lib/updater';
 import { loadCategories, importCategories } from './lib/categories';
 import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
 import {
@@ -94,7 +94,7 @@ const parseStringSetting = (val, fallback = '', allowedList = null) => {
 export default function App() {
   const { language, setLanguage, t, isRtl } = useLanguage();
   const isDesktop = isTauri();
-  const [appVersion, setAppVersion] = useState('');
+  const [appVersion, setAppVersion] = useState(() => getStaticAppVersion());
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 

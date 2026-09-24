@@ -3,9 +3,8 @@
  * Uses GitHub Releases + latest.json. Non-blocking, offline-safe, with download progress.
  */
 
-import { isTauri } from './desktop';
-import { compareSemver } from './notifications';
-import packageJson from '../../package.json';
+import { isTauri } from './desktop.js';
+import packageJson from '../../package.json' with { type: 'json' };
 
 let runtimeAppVersion = null;
 
@@ -32,6 +31,13 @@ export async function getAppVersion() {
 
   runtimeAppVersion = packageJson.version || '0.0.0';
   return runtimeAppVersion;
+}
+
+/**
+ * Obtain the statically packaged application version synchronously.
+ */
+export function getStaticAppVersion() {
+  return runtimeAppVersion || packageJson.version || '0.0.0';
 }
 
 /**
@@ -144,3 +150,38 @@ export async function relaunchApp() {
     window.location.reload();
   }
 }
+
+/**
+ * Helper to determine if an updater error is caused by Windows Smart App Control
+ * or local OS security execution policies (e.g., error 1260 / blocked by group policy).
+ * @param {Error|string} error
+ * @returns {boolean}
+ */
+export function isWindowsSecurityBlockedError(error) {
+  if (!error) return false;
+  const msg = (typeof error === 'string' ? error : error?.message || String(error)).toLowerCase();
+  return (
+    msg.includes('1260') ||
+    msg.includes('group policy') ||
+    msg.includes('smart app control') ||
+    msg.includes('smartappcontrol') ||
+    msg.includes('smartscreen') ||
+    msg.includes('access_disabled_by_policy') ||
+    msg.includes('virus or potentially unwanted software') ||
+    msg.includes('operation did not complete successfully') ||
+    (msg.includes('access is denied') && msg.includes('os error 5'))
+  );
+}
+
+/**
+ * Construct the official direct standalone installer URL on GitHub Releases.
+ * @param {string} version
+ * @returns {string}
+ */
+export function getStandaloneInstallerUrl(version) {
+  if (!version) return 'https://github.com/vltmk/Checkpoint/releases/latest';
+  const cleanTag = version.replace(/^v/i, '');
+  const releaseTag = version.startsWith('v') ? version : `v${version}`;
+  return `https://github.com/vltmk/Checkpoint/releases/download/${releaseTag}/CHECKPOINT_${cleanTag}_x64-setup.exe`;
+}
+

@@ -74,6 +74,8 @@ export function NumberStepperInput({
     }
   };
 
+  const allowsDecimals = currency === 'USD' || currency === 'EUR';
+
   return (
     <div
       className={cn(
@@ -94,7 +96,7 @@ export function NumberStepperInput({
         onPaste={(e) => {
           const clipboard = e.clipboardData?.getData('text');
           if (clipboard) {
-            const cleaned = sanitizePriceInput(clipboard);
+            const cleaned = sanitizePriceInput(clipboard, { allowDecimals: allowsDecimals });
             if (cleaned) {
               e.preventDefault();
               e.target.value = cleaned;
@@ -115,7 +117,7 @@ export function NumberStepperInput({
           const hasPlus = raw.includes('+');
 
           // Normalize commas, dots, multipliers, and formatting
-          let val = sanitizePriceInput(raw).replace(/[-+]/g, '');
+          let val = sanitizePriceInput(raw, { allowDecimals: allowsDecimals }).replace(/[-+]/g, '');
 
           if (hasMinus) {
             val = '-' + val;

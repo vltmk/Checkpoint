@@ -873,7 +873,7 @@ export class StorageDB {
 
         const entry = { ...rows[0] };
         if (entry.currency === 'WOW_GOLD') entry.currency = 'GOLD';
-        if (!['USD', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
+        if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
 
         const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
         const defaultRate = isClassic ? 7000 : 3200;
@@ -926,7 +926,7 @@ export class StorageDB {
         const entry = request.result || null;
         if (entry) {
           if (entry.currency === 'WOW_GOLD') entry.currency = 'GOLD';
-          if (!['USD', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
+          if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';
           const isClassic = entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic';
           const defaultRate = isClassic ? 7000 : 3200;
           entry.source = entry.source || '';
@@ -954,7 +954,7 @@ export class StorageDB {
 
     let cleanEntry = { ...entry };
     if (cleanEntry.currency === 'WOW_GOLD') cleanEntry.currency = 'GOLD';
-    if (!['USD', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'TOMAN';
+    if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'TOMAN';
 
     const isClassic = cleanEntry.rateUnit === '1' || cleanEntry.game === 'World of Warcraft Classic';
     const defaultRate = isClassic ? 7000 : 3200;

@@ -15,8 +15,14 @@ import {
   ExternalLink,
   RotateCw,
   Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
-import { installUpdate, relaunchApp } from '../lib/updater';
+import {
+  installUpdate,
+  relaunchApp,
+  isWindowsSecurityBlockedError,
+  getStandaloneInstallerUrl,
+} from '../lib/updater';
 import { openExternalUrl } from '../lib/desktop';
 import { getReleaseNotesForVersion } from '../lib/releaseNotes';
 import { isRTL } from '../lib/utils';
@@ -57,6 +63,7 @@ export function UpdateModal({
 
   const currentVersion = updateInfo?.currentVersion || updateInfo?.rawUpdate?.currentVersion || '';
   const newVersion = updateInfo?.version || updateInfo?.rawUpdate?.version || '';
+  const isSecurityBlock = isWindowsSecurityBlockedError(errorMessage);
 
   const handleStartUpdate = async () => {
     if (!updateInfo.rawUpdate) {
@@ -83,6 +90,12 @@ export function UpdateModal({
 
   const handleRelaunch = async () => {
     await relaunchApp();
+  };
+
+  const handleDownloadInstaller = () => {
+    const directUrl = getStandaloneInstallerUrl(newVersion);
+    const fallbackUrl = updateInfo?.releaseUrl || 'https://github.com/vltmk/Checkpoint/releases/latest';
+    openExternalUrl(directUrl || fallbackUrl);
   };
 
   const formatBytes = (bytes) => {
@@ -238,8 +251,57 @@ export function UpdateModal({
           </div>
         )}
 
-        {/* Error State */}
-        {installState === 'error' && (
+        {/* Error State: Security / Smart App Control Block */}
+        {installState === 'error' && isSecurityBlock && (
+          <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-amber-300/80 dark:border-amber-700/60 space-y-2.5">
+            <div className="flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/80 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div className={cn('space-y-1 min-w-0 flex-1 text-xs', isRtl && 'font-farsi')}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
+                    {t('update.securityBlockedTitle', 'Blocked by Windows Security')}
+                  </p>
+                  <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border border-amber-300/80 dark:border-amber-800/80 text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 shrink-0">
+                    Smart App Control
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                  {t(
+                    'update.securityBlockedDesc',
+                    'Windows Smart App Control or system policy blocked the silent background update. You can update safely by downloading and running the standalone installer.'
+                  )}
+                </p>
+                {errorMessage && (
+                  <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-500 truncate pt-0.5" title={errorMessage}>
+                    {errorMessage}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+              <span className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                {t('update.settingsPreserved', 'All your data and settings will be preserved.')}
+              </span>
+              <button
+                type="button"
+                onClick={handleDownloadInstaller}
+                className={cn(
+                  'inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 underline underline-offset-2 transition-colors',
+                  isRtl && 'font-farsi'
+                )}
+              >
+                <Download className="w-3 h-3" />
+                <span>{t('update.downloadInstaller', 'Download Installer (.exe)')}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error State: Standard / Network Failure */}
+        {installState === 'error' && !isSecurityBlock && (
           <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
             <div className={cn('text-xs text-rose-900 dark:text-rose-200', isRtl && 'font-farsi')}>
@@ -279,6 +341,27 @@ export function UpdateModal({
               <RotateCw className="w-3.5 h-3.5" />
               <span>{t('update.readyRestart')}</span>
             </Button>
+          ) : installState === 'error' && isSecurityBlock ? (
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartUpdate}
+                className={cn('gap-1.5 font-medium', isRtl && 'font-farsi')}
+              >
+                <RotateCw className="w-3 h-3" />
+                <span>{t('update.retry', 'Retry')}</span>
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleDownloadInstaller}
+                className={cn('gap-1.5 font-medium', isRtl && 'font-farsi')}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t('update.downloadInstaller', 'Download Installer (.exe)')}</span>
+              </Button>
+            </div>
           ) : (
             <Button
               variant="primary"
@@ -291,6 +374,11 @@ export function UpdateModal({
                 <>
                   <RotateCw className="w-3.5 h-3.5 animate-spin" />
                   <span>{t('update.downloading')}</span>
+                </>
+              ) : installState === 'error' ? (
+                <>
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{t('update.retry', 'Retry')}</span>
                 </>
               ) : (
                 <>

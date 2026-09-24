@@ -542,6 +542,11 @@ export const TRANSLATIONS = {
     'update.downloading': 'Downloading update...',
     'update.readyRestart': 'Update ready to install',
     'update.installNow': 'Update Now',
+    'update.retry': 'Retry',
+    'update.securityBlockedTitle': 'Blocked by Windows Security',
+    'update.securityBlockedDesc': 'Windows Smart App Control or system policy blocked the silent background update. You can update safely by downloading and running the standalone installer.',
+    'update.settingsPreserved': 'All your data and settings will be preserved.',
+    'update.downloadInstaller': 'Download Installer (.exe)',
 
     // Common Buttons & Tooltips
     'common.save': 'Save',
@@ -996,6 +1001,11 @@ export const TRANSLATIONS = {
     'update.downloading': 'درحال دانلود به‌روزرسانی...',
     'update.readyRestart': 'آماده نصب و راه‌اندازی مجدد',
     'update.installNow': 'دانلود و نصب',
+    'update.retry': 'تلاش مجدد',
+    'update.securityBlockedTitle': 'مسدود شده توسط امنیت ویندوز',
+    'update.securityBlockedDesc': 'سیستم Smart App Control یا سیاست‌های امنیتی ویندوز مانع اجرای خودکار نصب‌کننده شدند. می‌توانید با دریافت فایل نصبی، به‌روزرسانی را دستی انجام دهید.',
+    'update.settingsPreserved': 'تمامی داده‌ها و تنظیمات شما بدون تغییر حفظ خواهند شد.',
+    'update.downloadInstaller': 'دریافت فایل نصبی (.exe)',
 
     // Common Buttons & Tooltips
     'common.save': 'ذخیره',

@@ -55,6 +55,7 @@ export const SHARED_SYNC_SETTING_KEYS = [
   'checkpoint_usd_rate_toman',
   'checkpoint_eur_rate_usd',
   'checkpoint_currency',
+  'checkpoint_gold_ratio_tour_seen_version',
 ];
 
 /**

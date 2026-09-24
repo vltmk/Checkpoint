@@ -26,6 +26,63 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '4.2.0': {
+    date: '2026-09-24',
+    title: {
+      en: "What's New in Checkpoint v4.2.0",
+      fa: 'امکانات و تغییرات نسخه ۴.۲.۰',
+    },
+    summary: {
+      en: 'Gold Ratio onboarding tour, Windows Smart App Control updater fallback, full EUR currency flow, and desktop ergonomics.',
+      fa: 'راهنمای تعاملی نرخ روزانه گلد، راهکار امنیتی به‌روزرسانی برای Windows SAC، پشتیبانی کامل از ارز یورو (EUR) و ارتقای نوار ابزار.',
+    },
+    items: {
+      en: [
+        {
+          tag: 'new',
+          text: 'Interactive Gold Exchange Ratio onboarding tour for new users and after major app updates with dual-theme popover and persistence.',
+        },
+        {
+          tag: 'new',
+          text: 'Windows Smart App Control (SAC) & Security block safeguard in updater with dedicated error guidance and 1-click standalone installer download.',
+        },
+        {
+          tag: 'new',
+          text: 'Full EUR currency preservation across SQLite database and NumberStepperInput with decimal cents support and profile-scoped persistence.',
+        },
+        {
+          tag: 'improved',
+          text: 'Split primary action button on topbar for advertisers with immediate 1-click access to the Order Calculator.',
+        },
+        {
+          tag: 'improved',
+          text: 'Native desktop webview window icon initialization on application launch.',
+        },
+      ],
+      fa: [
+        {
+          tag: 'new',
+          text: 'راهنمای تعاملی و برجسته‌سازی نرخ روزانه تبدیل گلد برای کاربران تازه و پس از به‌روزرسانی با هماهنگی کامل تم روشن و تاریک.',
+        },
+        {
+          tag: 'new',
+          text: 'سازگاری با سیستم امنیتی Smart App Control ویندوز در به‌روزرسانی خودکار به همراه دکمه دانلود مستقیم فایل نصبی مستقل (.exe).',
+        },
+        {
+          tag: 'new',
+          text: 'پشتیبانی کامل و پایدار از ارز یورو (EUR) در دیتابیس SQLite با قابلیت اعشار و ذخیره آخرین ارز انتخابی هر پروفایل.',
+        },
+        {
+          tag: 'improved',
+          text: 'دکمه دوگانه در نوار ابزار پروفایل ادورتایزر برای دسترسی فوق سریع به ماشین‌حساب سفارشات.',
+        },
+        {
+          tag: 'improved',
+          text: 'تنظیم خودکار آیکون برنامه برای پنجره اصلی دسکتاپ هنگام باز شدن.',
+        },
+      ],
+    },
+  },
   '4.1.0': {
     date: '2026-09-24',
     title: {
