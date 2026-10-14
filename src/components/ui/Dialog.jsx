@@ -46,41 +46,39 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
-          {/* Balanced Backdrop Scrim */}
+          {/* Scrim Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.12 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/20 dark:bg-black/30 backdrop-blur-[1px]"
+            className="fixed inset-0 bg-black/40 dark:bg-black/50 backdrop-blur-xs"
           />
 
-          {/* Frosted Glass Dialog Container */}
+          {/* Floating Sheet Container */}
           <div className={cn('relative z-10 w-full my-0 sm:my-auto flex justify-center items-center', maxWidth)}>
-            <FrostedGlass
-              as="motion.div"
-              variant="modal"
-              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+            <motion.div
+              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
               animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
               role="dialog"
               aria-modal="true"
               className={cn(
-                'relative z-10 w-full max-h-[92vh] flex flex-col',
+                'relative z-10 w-full max-h-[92vh] flex flex-col bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-2xl shadow-black/50 overflow-hidden',
                 className
               )}
             >
               {children}
-            </FrostedGlass>
+            </motion.div>
 
             {floatingActions && (
               <motion.div
-                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
+                initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
                 animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.98 }}
-                transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
+                transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
                 className="absolute -right-12 sm:-right-14 top-0 z-30 flex flex-col pointer-events-auto"
                 dir="ltr"
               >
@@ -98,18 +96,18 @@ export function DialogHeader({ children, className, onClose, actions }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-20',
+        'flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 relative z-20',
         className
       )}
     >
-      <div className="flex items-center gap-3 flex-1 min-w-0">{children}</div>
+      <div className="flex items-center gap-3 flex-1 min-w-0 text-start">{children}</div>
       <div className="flex items-center gap-2 shrink-0">
         {actions}
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60 transition-colors"
+            className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -121,7 +119,7 @@ export function DialogHeader({ children, className, onClose, actions }) {
 
 export function DialogTitle({ children, className }) {
   return (
-    <h3 className={cn('text-sm font-medium tracking-tight text-zinc-800 dark:text-zinc-200 flex items-center gap-2', className)}>
+    <h3 className={cn('text-sm font-medium tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2', className)}>
       {children}
     </h3>
   );
@@ -135,7 +133,7 @@ export function DialogFooter({ children, className }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-white/25 dark:bg-zinc-950/25 relative z-10',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 relative z-10',
         className
       )}
     >

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { trackerDB } from './lib/db';
-import { STATUS_CONFIG, generateDiscordReceiptText } from './lib/currencies';
+import { STATUS_CONFIG, generateDiscordReceiptText, convertEntryCurrency, formatMoney } from './lib/currencies';
 import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
-import { SplashScreen } from './components/ui/SplashScreen';
 import { LedgerView } from './components/views/LedgerView';
 import { AnalyticsView } from './components/views/AnalyticsView';
 import { WorkModal } from './components/WorkModal';
@@ -67,7 +66,7 @@ import {
   setTelemetryEnabled,
 } from './lib/telemetry';
 
-import { useLanguage } from './lib/i18n';
+import { useLanguage, formatShamsiDate } from './lib/i18n';
 
 // Defensive Settings Parsing Utilities
 const parseBooleanSetting = (val, fallback = false) => {
@@ -175,10 +174,12 @@ export default function App() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const currentTheme = resolvedTheme || theme || 'dark';
 
-  // User Currency Preferences (TOMAN | GOLD)
+  // User Currency Preferences (TOMAN | GOLD | USD | EUR)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
     const saved = localStorage.getItem('checkpoint_currency') || localStorage.getItem('nodrapay_currency');
     if (saved === 'WOW_GOLD' || saved === 'GOLD') return 'GOLD';
+    if (saved === 'USD') return 'USD';
+    if (saved === 'EUR') return 'EUR';
     return 'TOMAN';
   });
 
@@ -248,6 +249,9 @@ export default function App() {
   // Lifted selection state for context menu & ledger synchronization
   const [selectedEntryIds, setSelectedEntryIds] = useState(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [isDiscordBatchCopied, setIsDiscordBatchCopied] = useState(false);
   const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
   const [undoDeleteState, setUndoDeleteState] = useState({ isOpen: false, items: [], count: 0 });
 
@@ -395,11 +399,7 @@ export default function App() {
     } catch (err) {
       console.error('Failed to load data from storage engine:', err);
     } finally {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, 2200 - elapsed);
-      setTimeout(() => {
-        setIsLoading(false);
-      }, remaining);
+      setIsLoading(false);
     }
   }, []);
 
@@ -813,7 +813,7 @@ export default function App() {
 
   // Currency Handlers
   const handleCurrencyChange = (newCurr) => {
-    const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (newCurr === 'USD' ? 'TOMAN' : newCurr);
+    const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (['TOMAN', 'GOLD', 'USD', 'EUR'].includes(newCurr) ? newCurr : 'TOMAN');
     setGlobalCurrency(cur);
     localStorage.setItem('checkpoint_currency', cur);
     if (activeProfileId) {
@@ -929,6 +929,97 @@ export default function App() {
     await trackerDB.bulkUpdateStatus(ids, nextStatus);
     await reloadEntries();
   };
+
+  const selectedSum = useMemo(() => {
+    if (selectedEntryIds.size === 0) return 0;
+    return entries.reduce((sum, e) => {
+      if (!selectedEntryIds.has(e.id)) return sum;
+      if (e.status === 'Failed') return sum;
+      return sum + convertEntryCurrency(e, globalCurrency, { goldRateTOMAN, usdRateTOMAN, eurRateUSD });
+    }, 0);
+  }, [entries, selectedEntryIds, globalCurrency, goldRateTOMAN, usdRateTOMAN, eurRateUSD]);
+
+  const handleBatchStatusChange = useCallback(async (status) => {
+    if (selectedEntryIds.size === 0) return;
+    const ids = Array.from(selectedEntryIds);
+    await handleBulkUpdateStatus(ids, status);
+  }, [selectedEntryIds, handleBulkUpdateStatus]);
+
+  const handleBatchDeleteFromNav = useCallback(async () => {
+    if (selectedEntryIds.size === 0) return;
+    const ids = Array.from(selectedEntryIds);
+    await handleBulkDelete(ids);
+    setSelectedEntryIds(new Set());
+    setIsSelectMode(false);
+  }, [selectedEntryIds, handleBulkDelete]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedEntryIds(new Set());
+    setIsSelectMode(false);
+  }, []);
+
+  const handleBatchCopyDiscord = useCallback(async () => {
+    if (selectedEntryIds.size === 0) return;
+    const selectedEntriesList = entries.filter((e) => selectedEntryIds.has(e.id));
+    if (selectedEntriesList.length === 0) return;
+    const isFa = language === 'fa';
+    const now = new Date();
+    const dateStr = isFa
+      ? formatShamsiDate(now, { month: 'long', day: 'numeric', year: 'numeric' })
+      : now.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+
+    const totalSumFormatted = formatMoney(selectedSum, globalCurrency, false, isFa);
+
+    const itemsText = selectedEntriesList.map((entry, idx) => {
+      const entryCur = entry.currency && entry.currency !== 'DEFAULT' ? entry.currency : globalCurrency;
+      const amountStr = formatMoney(entry.income || 0, entryCur, false, isFa);
+      const orderIdPart = entry.orderId ? `#${entry.orderId} | ` : '';
+      const st = STATUS_CONFIG[entry.status]?.label || entry.status || 'Paid';
+      const sourcePart = entry.source ? ` [${entry.source}]` : '';
+
+      if (activeProfileId === 'advertiser') {
+        const clientPrice = entry.pot || entry.income || 0;
+        const formattedClient = formatMoney(clientPrice, entryCur, false, isFa);
+        const payout = Math.max(0, (entry.pot || 0) - (entry.income || 0));
+        const payoutStr = payout > 0 ? ` (Payout: ${formatMoney(payout, entryCur, false, isFa)})` : '';
+        return `${idx + 1}. ${orderIdPart}${entry.title || 'Order'}${sourcePart} | ${formattedClient} | ${st}${payoutStr}`;
+      }
+
+      const teamPart = entry.teammates && entry.teammates.length > 0 ? ` (@${entry.teammates.join(', @')})` : '';
+      return `${idx + 1}. ${orderIdPart}${entry.title || 'Job'}${sourcePart} | ${amountStr} | ${st}${teamPart}`;
+    }).join('\n');
+
+    let md = '';
+    if (isFa) {
+      md = `\`\`\`ini
+[ گزارش دسته‌ای چک‌پوینت - CHECKPOINT ]
+تاریخ        = ${dateStr}
+تعداد کارها   = ${selectedEntriesList.length}
+مجموع کارکرد  = ${totalSumFormatted}
+ارز پایه     = ${globalCurrency}
+--------------------------------------------------
+${itemsText}
+--------------------------------------------------
+ثبت شده توسط CHECKPOINT Desktop
+\`\`\``;
+    } else {
+      md = `\`\`\`ini
+[ CHECKPOINT - BATCH SUMMARY ]
+Date        = ${dateStr}
+Total Jobs  = ${selectedEntriesList.length}
+Total Earned= ${totalSumFormatted}
+Base Unit   = ${globalCurrency}
+--------------------------------------------------
+${itemsText}
+--------------------------------------------------
+Exported via CHECKPOINT Desktop
+\`\`\``;
+    }
+
+    copyTextNative(md);
+    setIsDiscordBatchCopied(true);
+    setTimeout(() => setIsDiscordBatchCopied(false), 2000);
+  }, [selectedEntryIds, entries, language, selectedSum, globalCurrency, activeProfileId]);
 
   // Bulk Export CSV
   const handleBulkExportCsv = useCallback(async (selectedIds) => {
@@ -1665,12 +1756,7 @@ export default function App() {
   }, [activeProfileId]);
 
   return (
-    <div className="w-full h-screen bg-black text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-900 shadow-2xl">
-      {/* 0. App Launch Splash Screen */}
-      <AnimatePresence>
-        {isLoading && <SplashScreen key="app-splash" />}
-      </AnimatePresence>
-
+    <div className="w-full h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl">
       {/* 1. Desktop Unified Top Navigation Bar */}
       <Navbar
         activeTab={activeTab}
@@ -1700,6 +1786,17 @@ export default function App() {
         onProfileChange={handleProfileChange}
         boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? entries.length : 0)}
         advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? entries.length : 0)}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        selectedCount={selectedEntryIds.size}
+        selectedSum={selectedSum}
+        onBatchStatusChange={handleBatchStatusChange}
+        onBatchDelete={handleBatchDeleteFromNav}
+        onCopyDiscordBatch={handleBatchCopyDiscord}
+        isDiscordBatchCopied={isDiscordBatchCopied}
+        onClearSelection={handleClearSelection}
       />
 
       {/* 2. Mobile Top Header (Only on Web viewports) */}
@@ -1720,12 +1817,17 @@ export default function App() {
       )}
 
       {/* 3. Main Centered Mini-App Workspace */}
-      <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-black gpu-scroll">
+      <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-50 dark:bg-zinc-950 gpu-scroll">
         {/* Centered Tablet-Width Mini-App Frame */}
         <div className="max-w-4xl mx-auto w-full">
           {isLoading ? (
-            <div className="flex items-center justify-center h-64 text-zinc-500 text-xs">
-              Loading ledger...
+            <div className="space-y-2 py-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-14 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50 animate-pulse"
+                />
+              ))}
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -1746,6 +1848,7 @@ export default function App() {
                       goldRateTOMAN={goldRateTOMAN}
                       usdRateTOMAN={usdRateTOMAN}
                       eurRateUSD={eurRateUSD}
+                      onSaveRates={handleSaveRates}
                       onOpenWorkModal={handleOpenWorkModal}
                       onOpenReceipt={handleOpenReceipt}
                       onOpenLightbox={handleOpenLightbox}
@@ -1773,6 +1876,10 @@ export default function App() {
                       onUpdateSourcePaid={handleUpdateSourcePaid}
                       onUpdateBoosterPaid={handleUpdateBoosterPaid}
                       ledgerDateFormat={ledgerDateFormat}
+                      searchQuery={searchQuery}
+                      onSearchQueryChange={setSearchQuery}
+                      statusFilter={statusFilter}
+                      onStatusFilterChange={setStatusFilter}
                     />
                   )}
 
@@ -1932,6 +2039,7 @@ export default function App() {
         onOpenShortcuts={handleContextShortcuts}
         onThemeChange={handleThemeChange}
         onLanguageChange={setLanguage}
+        onFlipStatus={handleFlipStatus}
         onEditEntry={(entry) => handleOpenWorkModal(entry)}
         onDuplicateEntry={(entry) => handleDuplicateEntry(entry.id)}
         onViewReceipt={(entry) => handleOpenReceipt(entry)}

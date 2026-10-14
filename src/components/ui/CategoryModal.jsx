@@ -28,6 +28,7 @@ export function CategoryModal({
   onClose,
   category = null, // if editing existing category: { id, name, color, icon, isDefault, supportsGold }
   onSave, // (updatedCategory) => void
+  onSaved,
 }) {
   const { t, language, isRtl } = useLanguage();
   const [name, setName] = useState('');
@@ -133,7 +134,8 @@ export function CategoryModal({
       };
 
       const updatedList = await addOrUpdateCategory(catObj, category?.name || null);
-      onSave?.(catObj, updatedList);
+      const callback = onSave || onSaved;
+      callback?.(catObj, updatedList);
       onClose?.();
     } catch (err) {
       console.error('Failed to save category:', err);

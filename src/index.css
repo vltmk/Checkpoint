@@ -87,9 +87,9 @@
 
 @layer base {
   :root {
-    --background: #000000;
+    --background: #09090b;
     --foreground: #e4e4e7;
-    --card: #09090b;
+    --card: #121215;
     --card-foreground: #e4e4e7;
     --border: #27272a;
     --muted: #18181b;
@@ -97,7 +97,17 @@
     --primary: #e4e4e7;
     --primary-foreground: #18181b;
 
-    /* Motion Tokens (AUDIT.md / emil-design-eng) */
+    /* 3-Tier Surface Hierarchy Tokens (Dark) */
+    --surface-canvas: #09090b;
+    --surface-elevated: #121215;
+    --surface-interactive: #18181b;
+    --surface-active: #27272a;
+    --hairline: rgba(255, 255, 255, 0.08);
+
+    /* Precision Motion Tokens */
+    --duration-instant: 100ms;
+    --duration-normal: 140ms;
+    --ease-precision: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -107,13 +117,20 @@
   html:not(.dark) {
     --background: #ffffff;
     --foreground: #27272a;
-    --card: #ffffff;
+    --card: #f8f9fa;
     --card-foreground: #27272a;
     --border: #e4e4e7;
     --muted: #f4f4f5;
     --muted-foreground: #71717a;
     --primary: #27272a;
     --primary-foreground: #f4f4f5;
+
+    /* 3-Tier Surface Hierarchy Tokens (Light) */
+    --surface-canvas: #ffffff;
+    --surface-elevated: #f8f9fa;
+    --surface-interactive: #f4f4f5;
+    --surface-active: #e4e4e7;
+    --hairline: rgba(0, 0, 0, 0.08);
   }
 
   * {
@@ -124,7 +141,7 @@
 
   html,
   body {
-    background-color: #000000;
+    background-color: #09090b;
     color: #e4e4e7;
     font-family: 'Inter', 'IRANYekanRd', 'IranYekanRd', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'tnum';
@@ -133,6 +150,14 @@
     margin: 0;
     padding: 0;
     overscroll-behavior: none;
+  }
+
+  html.light,
+  html.light body,
+  html:not(.dark),
+  html:not(.dark) body {
+    background-color: #ffffff;
+    color: #27272a;
   }
 
   button,
@@ -728,6 +753,74 @@ html:not(.dark) .checkpoint-glass-dither {
   .checkpoint-glass-dither {
     display: none !important;
   }
+}
+
+/* Custom Range Slider styling for high-density controls */
+.checkpoint-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 9999px;
+  background: #e4e4e7;
+  outline: none;
+  transition: background-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html.dark .checkpoint-slider {
+  background: #27272a;
+}
+
+.checkpoint-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 100ms ease, background-color 100ms ease;
+}
+
+html.dark .checkpoint-slider::-webkit-slider-thumb {
+  background: #f4f4f5;
+  border: 2px solid #18181b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.checkpoint-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.checkpoint-slider::-webkit-slider-thumb:active {
+  transform: scale(1.25);
+}
+
+.checkpoint-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 100ms ease, background-color 100ms ease;
+}
+
+html.dark .checkpoint-slider::-moz-range-thumb {
+  background: #f4f4f5;
+  border: 2px solid #18181b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.checkpoint-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+.checkpoint-slider::-moz-range-thumb:active {
+  transform: scale(1.25);
 }
 
 

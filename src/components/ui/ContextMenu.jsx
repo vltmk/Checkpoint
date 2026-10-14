@@ -37,6 +37,7 @@ import {
 } from './Icons';
 import { detectAppLink } from '../../lib/appLinks';
 import { openAppAwareUrl } from '../../lib/desktop';
+import { STATUSES, STATUS_CONFIG } from '../../lib/currencies';
 
 /**
  * Apple-grade Context Menu Component
@@ -68,6 +69,7 @@ export function ContextMenu({
   onOpenShortcuts,
   onThemeChange,
   onLanguageChange,
+  onFlipStatus,
   // Single entry actions
   onEditEntry,
   onDuplicateEntry,
@@ -89,10 +91,11 @@ export function ContextMenu({
   const [flipSubmenuLeft, setFlipSubmenuLeft] = useState(false);
   const [flipSubmenuUp, setFlipSubmenuUp] = useState(false);
   const [isConstrained, setIsConstrained] = useState(false);
-  const [activeSubmenu, setActiveSubmenu] = useState(null); // null | 'theme' | 'language'
+  const [activeSubmenu, setActiveSubmenu] = useState(null); // null | 'theme' | 'language' | 'status'
   const submenuTimeoutRef = useRef(null);
   const themeTriggerRef = useRef(null);
   const languageTriggerRef = useRef(null);
+  const statusTriggerRef = useRef(null);
   const [submenuAnchor, setSubmenuAnchor] = useState({ top: 0, height: 28 });
   const [measuredMenuWidth, setMeasuredMenuWidth] = useState(224);
 
@@ -319,7 +322,7 @@ export function ContextMenu({
 
   // Submenu Hover Intent Handlers with 100ms Triangle Safe Zone
   const updateSubmenuAnchor = useCallback((name) => {
-    const triggerEl = name === 'theme' ? themeTriggerRef.current : name === 'language' ? languageTriggerRef.current : null;
+    const triggerEl = name === 'status' ? statusTriggerRef.current : name === 'theme' ? themeTriggerRef.current : name === 'language' ? languageTriggerRef.current : null;
     if (triggerEl && menuRef.current) {
       const menuRect = menuRef.current.getBoundingClientRect();
       const triggerRect = triggerEl.getBoundingClientRect();
@@ -511,6 +514,45 @@ export function ContextMenu({
 
             <MenuDivider />
 
+            {/* Status Submenu Trigger */}
+            <div
+              ref={statusTriggerRef}
+              className="relative"
+              onMouseEnter={() => handleSubmenuTriggerMouseEnter('status')}
+              onMouseLeave={handleSubmenuTriggerMouseLeave}
+            >
+              <ContextMenuItem
+                icon={
+                  <span
+                    className={cn(
+                      'w-2 h-2 rounded-full shrink-0',
+                      STATUS_CONFIG[targetEntry.status]?.color === 'emerald'
+                        ? 'bg-emerald-500'
+                        : STATUS_CONFIG[targetEntry.status]?.color === 'amber'
+                        ? 'bg-amber-500'
+                        : STATUS_CONFIG[targetEntry.status]?.color === 'sky'
+                        ? 'bg-sky-500'
+                        : STATUS_CONFIG[targetEntry.status]?.color === 'rose'
+                        ? 'bg-rose-500'
+                        : 'bg-zinc-500'
+                    )}
+                  />
+                }
+                label={t('ledger.status', 'Status')}
+                hasSubmenu
+                isSubmenuOpen={activeSubmenu === 'status'}
+                isRtl={isRtl}
+                flipSubmenuLeft={flipSubmenuLeft}
+                suffix={
+                  <span className="text-[10px] text-zinc-400 font-medium">
+                    {t('status.' + targetEntry.status, STATUS_CONFIG[targetEntry.status]?.label || targetEntry.status)}
+                  </span>
+                }
+              />
+            </div>
+
+            <MenuDivider />
+
             {/* Section 2: Editing, Screenshots & Duplication */}
             <ContextMenuItem
               icon={<Edit3 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
@@ -676,6 +718,34 @@ export function ContextMenu({
                   isChecked={theme === 'light'}
                   onClick={() => executeAction(() => onThemeChange?.('light'))}
                 />
+              </>
+            )}
+            {activeSubmenu === 'status' && targetEntry && (
+              <>
+                {STATUSES.map((st) => (
+                  <ContextMenuItem
+                    key={st}
+                    icon={
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full shrink-0',
+                          STATUS_CONFIG[st]?.color === 'emerald'
+                            ? 'bg-emerald-500'
+                            : STATUS_CONFIG[st]?.color === 'amber'
+                            ? 'bg-amber-500'
+                            : STATUS_CONFIG[st]?.color === 'blue'
+                            ? 'bg-blue-500'
+                            : STATUS_CONFIG[st]?.color === 'rose'
+                            ? 'bg-rose-500'
+                            : 'bg-zinc-500'
+                        )}
+                      />
+                    }
+                    label={t('status.' + st, STATUS_CONFIG[st]?.label || st)}
+                    isChecked={targetEntry.status === st}
+                    onClick={() => executeAction(() => onFlipStatus?.(targetEntry.id, targetEntry.status, st))}
+                  />
+                ))}
               </>
             )}
             {activeSubmenu === 'language' && (

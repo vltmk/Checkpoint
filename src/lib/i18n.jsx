@@ -182,7 +182,7 @@ export const TRANSLATIONS = {
 
     // Statuses
     'status.Paid': 'Paid',
-    'status.Pending': 'Pending',
+    'status.Pending': 'Complete',
     'status.Working': 'Working',
     'status.On Hold': 'On Hold',
     'status.Failed': 'Failed',
@@ -410,6 +410,11 @@ export const TRANSLATIONS = {
 
     // Settings Modal
     'settings.title': 'Settings & Data',
+    'settings.tabGeneral': 'General',
+    'settings.tabAppearance': 'Appearance',
+    'settings.tabSystem': 'System',
+    'settings.tabBackups': 'Backups & Data',
+    'settings.tabAbout': 'About & Updates',
     'settings.language': 'Language',
     'settings.languageDesc': 'Choose interface language and number formatting',
     'settings.langFa': 'فارسی (پیش‌فرض)',
@@ -641,7 +646,7 @@ export const TRANSLATIONS = {
 
     // Statuses
     'status.Paid': 'پرداخت شده',
-    'status.Pending': 'درحال انتظار',
+    'status.Pending': 'تکمیل شده',
     'status.Working': 'درحال انجام',
     'status.On Hold': 'توقف موقت',
     'status.Failed': 'ناموفق',
@@ -654,7 +659,7 @@ export const TRANSLATIONS = {
     'ledger.pendingPayout': 'در‌انتظار پرداخت',
     'ledger.averageRate': 'نرخ درآمد',
     'ledger.paidSummary': 'پرداخت شده',
-    'ledger.pendingSummary': 'درحال انتظار',
+    'ledger.pendingSummary': 'تکمیل شده',
     'ledger.failedSummary': 'ناموفق',
     'ledger.filtered': 'فیلتر شده',
     'ledger.clearFilters': 'پاک کردن فیلترهای فعال',
@@ -869,6 +874,11 @@ export const TRANSLATIONS = {
 
     // Settings Modal
     'settings.title': 'تنظیمات و مدیریت داده‌ها',
+    'settings.tabGeneral': 'عمومی',
+    'settings.tabAppearance': 'ظاهر و گرافیک',
+    'settings.tabSystem': 'سیستم و میزکار',
+    'settings.tabBackups': 'پشتیبان‌گیری و داده‌ها',
+    'settings.tabAbout': 'درباره و بروزرسانی',
     'settings.language': 'زبان برنامه',
     'settings.languageDesc': 'انتخاب زبان رابط کاربری و تقویم (فارسی / انگلیسی)',
     'settings.langFa': 'فارسی (پیش‌فرض)',

@@ -12,19 +12,19 @@ export function Button({
   ...props
 }) {
   const baseStyles =
-    'inline-flex items-center justify-center font-medium leading-none transition-[color,background-color,border-color,opacity,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.97] select-none';
+    'inline-flex items-center justify-center font-medium leading-none transition-[color,background-color,border-color,opacity,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] select-none';
 
   const variants = {
     primary:
-      'bg-zinc-800 text-zinc-100 hover:bg-zinc-700 dark:bg-zinc-200 dark:text-zinc-900 dark:hover:bg-zinc-100 border border-transparent shadow-sm',
+      'bg-zinc-900 text-zinc-100 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white border border-transparent shadow-xs',
     secondary:
-      'bg-zinc-100 text-zinc-800 hover:bg-zinc-200 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-100 dark:border-zinc-800',
+      'bg-zinc-100/90 text-zinc-800 hover:bg-zinc-200/90 dark:bg-zinc-900/90 dark:text-zinc-200 dark:hover:bg-zinc-800 border border-transparent',
     outline:
-      'bg-transparent text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 border-zinc-200 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:border-zinc-800',
+      'bg-transparent text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200/80 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:border-zinc-800/80',
     ghost:
-      'bg-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900 border border-transparent',
+      'bg-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/80 border border-transparent',
     danger:
-      'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 dark:border-rose-800/40',
+      'bg-rose-500/10 text-rose-600 hover:bg-rose-500/15 dark:bg-rose-500/15 dark:text-rose-400 dark:hover:bg-rose-500/20 border border-transparent',
   };
 
   const sizes = {

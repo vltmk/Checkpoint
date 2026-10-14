@@ -44,6 +44,7 @@ import { detectAppLink } from '../lib/appLinks';
 import { useLanguage, normalizeDigits } from '../lib/i18n';
 import { sanitizePriceInput, convertCurrency, formatMoney } from '../lib/currencies';
 import { cn } from '../lib/utils';
+import { parseOrderText } from '../lib/orderParser.js';
 import { ADVERTISER_LAST_FEE_KEY } from '../lib/profiles';
 
 const DRAFT_KEY = 'checkpoint_work_draft';
@@ -142,6 +143,7 @@ export function WorkModal({
     pot: '',
     income: '',
     teammateCuts: {},
+    teammateNotes: {},
     currency: 'TOMAN',
     exchangeRate: String(goldRateTOMAN || 3200),
     status: 'Pending',
@@ -280,6 +282,10 @@ export function WorkModal({
         editingEntry.teammateCuts && typeof editingEntry.teammateCuts === 'object'
           ? { ...editingEntry.teammateCuts }
           : {};
+      const initialNotes =
+        editingEntry.teammateNotes && typeof editingEntry.teammateNotes === 'object'
+          ? { ...editingEntry.teammateNotes }
+          : {};
 
       const isExpense = editingEntry.income !== undefined && editingEntry.income !== null && Number(editingEntry.income) < 0;
       setEntryType(isExpense ? 'expense' : 'income');
@@ -309,6 +315,7 @@ export function WorkModal({
         pot: initialPot,
         income: editingEntry.income !== undefined && editingEntry.income !== null ? String(Math.abs(Number(editingEntry.income))) : '',
         teammateCuts: initialCuts,
+        teammateNotes: initialNotes,
         currency: entryCur,
         exchangeRate: String(editingEntry.exchangeRate || goldRateTOMAN || 3200),
         status: editingEntry.status || 'Pending',
@@ -375,6 +382,7 @@ export function WorkModal({
             pot: parsed.pot || '',
             income: parsed.income || '',
             teammateCuts: parsed.teammateCuts || {},
+            teammateNotes: parsed.teammateNotes || {},
             currency: parsed.currency || defaultCur,
             exchangeRate: String(goldRateTOMAN || 3200),
             status: parsed.status || 'Pending',
@@ -405,6 +413,7 @@ export function WorkModal({
             pot: '',
             income: '',
             teammateCuts: {},
+            teammateNotes: {},
             currency: defaultCur,
             exchangeRate: String(goldRateTOMAN || 3200),
             status: 'Pending',
@@ -491,6 +500,7 @@ export function WorkModal({
       pot: '',
       income: '',
       teammateCuts: {},
+      teammateNotes: {},
       currency: defaultCur,
       exchangeRate: String(goldRateTOMAN || 3200),
       status: 'Pending',
@@ -631,6 +641,78 @@ export function WorkModal({
         teammateCuts: cuts,
       });
     }
+  };
+
+  const [pasteSuccess, setPasteSuccess] = useState(false);
+  const [parsedOrderPreview, setParsedOrderPreview] = useState(null);
+  const [isParsingClipboard, setIsParsingClipboard] = useState(false);
+
+  const handleSplitEvenly = () => {
+    if (!formData.teammates || formData.teammates.length === 0) return;
+    const clientPrice = parseFloat(formData.pot) || 0;
+    const myProfit = parseFloat(formData.income) || 0;
+    const totalPayout = Math.max(0, clientPrice - myProfit);
+    const perBooster = Math.floor((totalPayout / formData.teammates.length) * 100) / 100;
+    const newCuts = {};
+    formData.teammates.forEach((tm) => {
+      newCuts[tm] = String(perBooster);
+    });
+    updateFormData({ teammateCuts: newCuts });
+  };
+
+  const handleClipboardAutoFill = async () => {
+    setIsParsingClipboard(true);
+    try {
+      let text = '';
+      if (navigator?.clipboard?.readText) {
+        text = await navigator.clipboard.readText();
+      }
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        setParsedOrderPreview({ error: language === 'fa' ? 'کلیپ‌بورد خالی است' : 'Clipboard is empty' });
+        setTimeout(() => setParsedOrderPreview(null), 2500);
+        return;
+      }
+
+      const parsed = parseOrderText(text);
+      if (parsed.confidence > 0) {
+        setParsedOrderPreview(parsed);
+      } else {
+        setParsedOrderPreview({ error: language === 'fa' ? 'اطلاعات سفارشی در متن کلیپ‌بورد یافت نشد' : 'No order details found in clipboard' });
+        setTimeout(() => setParsedOrderPreview(null), 2500);
+      }
+    } catch (err) {
+      console.warn('Smart clipboard parse failed:', err);
+      setParsedOrderPreview({ error: language === 'fa' ? 'دسترسی به کلیپ‌بورد امکان‌پذیر نیست' : 'Cannot read clipboard' });
+      setTimeout(() => setParsedOrderPreview(null), 2500);
+    } finally {
+      setIsParsingClipboard(false);
+    }
+  };
+
+  const handleApplyParsedOrder = () => {
+    if (!parsedOrderPreview || parsedOrderPreview.error) return;
+    const updates = {};
+    if (parsedOrderPreview.title) updates.title = parsedOrderPreview.title;
+    if (parsedOrderPreview.orderId) updates.orderId = parsedOrderPreview.orderId;
+    if (parsedOrderPreview.source) updates.source = parsedOrderPreview.source;
+    if (parsedOrderPreview.link) updates.link = parsedOrderPreview.link;
+    if (parsedOrderPreview.currency) updates.currency = parsedOrderPreview.currency;
+
+    if (parsedOrderPreview.price !== null) {
+      const priceStr = String(parsedOrderPreview.price);
+      if (isAdvertiser) {
+        updates.pot = priceStr;
+        const pct = parseFloat(formData.feeRate) || 15;
+        updates.income = String(Math.round(parsedOrderPreview.price * (pct / 100) * 100) / 100);
+      } else {
+        updates.income = priceStr;
+      }
+    }
+
+    updateFormData(updates);
+    setParsedOrderPreview(null);
+    setPasteSuccess(true);
+    setTimeout(() => setPasteSuccess(false), 2000);
   };
 
   // Team Share Calculations
@@ -1041,6 +1123,7 @@ export function WorkModal({
       pot: finalPot,
       income: signedIncome,
       teammateCuts: entryType === 'expense' ? {} : (isAdvertiser || formData.teamMode ? (formData.teammateCuts || {}) : {}),
+      teammateNotes: entryType === 'expense' ? {} : (isAdvertiser || formData.teamMode ? (formData.teammateNotes || {}) : {}),
       currency: formData.currency,
       exchangeRate: rateNum,
       rateUnit: isClassic ? '1' : '1k',
@@ -1207,6 +1290,16 @@ export function WorkModal({
           <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
             {editingEntry ? t('work.editBadge') : t('work.newBadge')}
           </span>
+          <button
+            type="button"
+            onClick={handleClipboardAutoFill}
+            disabled={isParsingClipboard}
+            title={language === 'fa' ? 'خواندن خودکار جزئیات سفارش از کلیپ‌بورد' : 'Auto-fill order details from clipboard'}
+            className="flex items-center gap-1 h-6 px-2 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer select-none"
+          >
+            <span>📋</span>
+            <span>{isParsingClipboard ? (language === 'fa' ? 'درحال خواندن...' : 'Parsing...') : (language === 'fa' ? 'خواندن کلیپ‌بورد' : 'Auto-Fill from Clipboard')}</span>
+          </button>
         </div>
 
         {!editingEntry && isDraftRestored && (
@@ -1228,6 +1321,75 @@ export function WorkModal({
 
       <form onSubmit={handleSubmit} noValidate>
         <DialogContent className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Smart Order Clipboard Preview Confirmation Chip */}
+          <AnimatePresence>
+            {parsedOrderPreview && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98, y: -6 }}
+                transition={{ duration: 0.15 }}
+                className="p-2.5 rounded-xl bg-zinc-100/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 shadow-md text-xs space-y-2 select-none"
+                dir={isRtl ? 'rtl' : 'ltr'}
+              >
+                {parsedOrderPreview.error ? (
+                  <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-[11px]">
+                    <span>{parsedOrderPreview.error}</span>
+                    <button type="button" onClick={() => setParsedOrderPreview(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/80 pb-1.5 text-[11px]">
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                        <span>📋</span>
+                        <span>{language === 'fa' ? 'سفارش شناسایی‌شده از کلیپ‌بورد' : 'Detected Order from Clipboard'}</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Button variant="primary" size="xs" onClick={handleApplyParsedOrder} className="h-6 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-500 text-white">
+                          <Check className="w-3 h-3" />
+                          <span>{language === 'fa' ? 'اعمال ✓' : 'Apply ✓'}</span>
+                        </Button>
+                        <button type="button" onClick={() => setParsedOrderPreview(null)} className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                      {parsedOrderPreview.title && (
+                        <div className="col-span-2">
+                          <span className="text-zinc-400 block">{language === 'fa' ? 'عنوان:' : 'Title:'}</span>
+                          <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate block">{parsedOrderPreview.title}</span>
+                        </div>
+                      )}
+                      {parsedOrderPreview.price !== null && (
+                        <div>
+                          <span className="text-zinc-400 block">{language === 'fa' ? 'مبلغ:' : 'Amount:'}</span>
+                          <span className="font-mono font-medium text-emerald-600 dark:text-emerald-400">
+                            {parsedOrderPreview.price.toLocaleString()} {parsedOrderPreview.currency || ''}
+                          </span>
+                        </div>
+                      )}
+                      {parsedOrderPreview.orderId && (
+                        <div>
+                          <span className="text-zinc-400 block">{language === 'fa' ? 'شناسه:' : 'Order ID:'}</span>
+                          <span className="font-mono text-zinc-700 dark:text-zinc-300">#{parsedOrderPreview.orderId}</span>
+                        </div>
+                      )}
+                      {parsedOrderPreview.source && (
+                        <div>
+                          <span className="text-zinc-400 block">{language === 'fa' ? 'منبع:' : 'Source:'}</span>
+                          <span className="text-zinc-700 dark:text-zinc-300">{parsedOrderPreview.source}</span>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
           {saveError && (
             <div role="alert" className="flex items-start gap-2.5 rounded-md border border-rose-800/70 bg-rose-950/30 p-3 text-xs">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
@@ -1349,9 +1511,20 @@ export function WorkModal({
                       <Hash className="w-3 h-3 text-zinc-400" />
                       <span>{language === 'fa' ? 'شناسه سفارش' : 'Order ID'}</span>
                     </span>
-                    <span className="text-[9px] text-zinc-500 font-normal">
-                      {language === 'fa' ? 'اختیاری' : 'Optional'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleClipboardAutoFill}
+                        title={language === 'fa' ? 'خواندن سفارش از کلیپ‌بورد' : 'Parse order from clipboard'}
+                        className="inline-flex items-center gap-1 text-[9px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-2.5 h-2.5" />
+                        <span>{pasteSuccess ? (language === 'fa' ? 'خوانده شد!' : 'Parsed!') : (language === 'fa' ? 'خواندن خودکار' : 'Smart Fill')}</span>
+                      </button>
+                      <span className="text-[9px] text-zinc-500 font-normal">
+                        {language === 'fa' ? 'اختیاری' : 'Optional'}
+                      </span>
+                    </div>
                   </label>
                   <div className="relative" dir="ltr">
                     <Input
@@ -1423,7 +1596,7 @@ export function WorkModal({
                         <span>
                           {entryType === 'expense'
                             ? (language === 'fa' ? 'مبلغ هزینه / پرداختی *' : 'Expense Amount *')
-                            : (language === 'fa' ? 'مبلغ ناخالص مشتری (Client Price) *' : 'Client Price (Gross) *')}
+                            : (language === 'fa' ? 'مبلغ ناخالص سورس (Source Price) *' : 'Source Price (Gross) *')}
                         </span>
                         {entryType !== 'expense' && (
                           <button
@@ -1593,7 +1766,7 @@ export function WorkModal({
                           >
                             <span className="flex items-center gap-1.5 font-medium">
                               <span className={cn('w-2 h-2 rounded-full', formData.sourcePaid ? 'bg-emerald-500' : 'bg-amber-400')} />
-                              {language === 'fa' ? 'دریافت از مشتری:' : 'Client Paid:'}
+                              {language === 'fa' ? 'دریافت از سورس:' : 'Source Paid:'}
                             </span>
                             <span className="text-[11px] font-semibold">
                               {formData.sourcePaid ? (language === 'fa' ? 'تسویه شده' : 'Paid') : (language === 'fa' ? 'در انتظار' : 'Pending')}
@@ -1620,21 +1793,89 @@ export function WorkModal({
                           </button>
                         </div>
 
-                        {formData.teammates?.length > 1 && (
-                          <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800/60">
-                            <span className={cn('block text-[10px] text-zinc-400 font-medium', isRtl && 'font-farsi')}>
-                              {language === 'fa' ? 'تقسیم سهم بین بوسترها:' : 'Payout per Booster:'}
-                            </span>
-                            {formData.teammates.map((b) => (
-                              <div key={b} className="flex items-center justify-between text-xs">
-                                <span className="text-zinc-600 dark:text-zinc-400 text-[11px]">{b}:</span>
-                                <span className="font-mono text-zinc-800 dark:text-zinc-200 text-[11px]">
-                                  <MoneyDisplay amount={formData.teammateCuts?.[b] || '0'} currency={formData.currency} />
+                        {formData.teammates?.length > 0 && (() => {
+                          const clientPrice = parseFloat(formData.pot) || 0;
+                          const myProfit = parseFloat(formData.income) || 0;
+                          const totalPayout = Math.max(0, clientPrice - myProfit);
+                          const sumCuts = (formData.teammates || []).reduce((acc, tm) => acc + (parseFloat(formData.teammateCuts?.[tm]) || 0), 0);
+                          const isOverAllocated = totalPayout > 0 && sumCuts > totalPayout + 0.01;
+
+                          return (
+                            <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800/60">
+                              <div className="flex items-center justify-between">
+                                <span className={cn('text-[10px] text-zinc-400 font-medium uppercase tracking-wider', isRtl && 'font-farsi')}>
+                                  {language === 'fa' ? 'سهم بوسترها:' : 'Booster Cuts & Splits:'}
                                 </span>
+                                {formData.teammates.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={handleSplitEvenly}
+                                    className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors font-medium cursor-pointer"
+                                  >
+                                    {language === 'fa' ? 'تقسیم مساوی' : 'Split Evenly'}
+                                  </button>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        )}
+
+                              {isOverAllocated && (
+                                <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1 bg-rose-50 dark:bg-rose-950/30 p-1.5 rounded-md border border-rose-200 dark:border-rose-900/50">
+                                  <AlertTriangle className="w-3 h-3 shrink-0" />
+                                  <span>
+                                    {language === 'fa'
+                                      ? `مجموع سهم بوسترها (${formatMoney(sumCuts, formData.currency)}) از سهم پرداختی (${formatMoney(totalPayout, formData.currency)}) بیشتر است!`
+                                      : `Total cuts (${formatMoney(sumCuts, formData.currency)}) exceed booster payout (${formatMoney(totalPayout, formData.currency)})!`}
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="space-y-1.5">
+                                {formData.teammates.map((b) => (
+                                  <div key={b} className="p-2 rounded-lg bg-white dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/80 text-xs space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <Users className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                                        <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate text-[11px]">{b}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
+                                        <Input
+                                          type="text"
+                                          dir="ltr"
+                                          value={formData.teammateCuts?.[b] ?? ''}
+                                          onChange={(e) => {
+                                            const val = normalizeDigits(e.target.value);
+                                            updateFormData({
+                                              teammateCuts: {
+                                                ...(formData.teammateCuts || {}),
+                                                [b]: val,
+                                              },
+                                            });
+                                          }}
+                                          placeholder="0"
+                                          className="h-6 w-24 text-[11px] font-mono text-right px-2"
+                                        />
+                                        <span className="text-[10px] text-zinc-400">{formData.currency}</span>
+                                      </div>
+                                    </div>
+                                    <Input
+                                      type="text"
+                                      value={formData.teammateNotes?.[b] ?? ''}
+                                      onChange={(e) => {
+                                        updateFormData({
+                                          teammateNotes: {
+                                            ...(formData.teammateNotes || {}),
+                                            [b]: e.target.value,
+                                          },
+                                        });
+                                      }}
+                                      placeholder={language === 'fa' ? `یادداشت برای ${b} (پرداخت، کاراکتر، اکانت...)` : `Note for ${b} (character, spec, payout note...)`}
+                                      className="h-6 text-[10px] px-2 bg-zinc-50/60 dark:bg-zinc-900/40 border-zinc-200/60 dark:border-zinc-800/60 placeholder:text-zinc-400"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </motion.div>
                   )}
@@ -2176,14 +2417,30 @@ export function WorkModal({
 
                               {/* Each Teammate */}
                               {formData.teammates.map((tm) => (
-                                <div key={tm} className="flex items-center justify-between gap-2">
-                                  <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate">{tm}:</span>
-                                  <NumberStepperInput
-                                    value={formData.teammateCuts?.[tm] || ''}
-                                    onChange={(e) => handleCustomCutChange(tm, e.target.value)}
-                                    currency={formData.currency}
-                                    className="w-32 h-7"
-                                    placeholder="0"
+                                <div key={tm} className="p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200/60 dark:border-zinc-800/60 space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate">{tm}:</span>
+                                    <NumberStepperInput
+                                      value={formData.teammateCuts?.[tm] || ''}
+                                      onChange={(e) => handleCustomCutChange(tm, e.target.value)}
+                                      currency={formData.currency}
+                                      className="w-32 h-7"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <Input
+                                    type="text"
+                                    value={formData.teammateNotes?.[tm] ?? ''}
+                                    onChange={(e) => {
+                                      updateFormData({
+                                        teammateNotes: {
+                                          ...(formData.teammateNotes || {}),
+                                          [tm]: e.target.value,
+                                        },
+                                      });
+                                    }}
+                                    placeholder={language === 'fa' ? `یادداشت برای ${tm}...` : `Note for ${tm}...`}
+                                    className="h-6 text-[10px] px-2 bg-white dark:bg-zinc-900/60 border-zinc-200/60 dark:border-zinc-800/60 placeholder:text-zinc-400"
                                   />
                                 </div>
                               ))}

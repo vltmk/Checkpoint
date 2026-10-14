@@ -25,7 +25,7 @@
         "visible": true,
         "shadow": true,
         "center": true,
-        "backgroundColor": "#000000",
+        "backgroundColor": "#09090b",
         "additionalBrowserArgs": "--disable-features=ElasticOverscroll,OverscrollHistoryNavigation"
       }
     ],

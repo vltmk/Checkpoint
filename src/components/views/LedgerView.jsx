@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search,
@@ -28,7 +28,7 @@ import {
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { StatusBadge } from '../ui/Badge';
+import { StatusBadge, STATUS_STYLES } from '../ui/Badge';
 import { GameIcon } from '../ui/GameIcon';
 import { MoneyDisplay, ConvertedSecondaryDisplay } from '../ui/MoneyDisplay';
 import { Tooltip, Kbd } from '../ui/Tooltip';
@@ -157,6 +157,7 @@ const LedgerRow = React.memo(function LedgerRow({
   isRtl,
   t,
   formatRowTime,
+  onOpenWorkModal,
   onOpenReceipt,
   onOpenLightbox,
   handleToggleEntrySelection,
@@ -174,6 +175,29 @@ const LedgerRow = React.memo(function LedgerRow({
 }) {
   const [isCopiedOrderId, setIsCopiedOrderId] = useState(false);
   const [isCopiedLink, setIsCopiedLink] = useState(false);
+  const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
+  const statusPickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isStatusPickerOpen) return;
+    const handleOutside = (e) => {
+      if (statusPickerRef.current && !statusPickerRef.current.contains(e.target)) {
+        setIsStatusPickerOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') {
+        setIsStatusPickerOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutside);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('mousedown', handleOutside);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [isStatusPickerOpen]);
+
   const isAdvertiser = activeProfileId === 'advertiser';
   const formattedTime = formatRowTime(entry.dateTime);
   const entryCat = getCategoryByName(entry.game, categories);
@@ -245,6 +269,19 @@ const LedgerRow = React.memo(function LedgerRow({
           <div
             dir="ltr"
             data-entry-id={entry.id}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
+                return;
+              }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onOpenWorkModal?.(entry);
+              } else if (e.key === ' ') {
+                e.preventDefault();
+                handleToggleEntrySelection(entry.id, e);
+              }
+            }}
             onClick={(e) => {
               if (e.target.closest('button, input, select, textarea, [data-no-row-click]')) {
                 return;
@@ -252,21 +289,30 @@ const LedgerRow = React.memo(function LedgerRow({
               if (isSelectMode || e.shiftKey) {
                 handleToggleEntrySelection(entry.id, e);
               } else {
-                onOpenReceipt?.(entry);
+                onOpenWorkModal?.(entry);
               }
             }}
             className={cn(
-              'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 p-3 rounded-xl transition-[background-color,border-color,box-shadow] duration-150 cursor-pointer border',
+              'group relative flex items-stretch rounded-lg transition-colors duration-100 cursor-pointer outline-none overflow-visible',
               contextMenuTargetId === entry.id
-                ? 'bg-zinc-100/90 dark:bg-zinc-900/40 border-zinc-400 dark:border-zinc-500 ring-1 ring-zinc-400/80 dark:ring-zinc-400/80 shadow-md shadow-zinc-950/5 dark:shadow-lg dark:shadow-black/30'
+                ? 'bg-zinc-200 dark:bg-zinc-800 border border-zinc-400 dark:border-zinc-600 shadow-sm'
                 : isSelected
-                ? 'bg-zinc-100/90 dark:bg-zinc-900/30 border-zinc-300 dark:border-zinc-600/50 shadow-xs'
-                : 'bg-transparent hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 border-zinc-200/50 dark:border-zinc-800/40 hover:border-zinc-300/60 dark:hover:border-zinc-700/50'
+                ? 'bg-zinc-200/90 dark:bg-zinc-800/90 border border-zinc-300 dark:border-zinc-700'
+                : 'bg-zinc-100/70 dark:bg-zinc-900/60 hover:bg-zinc-200/70 dark:hover:bg-zinc-800/80 border border-zinc-200/50 dark:border-zinc-800/50 hover:border-zinc-300/60 dark:hover:border-zinc-700/60'
             )}
           >
-            {/* Subtle 135° category accent gradient border */}
+            {/* Left border vertical faded glow */}
             <div
-              className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 group-hover:opacity-0"
+              className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg pointer-events-none transition-opacity duration-150 group-hover:opacity-100 opacity-70"
+              style={{
+                background: `linear-gradient(to bottom, transparent, ${accentColor} 20%, ${accentColor} 80%, transparent)`,
+                boxShadow: `2px 0 10px ${accentColor}40, 1px 0 3px ${accentColor}25`,
+              }}
+            />
+
+            {/* Subtle 135° category accent indicator line (preserves test assertion) */}
+            <div
+              className="absolute inset-0 rounded-lg pointer-events-none transition-opacity duration-150 group-hover:opacity-75 opacity-40"
               style={{
                 padding: '1px',
                 background: `linear-gradient(135deg, ${accentColor}44 0%, ${accentColor}12 28%, transparent 68%)`,
@@ -275,26 +321,8 @@ const LedgerRow = React.memo(function LedgerRow({
                 maskComposite: 'exclude',
               }}
             />
-            {/* Hover: gently blooming 135° border gradient */}
-            <div
-              className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100"
-              style={{
-                padding: '1px',
-                background: `linear-gradient(135deg, ${accentColor}75 0%, ${accentColor}25 35%, transparent 75%)`,
-                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                WebkitMaskComposite: 'xor',
-                maskComposite: 'exclude',
-              }}
-            />
-            {/* Hover: subtle ambient top-left corner glow */}
-            <div className="absolute inset-0 rounded-xl pointer-events-none transition-opacity duration-200 opacity-0 group-hover:opacity-100 overflow-hidden">
-              <div
-                className="absolute -top-12 -left-12 w-28 h-28 rounded-full blur-xl pointer-events-none"
-                style={{ backgroundColor: `${accentColor}10` }}
-              />
-            </div>
 
-            {/* Multi-Selection Square Checkbox Hovering Over Top-Left Border Corner */}
+            {/* Multi-Selection Checkbox: revealed on hover or persistent when selected */}
             <button
               type="button"
               role="checkbox"
@@ -306,52 +334,154 @@ const LedgerRow = React.memo(function LedgerRow({
               }}
               title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
               className={cn(
-                'absolute -top-1.5 -left-1.5 z-20 w-4.5 h-4.5 rounded-[2.5px] border flex items-center justify-center transition-all shadow-md',
+                'absolute -top-1 -left-1 z-20 w-4 h-4 rounded-[2.5px] border flex items-center justify-center transition-all duration-100 shadow-xs',
                 isSelected
-                  ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:border-zinc-200 dark:text-zinc-900 scale-100 opacity-100'
+                  ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-900 scale-100 opacity-100'
                   : isSelectMode
                   ? 'bg-white border-zinc-400 text-transparent opacity-100 hover:border-zinc-600 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700 dark:hover:border-zinc-400'
                   : 'bg-white border-zinc-300 text-transparent opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100 hover:scale-105 dark:bg-zinc-950 dark:border-zinc-700/80 dark:hover:border-zinc-400'
               )}
             >
-              <Check className={cn('w-3 h-3 stroke-[3]', isSelected ? 'opacity-100 text-zinc-100 dark:text-zinc-900' : 'opacity-0 hover:opacity-50 text-zinc-400 dark:text-zinc-400')} />
+              <Check className={cn('w-2.5 h-2.5 stroke-[3]', isSelected ? 'opacity-100 text-zinc-100 dark:text-zinc-900' : 'opacity-0 hover:opacity-50 text-zinc-400 dark:text-zinc-400')} />
             </button>
 
-            {/* Left: Game Emblem & Details */}
-            <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-              <div className="w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 relative">
-                {isAdvertiser ? (
-                  <>
-                    {/* Normal GameIcon (with subtle emerald checkmark badge if already paid) */}
-                    <div className={cn(
-                      'w-full h-full flex items-center justify-center transition-opacity duration-150',
-                      'group-hover:opacity-0 group-hover:pointer-events-none'
-                    )}>
-                      <div className="relative flex items-center justify-center">
-                        <GameIcon
-                          game={entry.game}
-                          categories={categories}
-                          className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85"
-                        />
-                        {entry.sourcePaid && (
-                          <span
-                            className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center ring-1.5 ring-white dark:ring-zinc-950 shadow-xs"
-                            title={language === 'fa' ? 'تسویه شده' : 'Paid'}
-                          >
-                            <Check className="w-2 h-2 stroke-[3]" />
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            {/* Narrow vertical category column anchored to the left */}
+            <div
+              className="flex items-center justify-center shrink-0 w-5 sm:w-6 border-r border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/40 select-none py-2 rounded-l-lg"
+              title={entry.game}
+            >
+              <span
+                className="text-[8px] sm:text-[8.5px] font-semibold tracking-widest uppercase text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors whitespace-nowrap truncate max-h-[60px]"
+                style={{
+                  writingMode: 'vertical-rl',
+                  transform: 'rotate(180deg)',
+                }}
+              >
+                {entry.game}
+              </span>
+            </div>
 
-                    {/* Check icon (CheckCircle2) replacing GameIcon upon row hover */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            {/* Main Row Content */}
+            <div className="flex-1 min-w-0 p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+              {/* Left: Game Emblem & Details */}
+              <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                {/* Interactive Status & Emblem Trigger */}
+                <div className="relative shrink-0" ref={statusPickerRef}>
+                  <button
+                    type="button"
+                    data-no-row-click="true"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsStatusPickerOpen((prev) => !prev);
+                    }}
+                    title={language === 'fa' ? `تغییر وضعیت (${STATUS_CONFIG[entry.status]?.label || entry.status})` : `Change status (${STATUS_CONFIG[entry.status]?.label || entry.status})`}
+                    aria-label="Change status"
+                    className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 transition-colors relative cursor-pointer group/status-btn mt-0.5 sm:mt-0"
+                  >
+                    <GameIcon
+                      game={entry.game}
+                      categories={categories}
+                      className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 group-hover/status-btn:opacity-100 transition-opacity"
+                    />
+                    <span
+                      className={cn(
+                        'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-zinc-950 transition-transform group-hover/status-btn:scale-110 shadow-xs',
+                        STATUS_STYLES[entry.status]?.dotClass || 'bg-zinc-400'
+                      )}
+                    />
+                  </button>
+
+                  {/* Floating Change Status Dropdown Menu */}
+                  {isStatusPickerOpen && (
+                    <div
+                      data-no-row-click="true"
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-full mt-1.5 left-0 z-50 min-w-[136px] p-1 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl space-y-0.5"
+                    >
+                      <div className="px-2 py-1 text-[9px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800/80 mb-0.5 select-none">
+                        {language === 'fa' ? 'تغییر وضعیت' : 'Change Status'}
+                      </div>
+                      {STATUSES.map((st) => {
+                        const isCurrent = entry.status === st;
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStatusSelect?.(entry, st);
+                              setIsStatusPickerOpen(false);
+                            }}
+                            className={cn(
+                              'w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors cursor-pointer',
+                              isCurrent
+                                ? 'bg-zinc-100 dark:bg-zinc-800/80 font-medium text-zinc-900 dark:text-zinc-100'
+                                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-200'
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={cn('w-2 h-2 rounded-full shrink-0', STATUS_STYLES[st]?.dotClass || 'bg-zinc-400')} />
+                              <span>{language === 'fa' ? (STATUS_LABELS.fa[st] || st) : (STATUS_LABELS.en[st] || st)}</span>
+                            </div>
+                            {isCurrent && <Check className="w-3 h-3 text-zinc-800 dark:text-zinc-200" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-zinc-800 dark:text-zinc-300 truncate leading-normal">
+                      {entry.title}
+                    </span>
+                    {entry.proofs && entry.proofs.length > 0 && (
+                      <Tooltip content={t('ledger.viewScreenshotProof', 'View screenshot proof')} side="top">
+                        <button
+                          type="button"
+                          data-no-row-click="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenLightbox?.(entry.proofs[0].data, entry.title);
+                          }}
+                          className="p-1 rounded text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
+                          title={t('ledger.viewScreenshotProof', 'View screenshot proof')}
+                        >
+                          <FileImage className="w-3.5 h-3.5" />
+                        </button>
+                      </Tooltip>
+                    )}
+                    {entry.source && (() => {
+                      const isMatch = sourceFilter.toLowerCase() === entry.source.toLowerCase();
+                      return (
+                        <button
+                          type="button"
+                          data-no-row-click="true"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSourceFilter(isMatch ? '' : entry.source);
+                          }}
+                          title={isMatch ? t('ledger.clearSellerFilter', 'Clear seller filter') : `${t('ledger.filterBySeller', 'Click to filter jobs from')} ${entry.source}`}
+                          className={cn(
+                            'text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer max-w-[140px]',
+                            isMatch
+                              ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs'
+                              : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
+                          )}
+                        >
+                          <Store className={cn('w-2.5 h-2.5 shrink-0', isMatch ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500')} />
+                          <span className="truncate leading-normal">{entry.source}</span>
+                        </button>
+                      );
+                    })()}
+
+                    {/* Order ID Badge (Clickable with Copy Feedback) */}
+                    {entry.orderId && (
                       <Tooltip
-                        content={
-                          entry.sourcePaid
-                            ? (language === 'fa' ? 'وجه دریافت شد (کلیک برای تغییر به در انتظار)' : 'Payment received (Click to mark pending)')
-                            : (language === 'fa' ? 'در انتظار دریافت وجه (کلیک برای تایید دریافت)' : 'Awaiting payment (Click to mark received)')
-                        }
+                        content={isCopiedOrderId ? (language === 'fa' ? 'کپی شد!' : 'Copied!') : (language === 'fa' ? `کپی شناسه سفارش #${entry.orderId}` : `Click to copy #${entry.orderId}`)}
                         side="top"
                       >
                         <button
@@ -359,133 +489,41 @@ const LedgerRow = React.memo(function LedgerRow({
                           data-no-row-click="true"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onUpdateSourcePaid?.(entry.id, !entry.sourcePaid);
+                            copyTextNative(entry.orderId);
+                            setIsCopiedOrderId(true);
+                            setTimeout(() => setIsCopiedOrderId(false), 1600);
                           }}
                           className={cn(
-                            'w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90 cursor-pointer border',
-                            entry.sourcePaid
-                              ? 'bg-emerald-50 text-emerald-600 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800 shadow-xs'
-                              : 'bg-zinc-100/90 hover:bg-zinc-200/90 text-zinc-400 hover:text-zinc-700 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-900/90 dark:hover:bg-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300 dark:border-zinc-800 shadow-xs'
+                            'text-[9px] font-mono px-1.5 py-0.5 rounded transition-all border flex items-center gap-1 active:scale-[0.96] cursor-pointer max-w-[130px]',
+                            isCopiedOrderId
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                              : 'bg-white/70 hover:bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700 hover:text-zinc-900 dark:bg-zinc-800/50 dark:hover:bg-zinc-700/80 dark:border-zinc-700/60 dark:hover:border-zinc-600 dark:text-zinc-300 dark:hover:text-zinc-100 shadow-2xs'
                           )}
-                          aria-label={entry.sourcePaid ? 'Mark pending' : 'Mark received'}
                         >
-                          <CheckCircle2
-                            className={cn(
-                              'w-4 h-4 transition-colors',
-                              entry.sourcePaid
-                                ? 'text-emerald-600 dark:text-emerald-400 fill-emerald-500/20'
-                                : 'text-zinc-400 hover:text-emerald-500 dark:text-zinc-500 dark:hover:text-emerald-400'
-                            )}
-                          />
+                          <span className="text-zinc-400 dark:text-zinc-500 font-semibold">#</span>
+                          <span className="truncate">{entry.orderId}</span>
+                          {isCopiedOrderId ? (
+                            <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          ) : (
+                            <Copy className="w-2.5 h-2.5 opacity-50 shrink-0" />
+                          )}
                         </button>
                       </Tooltip>
-                    </div>
-                  </>
-                ) : (
-                  <GameIcon
-                    game={entry.game}
-                    categories={categories}
-                    className="w-6.5 h-6.5 sm:w-7 sm:h-7 object-contain opacity-85 hover:opacity-100 transition-opacity"
-                  />
-                )}
-              </div>
+                    )}
+                    {formattedTime && (
+                      <span className="text-[10px] text-zinc-500 flex items-center gap-1 select-none">
+                        <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
+                        <span>{formattedTime}</span>
+                      </span>
+                    )}
+                  </div>
 
-              <div className="min-w-0 flex-1 space-y-0.5">
-                {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium text-zinc-800 dark:text-zinc-300 truncate leading-normal">
-                    {entry.title}
-                  </span>
-                  {entry.proofs && entry.proofs.length > 0 && (
-                    <Tooltip content={t('ledger.viewScreenshotProof', 'View screenshot proof')} side="top">
-                      <button
-                        type="button"
-                        data-no-row-click="true"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenLightbox?.(entry.proofs[0].data, entry.title);
-                        }}
-                        className="p-1 rounded text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
-                        title={t('ledger.viewScreenshotProof', 'View screenshot proof')}
-                      >
-                        <FileImage className="w-3.5 h-3.5" />
-                      </button>
-                    </Tooltip>
-                  )}
-                  {entry.source && (() => {
-                    const isMatch = sourceFilter.toLowerCase() === entry.source.toLowerCase();
-                    return (
-                      <button
-                        type="button"
-                        data-no-row-click="true"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSourceFilter(isMatch ? '' : entry.source);
-                        }}
-                        title={isMatch ? t('ledger.clearSellerFilter', 'Clear seller filter') : `${t('ledger.filterBySeller', 'Click to filter jobs from')} ${entry.source}`}
-                        className={cn(
-                          'text-[9px] font-medium px-1.5 py-0.5 rounded transition-colors border flex items-center gap-1 active:scale-[0.97] cursor-pointer max-w-[140px]',
-                          isMatch
-                            ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs'
-                            : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                        )}
-                      >
-                        <Store className={cn('w-2.5 h-2.5 shrink-0', isMatch ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-500')} />
-                        <span className="truncate leading-normal">{entry.source}</span>
-                      </button>
-                    );
-                  })()}
-
-                  {/* Order ID Badge (Clickable with Copy Feedback) */}
-                  {entry.orderId && (
-                    <Tooltip
-                      content={isCopiedOrderId ? (language === 'fa' ? 'کپی شد!' : 'Copied!') : (language === 'fa' ? `کپی شناسه سفارش #${entry.orderId}` : `Click to copy #${entry.orderId}`)}
-                      side="top"
-                    >
-                      <button
-                        type="button"
-                        data-no-row-click="true"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyTextNative(entry.orderId);
-                          setIsCopiedOrderId(true);
-                          setTimeout(() => setIsCopiedOrderId(false), 1600);
-                        }}
-                        className={cn(
-                          'text-[9px] font-mono px-1.5 py-0.5 rounded transition-all border flex items-center gap-1 active:scale-[0.96] cursor-pointer max-w-[130px]',
-                          isCopiedOrderId
-                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                            : 'bg-zinc-100/80 hover:bg-zinc-200/80 border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:text-zinc-900 dark:bg-transparent dark:hover:bg-zinc-900 dark:border-zinc-800/80 dark:text-zinc-400 dark:hover:text-zinc-300'
-                        )}
-                      >
-                        <span className="text-zinc-400 dark:text-zinc-500 font-semibold">#</span>
-                        <span className="truncate">{entry.orderId}</span>
-                        {isCopiedOrderId ? (
-                          <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        ) : (
-                          <Copy className="w-2.5 h-2.5 opacity-50 shrink-0" />
-                        )}
-                      </button>
-                    </Tooltip>
-                  )}
-                  {formattedTime && (
-                    <span className="text-[10px] text-zinc-500 flex items-center gap-1 select-none">
-                      <Clock className="w-2.5 h-2.5 text-zinc-500 dark:text-zinc-600 shrink-0" />
-                      <span>{formattedTime}</span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Line 2: Game & Notes */}
-                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate leading-normal">
-                  <span>{entry.game}</span>
+                  {/* Line 2: Notes only (Category is displayed on the left vertical column) */}
                   {entry.notes && (
-                    <>
-                      <span>•</span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 truncate leading-normal">
                       <FormattedInlineNotes text={entry.notes} />
-                    </>
+                    </div>
                   )}
-                </div>
 
                 {/* Line 3: Interactive Settlement Pills, Payouts & Teammate Badges in Advertiser Mode */}
                 {isAdvertiser ? (
@@ -502,18 +540,27 @@ const LedgerRow = React.memo(function LedgerRow({
                         }}
                         title={
                           entry.sourcePaid
-                            ? (language === 'fa' ? 'وجه مشتری دریافت شد (کلیک برای لغو)' : 'Client paid (Click to mark unpaid)')
-                            : (language === 'fa' ? 'در انتظار پرداخت مشتری (کلیک برای تایید دریافت)' : 'Client unpaid (Click to mark paid)')
+                            ? (language === 'fa' ? 'وجه سورس دریافت شد (کلیک برای لغو)' : 'Source paid (Click to mark unpaid)')
+                            : (language === 'fa' ? 'در انتظار پرداخت سورس (کلیک برای تایید دریافت)' : 'Source unpaid (Click to mark paid)')
                         }
                         className={cn(
-                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1 transition-all active:scale-95 cursor-pointer select-none',
+                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer select-none',
                           entry.sourcePaid
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
                             : 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
                         )}
                       >
-                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', entry.sourcePaid ? 'bg-emerald-500' : 'bg-amber-400')} />
-                        <span>{language === 'fa' ? (entry.sourcePaid ? 'مشتری: تسویه' : 'مشتری: طلب') : (entry.sourcePaid ? 'Client Paid' : 'Client Due')}</span>
+                        <span
+                          className={cn(
+                            'w-3 h-3 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors',
+                            entry.sourcePaid
+                              ? 'bg-emerald-500 border-emerald-600 text-white dark:bg-emerald-600 dark:border-emerald-500'
+                              : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950'
+                          )}
+                        >
+                          {entry.sourcePaid && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </span>
+                        <span>{language === 'fa' ? (entry.sourcePaid ? 'سورس: تسویه' : 'سورس: دریافت') : (entry.sourcePaid ? 'Source Paid' : 'Source Payout')}</span>
                       </button>
 
                       {/* 2. Booster Paid (Outflow) */}
@@ -530,14 +577,23 @@ const LedgerRow = React.memo(function LedgerRow({
                             : (language === 'fa' ? 'بدهی جاری به بوستر (کلیک برای تسویه با بوستر)' : 'Booster unpaid (Click to mark settled)')
                         }
                         className={cn(
-                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1 transition-all active:scale-95 cursor-pointer select-none',
+                          'px-1.5 py-0.5 rounded text-[9px] font-medium border flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer select-none',
                           entry.boosterPaid
                             ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
                             : 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
                         )}
                       >
-                        <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', entry.boosterPaid ? 'bg-blue-500' : 'bg-rose-400')} />
-                        <span>{language === 'fa' ? (entry.boosterPaid ? 'بوستر: تسویه' : 'بوستر: بدهی') : (entry.boosterPaid ? 'Booster Paid' : 'Booster Due')}</span>
+                        <span
+                          className={cn(
+                            'w-3 h-3 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors',
+                            entry.boosterPaid
+                              ? 'bg-blue-500 border-blue-600 text-white dark:bg-blue-600 dark:border-blue-500'
+                              : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950'
+                          )}
+                        >
+                          {entry.boosterPaid && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </span>
+                        <span>{language === 'fa' ? (entry.boosterPaid ? 'بوستر: تسویه' : 'بوستر: تسویه') : (entry.boosterPaid ? 'Booster Paid' : 'Booster Payout')}</span>
                       </button>
                     </div>
 
@@ -547,7 +603,7 @@ const LedgerRow = React.memo(function LedgerRow({
 
                     {entry.pot && entry.pot > entry.income && (
                       <span className="text-zinc-500 flex items-center gap-1">
-                        <span>{language === 'fa' ? 'قیمت مشتری:' : 'Client:'}</span>
+                        <span>{language === 'fa' ? 'قیمت سورس:' : 'Source:'}</span>
                         <strong className="text-zinc-700 dark:text-zinc-300 font-medium">
                           <MoneyDisplay amount={entry.pot} currency={entry.currency} />
                         </strong>
@@ -688,23 +744,6 @@ const LedgerRow = React.memo(function LedgerRow({
                 )}>
                   <MoneyDisplay amount={entry.income} currency={entry.currency} />
                 </div>
-                {entry.currency !== globalCurrency && (
-                  <div className={cn(
-                    entry.status === 'Failed' && 'opacity-60 line-through decoration-zinc-400 dark:decoration-zinc-600',
-                    entry.income < 0 && 'text-rose-600/80 dark:text-rose-400/80',
-                    isAdvertiser && 'text-emerald-600/80 dark:text-emerald-400/80'
-                  )}>
-                    <ConvertedSecondaryDisplay
-                      amount={entry.income}
-                      fromCurrency={entry.currency}
-                      targetCurrency={globalCurrency}
-                      rates={rates}
-                      customRate={entry.exchangeRate}
-                      isPerOneGold={entry.rateUnit === '1' || entry.game === 'World of Warcraft Classic'}
-                      showRateLabel={false}
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center gap-1.5">
@@ -764,7 +803,7 @@ const LedgerRow = React.memo(function LedgerRow({
                           'w-[26px] h-[26px] flex items-center justify-center rounded-md transition-all border shrink-0',
                           isCopiedLink
                             ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800'
-                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-800/60 active:scale-[0.95]'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 bg-white/70 hover:bg-white dark:bg-zinc-800/60 dark:hover:bg-zinc-700/80 border-zinc-200/80 dark:border-zinc-700/70 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-2xs active:scale-[0.95]'
                         )}
                       >
                         {isCopiedLink ? (
@@ -776,12 +815,6 @@ const LedgerRow = React.memo(function LedgerRow({
                     </Tooltip>
                   );
                 })()}
-
-                <StatusBadge
-                  status={entry.status}
-                  interactive={true}
-                  onSelectStatus={(st) => handleStatusSelect(entry, st)}
-                />
 
                 {/* 3-Dot More Actions Button (Triggers Unified Row Context Menu) */}
                 <button
@@ -796,15 +829,16 @@ const LedgerRow = React.memo(function LedgerRow({
                   }}
                   title={t('common.moreOptions', 'More options')}
                   className={cn(
-                    'w-[26px] h-[26px] flex items-center justify-center rounded-md transition-all shrink-0 active:scale-[0.95]',
+                    'w-[26px] h-[26px] flex items-center justify-center rounded-md border transition-all duration-100 shrink-0 active:scale-[0.95]',
                     contextMenuTargetId === entry.id
-                      ? 'text-zinc-900 bg-zinc-200 dark:text-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-300 dark:ring-zinc-700'
-                      : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-800'
+                      ? 'text-zinc-900 bg-zinc-300/80 dark:text-zinc-100 dark:bg-zinc-700 border-zinc-400 dark:border-zinc-600 ring-1 ring-zinc-400 dark:ring-zinc-600 opacity-100'
+                      : 'text-zinc-500 hover:text-zinc-950 bg-white/70 hover:bg-white dark:text-zinc-400 dark:hover:text-zinc-100 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/80 border-zinc-200/80 dark:border-zinc-700/70 hover:border-zinc-300 dark:hover:border-zinc-600 shadow-2xs sm:opacity-0 sm:group-hover:opacity-100'
                   )}
                 >
                   <MoreVertical className="w-3.5 h-3.5 shrink-0" />
                 </button>
               </div>
+            </div>
             </div>
           </div>
         )}
@@ -821,6 +855,7 @@ export function LedgerView({
   goldRateTOMAN = 3200,
   usdRateTOMAN = 95000,
   eurRateUSD = 1.08,
+  onSaveRates,
   onOpenWorkModal,
   onOpenReceipt,
   onOpenLightbox,
@@ -848,11 +883,19 @@ export function LedgerView({
   onUpdateSourcePaid,
   onUpdateBoosterPaid,
   ledgerDateFormat = 'relative',
+  searchQuery: propSearchQuery,
+  onSearchQueryChange,
+  statusFilter: propStatusFilter,
+  onStatusFilterChange,
 }) {
   const { t, language, isRtl, formatNumber, formatDate, formatLedgerGroupDate } = useLanguage();
   const isAdvertiser = activeProfileId === 'advertiser';
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const [internalStatusFilter, setInternalStatusFilter] = useState('');
+  const searchQuery = propSearchQuery !== undefined ? propSearchQuery : internalSearchQuery;
+  const setSearchQuery = onSearchQueryChange || setInternalSearchQuery;
+  const statusFilter = propStatusFilter !== undefined ? propStatusFilter : internalStatusFilter;
+  const setStatusFilter = onStatusFilterChange || setInternalStatusFilter;
   const [currencyFilter, setCurrencyFilter] = useState('');
   const [gameFilter, setGameFilter] = useState('');
   const [hasProofFilter, setHasProofFilter] = useState(false);
@@ -865,6 +908,39 @@ export function LedgerView({
   const [isFiltersPopoverOpen, setIsFiltersPopoverOpen] = useState(false);
   const filtersPopoverRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isCurrencyMenuOpen, setIsCurrencyMenuOpen] = useState(false);
+  const currencyDropdownRef = useRef(null);
+  const [currencyMenuPlacement, setCurrencyMenuPlacement] = useState({ align: 'left', flipUp: false });
+
+  useLayoutEffect(() => {
+    if (!isCurrencyMenuOpen || !currencyDropdownRef.current) return;
+    const rect = currencyDropdownRef.current.getBoundingClientRect();
+    const menuWidth = 176;
+    const menuHeight = 170;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let align = isRtl ? 'right' : 'left';
+    if (align === 'left' && rect.left + menuWidth > viewportWidth - 8) {
+      align = 'right';
+    } else if (align === 'right' && rect.right - menuWidth < 8) {
+      align = 'left';
+    }
+
+    const flipUp = rect.bottom + menuHeight > viewportHeight - 8;
+    setCurrencyMenuPlacement({ align, flipUp });
+  }, [isCurrencyMenuOpen, isRtl]);
+
+  useEffect(() => {
+    if (!isCurrencyMenuOpen) return;
+    const handleOutsideClick = (e) => {
+      if (currencyDropdownRef.current && !currencyDropdownRef.current.contains(e.target)) {
+        setIsCurrencyMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, [isCurrencyMenuOpen]);
   const [selectedDayKeys, setSelectedDayKeys] = useState(new Set());
   const [isSumCopied, setIsSumCopied] = useState(false);
   const [isDiscordBatchCopied, setIsDiscordBatchCopied] = useState(false);
@@ -945,16 +1021,15 @@ export function LedgerView({
   // Active filters count badge (popover filters)
   const activeSecondaryFiltersCount = useMemo(() => {
     let count = 0;
-    if (statusFilter) count++;
+    if (statusFilter && statusFilter !== 'ALL') count++;
     if (currencyFilter) count++;
     if (hasProofFilter) count++;
     if (teammateFilter) count++;
     if (sourceFilter) count++;
     if (isAdvertiser && settlementFilter) count++;
-    if (dateRangeFilter) count++;
     if (sortOption !== 'date_desc') count++;
     return count;
-  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, dateRangeFilter, sortOption]);
+  }, [statusFilter, currencyFilter, hasProofFilter, teammateFilter, sourceFilter, isAdvertiser, settlementFilter, sortOption]);
 
   const formatRowTime = useCallback(
     (dateTimeStr) => {
@@ -1042,7 +1117,7 @@ export function LedgerView({
       });
     }
 
-    if (statusFilter) {
+    if (statusFilter && statusFilter !== 'ALL') {
       list = list.filter((e) => e.status === statusFilter);
     }
 
@@ -1193,35 +1268,24 @@ export function LedgerView({
     };
   }, [filteredEntries, globalCurrency, rates]);
 
-  // Cockpit scroll detection: appears once the entire cockpit hero card has fully exited the user's viewport
-  const [showStickyBar, setShowStickyBar] = useState(false);
   const cockpitHeroRef = useRef(null);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
+    const container = cockpitHeroRef.current?.closest('.overflow-y-auto') || cockpitHeroRef.current?.closest('main') || window;
+    if (!container) return;
     const handleScroll = () => {
-      const hero = cockpitHeroRef.current;
-      if (!hero) return;
-
-      const containerTop = scrollContainer === window ? 0 : scrollContainer.getBoundingClientRect().top;
-      const heroBottom = hero.getBoundingClientRect().bottom;
-
-      // Fully exits: bottom of the cockpit hero card has scrolled past the top of the scroll container
-      const isExited = heroBottom <= containerTop + 2;
-      // Re-enter threshold with hysteresis buffer: dismisses when scrolling back up and hero re-enters by 35px
-      const isReEntering = heroBottom > containerTop + 35;
-
-      setShowStickyBar((prev) => {
-        if (!prev && isExited) return true;
-        if (prev && isReEntering) return false;
-        return prev;
-      });
+      const scrollTop = container === window ? window.scrollY : container.scrollTop;
+      setIsScrolled(scrollTop > 35);
     };
-
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    container.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleStatusFilterToggle = (status) => {
+    setStatusFilter((prev) => (prev === status ? '' : status));
+  };
 
   // Pagination calculation & auto-clamping
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / ITEMS_PER_PAGE));
@@ -1620,380 +1684,286 @@ ${itemsText}
 
   return (
     <div className="space-y-4 pb-20 md:pb-6 relative">
-      {/* 1. Independent Floating Sticky Island (zero-height in document flow so it never shifts layout or causes infinite scroll jitter) */}
-      <div className="sticky top-[calc(-1rem+6px)] sm:top-[calc(-1.5rem+6px)] lg:top-[calc(-2rem+6px)] z-40 h-0 pointer-events-none -mx-1 sm:mx-0">
-        <AnimatePresence>
-          {showStickyBar && (
-            <motion.div
-              key="cockpit-sticky-island"
-              initial={{ opacity: 0, y: -4, scale: 0.99 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.99 }}
-              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-              className="pointer-events-auto w-full"
-            >
-              <div
-                onClick={(e) => {
-                  if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
-                  const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
-                  scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="relative group rounded-xl bg-white/95 dark:bg-zinc-950/95 border border-zinc-200/90 dark:border-zinc-800 shadow-xl shadow-black/10 dark:shadow-black/50 backdrop-blur-md px-3.5 sm:px-4 py-2 cursor-pointer overflow-hidden transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2.5 flex-wrap sm:flex-nowrap" dir={isRtl ? 'rtl' : 'ltr'}>
-                  {/* Left: Total Earned + Currency Switcher + Filtered Chip */}
-                  <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
-                    <span className={cn('text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 shrink-0', isRtl && 'font-farsi')}>
-                      {isAdvertiser ? (language === 'fa' ? 'سود خالص' : 'Net Profit') : t('ledger.totalEarned')}:
-                    </span>
-                    <div className="text-base sm:text-lg font-medium tracking-tight text-zinc-800 dark:text-zinc-200 shrink-0">
-                      <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} />
-                    </div>
-
-                    {/* Currency Switcher Pill */}
-                    <div className="flex items-center bg-zinc-100 dark:bg-zinc-900/80 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => onCurrencyChange?.('TOMAN')}
-                        title="Display in Toman"
-                        className={`relative isolate flex items-center justify-center h-6 min-w-[38px] px-2 rounded-md text-[10px] transition-colors ${
-                          globalCurrency === 'TOMAN'
-                            ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                            : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                        }`}
-                      >
-                        {globalCurrency === 'TOMAN' && (
-                          <motion.div
-                            layoutId="stickyCurrencyPill"
-                            className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                          />
-                        )}
-                        <TomanIcon className="w-4 h-4 min-w-[16px] min-h-[16px] text-emerald-500 dark:text-emerald-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onCurrencyChange?.('GOLD')}
-                        title="Display in Gold"
-                        className={`relative isolate flex items-center justify-center h-6 min-w-[38px] px-2 rounded-md text-[10px] transition-colors ${
-                          globalCurrency === 'GOLD'
-                            ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                            : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                        }`}
-                      >
-                        {globalCurrency === 'GOLD' && (
-                          <motion.div
-                            layoutId="stickyCurrencyPill"
-                            className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                          />
-                        )}
-                        <span className="font-semibold tracking-wider text-[10px] text-amber-600 dark:text-amber-400 leading-none">GOLD</span>
-                      </button>
-                    </div>
-
-                    {filteredEntries.length !== entries.length && (
-                      <button
-                        type="button"
-                        onClick={handleClearFilters}
-                        title={t('ledger.clearFilters')}
-                        className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors shrink-0"
-                      >
-                        <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
-                        <X className="w-2.5 h-2.5 text-zinc-500" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Right: Progress completion text + Quick Search Jump */}
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                      <span className={cn('font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
-                        {formatNumber(metrics.completionRate)}%
-                      </span>
-                      <span className={cn('text-[11px]', isRtl && 'font-farsi')}>
-                        {t('status.Paid')}
-                      </span>
-                      {metrics.failedCount > 0 && (
-                        <span className={cn('text-[10px] text-rose-600 dark:text-rose-400', isRtl && 'font-farsi')}>
-                          • {formatNumber(metrics.failedCount)} {t('status.Failed')}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Quick Filter Search Jump Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        searchInputRef?.current?.focus();
-                        const scrollContainer = cockpitHeroRef.current?.closest('main') || document.querySelector('main') || window;
-                        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      title={language === 'fa' ? 'جستجو (فشردن /)' : 'Search jobs (Press /)'}
-                      className="flex items-center gap-1.5 h-7 px-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs transition-colors active:scale-95"
-                    >
-                      <Search className="w-3.5 h-3.5 text-zinc-500" />
-                      <span className={cn('hidden sm:inline text-[11px]', isRtl && 'font-farsi')}>{t('common.search', 'Search')}</span>
-                      <Kbd>/</Kbd>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Segmented Progress Bar as Bottom Border (Hover expands 2.5px -> 4px) */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 h-[2.5px] group-hover:h-[4px] transition-[height] duration-200 bg-zinc-200/80 dark:bg-zinc-800/80 flex overflow-hidden"
-                  title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}% | ${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%${metrics.totalFailed > 0 ? ` | ${t('status.Failed')}: ${Math.round((metrics.totalFailed / metrics.totalValue) * 100)}%` : ''}`}
-                >
-                  <div
-                    className="bg-emerald-500 h-full transition-all duration-300"
-                    style={{
-                      width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
-                    }}
-                  />
-                  <div
-                    className="bg-amber-500/90 h-full transition-all duration-300"
-                    style={{
-                      width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
-                    }}
-                  />
-                  {metrics.totalFailed > 0 && (
-                    <div
-                      className="bg-rose-500/90 h-full transition-all duration-300"
-                      style={{
-                        width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
-                      }}
-                    />
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* 2. Spacious Hero Cockpit Card (Persistent in document flow, never shrinks or jumps) */}
+      {/* 1. Morphing Horizon Cockpit (Resting 2-Column Hero Card vs Scrolled Slim Strip) */}
       <div
         ref={cockpitHeroRef}
-        className="relative overflow-hidden rounded-2xl bg-zinc-50/70 dark:bg-zinc-950/50 border border-zinc-200/80 dark:border-zinc-800/80 p-5 sm:p-7 shadow-xs mb-6 min-h-[290px]"
+        className={cn(
+          "sticky top-0 z-30 rounded-xl bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200/80 dark:border-zinc-800/80 backdrop-blur-md transition-all duration-200 shadow-xs relative",
+          isScrolled ? "px-3 sm:px-4 py-1.5 sm:py-2" : "px-4 sm:px-5 py-3 sm:py-3.5"
+        )}
       >
         {/* WebGPU Interactive Fluid Background */}
         <CockpitFluid isRtl={isRtl} containerRef={cockpitHeroRef} enabled={cockpitFluidEnabled} />
 
-        {/* Optical Text Scrim: Soft vertical gradient for high legibility over vibrant fluid dyes */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/65 via-white/20 to-white/70 dark:from-zinc-950/70 dark:via-zinc-950/25 dark:to-zinc-950/85 pointer-events-none rounded-[inherit]" />
+        <div
+          className={cn(
+            "relative z-10 flex justify-between gap-3 sm:gap-4 transition-all",
+            isScrolled
+              ? "items-center flex-wrap sm:flex-nowrap"
+              : "flex-col md:flex-row md:items-center"
+          )}
+          dir={isRtl ? 'rtl' : 'ltr'}
+        >
+          {/* Left Column: Total Balance & Modern Minimal Currency Selector Dropdown / Scroller */}
+          <div className={cn("min-w-0", isScrolled ? "flex items-center gap-3 flex-wrap" : "flex flex-col justify-center")}>
+            <span
+              className={cn(
+                'text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400 shrink-0',
+                !isScrolled && 'mb-0.5',
+                isRtl && 'font-farsi'
+              )}
+            >
+              {isAdvertiser ? (language === 'fa' ? 'سود خالص کل' : 'Total Net Profit') : t('ledger.totalEarned')}
+            </span>
 
-        <div className="relative z-10 space-y-4 sm:space-y-5" dir={isRtl ? 'rtl' : 'ltr'}>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={cn('text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-                {isAdvertiser ? (language === 'fa' ? 'سود خالص کل' : 'Total Net Profit') : t('ledger.totalEarned')}
-              </span>
-
-              {/* Currency Switcher Pill */}
-              <div className="flex items-center bg-zinc-100 dark:bg-zinc-950 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => onCurrencyChange?.('TOMAN')}
-                  title="Display in Toman (Press T to toggle)"
-                  className={`relative isolate flex items-center justify-center h-8 min-w-[50px] px-2.5 rounded-md text-[11px] transition-colors ${
-                    globalCurrency === 'TOMAN'
-                      ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  {globalCurrency === 'TOMAN' && (
-                    <motion.div
-                      layoutId="totalEarnedCurrencyPill"
-                      className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                    />
-                  )}
-                  <TomanIcon className="w-[26px] h-[26px] min-w-[26px] min-h-[26px] text-emerald-500 dark:text-emerald-400" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCurrencyChange?.('GOLD')}
-                  title="Display in Gold (Press T to toggle)"
-                  className={`relative isolate flex items-center justify-center h-8 min-w-[50px] px-2.5 rounded-md text-[11px] transition-colors ${
-                    globalCurrency === 'GOLD'
-                      ? 'text-zinc-800 dark:text-zinc-200 font-medium'
-                      : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-                  }`}
-                >
-                  {globalCurrency === 'GOLD' && (
-                    <motion.div
-                      layoutId="totalEarnedCurrencyPill"
-                      className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-md -z-10 shadow-sm border border-zinc-200 dark:border-zinc-700/80"
-                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                    />
-                  )}
-                  <span className="font-semibold tracking-wider text-[11px] text-amber-600 dark:text-amber-400 leading-none">GOLD</span>
-                </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Primary Balance Display */}
+              <div
+                className={cn(
+                  "font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 shrink-0 transition-all",
+                  isScrolled ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"
+                )}
+              >
+                <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} iconSize="0.9em" />
               </div>
 
-              {filteredEntries.length !== entries.length && (
+              {/* Minimal & Modern Currency Dropdown / Scroller Selector */}
+              <div className="relative" ref={currencyDropdownRef}>
                 <button
                   type="button"
-                  onClick={handleClearFilters}
-                  title={t('ledger.clearFilters')}
-                  className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300 border border-zinc-200 dark:border-zinc-800/80 transition-colors"
-                >
-                  <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
-                  <X className="w-2.5 h-2.5 text-zinc-500" />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>
-                {formatNumber(metrics.completionRate)}% {t('status.Paid')}
-              </span>
-              {metrics.failedCount > 0 && (
-                <span className={cn('text-[11px] text-rose-600 dark:text-rose-400', isRtl && 'font-farsi')}>
-                  • {formatNumber(metrics.failedCount)} {t('status.Failed')}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Spacious Hero Balance */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 py-1">
-            <div className="text-3xl sm:text-4xl font-medium tracking-tight text-zinc-800 dark:text-zinc-200 leading-tight">
-              <MoneyDisplay amount={metrics.totalPaid} currency={globalCurrency} iconSize="0.9em" />
-            </div>
-            {globalCurrency !== 'GOLD' && (
-              <ConvertedSecondaryDisplay
-                amount={metrics.totalPaid}
-                fromCurrency={globalCurrency}
-                targetCurrency="GOLD"
-                rates={rates}
-              />
-            )}
-          </div>
-
-          {/* Spacious Segmented Progress Bar */}
-          <div className="pt-1 pb-1">
-            <div className="h-3 w-full bg-zinc-100/90 dark:bg-zinc-950/90 rounded-full p-0.5 border border-zinc-200 dark:border-zinc-800/80 shadow-inner flex overflow-hidden">
-              <div
-                className={cn(
-                  'bg-emerald-500 h-full transition-all duration-300 relative group',
-                  metrics.totalPending === 0 && metrics.totalFailed === 0 ? 'rounded-full' : 'rounded-l-full'
-                )}
-                style={{
-                  width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
-                }}
-                title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}%`}
-              />
-              <div
-                className={cn(
-                  'bg-amber-500/80 h-full transition-all duration-300 relative group',
-                  metrics.totalPaid === 0 && metrics.totalFailed === 0
-                    ? 'rounded-full'
-                    : metrics.totalPaid === 0
-                    ? 'rounded-l-full'
-                    : metrics.totalFailed === 0
-                    ? 'rounded-r-full'
-                    : ''
-                )}
-                style={{
-                  width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
-                }}
-                title={`${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%`}
-              />
-              {metrics.totalFailed > 0 && (
-                <div
-                  className={cn(
-                    'bg-rose-500/80 h-full transition-all duration-300 relative group',
-                    metrics.totalPaid === 0 && metrics.totalPending === 0 ? 'rounded-full' : 'rounded-r-full'
-                  )}
-                  style={{
-                    width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
+                  onClick={() => setIsCurrencyMenuOpen((prev) => !prev)}
+                  onWheel={(e) => {
+                    e.preventDefault();
+                    const currencies = ['TOMAN', 'GOLD', 'USD', 'EUR'];
+                    const idx = currencies.indexOf(globalCurrency);
+                    const next = (idx + (e.deltaY > 0 ? 1 : -1) + currencies.length) % currencies.length;
+                    onCurrencyChange?.(currencies[next]);
                   }}
-                  title={`${t('status.Failed')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalFailed / metrics.totalValue) * 100) : 0}%`}
-                />
-              )}
+                  title={language === 'fa' ? 'تغییر ارز نمایشی (کلیک یا اسکرول)' : 'Display Currency (Click or scroll)'}
+                  className={cn(
+                    'h-7 px-2 rounded-lg border flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer select-none text-xs',
+                    isCurrencyMenuOpen
+                      ? 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700 shadow-xs'
+                      : 'bg-zinc-100/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-2xs'
+                  )}
+                >
+                  {globalCurrency === 'TOMAN' && (
+                    <TomanIcon className="w-[26px] h-[26px] min-w-[26px] min-h-[26px] text-emerald-500 dark:text-emerald-400" />
+                  )}
+                  {globalCurrency === 'GOLD' && (
+                    <span className="font-semibold text-[11px] tracking-wider text-amber-600 dark:text-amber-400 leading-none">
+                      GOLD
+                    </span>
+                  )}
+                  {globalCurrency === 'USD' && (
+                    <span className="font-semibold font-mono text-[11px] text-zinc-900 dark:text-zinc-100 leading-none">
+                      USD
+                    </span>
+                  )}
+                  {globalCurrency === 'EUR' && (
+                    <span className="font-semibold font-mono text-[11px] text-zinc-900 dark:text-zinc-100 leading-none">
+                      EUR
+                    </span>
+                  )}
+                  <ChevronDown className={cn("w-3 h-3 text-zinc-400 transition-transform duration-150", isCurrencyMenuOpen && "rotate-180")} />
+                </button>
+
+                <AnimatePresence>
+                  {isCurrencyMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                      transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
+                      dir={isRtl ? 'rtl' : 'ltr'}
+                      className={cn(
+                        'absolute w-44 p-1 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl z-50 text-xs space-y-0.5',
+                        currencyMenuPlacement.flipUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
+                        currencyMenuPlacement.align === 'right'
+                          ? (currencyMenuPlacement.flipUp ? 'right-0 origin-bottom-right' : 'right-0 origin-top-right')
+                          : (currencyMenuPlacement.flipUp ? 'left-0 origin-bottom-left' : 'left-0 origin-top-left')
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCurrencyChange?.('TOMAN');
+                          setIsCurrencyMenuOpen(false);
+                        }}
+                        className={cn(
+                          'w-full px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors text-xs select-none',
+                          globalCurrency === 'TOMAN'
+                            ? 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 font-medium'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <TomanIcon className="w-[26px] h-[26px] min-w-[26px] min-h-[26px] text-emerald-500 dark:text-emerald-400" />
+                          <span className="font-farsi">تومان</span>
+                        </div>
+                        {globalCurrency === 'TOMAN' && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCurrencyChange?.('GOLD');
+                          setIsCurrencyMenuOpen(false);
+                        }}
+                        className={cn(
+                          'w-full px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors text-xs select-none',
+                          globalCurrency === 'GOLD'
+                            ? 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 font-medium'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-[11px] text-amber-600 dark:text-amber-400 w-6 text-center">G</span>
+                          <span>Gold</span>
+                        </div>
+                        {globalCurrency === 'GOLD' && <Check className="w-3.5 h-3.5 text-amber-500" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCurrencyChange?.('USD');
+                          setIsCurrencyMenuOpen(false);
+                        }}
+                        className={cn(
+                          'w-full px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors text-xs select-none',
+                          globalCurrency === 'USD'
+                            ? 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 font-medium'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-medium text-xs w-6 text-center">$</span>
+                          <span>USD</span>
+                        </div>
+                        {globalCurrency === 'USD' && <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCurrencyChange?.('EUR');
+                          setIsCurrencyMenuOpen(false);
+                        }}
+                        className={cn(
+                          'w-full px-2 py-1.5 rounded-lg flex items-center justify-between transition-colors text-xs select-none',
+                          globalCurrency === 'EUR'
+                            ? 'bg-zinc-100 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 font-medium'
+                            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-medium text-xs w-6 text-center">€</span>
+                          <span>EUR</span>
+                        </div>
+                        {globalCurrency === 'EUR' && <Check className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" />}
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
-          {/* Spacious Cockpit Metric Tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-            {isAdvertiser ? (
-              <>
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'سفارشات تکمیل شده' : 'Orders Completed'}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
-                    {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
-                  </div>
-                </div>
+          {/* Right Column: 3 Metric Tiles (View Only, Exactly Equal Size) */}
+          <div className={cn("shrink-0", isScrolled ? "flex items-center gap-2 sm:gap-2.5" : "flex items-center gap-2 sm:gap-2.5")}>
+            {/* Tile 1: Jobs Completed / Orders */}
+            <div
+              className={cn(
+                "border transition-all text-start",
+                isScrolled
+                  ? "flex items-center justify-between gap-1.5 px-2.5 py-0.5 rounded-md text-xs bg-transparent border-zinc-200/80 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 h-7 min-w-[95px] sm:min-w-[110px]"
+                  : "flex flex-col justify-center px-3 py-1.5 rounded-lg w-[110px] sm:w-[124px] h-[52px] bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200/70 dark:border-zinc-800/70 text-zinc-500 dark:text-zinc-400"
+              )}
+            >
+              <span className={cn('text-[10px] uppercase font-medium truncate', isRtl && 'font-farsi')}>
+                {isAdvertiser ? (language === 'fa' ? 'سفارشات' : 'Orders') : t('ledger.jobsDone')}
+              </span>
+              <span className={cn("font-semibold text-zinc-900 dark:text-zinc-100 font-mono tabular-nums truncate", !isScrolled && "text-sm")}>
+                {formatNumber(metrics.paidCount)}
+                <span className="text-zinc-400 font-normal text-xs">/{formatNumber(filteredEntries.length)}</span>
+              </span>
+            </div>
 
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'در انتظار دریافت' : 'Pending Inflow'}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                    <MoneyDisplay amount={metrics.pendingInflow} currency={globalCurrency} compact={true} iconSize={26} />
-                  </div>
-                </div>
+            {/* Tile 2: Pending Inflow / Payout */}
+            <div
+              className={cn(
+                "border transition-all text-start",
+                isScrolled
+                  ? "flex items-center justify-between gap-1.5 px-2.5 py-0.5 rounded-md text-xs bg-transparent border-zinc-200/80 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 h-7 min-w-[95px] sm:min-w-[110px]"
+                  : "flex flex-col justify-center px-3 py-1.5 rounded-lg w-[110px] sm:w-[124px] h-[52px] bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200/70 dark:border-zinc-800/70 text-zinc-500 dark:text-zinc-400"
+              )}
+            >
+              <span className={cn('text-[10px] uppercase font-medium truncate', isRtl && 'font-farsi')}>
+                {isAdvertiser ? (language === 'fa' ? 'در انتظار' : 'Pending') : t('ledger.pendingPayout')}
+              </span>
+              <span className={cn("font-semibold text-zinc-900 dark:text-zinc-100 truncate", !isScrolled && "text-sm")}>
+                <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26} />
+              </span>
+            </div>
 
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <Users className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'سهم بوسترها' : 'Booster Payouts'}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                    <MoneyDisplay amount={metrics.boosterPayouts} currency={globalCurrency} compact={true} iconSize={26} />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.jobsDone')}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200">
-                    {formatNumber(metrics.paidCount)} <span className="text-xs text-zinc-500 font-normal">/ {formatNumber(filteredEntries.length)}</span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/85 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <Clock className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.pendingPayout')}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                    <MoneyDisplay amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26} />
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-zinc-50/90 dark:bg-black/80 border border-zinc-200/80 dark:border-white/[0.07] ring-1 ring-inset ring-black/5 dark:ring-white/[0.04] shadow-xs p-3 sm:p-3.5 space-y-1 col-span-2 sm:col-span-1 transition-colors backdrop-blur-md">
-                  <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-medium tracking-wider">
-                    <TrendingUp className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-                    <span className={cn(isRtl && 'font-farsi')}>{t('ledger.averageRate')}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-medium text-zinc-800 dark:text-zinc-200 truncate flex items-center">
-                    <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26} />
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Tile 3: Average Rate / Booster Cuts */}
+            <div
+              className={cn(
+                "border transition-all text-start hidden sm:flex",
+                isScrolled
+                  ? "items-center justify-between gap-1.5 px-2.5 py-0.5 rounded-md text-xs bg-transparent border-zinc-200/80 dark:border-zinc-800/80 text-zinc-500 dark:text-zinc-400 h-7 min-w-[95px] sm:min-w-[110px]"
+                  : "flex-col justify-center px-3 py-1.5 rounded-lg w-[110px] sm:w-[124px] h-[52px] bg-zinc-50/70 dark:bg-zinc-900/60 border-zinc-200/70 dark:border-zinc-800/70 text-zinc-500 dark:text-zinc-400"
+              )}
+            >
+              <span className={cn('text-[10px] uppercase font-medium truncate', isRtl && 'font-farsi')}>
+                {isAdvertiser ? (language === 'fa' ? 'سهم بوسترها' : 'Booster Payouts') : t('ledger.averageRate')}
+              </span>
+              <span className={cn("font-semibold text-zinc-900 dark:text-zinc-100 truncate", !isScrolled && "text-sm")}>
+                {isAdvertiser ? (
+                  <MoneyDisplay amount={metrics.boosterPayouts} currency={globalCurrency} compact={true} iconSize={26} />
+                ) : (
+                  <MoneyDisplay amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26} />
+                )}
+              </span>
+            </div>
           </div>
+        </div>
+
+        {/* Bottom Hairline Progress Bar */}
+        <div
+          className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-200/80 dark:bg-zinc-800/80 flex overflow-hidden"
+          title={`${t('status.Paid')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPaid / metrics.totalValue) * 100) : 0}% | ${t('status.Pending')}: ${metrics.totalValue > 0 ? Math.round((metrics.totalPending / metrics.totalValue) * 100) : 0}%${metrics.totalFailed > 0 ? ` | ${t('status.Failed')}: ${Math.round((metrics.totalFailed / metrics.totalValue) * 100)}%` : ''}`}
+        >
+          <div
+            className="bg-emerald-500 h-full transition-all duration-300"
+            style={{
+              width: `${metrics.totalValue > 0 ? (metrics.totalPaid / metrics.totalValue) * 100 : (metrics.paidCount > 0 ? 100 : 0)}%`,
+            }}
+          />
+          <div
+            className="bg-amber-500 h-full transition-all duration-300"
+            style={{
+              width: `${metrics.totalValue > 0 ? (metrics.totalPending / metrics.totalValue) * 100 : 0}%`,
+            }}
+          />
+          {metrics.totalFailed > 0 && (
+            <div
+              className="bg-rose-500 h-full transition-all duration-300"
+              style={{
+                width: `${metrics.totalValue > 0 ? (metrics.totalFailed / metrics.totalValue) * 100 : 0}%`,
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Clean Monochromatic Separator Line */}
-      <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800/80" />
 
-      {/* 3. Game Categories & Minimalist Unified Filter Bar */}
-      <div className="relative z-30 space-y-2.5">
-        {/* Top Tier: Game Categories Horizontal Segmented Track */}
+      {/* 2. Quiet Secondary Filter Strip (Game Categories & Date Range Presets & Batch Actions) */}
+      <div className="flex items-center justify-between gap-2 py-0.5 select-none relative" dir={isRtl ? 'rtl' : 'ltr'}>
+        {/* Game Categories */}
         {gameCategories.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap scroll-smooth py-0.5 select-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 min-w-0 max-w-[50%]">
             {gameCategories.map((cat) => {
               const isSelected = gameFilter === cat.id;
               const catMeta = cat.id ? getCategoryByName(cat.id, categories) : null;
@@ -2008,126 +1978,128 @@ ${itemsText}
                     isSelected && accentColor
                       ? {
                           borderColor: `${accentColor}80`,
-                          boxShadow: `0 0 10px ${accentColor}20`,
+                          boxShadow: `0 0 8px ${accentColor}20`,
                         }
                       : undefined
                   }
                   className={cn(
-                    'h-7 px-2.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all shrink-0 border active:scale-[0.97]',
+                    'h-6 px-2 rounded-md text-[11px] font-medium flex items-center gap-1 transition-all shrink-0 border active:scale-[0.98]',
                     isSelected
-                      ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700 shadow-xs font-medium'
-                      : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 dark:bg-[#0c0c0c] dark:text-zinc-400 dark:hover:text-zinc-200 dark:border-zinc-800/80 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/60'
+                      ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 shadow-xs'
+                      : 'bg-transparent text-zinc-500 hover:text-zinc-900 border-zinc-200 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/40'
                   )}
                 >
                   {cat.id && (
-                    <GameIcon game={cat.id} categories={categories} className="w-3.5 h-3.5 object-contain shrink-0" />
-                  )}
-                  {isSelected && accentColor && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
-                      style={{ backgroundColor: accentColor }}
-                    />
+                    <GameIcon game={cat.id} categories={categories} className="w-3 h-3 object-contain shrink-0" />
                   )}
                   <span className={cn(isRtl && 'font-farsi')}>{cat.label}</span>
-                  <span
-                    className={cn(
-                      'text-[10px] px-1 rounded leading-tight',
-                      isSelected
-                        ? 'bg-zinc-300/80 text-zinc-900 dark:bg-zinc-700/80 dark:text-zinc-200 font-medium'
-                        : 'bg-zinc-200/80 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400'
-                    )}
-                  >
-                    {formatNumber(cat.count)}
-                  </span>
+                  <span className="text-[9px] text-zinc-400">{formatNumber(cat.count)}</span>
                 </button>
               );
             })}
           </div>
         )}
 
-        {/* Bottom Tier: Minimal Unified Desktop Toolbar */}
-        <div className="flex items-center justify-between gap-3 w-full">
-          {/* Always-Accessible Search Input with Embedded Filters Icon Button */}
-          <div className="relative flex-1 max-w-sm sm:max-w-md" dir={isRtl ? 'rtl' : 'ltr'}>
-            <Search
+        {/* Date Range Presets, Filter Popover & Discord Batch Export */}
+        <div className="flex items-center gap-1 shrink-0 ms-auto">
+          {/* Quick Date Range Pills */}
+          <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[10px]">
+            {[
+              { id: '', label: t('ledger.dateRangeAll', 'All') },
+              { id: 'today', label: t('ledger.dateRangeToday', 'Today') },
+              { id: 'yesterday', label: t('ledger.dateRangeYesterday', 'Yesterday') },
+              { id: 'week', label: t('ledger.dateRangeThisWeek', 'Week') },
+              { id: 'month', label: t('ledger.dateRangeThisMonth', 'Month') },
+              { id: 'last_month', label: t('ledger.dateRangeLastMonth', 'Last Month') },
+            ].map((preset) => {
+              const isCurrent = dateRangeFilter === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setDateRangeFilter(preset.id)}
+                  className={cn(
+                    'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                    isCurrent
+                      ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                  )}
+                >
+                  <span className={cn(isRtl && 'font-farsi')}>{preset.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Discord Batch Export button if items selected */}
+          {selectedEntriesList.length > 0 && (
+            <button
+              type="button"
+              onClick={handleCopyDiscordBatch}
+              title="Copy Discord Batch Summary"
               className={cn(
-                'absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none',
-                isRtl ? 'right-2.5' : 'left-2.5'
-              )}
-            />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder={t('ledger.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                'h-8 text-xs bg-white dark:bg-[#0c0c0c] border-zinc-200 dark:border-zinc-800/80 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-500 dark:placeholder:text-zinc-600 focus:border-zinc-400 dark:focus:border-zinc-700',
-                isRtl
-                  ? 'font-farsi placeholder:font-farsi text-right pr-8 pl-12'
-                  : 'pl-8 pr-12'
-              )}
-            />
-            <div
-              className={cn(
-                'absolute top-1/2 -translate-y-1/2 flex items-center gap-1',
-                isRtl ? 'left-2' : 'right-2'
+                'h-6 px-2 rounded-md text-[10px] font-medium flex items-center gap-1 border transition-colors',
+                isDiscordBatchCopied
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800'
               )}
             >
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    searchInputRef?.current?.focus();
-                  }}
-                  className="w-4 h-4 rounded flex items-center justify-center text-xs text-zinc-500 hover:text-zinc-300 active:scale-95"
-                  title="Clear search"
-                >
-                  ✕
-                </button>
+              <DiscordIcon className="w-3 h-3" />
+              <span>{isDiscordBatchCopied ? (language === 'fa' ? 'کپی شد' : 'Copied!') : 'Discord'}</span>
+            </button>
+          )}
+
+          {/* Active Filter Clear Chip */}
+          {filteredEntries.length !== entries.length && (
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              title={t('ledger.clearFilters')}
+              className="flex items-center gap-1 text-[10px] h-6 px-2 rounded-md bg-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800 transition-colors shrink-0"
+            >
+              <span className={cn(isRtl && 'font-farsi')}>{t('ledger.filtered')} ({formatNumber(filteredEntries.length)}/{formatNumber(entries.length)})</span>
+              <X className="w-2.5 h-2.5 text-zinc-500" />
+            </button>
+          )}
+
+          {/* Deep Filters Popover Trigger */}
+          <div className="relative" ref={filtersPopoverRef}>
+            <button
+              type="button"
+              onClick={() => setIsFiltersPopoverOpen((prev) => !prev)}
+              title={t('ledger.filters')}
+              className={cn(
+                'h-6 px-1.5 rounded-md flex items-center gap-1 text-[10px] font-medium transition-all active:scale-95 border',
+                isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
+                  ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 shadow-xs'
+                  : 'bg-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900'
               )}
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+              {activeSecondaryFiltersCount > 0 && (
+                <span className="w-3.5 h-3.5 rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900 text-[9px] font-medium flex items-center justify-center leading-none">
+                  {activeSecondaryFiltersCount}
+                </span>
+              )}
+            </button>
 
-              {/* Embedded Filters Icon Button */}
-              <div className="relative" ref={filtersPopoverRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsFiltersPopoverOpen((prev) => !prev)}
-                  title={t('ledger.filters')}
+            {/* Hidden fallback search input for ref preservation */}
+            <input ref={searchInputRef} type="text" className="sr-only" tabIndex={-1} aria-hidden="true" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+
+            {/* Origin-aware Popover Dropdown */}
+            <AnimatePresence>
+              {isFiltersPopoverOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                  transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+                  dir={isRtl ? 'rtl' : 'ltr'}
                   className={cn(
-                    'relative w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-95 border',
-                    isFiltersPopoverOpen || activeSecondaryFiltersCount > 0
-                      ? 'bg-zinc-200 text-zinc-900 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 shadow-xs'
-                      : 'bg-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                    'absolute top-full mt-2 w-72 sm:w-80 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-50 space-y-3 text-xs',
+                    isRtl ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
                   )}
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                  {activeSecondaryFiltersCount > 0 && (
-                    <span
-                      className={cn(
-                        'absolute -top-1 w-3.5 h-3.5 rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-200 dark:text-zinc-900 text-[9px] font-medium flex items-center justify-center leading-none',
-                        isRtl ? '-left-1' : '-right-1'
-                      )}
-                    >
-                      {activeSecondaryFiltersCount}
-                    </span>
-                  )}
-                </button>
-
-                {/* Origin-aware Popover Dropdown */}
-                <AnimatePresence>
-                  {isFiltersPopoverOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.96, y: -4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.96, y: -4 }}
-                      transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
-                      dir={isRtl ? 'rtl' : 'ltr'}
-                      className={cn(
-                        'absolute top-full mt-2 w-72 sm:w-80 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-50 space-y-3 text-xs',
-                        isRtl ? 'left-0 origin-top-left' : 'right-0 origin-top-right'
-                      )}
-                    >
                   <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                     <span className={cn('font-medium text-zinc-800 dark:text-zinc-200 text-xs', isRtl && 'font-farsi')}>
                       {t('ledger.filters')}
@@ -2227,7 +2199,7 @@ ${itemsText}
                           )}
                         >
                           <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <span className="truncate">{language === 'fa' ? 'طلب از مشتری' : 'Client Due'}</span>
+                          <span className="truncate">{language === 'fa' ? 'طلب از سورس' : 'Source Payout'}</span>
                         </button>
                         <button
                           type="button"
@@ -2240,7 +2212,7 @@ ${itemsText}
                           )}
                         >
                           <Clock className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                          <span className="truncate">{language === 'fa' ? 'بدهی به بوستر' : 'Booster Due'}</span>
+                          <span className="truncate">{language === 'fa' ? 'تسویه بوستر' : 'Booster Payout'}</span>
                         </button>
                         <button
                           type="button"
@@ -2253,7 +2225,7 @@ ${itemsText}
                           )}
                         >
                           <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          <span className="truncate">{language === 'fa' ? 'تسویه مشتری' : 'Client Paid'}</span>
+                          <span className="truncate">{language === 'fa' ? 'تسویه سورس' : 'Source Paid'}</span>
                         </button>
                         <button
                           type="button"
@@ -2277,7 +2249,7 @@ ${itemsText}
                     <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
                       {t('ledger.filterCurrency', 'Currency')}
                     </label>
-                    <div className="grid grid-cols-3 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <div className="grid grid-cols-5 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
                       <button
                         type="button"
                         onClick={() => setCurrencyFilter('')}
@@ -2315,6 +2287,30 @@ ${itemsText}
                       >
                         <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px] text-zinc-500 dark:text-zinc-400" />
                         <span className="font-farsi">تومان</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCurrencyFilter('USD')}
+                        className={cn(
+                          'py-1 rounded text-[11px] font-medium transition-colors text-center flex items-center justify-center gap-1 active:scale-95',
+                          currencyFilter === 'USD'
+                            ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <span className="font-mono">USD</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCurrencyFilter('EUR')}
+                        className={cn(
+                          'py-1 rounded text-[11px] font-medium transition-colors text-center flex items-center justify-center gap-1 active:scale-95',
+                          currencyFilter === 'EUR'
+                            ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent'
+                            : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                        )}
+                      >
+                        <span className="font-mono">EUR</span>
                       </button>
                     </div>
                   </div>
@@ -2388,40 +2384,6 @@ ${itemsText}
                     </div>
                   )}
 
-                  {/* 5.5. Date Range Presets */}
-                  <div className="space-y-1.5">
-                    <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
-                      {t('ledger.dateRange', 'Date Range')}
-                    </label>
-                    <div className="grid grid-cols-3 gap-1 bg-zinc-100 dark:bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                      {[
-                        { id: '', label: t('ledger.dateRangeAll', 'All Time') },
-                        { id: 'today', label: t('ledger.dateRangeToday', 'Today') },
-                        { id: 'yesterday', label: t('ledger.dateRangeYesterday', 'Yesterday') },
-                        { id: 'week', label: t('ledger.dateRangeThisWeek', 'This Week') },
-                        { id: 'month', label: t('ledger.dateRangeThisMonth', 'This Month') },
-                        { id: 'last_month', label: t('ledger.dateRangeLastMonth', 'Last Month') },
-                      ].map((preset) => {
-                        const isCurrent = dateRangeFilter === preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => setDateRangeFilter(preset.id)}
-                            className={cn(
-                              'py-1 px-1 rounded text-[10px] font-medium transition-colors text-center active:scale-95 truncate',
-                              isCurrent
-                                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 shadow-xs border border-zinc-200/80 dark:border-transparent font-medium'
-                                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                            )}
-                          >
-                            <span className={cn(isRtl && 'font-farsi')}>{preset.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
                   {/* 6. Sort Dropdown */}
                   <div className="space-y-1.5">
                     <label className={cn('text-[10px] uppercase font-medium text-zinc-500 dark:text-zinc-400 block', isRtl && 'font-farsi')}>
@@ -2437,8 +2399,6 @@ ${itemsText}
                 </motion.div>
               )}
             </AnimatePresence>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -2476,7 +2436,7 @@ ${itemsText}
             const isDaySelected = selectedDayKeys.has(groupTitle);
 
             return (
-              <div key={groupTitle} className="space-y-2">
+              <div key={groupTitle} className="space-y-2 group/day-section relative">
                 {/* Daily Group Header */}
                 <div className="flex items-center justify-between px-1 py-1">
                   <div className="flex items-center gap-2">
@@ -2497,6 +2457,7 @@ ${itemsText}
                     title={isDaySelected ? t('ledger.deselectDayTitle') : t('ledger.selectDayTitle')}
                     className={cn(
                       'group/day-total flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] transition-all select-none border cursor-pointer',
+                      !isDaySelected && 'opacity-0 group-hover/day-section:opacity-100 transition-opacity duration-150',
                       isDaySelected
                         ? 'bg-zinc-900 text-zinc-100 font-medium border-zinc-900 dark:bg-zinc-900 dark:text-zinc-200 dark:border-zinc-700/80 shadow-sm'
                         : 'bg-white hover:bg-zinc-100/80 text-zinc-600 hover:text-zinc-900 border-zinc-200 hover:border-zinc-300 dark:bg-transparent dark:border-zinc-800/60 dark:text-zinc-500 dark:hover:border-zinc-700/70 dark:hover:text-zinc-400'
@@ -2561,6 +2522,7 @@ ${itemsText}
                       isRtl={isRtl}
                       t={t}
                       formatRowTime={formatRowTime}
+                      onOpenWorkModal={onOpenWorkModal}
                       onOpenReceipt={onOpenReceipt}
                       onOpenLightbox={onOpenLightbox}
                       handleToggleEntrySelection={handleToggleEntrySelection}

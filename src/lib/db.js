@@ -28,7 +28,7 @@ const STORE_SNAPSHOTS = 'db_snapshots';
 const REQUIRED_WORK_ENTRY_COLUMNS = [
   'id', 'title', 'game', 'source', 'teamMode', 'teammates', 'income', 'currency',
   'exchangeRate', 'rateUnit', 'status', 'dateTime', 'hours', 'notes', 'link',
-  'pot', 'teamInputMode', 'teammateCuts', 'orderId', 'feeRate', 'sourcePaid',
+  'pot', 'teamInputMode', 'teammateCuts', 'teammateNotes', 'orderId', 'feeRate', 'sourcePaid',
   'feeType', 'boosterPaid', 'platformFee',
 ];
 
@@ -42,6 +42,7 @@ const WORK_ENTRY_COLUMN_MIGRATIONS = {
   pot: 'ALTER TABLE work_entries ADD COLUMN pot REAL DEFAULT NULL;',
   teamInputMode: "ALTER TABLE work_entries ADD COLUMN teamInputMode TEXT DEFAULT 'pot';",
   teammateCuts: "ALTER TABLE work_entries ADD COLUMN teammateCuts TEXT DEFAULT '{}';",
+  teammateNotes: "ALTER TABLE work_entries ADD COLUMN teammateNotes TEXT DEFAULT '{}';",
   orderId: "ALTER TABLE work_entries ADD COLUMN orderId TEXT DEFAULT '';",
   feeRate: 'ALTER TABLE work_entries ADD COLUMN feeRate REAL DEFAULT NULL;',
   sourcePaid: 'ALTER TABLE work_entries ADD COLUMN sourcePaid INTEGER DEFAULT 0;',
@@ -519,6 +520,7 @@ export class StorageDB {
         pot REAL DEFAULT NULL,
         teamInputMode TEXT DEFAULT 'pot',
         teammateCuts TEXT DEFAULT '{}',
+        teammateNotes TEXT DEFAULT '{}',
         orderId TEXT DEFAULT '',
         feeRate REAL DEFAULT NULL,
         sourcePaid INTEGER DEFAULT 0,
@@ -766,7 +768,7 @@ export class StorageDB {
         const rows = await this.sqliteDb.select(`
           SELECT 
             w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
-            w.pot, w.teamInputMode, w.teammateCuts, w.orderId, w.feeRate, w.sourcePaid, w.feeType, w.boosterPaid, w.platformFee,
+            w.pot, w.teamInputMode, w.teammateCuts, w.teammateNotes, w.orderId, w.feeRate, w.sourcePaid, w.feeType, w.boosterPaid, w.platformFee,
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -793,6 +795,12 @@ export class StorageDB {
             else if (r.teammateCuts && typeof r.teammateCuts === 'object') parsedTeammateCuts = r.teammateCuts;
           } catch (e) {}
 
+          let parsedTeammateNotes = {};
+          try {
+            if (typeof r.teammateNotes === 'string') parsedTeammateNotes = JSON.parse(r.teammateNotes);
+            else if (r.teammateNotes && typeof r.teammateNotes === 'object') parsedTeammateNotes = r.teammateNotes;
+          } catch (e) {}
+
           return {
             ...r,
             source: r.source || '',
@@ -805,6 +813,7 @@ export class StorageDB {
             pot: r.pot !== null && r.pot !== undefined ? Number(r.pot) : null,
             teamInputMode: r.teamInputMode === 'income' ? 'income' : 'pot',
             teammateCuts: parsedTeammateCuts,
+            teammateNotes: parsedTeammateNotes,
             orderId: r.orderId || '',
             feeRate: r.feeRate !== null && r.feeRate !== undefined && !isNaN(Number(r.feeRate)) ? Number(r.feeRate) : null,
             sourcePaid: Boolean(r.sourcePaid),
@@ -847,6 +856,7 @@ export class StorageDB {
             pot: entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null,
             teamInputMode: entry.teamInputMode === 'income' ? 'income' : 'pot',
             teammateCuts: entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {},
+            teammateNotes: entry.teammateNotes && typeof entry.teammateNotes === 'object' ? entry.teammateNotes : {},
             orderId: entry.orderId || '',
             feeRate: entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null,
             sourcePaid: Boolean(entry.sourcePaid),
@@ -902,6 +912,13 @@ export class StorageDB {
           entry.teammateCuts = {};
         }
 
+        try {
+          if (typeof entry.teammateNotes === 'string') entry.teammateNotes = JSON.parse(entry.teammateNotes);
+          else if (!entry.teammateNotes || typeof entry.teammateNotes !== 'object') entry.teammateNotes = {};
+        } catch (e) {
+          entry.teammateNotes = {};
+        }
+
         // Fetch full proofs attachments
         const proofRows = await this.sqliteDb.select(
           'SELECT id, name, data_blob as data, size, created_at as createdAt FROM proof_attachments WHERE entry_id = ? ORDER BY created_at ASC',
@@ -938,6 +955,7 @@ export class StorageDB {
           entry.pot = entry.pot !== null && entry.pot !== undefined ? Number(entry.pot) : null;
           entry.teamInputMode = entry.teamInputMode === 'income' ? 'income' : 'pot';
           entry.teammateCuts = entry.teammateCuts && typeof entry.teammateCuts === 'object' ? entry.teammateCuts : {};
+          entry.teammateNotes = entry.teammateNotes && typeof entry.teammateNotes === 'object' ? entry.teammateNotes : {};
           entry.orderId = entry.orderId || '';
           entry.feeRate = entry.feeRate !== null && entry.feeRate !== undefined && !isNaN(Number(entry.feeRate)) ? Number(entry.feeRate) : null;
           entry.sourcePaid = Boolean(entry.sourcePaid);
@@ -969,6 +987,7 @@ export class StorageDB {
       : null;
     const finalTeamInputMode = cleanEntry.teamInputMode === 'income' ? 'income' : 'pot';
     const teammateCutsJson = JSON.stringify(cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {});
+    const teammateNotesJson = JSON.stringify(cleanEntry.teammateNotes && typeof cleanEntry.teammateNotes === 'object' ? cleanEntry.teammateNotes : {});
     const finalOrderId = typeof cleanEntry.orderId === 'string' ? cleanEntry.orderId.trim() : '';
     const finalFeeRate = cleanEntry.feeRate !== null && cleanEntry.feeRate !== undefined && !Number.isNaN(Number(cleanEntry.feeRate))
       ? Number(cleanEntry.feeRate)
@@ -987,6 +1006,7 @@ export class StorageDB {
     cleanEntry.pot = finalPot;
     cleanEntry.teamInputMode = finalTeamInputMode;
     cleanEntry.teammateCuts = cleanEntry.teammateCuts && typeof cleanEntry.teammateCuts === 'object' ? cleanEntry.teammateCuts : {};
+    cleanEntry.teammateNotes = cleanEntry.teammateNotes && typeof cleanEntry.teammateNotes === 'object' ? cleanEntry.teammateNotes : {};
     cleanEntry.orderId = finalOrderId;
     cleanEntry.feeRate = finalFeeRate;
     cleanEntry.sourcePaid = Boolean(finalSourcePaid);
@@ -1001,8 +1021,8 @@ export class StorageDB {
 
       try {
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, orderId, feeRate, sourcePaid, feeType, boosterPaid, platformFee, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, teammateNotes, orderId, feeRate, sourcePaid, feeType, boosterPaid, platformFee, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -1022,6 +1042,7 @@ export class StorageDB {
             finalPot,
             finalTeamInputMode,
             teammateCutsJson,
+            teammateNotesJson,
             finalOrderId,
             finalFeeRate,
             finalSourcePaid,

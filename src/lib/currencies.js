@@ -63,7 +63,7 @@ export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold', 'Failed'];
 
 export const STATUS_LABELS = {
   Paid: 'پرداخت شده',
-  Pending: 'درحال انتظار',
+  Pending: 'تکمیل شده',
   Working: 'درحال انجام',
   'On Hold': 'توقف موقت',
   Failed: 'ناموفق',
@@ -78,7 +78,7 @@ export const STATUS_CONFIG = {
     next: 'Pending',
   },
   Pending: {
-    label: 'درحال انتظار',
+    label: 'تکمیل شده',
     color: 'amber',
     badgeClass: 'bg-amber-950/40 text-amber-400 border border-amber-800/40 hover:bg-amber-900/40',
     dotClass: 'bg-amber-400',

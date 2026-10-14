@@ -35,7 +35,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/90"
+            className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm"
           />
 
           {/* Lightbox Container */}
@@ -74,7 +74,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
             </div>
 
             {/* Image Preview Canvas */}
-            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/80">
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-zinc-950/60">
               <img
                 src={imgSrc}
                 alt={caption}

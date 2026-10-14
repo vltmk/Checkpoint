@@ -60,6 +60,7 @@ AGENTS.md
 .cursorrules
 .windsurfrules
 agents
+.agents/
 
 # Scratch & Staging
 /fluid/

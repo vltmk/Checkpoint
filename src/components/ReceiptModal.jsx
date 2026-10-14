@@ -16,7 +16,7 @@ import {
   Users,
   Store,
 } from 'lucide-react';
-import { CheckpointLogo } from './ui/Icons';
+import { CheckpointLogo, DiscordIcon } from './ui/Icons';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../lib/desktop';
 import { toBlob } from 'html-to-image';
 import { incrementLocalReceiptCount } from '../lib/telemetry';
@@ -106,6 +106,7 @@ export function ReceiptModal({
   const [copiedState, setCopiedState] = useState(false);
   const [copiedDiscord, setCopiedDiscord] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
+  const [copiedBoosterSlip, setCopiedBoosterSlip] = useState(null);
   const [receiptLang, setReceiptLang] = useState(language);
   const isAdvertiser = activeProfileId === 'advertiser';
   const [receiptMode, setReceiptMode] = useState('client'); // 'client' | 'booster'
@@ -419,6 +420,40 @@ Work Description = ${currentSafeEntry.notes || 'None'}
   ]);
 
   const handleCopyDiscordMarkdown = handleCopyDiscord;
+
+  const handleCopySingleBoosterDiscord = useCallback(async (e, tm) => {
+    e.stopPropagation();
+    if (!entry) return;
+    const cut = safeEntry.teammateCuts?.[tm] || safeEntry.income || 0;
+    const formattedCut = formatMoney(cut, entryCurrency, false, isReceiptFa);
+    const boosterNote = safeEntry.teammateNotes?.[tm]?.trim();
+    const md = isReceiptFa
+      ? `\`\`\`ini
+[ فیش تسویه بوستر CHECKPOINT ]
+شناسه      = ${receiptId}${safeEntry.orderId ? `\nشماره سفارش = #${safeEntry.orderId}` : ''}
+تاریخ      = ${dateStr}
+بازی       = ${safeEntry.game || 'World of Warcraft'}
+عنوان      = ${safeEntry.title || 'سفارش ثبت‌شده'}
+سورس       = ${safeEntry.source || 'سورس مستقیم'}
+بوستر      = @${tm}
+مبلغ تسویه = ${formattedCut}
+وضعیت      = ${t(`status.${safeEntry.status || 'Paid'}`)}${boosterNote ? `\nیادداشت    = ${boosterNote}` : ''}
+\`\`\``
+      : `\`\`\`ini
+[ CHECKPOINT - BOOSTER PAYOUT SLIP ]
+ID         = ${receiptId}${safeEntry.orderId ? `\nOrder ID   = #${safeEntry.orderId}` : ''}
+Date       = ${dateStr}
+Game       = ${safeEntry.game || 'World of Warcraft'}
+Title      = ${safeEntry.title || 'Work Record'}
+Source     = ${safeEntry.source || '-'}
+Booster    = @${tm}
+Payout     = ${formattedCut}
+Status     = ${safeEntry.status || 'Paid'}${boosterNote ? `\nNote       = ${boosterNote}` : ''}
+\`\`\``;
+    await copyTextNative(md);
+    setCopiedBoosterSlip(tm);
+    setTimeout(() => setCopiedBoosterSlip(null), 1800);
+  }, [entry, safeEntry, entryCurrency, isReceiptFa, receiptId, dateStr, t]);
 
   // Screenshot & Copy Image to Clipboard
   const handleScreenshotCopy = useCallback(async () => {
@@ -795,21 +830,39 @@ Work Description = ${currentSafeEntry.notes || 'None'}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {safeEntry.teammates.map((tm) => {
                       const cut = safeEntry.teammateCuts?.[tm] || (safeEntry.pot ? safeEntry.pot - safeEntry.income : safeEntry.income);
+                      const isSlipCopied = copiedBoosterSlip === tm;
                       return (
-                        <button
-                          key={tm}
-                          type="button"
-                          onClick={() => {
-                            onFilterTeammate?.(tm);
-                            onClose?.();
-                          }}
-                          title={`Filter ledger for ${tm} (Payout: ${formatMoney(cut, entryCurrency, false, isReceiptFa)})`}
-                          className="px-2 py-0.5 rounded-md text-xs font-medium bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 border border-zinc-200 dark:border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
-                        >
-                          <Users className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
-                          <span>{tm}</span>
-                          <span className="text-zinc-500 dark:text-zinc-400 text-[10px] inline-flex items-center">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
-                        </button>
+                        <div key={tm} className="inline-flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-md p-0.5 border border-zinc-200 dark:border-zinc-700">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onFilterTeammate?.(tm);
+                              onClose?.();
+                            }}
+                            title={`Filter ledger for ${tm} (Payout: ${formatMoney(cut, entryCurrency, false, isReceiptFa)})`}
+                            className="px-1.5 py-0.5 rounded text-xs font-medium text-zinc-800 hover:text-zinc-900 dark:text-zinc-200 dark:hover:text-zinc-100 transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Users className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
+                            <span>{tm}</span>
+                            <span className="text-zinc-500 dark:text-zinc-400 text-[10px] inline-flex items-center">(<MoneyDisplay amount={cut} currency={entryCurrency} />)</span>
+                            {safeEntry.teammateNotes?.[tm] && (
+                              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 italic max-w-[120px] truncate" title={safeEntry.teammateNotes[tm]}>
+                                • {safeEntry.teammateNotes[tm]}
+                              </span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopySingleBoosterDiscord(e, tm)}
+                            title={isReceiptFa ? `کپی فیش دیسکورد برای ${tm}` : `Copy Discord slip for ${tm}`}
+                            className={cn(
+                              "p-1 rounded text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer",
+                              isSlipCopied && "text-emerald-500 dark:text-emerald-400"
+                            )}
+                          >
+                            {isSlipCopied ? <Check className="w-3 h-3 stroke-[3]" /> : <DiscordIcon className="w-3 h-3" />}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

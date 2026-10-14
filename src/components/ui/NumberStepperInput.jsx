@@ -79,7 +79,7 @@ export function NumberStepperInput({
   return (
     <div
       className={cn(
-        'relative flex items-center w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500',
+        'relative flex items-center w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 overflow-hidden',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
@@ -133,51 +133,51 @@ export function NumberStepperInput({
         required={required}
         disabled={disabled}
         className={cn(
-          'w-full h-full bg-transparent flex-1 min-w-0 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none',
-          prefixIcon
-            ? (isRtl ? 'pr-2 pl-8 text-right' : 'pl-2 pr-8 text-left')
-            : (isRtl ? 'pl-8 pr-3 text-right' : 'pr-8 pl-3 text-left'),
+          'w-full h-full bg-transparent flex-1 min-w-0 text-xs font-medium text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none px-2.5',
+          isRtl ? 'text-right' : 'text-left',
           inputClassName
         )}
         {...props}
       />
 
-      {/* Stacked Incremental Stepper Chevrons */}
+      {/* Full-Height Proportional Stepper Button Column */}
       <div
         className={cn(
-          'absolute top-1 bottom-1 w-5 flex flex-col items-center justify-between',
+          'w-7 self-stretch shrink-0 flex flex-col justify-stretch items-center border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/60',
           isRtl
-            ? 'left-1 border-r border-zinc-200 dark:border-zinc-800/80 pr-0.5'
-            : 'right-1 border-l border-zinc-200 dark:border-zinc-800/80 pl-0.5'
+            ? 'border-r order-first'
+            : 'border-l order-last'
         )}
       >
         <button
           type="button"
           tabIndex={-1}
           disabled={disabled}
+          aria-label={`Increment (+${effectiveStep.toLocaleString()})`}
           onMouseDown={() => startHold(effectiveStep)}
           onMouseUp={stopHold}
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-t text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="flex-1 w-full flex items-center justify-center text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 active:bg-zinc-200 dark:active:bg-zinc-700 transition-colors cursor-pointer border-b border-zinc-200/60 dark:border-zinc-800/60"
           title={`Increment (+${effectiveStep.toLocaleString()})`}
         >
-          <ChevronUp className="w-3 h-3 stroke-[2.5]" />
+          <ChevronUp className="w-3 h-3 stroke-[2]" />
         </button>
         <button
           type="button"
           tabIndex={-1}
           disabled={disabled}
+          aria-label={`Decrement (-${effectiveStep.toLocaleString()})`}
           onMouseDown={() => startHold(-effectiveStep)}
           onMouseUp={stopHold}
           onMouseLeave={stopHold}
           onTouchStart={() => startHold(-effectiveStep)}
           onTouchEnd={stopHold}
-          className="flex-1 w-full flex items-center justify-center rounded-b text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="flex-1 w-full flex items-center justify-center text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 active:bg-zinc-200 dark:active:bg-zinc-700 transition-colors cursor-pointer"
           title={`Decrement (-${effectiveStep.toLocaleString()})`}
         >
-          <ChevronDown className="w-3 h-3 stroke-[2.5]" />
+          <ChevronDown className="w-3 h-3 stroke-[2]" />
         </button>
       </div>
     </div>
