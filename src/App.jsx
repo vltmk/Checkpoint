@@ -123,11 +123,6 @@ export default function App() {
     minimizeToTrayRef.current = minimizeToTray;
   }, [minimizeToTray]);
 
-  // Cockpit Fluid Simulation (Enabled by default)
-  const [cockpitFluidEnabled, setCockpitFluidEnabled] = useState(() => {
-    return parseBooleanSetting(localStorage.getItem('checkpoint_fluid_enabled'), true);
-  });
-
   // Automated Scheduled Backups to Custom Directory (Disabled by default)
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
     return parseBooleanSetting(localStorage.getItem('checkpoint_auto_backup_enabled'), false);
@@ -348,12 +343,6 @@ export default function App() {
         const val = parseBooleanSetting(savedMinToTray, false);
         setMinimizeToTray(val);
         localStorage.setItem('checkpoint_minimize_to_tray', String(val));
-      }
-      const savedFluid = await trackerDB.getSetting('checkpoint_fluid_enabled', null);
-      if (savedFluid !== null) {
-        const val = parseBooleanSetting(savedFluid, true);
-        setCockpitFluidEnabled(val);
-        localStorage.setItem('checkpoint_fluid_enabled', String(val));
       }
       const savedAutoBackupEnabled = await trackerDB.getSetting('checkpoint_auto_backup_enabled', null);
       if (savedAutoBackupEnabled !== null) {
@@ -695,15 +684,6 @@ export default function App() {
     localStorage.setItem('checkpoint_minimize_to_tray', String(boolVal));
     try {
       await trackerDB.setSetting('checkpoint_minimize_to_tray', String(boolVal));
-    } catch (e) {}
-  };
-
-  const handleCockpitFluidEnabledChange = async (val) => {
-    const boolVal = parseBooleanSetting(val, true);
-    setCockpitFluidEnabled(boolVal);
-    localStorage.setItem('checkpoint_fluid_enabled', String(boolVal));
-    try {
-      await trackerDB.setSetting('checkpoint_fluid_enabled', String(boolVal));
     } catch (e) {}
   };
 
@@ -1219,8 +1199,9 @@ Exported via CHECKPOINT Desktop
       return;
     }
 
-    if (typeof imgSrcOrEntry === 'string') {
-      const full = await trackerDB.getEntry(imgSrcOrEntry);
+    const targetId = typeof imgSrcOrEntry === 'string' ? imgSrcOrEntry : imgSrcOrEntry?.id;
+    if (typeof targetId === 'string' && targetId) {
+      const full = await trackerDB.getEntry(targetId);
       if (full && full.proofs && full.proofs.length > 0 && full.proofs[0]?.data) {
         setLightboxData({
           isOpen: true,
@@ -1871,7 +1852,6 @@ Exported via CHECKPOINT Desktop
                       confirmDeleteEntryId={confirmDeleteEntryId}
                       onConfirmDeleteChange={setConfirmDeleteEntryId}
                       onOpenEntryContextMenu={handleOpenEntryContextMenu}
-                      cockpitFluidEnabled={cockpitFluidEnabled}
                       activeProfileId={activeProfileId}
                       onUpdateSourcePaid={handleUpdateSourcePaid}
                       onUpdateBoosterPaid={handleUpdateBoosterPaid}
@@ -2011,8 +1991,6 @@ Exported via CHECKPOINT Desktop
         theme={currentTheme}
         onThemeChange={handleThemeChange}
         handleThemeChange={handleThemeChange}
-        cockpitFluidEnabled={cockpitFluidEnabled}
-        onCockpitFluidEnabledChange={handleCockpitFluidEnabledChange}
         ledgerDateFormat={ledgerDateFormat}
         onLedgerDateFormatChange={handleLedgerDateFormatChange}
       />

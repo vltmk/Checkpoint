@@ -420,6 +420,11 @@ export function AnalyticsView({
     };
   }, [velocityChartData, globalCurrency, t, isLight]);
 
+  // Velocity Activity Check
+  const hasVelocityData = useMemo(() => {
+    return velocityChartData?.data?.some((val) => Number(val) > 0);
+  }, [velocityChartData]);
+
   // Game or Source Distribution Donut Data
   const donutChartData = useMemo(() => {
     const isSource = breakdownView === 'source';
@@ -437,8 +442,8 @@ export function AnalyticsView({
         {
           data,
           backgroundColor: monochromaticPalette.slice(0, Math.max(labels.length, 1)),
-          borderColor: isLight ? '#f4f4f5' : '#18181b',
-          borderWidth: 2,
+          borderColor: isLight ? '#ffffff' : '#09090b',
+          borderWidth: 2.5,
         },
       ],
     };
@@ -852,8 +857,33 @@ export function AnalyticsView({
           </span>
         </div>
         <div className="h-48 w-full">
-          <Bar data={barChartData} options={barChartOptions} />
+          {hasVelocityData ? (
+            <Bar data={barChartData} options={barChartOptions} />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <p className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>
+                {t('analytics.noDataPeriod')}
+              </p>
+            </div>
+          )}
         </div>
+        <table className="sr-only">
+          <caption>{velocityChartData.title}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{language === 'fa' ? 'بازه زمانی' : 'Period'}</th>
+              <th scope="col">{language === 'fa' ? 'درآمد' : 'Earnings'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {velocityChartData.labels.map((label, idx) => (
+              <tr key={idx}>
+                <td>{label}</td>
+                <td>{velocityChartData.data[idx]} {globalCurrency}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* 3. Distribution & Ranking (By Game / By Source) */}
@@ -915,7 +945,28 @@ export function AnalyticsView({
 
             <div className="h-40 relative flex items-center justify-center">
               {(breakdownView === 'source' ? stats.sortedSources.length : stats.sortedGames.length) > 0 ? (
-                <Doughnut data={donutChartData} options={donutOptions} />
+                <>
+                  <Doughnut data={donutChartData} options={donutOptions} />
+                  <table className="sr-only">
+                    <caption>
+                      {breakdownView === 'source' ? t('analytics.revenueBySource') : t('analytics.revenueByGame')}
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">{breakdownView === 'source' ? t('analytics.source') : t('analytics.game')}</th>
+                        <th scope="col">{language === 'fa' ? 'درآمد' : 'Revenue'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {donutChartData.labels.map((label, idx) => (
+                        <tr key={idx}>
+                          <td>{label}</td>
+                          <td>{donutChartData.datasets[0]?.data?.[idx]} {globalCurrency}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               ) : (
                 <p className={cn('text-xs text-zinc-500', isRtl && 'font-farsi')}>{t('analytics.noDataPeriod')}</p>
               )}

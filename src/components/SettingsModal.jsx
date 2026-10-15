@@ -89,8 +89,6 @@ export function SettingsModal({
   onThemeChange,
   handleThemeChange,
   initialScrollSection = null,
-  cockpitFluidEnabled = true,
-  onCockpitFluidEnabledChange,
   ledgerDateFormat = 'relative',
   onLedgerDateFormatChange,
 }) {
@@ -519,27 +517,8 @@ export function SettingsModal({
                     </p>
                   </div>
 
-                  {/* Power Saver / Cockpit Fluid Simulation Toggle */}
-                  <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
-                    <div className="space-y-0.5 min-w-0">
-                      <div className={cn('text-xs font-medium text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-                        <Zap className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>{t('settings.cockpitFluid')}</span>
-                      </div>
-                      <div className={cn('text-[11px] text-zinc-500', isRtl && 'font-farsi')}>
-                        {t('settings.cockpitFluidDesc')}
-                      </div>
-                    </div>
-                    <Switch
-                      checked={cockpitFluidEnabled}
-                      onChange={(val) => onCockpitFluidEnabledChange?.(val)}
-                      aria-label={t('settings.cockpitFluid')}
-                      className="shrink-0"
-                    />
-                  </div>
-
                   {/* Categories & Games Customization */}
-                  <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                  <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5', isRtl && 'font-farsi')}>
                         <Gamepad2 className="w-3.5 h-3.5 text-zinc-400" />

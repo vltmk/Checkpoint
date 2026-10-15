@@ -38,9 +38,12 @@ function main() {
   }
 
   const cleanVer = targetVersion.replace(/^v/i, '').trim();
-  const notes = getReleaseNotesForVersion(cleanVer, 'en');
+  const notesFa = getReleaseNotesForVersion(cleanVer, 'fa');
+  const notesEn = getReleaseNotesForVersion(cleanVer, 'en');
 
-  const md = formatMarkdown(notes);
+  const mdFa = formatMarkdown(notesFa);
+  const mdEn = formatMarkdown(notesEn);
+  const md = [mdFa, mdEn].filter(Boolean).join('\n\n---\n\n');
   console.log(md || `See release details for Checkpoint v${cleanVer}.`);
 }
 

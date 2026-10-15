@@ -7,22 +7,59 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
-test("display.wgsl supports dual-theme display config with paper-white light mode and source dark mode", () => {
-  const displayWgsl = fs.readFileSync(
-    path.join(rootDir, "src/components/ui/fluid/shaders/display.wgsl"),
+test("WebGPU fluid simulation directory is cleanly retired", () => {
+  const fluidDir = path.join(rootDir, "src/components/ui/fluid");
+  assert.equal(fs.existsSync(fluidDir), false, "Fluid directory should not exist");
+});
+
+test("LedgerView.jsx implements zero-CLS minimal Action HUD with fixed height", () => {
+  const ledgerCode = fs.readFileSync(
+    path.join(rootDir, "src/components/views/LedgerView.jsx"),
     "utf8"
   );
-  
-  // Exact source background in Dark mode
-  assert.match(displayWgsl, /let dark_base = vec3f\(0\.003, 0\.005, 0\.014\);/);
-  assert.match(displayWgsl, /let dark_fluid = \(dark_base \+ color\) \* vignette;/);
-  
-  // Paper-white luminous background in Light mode
-  assert.match(displayWgsl, /let light_base = vec3f\(0\.985, 0\.985, 0\.990\);/);
-  assert.match(displayWgsl, /let light_fluid = mix\(light_base, rich_ink, ink_strength\);/);
+  assert.match(ledgerCode, /h-16 sm:h-\[68px\]/);
+  assert.match(ledgerCode, /sticky top-0 z-30/);
+});
 
-  // Canonical aligned uniform layout (output_size: vec2f, theme_mode: f32, _pad: f32)
-  assert.match(displayWgsl, /struct DisplayConfig\s*\{\s*output_size:\s*vec2f,\s*theme_mode:\s*f32,\s*_pad:\s*f32,\s*\}/);
+test("Action HUD provides click-to-open currency popover and interactive filter pills", () => {
+  const ledgerCode = fs.readFileSync(
+    path.join(rootDir, "src/components/views/LedgerView.jsx"),
+    "utf8"
+  );
+  assert.match(ledgerCode, /handleStatusFilterToggle\('Paid'\)/);
+  assert.match(ledgerCode, /handleStatusFilterToggle\('Pending'\)/);
+  assert.ok(!ledgerCode.includes("handleCurrencyWheel"), "Accidental wheel scrolling over currency must be removed");
+});
+
+test("Action HUD metrics and pills calculate over baseFilteredEntries to avoid zeroing out when status filter is toggled", () => {
+  const ledgerCode = fs.readFileSync(
+    path.join(rootDir, "src/components/views/LedgerView.jsx"),
+    "utf8"
+  );
+  assert.match(ledgerCode, /baseFilteredEntries\s*=\s*useMemo/);
+  assert.match(ledgerCode, /baseFilteredEntries\.forEach/);
+  assert.match(ledgerCode, /formatNumber\(baseFilteredEntries\.length\)/);
+});
+
+test("Ledger row keyboard navigation guards modifier keys and advances focus on deletion", () => {
+  const ledgerCode = fs.readFileSync(
+    path.join(rootDir, "src/components/views/LedgerView.jsx"),
+    "utf8"
+  );
+  assert.match(ledgerCode, /if \(e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey\)/);
+  assert.match(ledgerCode, /nextToFocus && nextToFocus !== e\.currentTarget/);
+  assert.match(ledgerCode, /scroll-mt-20/);
+});
+
+test("WorkModal comprehensively tracks all entry fields for dirty state detection", () => {
+  const workModalCode = fs.readFileSync(
+    path.join(rootDir, "src/components/WorkModal.jsx"),
+    "utf8"
+  );
+  assert.match(workModalCode, /init\.game !== formData\.game/);
+  assert.match(workModalCode, /init\.link !== formData\.link/);
+  assert.match(workModalCode, /init\.teammates !== JSON\.stringify/);
+  assert.match(workModalCode, /init\.proofsCount !== proofs\.length/);
 });
 
 test("16:9 Cover sizing guarantees isotropic canvas aspect ratio across container shapes", () => {

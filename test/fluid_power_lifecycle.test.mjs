@@ -7,51 +7,24 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
-test('renderer.js implements zero-overhead RAF culling, rate limiting, and focus auto-sleep', () => {
-  const rendererCode = fs.readFileSync(
-    path.join(rootDir, 'src/components/ui/fluid/renderer.js'),
+test('SettingsModal cleanly retires cockpitFluidEnabled and fluid toggle', () => {
+  const settingsModalCode = fs.readFileSync(
+    path.join(rootDir, 'src/components/SettingsModal.jsx'),
     'utf8'
   );
 
-  // 1. Zero-overhead RAF cancellation on pause
-  assert.match(rendererCode, /cancelAnimationFrame\(animationFrame\)/);
-  assert.match(rendererCode, /animationFrame\s*=\s*0/);
-
-  // 2. High-refresh monitor rate limiting (cadence clamping)
-  assert.match(rendererCode, /minFrameInterval\s*=\s*1000\s*\/\s*targetFps\s*-\s*1\.5/);
-  assert.match(rendererCode, /now\s*-\s*lastRenderTime\s*<\s*minFrameInterval/);
-
-  // 3. Inactivity & Window Blur auto-sleep
-  assert.match(rendererCode, /idleTimeout\s*=\s*isBatterySaver\s*\?\s*15000\s*:\s*45000/);
-  assert.match(rendererCode, /now\s*-\s*lastBlurTime\s*>\s*5000/);
-
-  // 4. Wake method and battery awareness
-  assert.match(rendererCode, /wake\s*=\s*\(\)\s*=>/);
-  assert.match(rendererCode, /navigator\.getBattery/);
-  assert.match(rendererCode, /isBatterySaver\s*=\s*!battery\.charging\s*\|\|\s*battery\.level\s*<=\s*0\.2/);
+  assert.ok(!settingsModalCode.includes('cockpitFluidEnabled'));
+  assert.ok(!settingsModalCode.includes('onCockpitFluidEnabledChange'));
 });
 
-test('CockpitFluid.jsx integrates with desktop window lifecycle and pointer wake events', () => {
-  const cockpitFluidCode = fs.readFileSync(
-    path.join(rootDir, 'src/components/ui/fluid/CockpitFluid.jsx'),
+test('HUD progressbar provides accessible role and aria attributes', () => {
+  const ledgerCode = fs.readFileSync(
+    path.join(rootDir, 'src/components/views/LedgerView.jsx'),
     'utf8'
   );
-
-  // Subscribes to desktop lifecycle
-  assert.match(cockpitFluidCode, /subscribeWindowVisibility/);
-  assert.match(cockpitFluidCode, /subscribeWindowFocus/);
-
-  // Combines offscreen culling with window visibility
-  assert.match(cockpitFluidCode, /const shouldPause\s*=\s*!isIntersecting\s*\|\|\s*!isVisible/);
-  assert.match(cockpitFluidCode, /rendererRef\.current\.setPaused\(shouldPause\)/);
-
-  // Wakes on pointer interaction
-  assert.match(cockpitFluidCode, /container\.addEventListener\("pointermove",\s*handleWake/);
-  assert.match(cockpitFluidCode, /container\.addEventListener\("pointerdown",\s*handleWake/);
-
-  // Supports user preference enabled prop
-  assert.match(cockpitFluidCode, /enabled\s*=\s*true/);
-  assert.match(cockpitFluidCode, /if\s*\(!enabled\)\s*return;/);
+  assert.match(ledgerCode, /role="progressbar"/);
+  assert.match(ledgerCode, /aria-label="Job settlement distribution"/);
+  assert.match(ledgerCode, /aria-valuenow=/);
 });
 
 test('desktop.js exports reactive window lifecycle tracking methods', async () => {
@@ -110,18 +83,6 @@ test('i18n contains English and Persian translations for cockpit fluid settings'
   // Persian
   assert.match(i18nCode, /'settings\.cockpitVisuals':\s*'صرفه‌جویی در مصرف انرژی'/);
   assert.match(i18nCode, /'settings\.cockpitFluid':\s*'انیمیشن کاکپیت'/);
-});
-
-test('SettingsModal renders Cockpit Fluid Simulation toggle control', () => {
-  const settingsModalCode = fs.readFileSync(
-    path.join(rootDir, 'src/components/SettingsModal.jsx'),
-    'utf8'
-  );
-
-  assert.match(settingsModalCode, /cockpitFluidEnabled\s*=\s*true/);
-  assert.match(settingsModalCode, /onCockpitFluidEnabledChange/);
-  assert.match(settingsModalCode, /t\('settings\.cockpitFluid'\)/);
-  assert.match(settingsModalCode, /t\('settings\.cockpitFluidDesc'\)/);
 });
 
 test('Simulated cadence limiter clamps frame rate on 144Hz-360Hz intervals', () => {

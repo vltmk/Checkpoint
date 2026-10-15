@@ -142,7 +142,10 @@ export function NotificationCenter({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end select-none">
+        <div
+          className={cn('fixed inset-0 z-50 flex select-none', isRtl ? 'justify-start' : 'justify-end')}
+          dir="ltr"
+        >
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -159,6 +162,7 @@ export function NotificationCenter({
           as="motion.div"
           variant="drawer"
           key="notification-drawer"
+          dir={isRtl ? 'rtl' : 'ltr'}
           initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
           animate={shouldReduceMotion ? { opacity: 1 } : { x: 0 }}
           exit={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}

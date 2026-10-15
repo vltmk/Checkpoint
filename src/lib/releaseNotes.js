@@ -26,6 +26,31 @@ export function compareSemver(v1, v2) {
  * Bundled changelog registry keyed by semantic version.
  */
 export const RELEASE_NOTES_REGISTRY = {
+  '4.3.0': {
+    date: '2026-10-15',
+    title: {
+      en: "What's New in Checkpoint v4.3.0",
+      fa: 'تغییرات و امکانات نسخه ۴.۳.۰',
+    },
+    summary: {
+      en: 'UI & UX improvements and upgrade',
+      fa: 'ارتقا و بهبودهای رابط کاربری و تجربه کاربری (UI & UX)',
+    },
+    items: {
+      en: [
+        {
+          tag: 'improved',
+          text: 'UI & UX improvements and upgrade',
+        },
+      ],
+      fa: [
+        {
+          tag: 'improved',
+          text: 'ارتقا و بهبودهای رابط کاربری و تجربه کاربری (UI & UX)',
+        },
+      ],
+    },
+  },
   '4.2.0': {
     date: '2026-09-24',
     title: {

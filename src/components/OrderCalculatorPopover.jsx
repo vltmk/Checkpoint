@@ -500,12 +500,12 @@ export function OrderCalculatorPopover({
                           </AnimatePresence>
                         </div>
 
-                        {/* Step 1 Confirmation Button with interactive green styling */}
+                        {/* Step 1 Confirmation Button with monochromatic styling */}
                         <div className="flex justify-end pt-1">
                           <button
                             type="button"
                             onClick={() => goToNextStep(1)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs active:scale-98 cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-100 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 transition-all shadow-xs active:scale-98 cursor-pointer select-none"
                           >
                             <span>{language === 'fa' ? 'مرحله بعد: تعیین مبلغ' : 'Next: Set Price'}</span>
                             <ArrowRight className={cn('w-3.5 h-3.5', isRtl && 'rotate-180')} />
@@ -718,9 +718,9 @@ export function OrderCalculatorPopover({
                             onClick={() => goToNextStep(2)}
                             disabled={!((mode === 'forward' ? cleanPrice > 0 : cleanDesiredPayout > 0))}
                             className={cn(
-                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer',
+                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer select-none',
                               (mode === 'forward' ? cleanPrice > 0 : cleanDesiredPayout > 0)
-                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-98'
+                                ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 active:scale-98'
                                 : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
                             )}
                           >

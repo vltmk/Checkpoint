@@ -42,7 +42,7 @@ export function MobileHeader({
           type="button"
           onClick={() => setIsProfilePopoverOpen((prev) => !prev)}
           title="Switch Profile"
-          className="flex items-center gap-2 active:opacity-75 transition-opacity text-start cursor-pointer"
+          className="flex items-center gap-2 active:opacity-75 transition-opacity text-start cursor-pointer min-h-[36px]"
         >
           <CheckpointLogo className="w-6 h-6 text-zinc-900 dark:text-zinc-100 shrink-0" />
           <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
@@ -72,12 +72,12 @@ export function MobileHeader({
         />
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           onClick={onOpenNotifications}
           title="Notifications & Feed"
-          className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 active:scale-[0.98] transition-all cursor-pointer"
+          className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 active:scale-[0.98] transition-all cursor-pointer after:absolute after:-inset-2 after:content-['']"
         >
           <Bell className="w-3.5 h-3.5" />
           {unreadNotificationsCount > 0 && (
@@ -90,7 +90,7 @@ export function MobileHeader({
             type="button"
             onClick={onOpenCalculator}
             title={language === 'fa' ? 'ماشین حساب سفارشات (Q)' : 'Order Calculator (Q)'}
-            className="flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 active:scale-[0.98] transition-all cursor-pointer"
+            className="relative flex items-center justify-center w-7 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 active:scale-[0.98] transition-all cursor-pointer after:absolute after:-inset-2 after:content-['']"
           >
             <Calculator className="w-3.5 h-3.5" />
           </button>
@@ -99,7 +99,7 @@ export function MobileHeader({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200 active:scale-[0.98] transition-all cursor-pointer"
+          className="relative flex items-center gap-1 px-2 py-1 h-7 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-800 dark:text-zinc-200 active:scale-[0.98] transition-all cursor-pointer after:absolute after:-inset-2 after:content-['']"
         >
           <span className="text-[10px] font-mono">{globalCurrency}</span>
           <Settings className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
@@ -127,7 +127,7 @@ export function MobileBottomNav({
         <button
           type="button"
           onClick={() => onTabChange?.('ledger')}
-          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+          className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
             activeTab === 'ledger' ? 'text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
           }`}
         >
@@ -141,10 +141,7 @@ export function MobileBottomNav({
             type="button"
             onClick={onOpenWorkModal}
             title={`${t('nav.addWork')} (N)`}
-            className={cn(
-              'mobile-add-work-btn flex items-center justify-center rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 shadow-md active:scale-[0.98] transition-all hover:bg-zinc-800 dark:hover:bg-white cursor-pointer',
-              activeProfileId === 'advertiser' ? 'w-11 h-11' : 'w-10 h-10'
-            )}
+            className="mobile-add-work-btn flex items-center justify-center rounded-full bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 shadow-md active:scale-[0.98] transition-all hover:bg-zinc-800 dark:hover:bg-white cursor-pointer w-11 h-11"
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -153,7 +150,7 @@ export function MobileBottomNav({
               type="button"
               onClick={onOpenCalculator}
               title={language === 'fa' ? 'ماشین حساب سفارشات (Q)' : 'Order Calculator (Q)'}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 shadow-xs active:scale-[0.98] transition-all hover:bg-zinc-200 dark:hover:bg-zinc-800 cursor-pointer"
+              className="relative flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 shadow-xs active:scale-[0.98] transition-all hover:bg-zinc-200 dark:hover:bg-zinc-800 cursor-pointer after:absolute after:-inset-1.5 after:content-['']"
             >
               <Calculator className="w-3.5 h-3.5" />
             </button>
@@ -164,7 +161,7 @@ export function MobileBottomNav({
         <button
           type="button"
           onClick={() => onTabChange?.('analytics')}
-          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-lg text-[10px] font-medium transition-colors ${
+          className={`flex flex-col items-center justify-center min-w-[56px] min-h-[44px] gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
             activeTab === 'analytics' ? 'text-zinc-900 dark:text-zinc-100 font-medium' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
           }`}
         >

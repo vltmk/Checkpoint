@@ -101,6 +101,26 @@ export function Navbar({
   const ratesDropdownRef = useRef(null);
   const searchInputRef = useRef(null);
   const batchStatusRef = useRef(null);
+  const brandRef = useRef(null);
+  const [brandRightOffset, setBrandRightOffset] = useState(150);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const expandedSearchRef = useRef(null);
+  const expandedSearchInputRef = useRef(null);
+
+  // Track right edge of Checkpoint logo & profile switcher so search overlay stops cleanly before it
+  useEffect(() => {
+    const updateBrandOffset = () => {
+      if (brandRef.current) {
+        const offset = brandRef.current.offsetLeft + brandRef.current.offsetWidth;
+        if (offset > 0) {
+          setBrandRightOffset(offset + 8);
+        }
+      }
+    };
+    updateBrandOffset();
+    window.addEventListener('resize', updateBrandOffset);
+    return () => window.removeEventListener('resize', updateBrandOffset);
+  }, [activeProfileId, language, isSearchExpanded]);
 
   useEffect(() => {
     setTempRateTOMAN(goldRateTOMAN);
@@ -180,12 +200,17 @@ export function Navbar({
     dismissTour();
   };
 
-  // Keyboard shortcut listener for Omnibar search focus (Ctrl+K or /)
+  // Keyboard shortcut listener for Omnibar search focus (Ctrl+K, /, Esc)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        if (window.innerWidth < 1024) {
+          setIsSearchExpanded(true);
+          setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
+        } else {
+          searchInputRef.current?.focus();
+        }
         return;
       }
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
@@ -193,13 +218,29 @@ export function Navbar({
         const tag = target?.tagName?.toLowerCase();
         if (tag !== 'input' && tag !== 'textarea' && !target?.isContentEditable) {
           e.preventDefault();
-          searchInputRef.current?.focus();
+          if (window.innerWidth < 1024) {
+            setIsSearchExpanded(true);
+            setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
+          } else {
+            searchInputRef.current?.focus();
+          }
         }
+      }
+      if (e.key === 'Escape' && isSearchExpanded) {
+        e.preventDefault();
+        setIsSearchExpanded(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isSearchExpanded]);
+
+  // Auto-focus expanded search input on activation
+  useEffect(() => {
+    if (isSearchExpanded) {
+      setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
+    }
+  }, [isSearchExpanded]);
 
   // Desktop window maximize state listener
   useEffect(() => {
@@ -226,9 +267,9 @@ export function Navbar({
     };
   }, [isDesktop]);
 
-  // Click outside listener for Rates dropdown & tour guide
+  // Click outside listener for Rates dropdown, tour guide, and expanded search
   useEffect(() => {
-    if (!isRatesOpen && !showTourGuide && !isBatchStatusOpen) return;
+    if (!isRatesOpen && !showTourGuide && !isBatchStatusOpen && !isSearchExpanded) return;
 
     const handleClickOutside = (e) => {
       if (ratesDropdownRef.current && !ratesDropdownRef.current.contains(e.target)) {
@@ -238,11 +279,14 @@ export function Navbar({
       if (batchStatusRef.current && !batchStatusRef.current.contains(e.target)) {
         setIsBatchStatusOpen(false);
       }
+      if (expandedSearchRef.current && !expandedSearchRef.current.contains(e.target)) {
+        setIsSearchExpanded(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isRatesOpen, showTourGuide, isBatchStatusOpen]);
+  }, [isRatesOpen, showTourGuide, isBatchStatusOpen, isSearchExpanded]);
 
   const handleSaveRate = () => {
     dismissTour();
@@ -298,12 +342,12 @@ export function Navbar({
       dir="ltr"
       data-tauri-drag-region
       onDoubleClick={handleHeaderDoubleClick}
-      className="hidden md:flex h-11 w-full bg-white/95 dark:bg-zinc-900/90 border-b border-zinc-200/80 dark:border-zinc-800/80 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-700 dark:text-zinc-300 relative cursor-default gap-3"
+      className="hidden md:flex h-11 w-full bg-white dark:bg-zinc-900 border-b border-zinc-200/80 dark:border-zinc-800/80 items-center justify-between px-3 lg:px-4 select-none shrink-0 z-40 text-zinc-700 dark:text-zinc-300 relative cursor-default gap-3"
     >
       {/* 1. Left Region: Brand & Profile Dropdown, +Work, Tabs */}
       <div data-no-drag className="flex items-center gap-2 shrink-0 z-10">
         {/* Brand & Profile Switcher */}
-        <div className="relative" data-no-drag>
+        <div ref={brandRef} className="relative z-50" data-no-drag>
           <button
             type="button"
             data-no-drag
@@ -412,14 +456,14 @@ export function Navbar({
         </div>
       </div>
 
-      {/* 2. Center Region: Centered Omnibar */}
+      {/* 2. Center Region: Centered Omnibar (lg+ only, collapses gracefully on smaller screens) */}
       <div
         data-tauri-drag-region
         className="flex-1 flex items-center justify-center min-w-0 px-2 h-full cursor-default z-10"
       >
         <div
           data-no-drag
-          className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/40 dark:focus-within:ring-zinc-600/40 rounded-lg px-2.5 h-7 w-64 lg:w-80 transition-all text-xs shadow-2xs"
+          className="hidden lg:flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/40 dark:focus-within:ring-zinc-600/40 rounded-lg px-2.5 h-7 w-full max-w-[300px] transition-all text-xs shadow-2xs"
         >
           <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
           
@@ -461,6 +505,40 @@ export function Navbar({
 
       {/* 3. Right Region: Ghost Actions & Desktop Window Controls */}
       <div data-no-drag className="flex items-center gap-1 shrink-0 z-10">
+        {/* Compact Search Trigger Button (< lg) */}
+        <div className="flex lg:hidden items-center" data-no-drag>
+          {searchQuery ? (
+            <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700 text-xs shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setIsSearchExpanded(true)}
+                className="flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white cursor-pointer select-none"
+                title={`${t('common.search', 'Search')}: ${searchQuery}`}
+              >
+                <Search className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="font-mono text-[11px] max-w-[80px] truncate">{searchQuery}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange?.('')}
+                className="text-zinc-400 hover:text-rose-500 p-0.5 rounded transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsSearchExpanded(true)}
+              title={`${t('common.search', 'Search')} (⌘K)`}
+              aria-label="Search"
+              className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer select-none"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
         {/* Software Update Badge */}
         {updateInfo && updateInfo.available && (
           <div data-no-drag className="flex items-center">
@@ -699,6 +777,74 @@ export function Navbar({
           </div>
         )}
       </div>
+
+      {/* Full-width Search Bar Overlay (< lg: Replaces topbar elements when activated) */}
+      <AnimatePresence>
+        {isSearchExpanded && (
+          <motion.div
+            ref={expandedSearchRef}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            data-no-drag
+            style={{ left: brandRightOffset ? `${brandRightOffset}px` : '150px' }}
+            className={cn(
+              "absolute inset-y-0 bg-white dark:bg-zinc-900 px-2.5 z-40 flex items-center gap-2 border-b border-zinc-200/80 dark:border-zinc-800/80",
+              isDesktop ? "right-[96px]" : "right-0"
+            )}
+          >
+            <div className="flex-1 flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/40 dark:focus-within:ring-zinc-600/40 rounded-lg px-2.5 h-7 text-xs shadow-2xs">
+              <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
+              
+              {statusFilter && statusFilter !== 'ALL' && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 shrink-0">
+                  <span>{t('status.' + statusFilter, statusFilter)}</span>
+                  <button
+                    type="button"
+                    onClick={() => onStatusFilterChange?.('')}
+                    className="hover:text-rose-500"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              )}
+
+              <input
+                ref={expandedSearchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange?.(e.target.value)}
+                placeholder={t('common.search', 'Search or filter...')}
+                className="flex-1 bg-transparent border-0 outline-none p-0 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 min-w-0"
+              />
+
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => onSearchQueryChange?.('')}
+                  className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-0.5"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <Kbd className="shrink-0 text-[9px] text-zinc-400 dark:text-zinc-500">⌘K</Kbd>
+              )}
+            </div>
+
+            {/* Close / Done Button */}
+            <button
+              type="button"
+              onClick={() => setIsSearchExpanded(false)}
+              className="h-7 px-2.5 rounded-lg border border-zinc-200/90 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer select-none"
+            >
+              <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'بستن' : 'Done'}</span>
+              <Kbd className="text-[9px]">Esc</Kbd>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

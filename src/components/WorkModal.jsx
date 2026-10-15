@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './ui/Dialog';
 import { Button } from './ui/Button';
@@ -228,6 +228,7 @@ export function WorkModal({
   const fileInputRef = useRef(null);
   const titleInputRef = useRef(null);
   const entryIdRef = useRef(null);
+  const initialValuesRef = useRef(null);
 
   const detectedLink = useMemo(() => {
     return detectAppLink(formData.link);
@@ -322,6 +323,25 @@ export function WorkModal({
         notes: editingEntry.notes || '',
         link: editingEntry.link || '',
       });
+      initialValuesRef.current = {
+        title: editingEntry.title || '',
+        game: editingEntry.game || 'World of Warcraft',
+        dateTime: editingEntry.dateTime || '',
+        income: editingEntry.income !== undefined && editingEntry.income !== null ? String(Math.abs(Number(editingEntry.income))) : '',
+        pot: initialPot,
+        source: editingEntry.source !== undefined && editingEntry.source !== null ? editingEntry.source : '',
+        orderId: editingEntry.orderId || '',
+        status: editingEntry.status || 'Pending',
+        currency: entryCur,
+        notes: editingEntry.notes || '',
+        link: editingEntry.link || '',
+        feeRate: editingEntry.feeRate !== undefined && editingEntry.feeRate !== null ? String(editingEntry.feeRate) : '',
+        entryType: isExpense ? 'expense' : 'income',
+        teamMode: !isExpense && Boolean(editingEntry.teamMode || entryTeammates.length > 0),
+        teammates: JSON.stringify(isExpense ? [] : entryTeammates),
+        teammateCuts: JSON.stringify(initialCuts || {}),
+        proofsCount: (editingEntry.proofs && editingEntry.proofs.length) || 0,
+      };
       setProofs(editingEntry.proofs && editingEntry.proofs.length > 0 && editingEntry.proofs[0]?.data ? [...editingEntry.proofs] : []);
       const hasCustomRate = editingEntry.exchangeRate && Number(editingEntry.exchangeRate) !== Number(goldRateTOMAN || 3200);
       setIsCustomRateActive(Boolean(hasCustomRate));
@@ -330,10 +350,14 @@ export function WorkModal({
         trackerDB.getEntry(editingEntry.id).then((full) => {
           if (full && Array.isArray(full.proofs) && full.proofs.length > 0) {
             setProofs(full.proofs);
+            if (initialValuesRef.current) {
+              initialValuesRef.current.proofsCount = full.proofs.length;
+            }
           }
         }).catch(() => {});
       }
     } else {
+      initialValuesRef.current = null;
       const isAdvertiser = activeProfileId === 'advertiser';
       const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
       const entryCategoryMatch = (categories || []).find(
@@ -1164,10 +1188,47 @@ export function WorkModal({
     await handleSubmit();
   };
 
-  // Floating Vertical Action Dock next to the top-right side of modal
+  const isDirty = useMemo(() => {
+    if (!editingEntry || !initialValuesRef.current) return false;
+    const init = initialValuesRef.current;
+    if (init.title !== formData.title) return true;
+    if (init.game !== formData.game) return true;
+    if (init.dateTime !== formData.dateTime) return true;
+    if (init.income !== formData.income) return true;
+    if (init.pot !== formData.pot) return true;
+    if (init.notes !== formData.notes) return true;
+    if (init.link !== formData.link) return true;
+    if (init.status !== formData.status) return true;
+    if (init.currency !== formData.currency) return true;
+    if (init.source !== formData.source) return true;
+    if (init.orderId !== formData.orderId) return true;
+    if (init.feeRate !== formData.feeRate) return true;
+    if (init.entryType !== entryType) return true;
+    if (init.teamMode !== formData.teamMode) return true;
+    if (init.teammates !== JSON.stringify(formData.teammates || [])) return true;
+    if (init.teammateCuts !== JSON.stringify(formData.teammateCuts || {})) return true;
+    if (init.proofsCount !== proofs.length) return true;
+    return false;
+  }, [editingEntry, formData, entryType, proofs.length]);
+
+  const handleSafeClose = useCallback(() => {
+    if (isSaving) return;
+    if (editingEntry && isDirty) {
+      const confirmMsg =
+        language === 'fa'
+          ? 'تغییرات ذخیره‌نشده‌ای دارید. آیا مطمئنید می‌خواهید خارج شوید؟'
+          : 'You have unsaved changes. Are you sure you want to discard them?';
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+    }
+    onClose?.();
+  }, [isSaving, editingEntry, isDirty, language, onClose]);
+
+  // Floating Vertical Action Dock next to the top-right side of modal (Desktop only)
   const floatingActions = (
     <div
-      className="flex flex-col items-center gap-1.5 p-1.5 rounded-xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200/90 dark:border-zinc-800/90 shadow-xl select-none"
+      className="hidden md:flex flex-col items-center gap-1.5 p-1.5 rounded-xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200/90 dark:border-zinc-800/90 shadow-xl select-none"
       dir="ltr"
     >
       {/* Section 1: Entry Type (Income vs Expense) */}
@@ -1271,17 +1332,98 @@ export function WorkModal({
     </div>
   );
 
+  // Mobile Header Actions for screens < md
+  const mobileHeaderActions = (
+    <div className="flex md:hidden items-center gap-1">
+      {/* Income / Expense toggle */}
+      <button
+        type="button"
+        onClick={() => {
+          if (entryType === 'income') {
+            setEntryType('expense');
+            updateFormData({
+              teamMode: false,
+              teammates: [],
+              teammateCuts: {},
+              income: isAdvertiser ? (formData.pot || formData.income) : formData.income,
+            });
+          } else {
+            setEntryType('income');
+            if (isAdvertiser && formData.pot) {
+              handleAdvertiserClientPriceChange(formData.pot);
+            }
+          }
+        }}
+        className={cn(
+          'h-7 px-2 rounded-lg flex items-center gap-1 text-[11px] font-medium border transition-colors cursor-pointer select-none',
+          entryType === 'income'
+            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold'
+            : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold'
+        )}
+        title={entryType === 'income' ? (language === 'fa' ? 'تغییر به هزینه (−)' : 'Switch to Expense (−)') : (language === 'fa' ? 'تغییر به درآمد (+)' : 'Switch to Income (+)')}
+        aria-label={entryType === 'income' ? 'Income mode' : 'Expense mode'}
+      >
+        {entryType === 'income' ? (
+          <>
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>{language === 'fa' ? 'درآمد' : 'Income'}</span>
+          </>
+        ) : (
+          <>
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>{language === 'fa' ? 'هزینه' : 'Expense'}</span>
+          </>
+        )}
+      </button>
+
+      {/* Team mode toggle (Income only) */}
+      {entryType === 'income' && (
+        <button
+          type="button"
+          onClick={() => {
+            if (formData.teamMode) {
+              updateFormData({ teamMode: false, teammates: [], teammateCuts: {} });
+            } else {
+              updateFormData({ teamMode: true });
+            }
+          }}
+          className={cn(
+            'relative h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer select-none border',
+            formData.teamMode
+              ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700'
+              : 'text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800/80'
+          )}
+          title={
+            isAdvertiser
+              ? (formData.teamMode
+                  ? (language === 'fa' ? 'تخصیص بوستر (فعال)' : 'Assigned Boosters (Active)')
+                  : (language === 'fa' ? 'تخصیص بوستر (تکی)' : 'Assigned Boosters (Solo)'))
+              : (formData.teamMode
+                  ? (language === 'fa' ? 'حالت تیمی (فعال)' : 'Team Mode (Active)')
+                  : (language === 'fa' ? 'حالت تیمی (تکی)' : 'Team Mode (Solo)'))
+          }
+          aria-label="Toggle Team Mode"
+        >
+          <Users className="w-3.5 h-3.5" />
+          {formData.teamMode && (
+            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-black" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
       <Dialog
         open={isOpen}
-        onClose={isSaving ? undefined : onClose}
+        onClose={isSaving ? undefined : handleSafeClose}
         maxWidth="max-w-xl"
         floatingActions={floatingActions}
       >
       <DialogHeader
-        onClose={isSaving ? undefined : onClose}
-        actions={null}
+        onClose={isSaving ? undefined : handleSafeClose}
+        actions={mobileHeaderActions}
       >
         <div className="flex items-center gap-2">
           <DialogTitle className={cn(isRtl && 'font-farsi')}>
@@ -2627,7 +2769,7 @@ export function WorkModal({
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose} type="button" disabled={isSaving} className={cn(isRtl && 'font-farsi')}>
+            <Button variant="ghost" size="sm" onClick={handleSafeClose} type="button" disabled={isSaving} className={cn(isRtl && 'font-farsi')}>
               {t('common.cancel')}
             </Button>
             <Button variant="primary" size="sm" type="submit" disabled={isSaving} className={cn(isRtl && 'font-farsi')}>
