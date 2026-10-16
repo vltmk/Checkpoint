@@ -469,7 +469,7 @@ export const TRANSLATIONS = {
     'settings.privacyDesc': 'Anonymous usage diagnostics are local and privacy-first',
     'settings.telemetry': 'Anonymous Usage Analytics',
     'settings.telemetryLabel': 'Share Anonymous Metrics',
-    'settings.telemetryDesc': 'Transmits zero financial, client, or ledger data. Only anonymous daily usage counts and crash statistics are reported to improve Checkpoint.',
+    'settings.telemetryDesc': 'Transmits zero financial, client, or ledger data. Only anonymous daily usage counts and app launch events are reported to improve Checkpoint.',
     'settings.telemetryEnabled': 'Enabled',
     'settings.telemetryDisabled': 'Disabled',
     'settings.dataPortability': 'Data Portability',
