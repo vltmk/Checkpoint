@@ -69,7 +69,7 @@ test('sanitizePriceInput: handles empty, invalid or falsy inputs', () => {
   assert.equal(sanitizePriceInput(60699), '60699');
 });
 
-test('UI wiring: NumberStepperInput, WorkModal, and QuickAddModal integrate sanitizePriceInput & onPaste', () => {
+test('UI wiring: NumberStepperInput and WorkModal integrate sanitizePriceInput & onPaste', () => {
   const stepperSrc = fs.readFileSync(path.join(rootDir, 'src/components/ui/NumberStepperInput.jsx'), 'utf8');
   assert.ok(stepperSrc.includes('sanitizePriceInput'), 'NumberStepperInput must import and use sanitizePriceInput');
   assert.ok(stepperSrc.includes('onPaste='), 'NumberStepperInput must have onPaste handler');
@@ -79,7 +79,4 @@ test('UI wiring: NumberStepperInput, WorkModal, and QuickAddModal integrate sani
   assert.ok(workModalSrc.includes('handlePotChange = (newPotStr) => {'), 'WorkModal must define handlePotChange');
   assert.ok(workModalSrc.includes('handleIncomeChange = (newIncomeStr) => {'), 'WorkModal must define handleIncomeChange');
 
-  const quickAddSrc = fs.readFileSync(path.join(rootDir, 'src/components/QuickAddModal.jsx'), 'utf8');
-  assert.ok(quickAddSrc.includes('sanitizePriceInput'), 'QuickAddModal must import and use sanitizePriceInput');
-  assert.ok(quickAddSrc.includes('onPaste='), 'QuickAddModal must have onPaste handler on price input');
 });

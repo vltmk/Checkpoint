@@ -19,6 +19,7 @@ import {
   Calculator,
   Search,
   Trash2,
+  Info,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
@@ -139,7 +140,7 @@ export function Navbar({
   const [shouldShowTour, setShouldShowTour] = useState(() => {
     const effVersion = appVersion || getStaticAppVersion();
     const lastSeen = getStoredGoldRatioTourSeenVersion();
-    const lastKnown = typeof localStorage !== 'undefined' ? localStorage.getItem('checkpoint_last_known_version') : null;
+    const lastKnown = null;
     return shouldShowGoldRatioTour({
       currentVersion: effVersion,
       lastSeenVersion: lastSeen,
@@ -154,8 +155,7 @@ export function Navbar({
       try {
         const effVersion = appVersion || getStaticAppVersion();
         const dbSeen = await trackerDB.getSetting(GOLD_RATIO_TOUR_SEEN_KEY, null);
-        const lastKnown = (await trackerDB.getSetting('checkpoint_last_known_version', null)) ||
-          (typeof localStorage !== 'undefined' ? localStorage.getItem('checkpoint_last_known_version') : null);
+        const lastKnown = (await trackerDB.getSetting('checkpoint_last_known_version', null));
         const effectiveSeen = dbSeen || getStoredGoldRatioTourSeenVersion();
         if (!isCancelled) {
           const eligible = shouldShowGoldRatioTour({
@@ -202,15 +202,26 @@ export function Navbar({
 
   // Keyboard shortcut listener for Omnibar search focus (Ctrl+K, /, Esc)
   useEffect(() => {
+    // Single place that decides which visible search field receives focus:
+    // the omnibar at lg+, or the expanded field on narrower viewports.
+    const focusSearch = () => {
+      if (window.innerWidth < 1024) {
+        setIsSearchExpanded(true);
+        setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
+      } else {
+        searchInputRef.current?.focus();
+      }
+    };
+
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault();
-        if (window.innerWidth < 1024) {
-          setIsSearchExpanded(true);
-          setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
-        } else {
-          searchInputRef.current?.focus();
-        }
+        focusSearch();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        focusSearch();
         return;
       }
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
@@ -218,12 +229,7 @@ export function Navbar({
         const tag = target?.tagName?.toLowerCase();
         if (tag !== 'input' && tag !== 'textarea' && !target?.isContentEditable) {
           e.preventDefault();
-          if (window.innerWidth < 1024) {
-            setIsSearchExpanded(true);
-            setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
-          } else {
-            searchInputRef.current?.focus();
-          }
+          focusSearch();
         }
       }
       if (e.key === 'Escape' && isSearchExpanded) {
@@ -386,25 +392,30 @@ export function Navbar({
         {/* Add Work Button (Booster / Advertiser) */}
         <div data-no-drag className="flex items-center">
           {activeProfileId === 'advertiser' ? (
-            <div className="inline-flex items-center rounded-md bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 shadow-xs border border-transparent select-none overflow-hidden h-7">
+            <div className="flex items-center gap-1.5 select-none">
               <button
                 type="button"
                 onClick={() => onOpenWorkModal?.()}
                 title={`${t('nav.addWork')} (N)`}
-                className="flex items-center gap-1 h-full px-2.5 text-[11px] font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] transition-colors cursor-pointer select-none"
+                className="flex items-center gap-1 h-7 px-2.5 rounded-md bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] text-[11px] font-medium shadow-xs border border-transparent transition-colors cursor-pointer select-none"
               >
                 <Plus className="w-3 h-3 shrink-0" />
                 <span className={cn(isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
               </button>
-              <div className="h-3 w-px bg-zinc-700 dark:bg-zinc-300 pointer-events-none shrink-0" />
               <button
                 type="button"
                 onClick={onToggleCalculator}
                 title={language === 'fa' ? 'ماشین حساب سفارشات ادورتایزر (Q)' : 'Order Calculator (Q)'}
-                aria-label="Order Calculator"
-                className="flex items-center justify-center h-full px-1.5 text-[11px] hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors cursor-pointer select-none"
+                aria-label={language === 'fa' ? 'ماشین حساب سفارشات ادورتایزر' : 'Order Calculator'}
+                aria-pressed={isCalculatorOpen}
+                className={cn(
+                  'flex items-center justify-center h-7 w-7 rounded-md border shadow-xs transition-colors cursor-pointer select-none active:scale-[0.97]',
+                  isCalculatorOpen
+                    ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-950'
+                    : 'bg-white border-zinc-400 text-zinc-800 hover:bg-zinc-100 hover:border-zinc-500 dark:bg-zinc-900 dark:border-zinc-600 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:hover:border-zinc-400'
+                )}
               >
-                <Calculator className="w-3 h-3 shrink-0" />
+                <Calculator className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               </button>
             </div>
           ) : (
@@ -470,7 +481,7 @@ export function Navbar({
           {statusFilter && statusFilter !== 'ALL' && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 shrink-0">
               <span>{t('status.' + statusFilter, statusFilter)}</span>
-              <button
+              <button aria-label={t('a11y.clearStatusFilter', 'Clear status filter')}
                 type="button"
                 onClick={() => onStatusFilterChange?.('')}
                 className="hover:text-rose-500"
@@ -490,7 +501,7 @@ export function Navbar({
           />
 
           {searchQuery ? (
-            <button
+            <button aria-label={t('a11y.clearSearch', 'Clear search')}
               type="button"
               onClick={() => onSearchQueryChange?.('')}
               className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -578,7 +589,13 @@ export function Navbar({
           >
             <Coins className={cn('w-3.5 h-3.5', isRatesOpen ? 'text-amber-600 dark:text-amber-400' : 'text-amber-500/90 dark:text-amber-400/90')} />
             {isRateUpdateNeeded && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-black" />
+              <>
+                <span
+                  aria-hidden="true"
+                  className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400/70 motion-safe:animate-[ping_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
+                />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-black" />
+              </>
             )}
           </button>
 
@@ -649,6 +666,16 @@ export function Navbar({
                   {language === 'fa' ? 'نرخ‌های تبدیل ارز' : 'Exchange Rates'}
                 </span>
                 <span className="text-[10px] text-zinc-400">{activeProfileId === 'advertiser' ? 'Advertiser' : 'Pro / Booster'}</span>
+              </div>
+
+              {/* What these rates do and when to update them */}
+              <div className={cn('flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/30 p-2.5 text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                <p>
+                  {language === 'fa'
+                    ? 'این نرخ‌ها ورودی‌های گلد، دلار و یورو را به تومان تبدیل می‌کنند تا مجموع‌ها، تحلیل‌ها و کارت‌های آمار درست بمانند. به‌صورت خودکار به‌روز نمی‌شوند؛ هر بار که بازار تغییر کرد، نرخ فعلی را وارد و ذخیره کنید.'
+                    : 'These rates convert Gold, USD and EUR entries into Toman for totals, analytics and metric cards. They do not update automatically: enter the current market rate and save whenever it changes.'}
+                </p>
               </div>
 
               {/* 1. Gold Rate */}
@@ -800,7 +827,7 @@ export function Navbar({
               {statusFilter && statusFilter !== 'ALL' && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 shrink-0">
                   <span>{t('status.' + statusFilter, statusFilter)}</span>
-                  <button
+                  <button aria-label={t('a11y.clearStatusFilter', 'Clear status filter')}
                     type="button"
                     onClick={() => onStatusFilterChange?.('')}
                     className="hover:text-rose-500"

@@ -14,22 +14,12 @@ export function TeammatesCombobox({
   onChange,
   placeholder = 'Add teammate name and press Enter...',
   prefixIcon = null,
+  ariaLabel,
 }) {
   const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [savedTeammates, setSavedTeammates] = useState(() => {
-    try {
-      const saved = localStorage.getItem(SAVED_TEAMMATES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((t) => typeof t === 'string');
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [savedTeammates, setSavedTeammates] = useState([]);
 
   // Hydrate saved teammates from SQLite trackerDB
   useEffect(() => {
@@ -39,9 +29,6 @@ export function TeammatesCombobox({
         if (Array.isArray(parsed) && parsed.length > 0) {
           const clean = parsed.filter((t) => typeof t === 'string');
           setSavedTeammates(clean);
-          try {
-            localStorage.setItem(SAVED_TEAMMATES_KEY, JSON.stringify(clean));
-          } catch (e) {}
         }
       }
     }).catch(() => {});
@@ -52,7 +39,6 @@ export function TeammatesCombobox({
 
   const saveToStorage = (list) => {
     try {
-      localStorage.setItem(SAVED_TEAMMATES_KEY, JSON.stringify(list));
       trackerDB.setSetting(SAVED_TEAMMATES_KEY, list).catch(() => {});
     } catch (e) {}
   };
@@ -213,6 +199,7 @@ export function TeammatesCombobox({
         <input
           ref={inputRef}
           type="text"
+          aria-label={ariaLabel}
           name="checkpoint_teammate_input"
           autoComplete="off"
           autoCorrect="off"

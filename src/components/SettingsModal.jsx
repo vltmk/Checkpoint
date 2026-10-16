@@ -127,7 +127,7 @@ export function SettingsModal({
 
     if (window.confirm(confirmMessage)) {
       await deleteCategory(cat.id || cat.name, fallbackName);
-      await onRefreshCategories?.();
+      await onRefreshCategories?.(true);
     }
   };
 
@@ -1162,10 +1162,10 @@ export function SettingsModal({
         }}
         category={editingCategory}
         onSave={async () => {
-          await onRefreshCategories?.();
+          await onRefreshCategories?.(true);
         }}
         onSaved={async () => {
-          await onRefreshCategories?.();
+          await onRefreshCategories?.(true);
         }}
       />
     </Dialog>

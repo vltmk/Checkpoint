@@ -8,20 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const quickAddCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'QuickAddModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const receiptModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ReceiptModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const dbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8').replace(/\r\n/g, '\n');
 const categoriesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'categories.js'), 'utf8').replace(/\r\n/g, '\n');
-
-test('QuickAdd level-up bracket supports level 90 cap for WoW', () => {
-  assert.ok(quickAddCode.includes('80-90'), 'Should contain 80-90 bracket');
-  assert.ok(quickAddCode.includes('1-90'), 'Should contain 1-90 bracket');
-  assert.ok(quickAddCode.includes('Math.min(90'), 'Should clamp custom levels to 90');
-  assert.ok(quickAddCode.includes('max="90"'), 'Input max should be 90');
-});
 
 test('WorkModal supports Income and Expense segmented modes', () => {
   assert.ok(workModalCode.includes("entryType === 'expense'"), 'Should check for expense mode');
@@ -56,11 +48,6 @@ test('WorkModal anchors Income/Expense switcher in DialogHeader actions', () => 
   assert.ok(workModalCode.includes('DialogHeader'), 'WorkModal must have DialogHeader');
   assert.ok(workModalCode.includes('actions='), 'DialogHeader should receive actions prop');
   assert.ok(workModalCode.includes("setEntryType('expense')"), 'Should toggle expense mode');
-});
-
-test('Tabs in QuickAddModal and AnalyticsView use transition-colors and constant border', () => {
-  assert.ok(quickAddCode.includes('transition-colors cursor-pointer border'), 'QuickAdd activity tabs must use transition-colors and constant border');
-  assert.ok(analyticsCode.includes('transition-colors select-none border'), 'Analytics TIMEFRAMES must use transition-colors and constant border');
 });
 
 test('Typing minus sign automatically transitions layout to expense', () => {

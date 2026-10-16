@@ -15,7 +15,8 @@ import {
   ArrowRight,
   AlertTriangle,
   Copy,
-  UploadCloud,
+  ImagePlus,
+  ClipboardPaste,
   X,
   Check,
   Banknote,
@@ -59,7 +60,7 @@ export function WorkModal({
   goldRateTOMAN = 3200,
   onOpenLightbox,
   categories = [],
-  entries = [],
+  latestEntryDefaults = null,
   onRefreshCategories,
   activeProfileId = 'booster',
   usdRateTOMAN = 95000,
@@ -132,7 +133,7 @@ export function WorkModal({
     customGameText: '',
     source: '',
     orderId: '',
-    feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+    feeRate: '15',
     feeType: 'percent', // 'percent' | 'flat'
     sourcePaid: false,
     boosterPaid: false,
@@ -251,8 +252,29 @@ export function WorkModal({
     }
   };
 
+  // Remembered values (draft, last currency for this profile, advertiser fee) come from the settings store.
+  // They are read each time the form opens; the form is initialised once they arrive.
+  const [storedDefaults, setStoredDefaults] = useState(null);
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setStoredDefaults(null);
+      return undefined;
+    }
+    let cancelled = false;
+    Promise.all([
+      trackerDB.getSetting(DRAFT_KEY, null),
+      trackerDB.getSetting(`checkpoint_work_last_currency_${activeProfileId}`, null),
+      trackerDB.getSetting(ADVERTISER_LAST_FEE_KEY, null),
+    ]).then(([draft, currency, fee]) => {
+      if (!cancelled) setStoredDefaults({ draft, currency, fee });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeProfileId]);
+
+  useEffect(() => {
+    if (!isOpen || (!editingEntry && storedDefaults === null)) return;
 
     setIsSaving(false);
     setSaveError(null);
@@ -305,7 +327,7 @@ export function WorkModal({
         orderId: editingEntry.orderId || '',
         feeRate: editingEntry.feeRate !== undefined && editingEntry.feeRate !== null
           ? String(editingEntry.feeRate)
-          : (typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15'),
+          : (storedDefaults?.fee || '15'),
         feeType: editingEntry.feeType || 'percent',
         sourcePaid: Boolean(editingEntry.sourcePaid),
         boosterPaid: Boolean(editingEntry.boosterPaid),
@@ -359,16 +381,14 @@ export function WorkModal({
     } else {
       initialValuesRef.current = null;
       const isAdvertiser = activeProfileId === 'advertiser';
-      const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
+      const latestEntryGame = latestEntryDefaults?.game || undefined;
       const entryCategoryMatch = (categories || []).find(
         (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
       )?.name;
       const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
 
-      const savedProfileCurrency = typeof localStorage !== 'undefined'
-        ? localStorage.getItem(`checkpoint_work_last_currency_${activeProfileId}`)
-        : null;
-      const latestEntryCurrency = entries?.find((e) => e?.currency)?.currency;
+      const savedProfileCurrency = storedDefaults?.currency || null;
+      const latestEntryCurrency = latestEntryDefaults?.currency || undefined;
       const validProfileCur = (savedProfileCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(savedProfileCurrency))
         ? savedProfileCurrency
         : (latestEntryCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(latestEntryCurrency))
@@ -377,9 +397,9 @@ export function WorkModal({
       const defaultCur = validProfileCur || globalCurrency || 'TOMAN';
 
       try {
-        const savedDraft = localStorage.getItem(DRAFT_KEY) || localStorage.getItem(LEGACY_DRAFT_KEY);
+        const savedDraft = storedDefaults?.draft && typeof storedDefaults.draft === 'object' ? storedDefaults.draft : null;
         if (savedDraft) {
-          const parsed = JSON.parse(savedDraft);
+          const parsed = savedDraft;
           const draftTeammates = Array.isArray(parsed.teammates) ? parsed.teammates : [];
           const draftSource = (parsed.source === 'Direct Client' ? '' : parsed.source) || '';
           const draftCategoryMatch = (categories || []).find(
@@ -395,7 +415,7 @@ export function WorkModal({
             customGameText: parsed.customGameText || '',
             source: draftSource || '',
             orderId: parsed.orderId || '',
-            feeRate: parsed.feeRate || (typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15'),
+            feeRate: parsed.feeRate || (storedDefaults?.fee || '15'),
             feeType: parsed.feeType || 'percent',
             sourcePaid: Boolean(parsed.sourcePaid),
             boosterPaid: Boolean(parsed.boosterPaid),
@@ -426,7 +446,7 @@ export function WorkModal({
             customGameText: '',
             source: '',
             orderId: '',
-            feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+            feeRate: storedDefaults?.fee || '15',
             feeType: 'percent',
             sourcePaid: false,
             boosterPaid: false,
@@ -453,7 +473,63 @@ export function WorkModal({
       }
     }
     setFieldErrors({ title: false, game: false, dateTime: false, income: false });
-  }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN, activeProfileId, categories, entries]);
+  }, [isOpen, editingEntry, globalCurrency, goldRateTOMAN, activeProfileId, categories, latestEntryDefaults, storedDefaults]);
+
+  // Draft writes are debounced: every keystroke used to write the whole form to the settings store.
+  // A pending write is flushed when the dialog closes or the window unloads, and cancelled when the draft is cleared.
+  const DRAFT_SAVE_DELAY_MS = 400;
+  const draftSaveTimerRef = useRef(null);
+  const pendingDraftRef = useRef(null);
+  const draftDirtyRef = useRef(false);
+
+  const writeDraftNow = (draft) => {
+    try {
+    } catch (e) {}
+    trackerDB.setSetting(DRAFT_KEY, draft).catch(() => {});
+  };
+
+  const flushPendingDraft = () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    if (pendingDraftRef.current) {
+      const draft = pendingDraftRef.current;
+      pendingDraftRef.current = null;
+      writeDraftNow(draft);
+    }
+  };
+
+  const cancelPendingDraft = () => {
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+    pendingDraftRef.current = null;
+  };
+
+  // Only user edits schedule a draft write; opening the form or restoring a draft does not
+  useEffect(() => {
+    if (!draftDirtyRef.current || editingEntry) return;
+    pendingDraftRef.current = formData;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(flushPendingDraft, DRAFT_SAVE_DELAY_MS);
+  }, [formData]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      flushPendingDraft();
+      draftDirtyRef.current = false;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    window.addEventListener('beforeunload', flushPendingDraft);
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingDraft);
+      flushPendingDraft();
+    };
+  }, []);
 
   const updateFormData = (patch) => {
     if (saveError) setSaveError(null);
@@ -463,26 +539,16 @@ export function WorkModal({
     if (patch.income !== undefined || patch.pot !== undefined) setFieldErrors((prev) => ({ ...prev, income: false }));
     if (patch.currency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(patch.currency)) {
       try {
-        localStorage.setItem(`checkpoint_work_last_currency_${activeProfileId}`, patch.currency);
         trackerDB.setSetting(`checkpoint_work_last_currency_${activeProfileId}`, patch.currency).catch(() => {});
       } catch (e) {}
     }
-    setFormData((prev) => {
-      const next = { ...prev, ...patch };
-      if (!editingEntry) {
-        try {
-          localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
-          trackerDB.setSetting(DRAFT_KEY, next).catch(() => {});
-        } catch (e) {}
-      }
-      return next;
-    });
+    draftDirtyRef.current = true;
+    setFormData((prev) => ({ ...prev, ...patch }));
   };
 
   const clearPersistedDraft = () => {
+    cancelPendingDraft();
     try {
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(LEGACY_DRAFT_KEY);
     } catch (err) {}
     trackerDB.setSetting(DRAFT_KEY, '').catch(() => {});
   };
@@ -493,15 +559,13 @@ export function WorkModal({
     clearPersistedDraft();
     setIsDraftRestored(false);
     setFieldErrors({ title: false, game: false, dateTime: false, income: false });
-    const latestEntryGame = entries?.find((e) => e?.game?.trim())?.game?.trim();
+    const latestEntryGame = latestEntryDefaults?.game || undefined;
     const entryCategoryMatch = (categories || []).find(
       (c) => c.name?.toLowerCase().trim() === latestEntryGame?.toLowerCase()
     )?.name;
     const defaultGame = entryCategoryMatch || categories?.[0]?.name || 'World of Warcraft';
-    const savedProfileCurrency = typeof localStorage !== 'undefined'
-      ? localStorage.getItem(`checkpoint_work_last_currency_${activeProfileId}`)
-      : null;
-    const latestEntryCurrency = entries?.find((e) => e?.currency)?.currency;
+    const savedProfileCurrency = storedDefaults?.currency || null;
+    const latestEntryCurrency = latestEntryDefaults?.currency || undefined;
     const validProfileCur = (savedProfileCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(savedProfileCurrency))
       ? savedProfileCurrency
       : (latestEntryCurrency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(latestEntryCurrency))
@@ -516,7 +580,7 @@ export function WorkModal({
       customGameText: '',
       source: '',
       orderId: '',
-      feeRate: typeof localStorage !== 'undefined' ? (localStorage.getItem(ADVERTISER_LAST_FEE_KEY) || '15') : '15',
+      feeRate: storedDefaults?.fee || '15',
       sourcePaid: false,
       teamMode: false,
       teammates: [],
@@ -588,7 +652,7 @@ export function WorkModal({
     const rate = parseFloat(cleanRate);
     if (activeType === 'percent') {
       try {
-        localStorage.setItem(ADVERTISER_LAST_FEE_KEY, cleanRate);
+        trackerDB.setSetting(ADVERTISER_LAST_FEE_KEY, cleanRate).catch(() => {});
       } catch (e) {}
     }
 
@@ -1164,7 +1228,6 @@ export function WorkModal({
     try {
       if (formData.currency && ['USD', 'EUR', 'TOMAN', 'GOLD'].includes(formData.currency)) {
         try {
-          localStorage.setItem(`checkpoint_work_last_currency_${activeProfileId}`, formData.currency);
           trackerDB.setSetting(`checkpoint_work_last_currency_${activeProfileId}`, formData.currency).catch(() => {});
         } catch (e) {}
       }
@@ -1439,7 +1502,7 @@ export function WorkModal({
             title={language === 'fa' ? 'خواندن خودکار جزئیات سفارش از کلیپ‌بورد' : 'Auto-fill order details from clipboard'}
             className="flex items-center gap-1 h-6 px-2 rounded-md bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-[10px] font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer select-none"
           >
-            <span>📋</span>
+            <ClipboardPaste className="w-3 h-3 shrink-0" aria-hidden="true" />
             <span>{isParsingClipboard ? (language === 'fa' ? 'درحال خواندن...' : 'Parsing...') : (language === 'fa' ? 'خواندن کلیپ‌بورد' : 'Auto-Fill from Clipboard')}</span>
           </button>
         </div>
@@ -1452,7 +1515,7 @@ export function WorkModal({
             <button
               type="button"
               onClick={handleClearDraft}
-              className="text-[10px] text-zinc-500 hover:text-zinc-300 underline cursor-pointer"
+              className="text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 underline underline-offset-2 cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
               title="Discard saved draft"
             >
               {t('common.clear', 'Clear')}
@@ -1477,7 +1540,7 @@ export function WorkModal({
                 {parsedOrderPreview.error ? (
                   <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-[11px]">
                     <span>{parsedOrderPreview.error}</span>
-                    <button type="button" onClick={() => setParsedOrderPreview(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                    <button aria-label={t('common.close', 'Close')} type="button" onClick={() => setParsedOrderPreview(null)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1485,15 +1548,15 @@ export function WorkModal({
                   <>
                     <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/80 pb-1.5 text-[11px]">
                       <span className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                        <span>📋</span>
+                        <ClipboardPaste className="w-3 h-3 shrink-0" aria-hidden="true" />
                         <span>{language === 'fa' ? 'سفارش شناسایی‌شده از کلیپ‌بورد' : 'Detected Order from Clipboard'}</span>
                       </span>
                       <div className="flex items-center gap-1.5">
                         <Button variant="primary" size="xs" onClick={handleApplyParsedOrder} className="h-6 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-500 text-white">
                           <Check className="w-3 h-3" />
-                          <span>{language === 'fa' ? 'اعمال ✓' : 'Apply ✓'}</span>
+                          <span>{language === 'fa' ? 'اعمال' : 'Apply'}</span>
                         </Button>
-                        <button type="button" onClick={() => setParsedOrderPreview(null)} className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                        <button aria-label={t('common.close', 'Close')} type="button" onClick={() => setParsedOrderPreview(null)} className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1570,14 +1633,14 @@ export function WorkModal({
                       <span className="text-[9px] text-rose-400 font-medium">Required</span>
                     )}
                   </label>
-                  <Select
+                  <Select ariaLabel={t('work.gamePlatform')}
                     value={formData.game}
                     onChange={handleGameSelect}
                     options={GAME_OPTIONS}
                   />
                   {formData.isCustomGame && (
                     <div className="mt-2">
-                      <Input
+                      <Input aria-label={t('work.gamePlatform')}
                         required
                         value={formData.customGameText}
                         onChange={(e) => updateFormData({ customGameText: e.target.value })}
@@ -1595,7 +1658,7 @@ export function WorkModal({
                     <span>{language === 'fa' ? 'سورس / کانال مشتری' : 'Channel / Source'}</span>
                     <span className={cn('text-[9px] text-zinc-500 leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
                   </label>
-                  <SourceCombobox
+                  <SourceCombobox ariaLabel={t('work.sellerSource')}
                     value={formData.source}
                     onChange={(val) => updateFormData({ source: val })}
                     placeholder={language === 'fa' ? 'مثال: Personal, G2G, FunPay یا مشتری...' : 'e.g. Personal, G2G, FunPay, Client...'}
@@ -1612,7 +1675,7 @@ export function WorkModal({
                       <span className="text-[9px] text-rose-400 font-medium">Required</span>
                     )}
                   </label>
-                  <Input
+                  <Input aria-label={(entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense title') : t('work.workTitle'))}
                     ref={titleInputRef}
                     required
                     value={formData.title}
@@ -1669,7 +1732,7 @@ export function WorkModal({
                     </div>
                   </label>
                   <div className="relative" dir="ltr">
-                    <Input
+                    <Input aria-label={(language === 'fa' ? 'شناسه سفارش' : 'Order ID')}
                       value={formData.orderId}
                       onChange={(e) => updateFormData({ orderId: e.target.value })}
                       placeholder={language === 'fa' ? 'مثال: #ORD-98234...' : 'e.g. #ORD-98234...'}
@@ -1719,7 +1782,7 @@ export function WorkModal({
                             : (language === 'fa' ? 'اختیاری (در صورت تخصیص)' : 'Optional (unassigned if empty)')}
                         </span>
                       </div>
-                      <TeammatesCombobox
+                      <TeammatesCombobox ariaLabel={t('work.teammatesCrew')}
                         value={formData.teammates}
                         onChange={handleTeammatesChange}
                         placeholder={language === 'fa' ? 'نام بوستر را وارد کرده و Enter بزنید...' : 'Type booster username and press Enter...'}
@@ -1758,14 +1821,14 @@ export function WorkModal({
                     </label>
                     <div className="flex gap-2">
                       <div className="w-[125px] shrink-0">
-                        <Select
+                        <Select ariaLabel={(language === 'fa' ? 'ارز' : 'Currency')}
                           value={formData.currency}
                           onChange={(val) => updateFormData({ currency: val })}
                           options={availableCurrencyOptions}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <NumberStepperInput
+                        <NumberStepperInput aria-label={(language === 'fa' ? 'مبلغ' : 'Amount')}
                           value={entryType === 'expense' ? formData.income : formData.pot}
                           onChange={(e) => handleAdvertiserClientPriceChange(e.target.value)}
                           currency={formData.currency}
@@ -1794,7 +1857,7 @@ export function WorkModal({
                           </span>
                         )}
                       </label>
-                      <NumberStepperInput
+                      <NumberStepperInput aria-label={t('work.exchangeRate')}
                         value={formData.exchangeRate}
                         onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
                         step={50}
@@ -1850,7 +1913,7 @@ export function WorkModal({
                                   </button>
                                 ))}
                                 <div className="w-16 ml-1">
-                                  <Input
+                                  <Input aria-label={(language === 'fa' ? 'درصد کارمزد' : 'Fee percentage')}
                                     type="text"
                                     value={formData.feeRate}
                                     onChange={(e) => handleAdvertiserFeeRateChange(e.target.value)}
@@ -1861,7 +1924,7 @@ export function WorkModal({
                               </>
                             ) : (
                               <div className="w-24">
-                                <Input
+                                <Input aria-label={(language === 'fa' ? 'کارمزد ثابت' : 'Flat fee')}
                                   type="text"
                                   value={formData.feeRate}
                                   onChange={(e) => handleAdvertiserFeeRateChange(e.target.value)}
@@ -1898,6 +1961,8 @@ export function WorkModal({
                         <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-zinc-200 dark:border-zinc-800/80">
                           <button
                             type="button"
+                            role="checkbox"
+                            aria-checked={Boolean(formData.sourcePaid)}
                             onClick={() => updateFormData({ sourcePaid: !formData.sourcePaid })}
                             className={cn(
                               'flex items-center justify-between p-2 rounded-lg border transition-all text-xs cursor-pointer',
@@ -1907,7 +1972,17 @@ export function WorkModal({
                             )}
                           >
                             <span className="flex items-center gap-1.5 font-medium">
-                              <span className={cn('w-2 h-2 rounded-full', formData.sourcePaid ? 'bg-emerald-500' : 'bg-amber-400')} />
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  'w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors',
+                                  formData.sourcePaid
+                                    ? 'bg-emerald-500 border-emerald-600 text-white dark:bg-emerald-600 dark:border-emerald-500'
+                                    : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950'
+                                )}
+                              >
+                                {formData.sourcePaid && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                              </span>
                               {language === 'fa' ? 'دریافت از سورس:' : 'Source Paid:'}
                             </span>
                             <span className="text-[11px] font-semibold">
@@ -1917,6 +1992,8 @@ export function WorkModal({
 
                           <button
                             type="button"
+                            role="checkbox"
+                            aria-checked={Boolean(formData.boosterPaid)}
                             onClick={() => updateFormData({ boosterPaid: !formData.boosterPaid })}
                             className={cn(
                               'flex items-center justify-between p-2 rounded-lg border transition-all text-xs cursor-pointer',
@@ -1926,7 +2003,17 @@ export function WorkModal({
                             )}
                           >
                             <span className="flex items-center gap-1.5 font-medium">
-                              <span className={cn('w-2 h-2 rounded-full', formData.boosterPaid ? 'bg-emerald-500' : 'bg-amber-400')} />
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  'w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors',
+                                  formData.boosterPaid
+                                    ? 'bg-emerald-500 border-emerald-600 text-white dark:bg-emerald-600 dark:border-emerald-500'
+                                    : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950'
+                                )}
+                              >
+                                {formData.boosterPaid && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                              </span>
                               {language === 'fa' ? 'پرداخت به بوستر:' : 'Booster Paid:'}
                             </span>
                             <span className="text-[11px] font-semibold">
@@ -1979,7 +2066,7 @@ export function WorkModal({
                                         <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate text-[11px]">{b}</span>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
-                                        <Input
+                                        <Input aria-label={(language === 'fa' ? `سهم ${b}` : `${b} cut`)}
                                           type="text"
                                           dir="ltr"
                                           value={formData.teammateCuts?.[b] ?? ''}
@@ -1998,7 +2085,7 @@ export function WorkModal({
                                         <span className="text-[10px] text-zinc-400">{formData.currency}</span>
                                       </div>
                                     </div>
-                                    <Input
+                                    <Input aria-label={(language === 'fa' ? `یادداشت ${b}` : `Note for ${b}`)}
                                       type="text"
                                       value={formData.teammateNotes?.[b] ?? ''}
                                       onChange={(e) => {
@@ -2029,7 +2116,7 @@ export function WorkModal({
                 <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5', isRtl && 'font-farsi')}>
                   {t('work.notes')}
                 </label>
-                <Textarea
+                <Textarea aria-label={t('work.notes')}
                   rows={2}
                   value={formData.notes}
                   onChange={(e) => updateFormData({ notes: e.target.value })}
@@ -2072,7 +2159,7 @@ export function WorkModal({
                 </div>
 
                 <div className="relative flex items-center">
-                  <Input
+                  <Input aria-label={t('work.link')}
                     type="text"
                     value={formData.link}
                     onChange={(e) => updateFormData({ link: e.target.value })}
@@ -2114,20 +2201,26 @@ export function WorkModal({
                       )}
                     </AnimatePresence>
                   </div>
-                  <span className={cn('text-[10px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
-                    {language === 'fa' ? '⚡ کلید Ctrl+V برای چسباندن اسکرین‌شات' : '⚡ Press Ctrl+V to paste screenshot'}
-                  </span>
-                </div>
+                                  </div>
 
                 <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => {
+                  role="button"
+                                    tabIndex={0}
+                                    aria-label={t('work.clickUpload')}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        fileInputRef.current?.click();
+                                      }
+                                    }}
+                                    onDragOver={(e) => {
                     e.preventDefault();
                     setIsDragOver(true);
                   }}
                   onDragLeave={() => setIsDragOver(false)}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
+                  className={`border-2 border-dashed rounded-xl px-3 py-2.5 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${
                     isDragOver
                       ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
                       : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
@@ -2146,15 +2239,7 @@ export function WorkModal({
                     multiple
                     className="hidden"
                   />
-                  <div className="flex flex-col items-center justify-center gap-1">
-                    <UploadCloud className="w-4 h-4 text-zinc-500" />
-                    <div className={cn('text-xs text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{t('work.clickUpload')}</span>
-                    </div>
-                    <div className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
-                      {language === 'fa' ? 'یا مستقیماً با Ctrl+V از Snipping Tool تصویر را بچسبانید' : <>Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool</>}
-                    </div>
-                  </div>
+                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"><ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className={cn('font-medium text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>{t('work.clickUpload')}</span><span className="inline-flex items-center gap-0.5 ms-1" aria-hidden="true"><Kbd>Ctrl</Kbd><Kbd>V</Kbd></span></div>
                 </div>
 
                 {proofs.length > 0 && (
@@ -2195,7 +2280,7 @@ export function WorkModal({
               {/* Row 1: Game & Seller Source */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Select
+                  <Select ariaLabel={t('work.gamePlatform')}
                     value={formData.game}
                     onChange={handleGameSelect}
                     options={GAME_OPTIONS}
@@ -2212,7 +2297,7 @@ export function WorkModal({
                   />
                   {formData.isCustomGame && (
                     <div className="mt-2">
-                      <Input
+                      <Input aria-label={t('work.gamePlatform')}
                         required
                         value={formData.customGameText}
                         onChange={(e) => updateFormData({ customGameText: e.target.value })}
@@ -2231,7 +2316,7 @@ export function WorkModal({
                 </div>
 
                 <div>
-                  <SourceCombobox
+                  <SourceCombobox ariaLabel={t('work.sellerSource')}
                     value={formData.source}
                     onChange={(val) => updateFormData({ source: val })}
                     prefixIcon={
@@ -2248,7 +2333,7 @@ export function WorkModal({
 
               {/* Row 2: Work Title */}
               <div>
-                <Input
+                <Input aria-label={(entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense title') : t('work.workTitle'))}
                   ref={titleInputRef}
                   required
                   value={formData.title}
@@ -2351,7 +2436,7 @@ export function WorkModal({
                         </div>
                       </div>
 
-                      <TeammatesCombobox
+                      <TeammatesCombobox ariaLabel={t('work.teammatesCrew')}
                         value={formData.teammates}
                         onChange={handleTeammatesChange}
                         prefixIcon={
@@ -2372,14 +2457,14 @@ export function WorkModal({
               <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-2.5">
                 <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                   <div className="w-[120px] sm:w-[125px] shrink-0">
-                    <Select
+                    <Select ariaLabel={(language === 'fa' ? 'ارز' : 'Currency')}
                       value={formData.currency}
                       onChange={(val) => updateFormData({ currency: val })}
                       options={availableCurrencyOptions}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <NumberStepperInput
+                    <NumberStepperInput aria-label={(language === 'fa' ? 'مبلغ' : 'Amount')}
                       value={formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income}
                       onChange={(e) => {
                         if (formData.teamMode && formData.teamInputMode === 'pot') {
@@ -2447,7 +2532,7 @@ export function WorkModal({
                       </Tooltip>
                     ) : (
                       <div className="flex items-center gap-1 shrink-0">
-                        <NumberStepperInput
+                        <NumberStepperInput aria-label={t('work.exchangeRate')}
                           value={formData.exchangeRate}
                           onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
                           step={isClassic ? 100 : 50}
@@ -2464,7 +2549,7 @@ export function WorkModal({
                         />
                         {Number(formData.exchangeRate) !== (isClassic ? 7000 : Number(goldRateTOMAN || 3200)) && (
                           <Tooltip content={language === 'fa' ? `بازنشانی به نرخ فعال (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} ت)` : `Reset to active rate (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} T)`}>
-                            <button
+                            <button aria-label={t('a11y.resetToActiveRate', 'Reset to active rate')}
                               type="button"
                               onClick={() => updateFormData({ exchangeRate: String(isClassic ? 7000 : (goldRateTOMAN || 3200)) })}
                               className="h-9 w-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0 cursor-pointer"
@@ -2474,7 +2559,7 @@ export function WorkModal({
                           </Tooltip>
                         )}
                         <Tooltip content={language === 'fa' ? 'بستن و استفاده از نرخ پیش‌فرض' : 'Dismiss and use default rate'}>
-                          <button
+                          <button aria-label={t('a11y.dismissCustomRate', 'Dismiss and use default rate')}
                             type="button"
                             onClick={() => {
                               setIsCustomRateActive(false);
@@ -2548,7 +2633,7 @@ export function WorkModal({
                               {/* You (Host) */}
                               <div className="flex items-center justify-between gap-2">
                                 <span className={cn('text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'شما (میزبان):' : 'You (Host):'}</span>
-                                <NumberStepperInput
+                                <NumberStepperInput aria-label={(language === 'fa' ? 'سهم شما' : 'Your cut')}
                                   value={formData.income}
                                   onChange={(e) => handleCustomCutChange('__user__', e.target.value)}
                                   currency={formData.currency}
@@ -2562,7 +2647,7 @@ export function WorkModal({
                                 <div key={tm} className="p-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200/60 dark:border-zinc-800/60 space-y-1">
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium truncate">{tm}:</span>
-                                    <NumberStepperInput
+                                    <NumberStepperInput aria-label={(language === 'fa' ? `سهم ${tm}` : `${tm} cut`)}
                                       value={formData.teammateCuts?.[tm] || ''}
                                       onChange={(e) => handleCustomCutChange(tm, e.target.value)}
                                       currency={formData.currency}
@@ -2570,7 +2655,7 @@ export function WorkModal({
                                       placeholder="0"
                                     />
                                   </div>
-                                  <Input
+                                  <Input aria-label={(language === 'fa' ? `یادداشت ${tm}` : `Note for ${tm}`)}
                                     type="text"
                                     value={formData.teammateNotes?.[tm] ?? ''}
                                     onChange={(e) => {
@@ -2605,7 +2690,7 @@ export function WorkModal({
 
               {/* Row 6: Notes */}
               <div>
-                <Textarea
+                <Textarea aria-label={t('work.notes')}
                   rows={2}
                   value={formData.notes}
                   onChange={(e) => updateFormData({ notes: e.target.value })}
@@ -2615,7 +2700,7 @@ export function WorkModal({
 
               {/* Row 7: Reference Link / URL */}
               <div className="relative flex items-center">
-                <Input
+                <Input aria-label={t('work.link')}
                   type="text"
                   value={formData.link}
                   onChange={(e) => updateFormData({ link: e.target.value })}
@@ -2671,20 +2756,26 @@ export function WorkModal({
                       )}
                     </AnimatePresence>
                   </div>
-                  <span className={cn('text-[10px] text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
-                    {language === 'fa' ? '⚡ کلید Ctrl+V برای چسباندن اسکرین‌شات' : '⚡ Press Ctrl+V to paste screenshot'}
-                  </span>
-                </div>
+                                  </div>
 
                 <div
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => {
+                  role="button"
+                                    tabIndex={0}
+                                    aria-label={t('work.clickUpload')}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        fileInputRef.current?.click();
+                                      }
+                                    }}
+                                    onDragOver={(e) => {
                     e.preventDefault();
                     setIsDragOver(true);
                   }}
                   onDragLeave={() => setIsDragOver(false)}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors ${
+                  className={`border-2 border-dashed rounded-xl px-3 py-2.5 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${
                     isDragOver
                       ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
                       : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
@@ -2703,15 +2794,7 @@ export function WorkModal({
                     multiple
                     className="hidden"
                   />
-                  <div className="flex flex-col items-center justify-center gap-1">
-                    <UploadCloud className="w-4 h-4 text-zinc-500" />
-                    <div className={cn('text-xs text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{t('work.clickUpload')}</span>
-                    </div>
-                    <div className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
-                      {language === 'fa' ? 'یا مستقیماً با Ctrl+V از Snipping Tool تصویر را بچسبانید' : <>Or press <Kbd>Ctrl</Kbd>+<Kbd>V</Kbd> anywhere from Snipping Tool</>}
-                    </div>
-                  </div>
+                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"><ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className={cn('font-medium text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>{t('work.clickUpload')}</span><span className="inline-flex items-center gap-0.5 ms-1" aria-hidden="true"><Kbd>Ctrl</Kbd><Kbd>V</Kbd></span></div>
                 </div>
 
                 {proofs.length > 0 && (
@@ -2757,7 +2840,7 @@ export function WorkModal({
               {t('work.status')}:
             </span>
             <div className="w-28 sm:w-32">
-              <Select
+              <Select ariaLabel={t('work.status')}
                 dropUp={true}
                 value={formData.status}
                 onChange={(val) => updateFormData({ status: val })}

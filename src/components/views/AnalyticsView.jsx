@@ -65,11 +65,7 @@ export function AnalyticsView({
   const isLight = resolvedTheme === 'light';
   const isAdvertiser = activeProfileId === 'advertiser';
 
-  const [timeframe, setTimeframe] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_analytics_timeframe') || localStorage.getItem('vault_analytics_timeframe');
-    if (saved && ['daily', 'weekly', 'monthly', 'all'].includes(saved)) return saved;
-    return 'monthly';
-  });
+  const [timeframe, setTimeframe] = useState('monthly');
 
   const [breakdownView, setBreakdownView] = useState('game'); // 'game' | 'source'
 
@@ -78,9 +74,6 @@ export function AnalyticsView({
     trackerDB.getSetting('checkpoint_analytics_timeframe', null).then((saved) => {
       if (saved && ['daily', 'weekly', 'monthly', 'all'].includes(saved) && saved !== timeframe) {
         setTimeframe(saved);
-        try {
-          localStorage.setItem('checkpoint_analytics_timeframe', saved);
-        } catch (e) {}
       }
     }).catch(() => {});
   }, []);
@@ -96,7 +89,6 @@ export function AnalyticsView({
     const validTf = ['daily', 'weekly', 'monthly', 'all'].includes(tf) ? tf : 'monthly';
     setTimeframe(validTf);
     try {
-      localStorage.setItem('checkpoint_analytics_timeframe', validTf);
       trackerDB.setSetting('checkpoint_analytics_timeframe', validTf).catch(() => {});
     } catch (e) {
       // Ignore quota errors

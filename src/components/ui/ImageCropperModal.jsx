@@ -6,6 +6,7 @@ import { extractDominantColor } from '../../lib/categories';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import { FrostedGlass } from './FrostedGlass';
+import { useModalFocus } from './useModalFocus';
 
 // Apple Design rubber-band formula for elastic resistance
 function rubberband(overshoot, dimension, constant = 0.55) {
@@ -25,6 +26,8 @@ export function ImageCropperModal({
   initialImage = null, // image URL, base64, or File
   onApply, // ({ dataUrl, dominantColor }) => void
 }) {
+  const cropperRef = useRef(null);
+  useModalFocus({ open: isOpen, containerRef: cropperRef, onClose: onClose });
   const { t, language, isRtl } = useLanguage();
   const [imageSrc, setImageSrc] = useState(null);
   const [imageObj, setImageObj] = useState(null);
@@ -308,7 +311,7 @@ export function ImageCropperModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
+    <div ref={cropperRef} role="dialog" aria-modal="true" tabIndex={-1} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
       <FrostedGlass
         variant="modal"
         className="w-full max-w-[380px] flex flex-col"
@@ -320,7 +323,7 @@ export function ImageCropperModal({
             <ImageIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             <span>{t('categories.editImage', 'Edit Image')}</span>
           </h3>
-          <button
+          <button aria-label={t('common.close', 'Close')}
             type="button"
             onClick={onClose}
             className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"

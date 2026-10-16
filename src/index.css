@@ -823,4 +823,16 @@ html.dark .checkpoint-slider::-moz-range-thumb {
   transform: scale(1.25);
 }
 
-
+/* Desktop-app feel: interactive chrome is not selectable, while content (amounts, IDs, notes, receipts) is */
+button,
+[role='button'],
+[role='tab'],
+[role='switch'],
+[role='menuitem'],
+[role='option'],
+[role='tablist'],
+nav,
+[data-no-select] {
+  -webkit-user-select: none;
+  user-select: none;
+}

@@ -2,8 +2,10 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Download, X } from 'lucide-react';
 import { isTauri, saveImageNative } from '../lib/desktop';
+import { useLanguage } from '../lib/i18n';
 
 export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof' }) {
+  const { t } = useLanguage();
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape' && isOpen) {
@@ -63,7 +65,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
                   <Download className="w-3.5 h-3.5" />
                   <span>Download</span>
                 </a>
-                <button
+                <button aria-label={t('common.close', 'Close')}
                   type="button"
                   onClick={onClose}
                   className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"

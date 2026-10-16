@@ -22,6 +22,7 @@ import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import { FrostedGlass } from './FrostedGlass';
 import wowIcon from '../../assets/world-of-warcraft-retail.svg';
+import { useModalFocus } from './useModalFocus';
 
 export function CategoryModal({
   isOpen,
@@ -30,6 +31,8 @@ export function CategoryModal({
   onSave, // (updatedCategory) => void
   onSaved,
 }) {
+  const modalRef = useRef(null);
+  useModalFocus({ open: isOpen, containerRef: modalRef, onClose: onClose });
   const { t, language, isRtl } = useLanguage();
   const [name, setName] = useState('');
   const [color, setColor] = useState(DEFAULT_WOW_COLOR);
@@ -152,7 +155,7 @@ export function CategoryModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
+      <div ref={modalRef} role="dialog" aria-modal="true" tabIndex={-1} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
         <FrostedGlass
           variant="modal"
           className="w-full max-w-[440px] flex flex-col"
@@ -168,7 +171,7 @@ export function CategoryModal({
                   : t('categories.newCategory', 'Add Category / Game')}
               </span>
             </h2>
-            <button
+            <button aria-label={t('common.close', 'Close')}
               type="button"
               onClick={onClose}
               className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
@@ -352,7 +355,7 @@ export function CategoryModal({
                   {t('categories.supportsGoldDesc', 'Allow recording in Gold with live conversion rates for this category')}
                 </p>
               </div>
-              <button
+              <button aria-label={t('categories.supportsGold', 'Enable in-game Gold & conversion rate')}
                 type="button"
                 role="switch"
                 aria-checked={supportsGold}

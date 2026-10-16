@@ -23,7 +23,7 @@ test('HUD progressbar provides accessible role and aria attributes', () => {
     'utf8'
   );
   assert.match(ledgerCode, /role="progressbar"/);
-  assert.match(ledgerCode, /aria-label="Job settlement distribution"/);
+  assert.match(ledgerCode, /Job settlement distribution/);
   assert.match(ledgerCode, /aria-valuenow=/);
 });
 

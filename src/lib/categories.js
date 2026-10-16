@@ -52,7 +52,7 @@ export const DEFAULT_CATEGORIES = [
 ];
 
 /**
- * Load categories from trackerDB and sync with localStorage.
+ * Load categories from the settings store.
  */
 export async function loadCategories() {
   let list = [];
@@ -60,13 +60,6 @@ export async function loadCategories() {
     const saved = await trackerDB.getSetting(CATEGORIES_STORAGE_KEY, null);
     if (saved) {
       list = Array.isArray(saved) ? saved : JSON.parse(saved);
-    } else if (typeof localStorage !== 'undefined') {
-      const local =
-        localStorage.getItem(CATEGORIES_STORAGE_KEY) ||
-        localStorage.getItem(LEGACY_CATEGORIES_STORAGE_KEY);
-      if (local) {
-        list = JSON.parse(local);
-      }
     }
   } catch (err) {
     console.warn('Failed to load categories:', err);
@@ -92,14 +85,11 @@ export async function loadCategories() {
 }
 
 /**
- * Save categories to trackerDB and localStorage.
+ * Save categories to the settings store.
  */
 export async function saveCategories(categories) {
   if (!Array.isArray(categories)) return false;
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-    }
     await trackerDB.setSetting(CATEGORIES_STORAGE_KEY, categories);
     return true;
   } catch (err) {

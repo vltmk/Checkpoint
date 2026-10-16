@@ -131,7 +131,7 @@ test('db.js & App.jsx: cached connection persistence and smooth profile transiti
   // LedgerView pagination boundary and reset safety
   assert.ok(ledgerCode.includes('activeProfileId, searchQuery, statusFilter'));
   assert.ok(ledgerCode.includes('currentPage > totalPages'));
-  assert.ok(ledgerCode.includes('Math.min(currentPage, totalPages)'));
+  assert.ok(fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'useLedgerData.js'), 'utf8').includes('Math.min(currentPage, totalPages)'));
 });
 
 test('EUR currency preservation: db.js, WorkModal, and NumberStepperInput support EUR without coercion to TOMAN', () => {

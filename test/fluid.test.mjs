@@ -17,7 +17,7 @@ test("LedgerView.jsx implements zero-CLS minimal Action HUD with fixed height", 
     path.join(rootDir, "src/components/views/LedgerView.jsx"),
     "utf8"
   );
-  assert.match(ledgerCode, /h-16 sm:h-\[68px\]/);
+  assert.match(ledgerCode, /grid grid-cols-2 sm:grid-cols-4/);
   assert.match(ledgerCode, /sticky top-0 z-30/);
 });
 
@@ -36,8 +36,9 @@ test("Action HUD metrics and pills calculate over baseFilteredEntries to avoid z
     path.join(rootDir, "src/components/views/LedgerView.jsx"),
     "utf8"
   );
-  assert.match(ledgerCode, /baseFilteredEntries\s*=\s*useMemo/);
-  assert.match(ledgerCode, /baseFilteredEntries\.forEach/);
+  assert.match(ledgerCode, /baseFilteredEntries\s*=\s*ledger\.sortedRows/);
+  const hookCode = fs.readFileSync(path.join(rootDir, "src/components/views/useLedgerData.js"), "utf8");
+  assert.match(hookCode, /computeLedgerMetrics\(metricsRows/);
   assert.match(ledgerCode, /formatNumber\(baseFilteredEntries\.length\)/);
 });
 

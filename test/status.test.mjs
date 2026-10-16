@@ -12,6 +12,7 @@ const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currenc
 const i18nCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const badgeCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'Badge.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8').replace(/\r\n/g, '\n');
+const ledgerQueryCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'ledgerQuery.js'), 'utf8');
 const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 
 test('STATUSES includes Failed in currencies.js', () => {
@@ -46,8 +47,8 @@ test('STATUS_STYLES in Badge.jsx defines dual-theme classes for Failed', () => {
 
 test('LedgerView.jsx properly excludes Failed from day earnings and pending', () => {
   assert.ok(ledgerCode.includes("item.status === 'Failed' ? 0 : convertEntryCurrency"));
-  assert.ok(ledgerCode.includes("else if (e.status === 'Failed')"));
-  assert.ok(ledgerCode.includes("totalFailed +="));
+  assert.ok(ledgerQueryCode.includes("else if (e.status === 'Failed')"));
+  assert.ok(ledgerQueryCode.includes("totalFailed +="));
 });
 
 test('AnalyticsView.jsx properly calculates lostRevenue and excludes Failed from earnings', () => {

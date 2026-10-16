@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Bell,
@@ -22,6 +22,7 @@ import { openExternalUrl, copyTextNative } from '../lib/desktop';
 import { isNotificationRTL, isRTL } from '../lib/utils';
 import { useLanguage, formatShamsiDateTime } from '../lib/i18n';
 import { cn } from '../lib/utils';
+import { useModalFocus } from './ui/useModalFocus';
 
 export function NotificationCenter({
   isOpen,
@@ -31,6 +32,8 @@ export function NotificationCenter({
   onMarkAllAsRead,
   onOpenUpdateModal,
 }) {
+  const drawerRef = useRef(null);
+  useModalFocus({ open: isOpen, containerRef: drawerRef, onClose: onClose });
   const shouldReduceMotion = useReducedMotion();
   const { t, language, isRtl, formatNumber } = useLanguage();
   const [filterMode, setFilterMode] = useState('all'); // 'all' | 'unread' | 'releases' | 'announcements'
@@ -143,6 +146,10 @@ export function NotificationCenter({
     <AnimatePresence>
       {isOpen && (
         <div
+          ref={drawerRef}
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           className={cn('fixed inset-0 z-50 flex select-none', isRtl ? 'justify-start' : 'justify-end')}
           dir="ltr"
         >

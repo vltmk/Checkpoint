@@ -11,6 +11,7 @@ const rootDir = path.resolve(__dirname, '..');
 
 const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
 const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8');
+const ledgerQueryCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'ledgerQuery.js'), 'utf8');
 const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8');
 const shortcutsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ShortcutsModal.jsx'), 'utf8');
 const undoToastCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'UndoToast.jsx'), 'utf8');
@@ -76,11 +77,11 @@ test('generateDiscordReceiptText formats advertiser orders with Order ID and Cli
 
 test('LedgerView supports Date Range preset filtering and batch Discord export', () => {
   assert.ok(ledgerCode.includes('dateRangeFilter'));
-  assert.ok(ledgerCode.includes("dateRangeFilter === 'today'"));
-  assert.ok(ledgerCode.includes("dateRangeFilter === 'yesterday'"));
-  assert.ok(ledgerCode.includes("dateRangeFilter === 'week'"));
-  assert.ok(ledgerCode.includes("dateRangeFilter === 'month'"));
-  assert.ok(ledgerCode.includes("dateRangeFilter === 'last_month'"));
+  assert.ok(ledgerQueryCode.includes("case 'today'"));
+  assert.ok(ledgerQueryCode.includes("case 'yesterday'"));
+  assert.ok(ledgerQueryCode.includes("case 'week'"));
+  assert.ok(ledgerQueryCode.includes("case 'month'"));
+  assert.ok(ledgerQueryCode.includes("case 'last_month'"));
   assert.ok(ledgerCode.includes('handleCopyDiscordBatch'));
   assert.ok(ledgerCode.includes('isDiscordBatchCopied'));
   assert.ok(ledgerCode.includes('CHECKPOINT - BATCH SUMMARY'));

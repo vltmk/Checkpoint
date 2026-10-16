@@ -413,9 +413,22 @@ export function DateTimePicker({
     <div ref={containerRef} className={cn('relative inline-block w-full', isOpen && 'z-50')}>
       {/* Trigger Bar */}
       <div
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={language === 'fa' ? 'تاریخ و زمان' : 'Date and time'}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-disabled={disabled || undefined}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (disabled || e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen((prev) => !prev);
+          }
+        }}
         className={cn(
-          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-visible:outline-none focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
           isOpen && 'border-zinc-500 ring-1 ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className

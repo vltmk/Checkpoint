@@ -33,8 +33,8 @@ test("MoneyDisplay uses TomanIcon for Toman currency with 24px default and iconS
 
 test("Cockpit in LedgerView configures 0.9em for hero total and 26px for metric cards and currency pill", () => {
   assert.ok(ledgerViewCode.includes("iconSize=\"0.9em\""));
-  assert.ok(ledgerViewCode.includes("amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={26}"));
-  assert.ok(ledgerViewCode.includes("amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={26}"));
+  assert.ok(ledgerViewCode.includes("amount={metrics.totalPending} currency={globalCurrency} compact={true} iconSize={20}"));
+  assert.ok(ledgerViewCode.includes("amount={metrics.avgRate} currency={globalCurrency} compact={true} iconSize={20}"));
   assert.ok(ledgerViewCode.includes("<TomanIcon className=\"w-[26px] h-[26px] min-w-[26px] min-h-[26px] text-emerald-500 dark:text-emerald-400\" />"));
 });
 

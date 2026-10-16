@@ -4,7 +4,6 @@ import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 import { TomanIcon } from './Icons';
-import { FrostedGlass } from './FrostedGlass';
 
 export function Select({
   value,
@@ -16,6 +15,7 @@ export function Select({
   dropUp = false,
   align = 'auto', // 'auto' | 'start' | 'end' | 'left' | 'right'
   prefixIcon = null,
+  ariaLabel,
 }) {
   const { isRtl } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -213,6 +213,7 @@ export function Select({
       {/* Trigger Button */}
       <button
         type="button"
+        aria-label={ariaLabel}
         dir={isRtl ? 'rtl' : 'ltr'}
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
@@ -247,9 +248,7 @@ export function Select({
       {/* Popover Dropdown */}
       <AnimatePresence>
         {isOpen && (
-          <FrostedGlass
-            as="motion.div"
-            variant="popover"
+          <motion.div
             ref={popoverRef}
             initial={{ opacity: 0, y: effectiveDropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -257,7 +256,7 @@ export function Select({
             transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
             dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
-              'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto p-1',
+              'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl',
               effectiveDropUp ? 'origin-bottom' : 'origin-top',
               // Boundary and alignment handling
               effectiveAlign === 'left'
@@ -292,7 +291,7 @@ export function Select({
                 No options available
               </div>
             )}
-          </FrostedGlass>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -230,21 +230,16 @@ export async function showWindow() {
 }
 
 export async function isTrayNotificationSent() {
-  const local = localStorage.getItem('checkpoint_tray_notified');
-  if (local === 'true') return true;
   try {
     const { trackerDB } = await import('./db.js');
     const dbVal = await trackerDB.getSetting('checkpoint_tray_notified', null);
-    if (dbVal === 'true' || dbVal === true) {
-      localStorage.setItem('checkpoint_tray_notified', 'true');
-      return true;
-    }
-  } catch (e) {}
-  return false;
+    return dbVal === 'true' || dbVal === true;
+  } catch (e) {
+    return false;
+  }
 }
 
 export async function setTrayNotificationSent() {
-  localStorage.setItem('checkpoint_tray_notified', 'true');
   try {
     const { trackerDB } = await import('./db.js');
     await trackerDB.setSetting('checkpoint_tray_notified', 'true');
@@ -252,7 +247,6 @@ export async function setTrayNotificationSent() {
 }
 
 export async function resetTrayNotificationFlag() {
-  localStorage.removeItem('checkpoint_tray_notified');
   try {
     const { trackerDB } = await import('./db.js');
     await trackerDB.setSetting('checkpoint_tray_notified', 'false');

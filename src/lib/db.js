@@ -17,7 +17,19 @@ import {
   migrateLegacySqliteData as runLegacySqliteMigration,
   SQLITE_MAIN_PATH,
 } from './sqliteMigration';
-import { getActiveProfileId, PROFILES, SHARED_SYNC_SETTING_KEYS } from './profiles';
+import { getActiveProfileId, PROFILES } from './profiles';
+import { chooseMigratedValue } from './settingsMigration';
+import {
+  buildLedgerWhere,
+  CURRENCY_SQL_EXPR,
+  compareByDate,
+  computeIndexColumns,
+  filterLedgerRows,
+  GAME_SQL_EXPR,
+  indexOrderSql,
+  LEDGER_INDEX_SELECT,
+  normalizeLedgerIndexRow,
+} from './ledgerQuery';
 
 const DB_NAME_IDB = 'CheckpointDB_v1';
 const DB_VERSION_IDB = 1;
@@ -49,7 +61,15 @@ const WORK_ENTRY_COLUMN_MIGRATIONS = {
   feeType: "ALTER TABLE work_entries ADD COLUMN feeType TEXT DEFAULT 'percent';",
   boosterPaid: 'ALTER TABLE work_entries ADD COLUMN boosterPaid INTEGER DEFAULT 0;',
   platformFee: 'ALTER TABLE work_entries ADD COLUMN platformFee REAL DEFAULT 0;',
+  // Index columns for the ledger query. No default: NULL marks rows that still need backfilling.
+  ts: 'ALTER TABLE work_entries ADD COLUMN ts INTEGER;',
+  date_label: 'ALTER TABLE work_entries ADD COLUMN date_label TEXT;',
 };
+
+// Every list-view column, shared by the full ledger read and the by-id read so both map identically
+const LIST_ENTRY_COLUMNS = `
+            w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
+            w.pot, w.teamInputMode, w.teammateCuts, w.teammateNotes, w.orderId, w.feeRate, w.sourcePaid, w.feeType, w.boosterPaid, w.platformFee`;
 
 export class StorageDB {
   constructor() {
@@ -155,7 +175,6 @@ export class StorageDB {
         }
       }
 
-      await this.syncSharedSettings().catch(() => {});
       return this.getStorageStatus();
     })();
 
@@ -165,21 +184,6 @@ export class StorageDB {
     } finally {
       if (this._switchPromise === currentSwitch) {
         this._switchPromise = null;
-      }
-    }
-  }
-
-  async syncSharedSettings() {
-    if (typeof localStorage === 'undefined') return;
-    for (const key of SHARED_SYNC_SETTING_KEYS) {
-      const val = localStorage.getItem(key);
-      if (val !== null) {
-        try {
-          const parsed = JSON.parse(val);
-          await this.setSetting(key, parsed);
-        } catch (e) {
-          await this.setSetting(key, val);
-        }
       }
     }
   }
@@ -199,12 +203,13 @@ export class StorageDB {
             }
           } else {
             try {
-              // Pre-warm into cache without closing the pool
-              const db = await this.initDesktopStorage(pid);
-              if (db) {
-                const res = await db.select('SELECT COUNT(*) as cnt FROM work_entries');
-                counts[pid] = res?.[0]?.cnt || 0;
-              }
+              // Count through a handle that never touches this.sqliteDb: initDesktopStorage
+              // temporarily rebinds the shared connection, which would let concurrent reads
+              // and writes for the active profile land in the other profile's database.
+              const Database = (await import('@tauri-apps/plugin-sql')).default;
+              const db = await Database.load(this.getSqliteDbPathForProfile(pid));
+              const res = await db.select('SELECT COUNT(*) as cnt FROM work_entries');
+              counts[pid] = res?.[0]?.cnt || 0;
             } catch (e) {
               counts[pid] = 0;
             }
@@ -235,7 +240,9 @@ export class StorageDB {
 
   async init() {
     if (this.isDesktop) {
-      return this.initDesktopStorage();
+      const db = await this.initDesktopStorage();
+      await this.migrateLocalStorageSettings().catch((err) => console.warn('Settings import skipped:', err));
+      return db;
     }
 
     try {
@@ -329,7 +336,6 @@ export class StorageDB {
       }
 
       // Sync shared metadata in background
-      this.syncSharedSettings().catch(() => {});
 
       return db;
     } catch (err) {
@@ -606,6 +612,19 @@ export class StorageDB {
     if (missingColumns.length > 0) {
       throw new Error(`work_entries schema is missing required columns: ${missingColumns.join(', ')}`);
     }
+
+    await this.ensureLedgerIndexColumns();
+  }
+
+  // Ledger index: epoch ms (ts) for date filters and sorts, and the Persian date label for search.
+  // Rows saved before these columns existed have date_label NULL and are filled in once here.
+  async ensureLedgerIndexColumns() {
+    await this.sqliteDb.execute('CREATE INDEX IF NOT EXISTS idx_entries_ts ON work_entries(ts);');
+    const pending = await this.sqliteDb.select('SELECT id, dateTime FROM work_entries WHERE date_label IS NULL');
+    for (const row of pending || []) {
+      const idx = computeIndexColumns(row.dateTime);
+      await this.sqliteDb.execute('UPDATE work_entries SET ts = ?, date_label = ? WHERE id = ?', [idx.ts, idx.date_label, row.id]);
+    }
   }
 
   async verifySqliteIntegrity() {
@@ -767,8 +786,7 @@ export class StorageDB {
         // Fast lightweight query with proof metadata
         const rows = await this.sqliteDb.select(`
           SELECT 
-            w.id, w.title, w.game, w.source, w.teamMode, w.teammates, w.income, w.currency, w.exchangeRate, w.rateUnit, w.status, w.dateTime, w.hours, w.notes, w.link,
-            w.pot, w.teamInputMode, w.teammateCuts, w.teammateNotes, w.orderId, w.feeRate, w.sourcePaid, w.feeType, w.boosterPaid, w.platformFee,
+            ${LIST_ENTRY_COLUMNS},
             COUNT(p.id) as proof_count
           FROM work_entries w
           LEFT JOIN proof_attachments p ON w.id = p.entry_id
@@ -776,53 +794,7 @@ export class StorageDB {
           ORDER BY w.dateTime DESC
         `);
 
-        return rows.map((r) => {
-          let cur = r.currency;
-          if (cur === 'WOW_GOLD') cur = 'GOLD';
-          if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
-          const isClassic = r.rateUnit === '1' || r.game === 'World of Warcraft Classic';
-          const defaultRate = isClassic ? 7000 : 3200;
-
-          let parsedTeammates = [];
-          try {
-            if (typeof r.teammates === 'string') parsedTeammates = JSON.parse(r.teammates);
-            else if (Array.isArray(r.teammates)) parsedTeammates = r.teammates;
-          } catch (e) {}
-
-          let parsedTeammateCuts = {};
-          try {
-            if (typeof r.teammateCuts === 'string') parsedTeammateCuts = JSON.parse(r.teammateCuts);
-            else if (r.teammateCuts && typeof r.teammateCuts === 'object') parsedTeammateCuts = r.teammateCuts;
-          } catch (e) {}
-
-          let parsedTeammateNotes = {};
-          try {
-            if (typeof r.teammateNotes === 'string') parsedTeammateNotes = JSON.parse(r.teammateNotes);
-            else if (r.teammateNotes && typeof r.teammateNotes === 'object') parsedTeammateNotes = r.teammateNotes;
-          } catch (e) {}
-
-          return {
-            ...r,
-            source: r.source || '',
-            teamMode: Boolean(r.teamMode),
-            teammates: parsedTeammates,
-            currency: cur,
-            exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
-            rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
-            link: r.link || '',
-            pot: r.pot !== null && r.pot !== undefined ? Number(r.pot) : null,
-            teamInputMode: r.teamInputMode === 'income' ? 'income' : 'pot',
-            teammateCuts: parsedTeammateCuts,
-            teammateNotes: parsedTeammateNotes,
-            orderId: r.orderId || '',
-            feeRate: r.feeRate !== null && r.feeRate !== undefined && !isNaN(Number(r.feeRate)) ? Number(r.feeRate) : null,
-            sourcePaid: Boolean(r.sourcePaid),
-            feeType: r.feeType || 'percent',
-            boosterPaid: Boolean(r.boosterPaid),
-            platformFee: r.platformFee !== null && r.platformFee !== undefined ? Number(r.platformFee) : 0,
-            proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
-          };
-        });
+        return rows.map((r) => this.mapSqliteEntryRow(r));
       } catch (err) {
         console.error('SQLite getAllEntries error:', err);
         return [];
@@ -870,6 +842,181 @@ export class StorageDB {
       };
       request.onerror = (e) => reject(e.target.error);
     });
+  }
+
+  // Maps one list-view row (with proof_count) to the entry shape the app uses. Shared by the full ledger read,
+  // the by-id read used by the ledger, and analytics, so all of them see identical values.
+  mapSqliteEntryRow(r) {
+          let cur = r.currency;
+          if (cur === 'WOW_GOLD') cur = 'GOLD';
+          if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cur)) cur = 'TOMAN';
+          const isClassic = r.rateUnit === '1' || r.game === 'World of Warcraft Classic';
+          const defaultRate = isClassic ? 7000 : 3200;
+
+          let parsedTeammates = [];
+          try {
+            if (typeof r.teammates === 'string') parsedTeammates = JSON.parse(r.teammates);
+            else if (Array.isArray(r.teammates)) parsedTeammates = r.teammates;
+          } catch (e) {}
+
+          let parsedTeammateCuts = {};
+          try {
+            if (typeof r.teammateCuts === 'string') parsedTeammateCuts = JSON.parse(r.teammateCuts);
+            else if (r.teammateCuts && typeof r.teammateCuts === 'object') parsedTeammateCuts = r.teammateCuts;
+          } catch (e) {}
+
+          let parsedTeammateNotes = {};
+          try {
+            if (typeof r.teammateNotes === 'string') parsedTeammateNotes = JSON.parse(r.teammateNotes);
+            else if (r.teammateNotes && typeof r.teammateNotes === 'object') parsedTeammateNotes = r.teammateNotes;
+          } catch (e) {}
+
+          return {
+            ...r,
+            source: r.source || '',
+            teamMode: Boolean(r.teamMode),
+            teammates: parsedTeammates,
+            currency: cur,
+            exchangeRate: Number(r.exchangeRate) > 0 ? Number(r.exchangeRate) : defaultRate,
+            rateUnit: r.rateUnit || (isClassic ? '1' : '1k'),
+            link: r.link || '',
+            pot: r.pot !== null && r.pot !== undefined ? Number(r.pot) : null,
+            teamInputMode: r.teamInputMode === 'income' ? 'income' : 'pot',
+            teammateCuts: parsedTeammateCuts,
+            teammateNotes: parsedTeammateNotes,
+            orderId: r.orderId || '',
+            feeRate: r.feeRate !== null && r.feeRate !== undefined && !isNaN(Number(r.feeRate)) ? Number(r.feeRate) : null,
+            sourcePaid: Boolean(r.sourcePaid),
+            feeType: r.feeType || 'percent',
+            boosterPaid: Boolean(r.boosterPaid),
+            platformFee: r.platformFee !== null && r.platformFee !== undefined ? Number(r.platformFee) : 0,
+            proofs: Array(r.proof_count || 0).fill({}), // Proof count placeholder for quick list
+          };
+  }
+
+  /* ---------- Ledger queries ----------
+   * Filtering, date ordering and counts run in SQL. Money is never computed here: the caller applies
+   * the existing conversion functions to the rows returned, so rounding and rate rules stay in one place. */
+
+  // Lightweight index rows for every entry matching the filters, in date order.
+  async queryLedgerIndex(filters, sortOption = 'date_desc') {
+    await this.initPromise;
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const { where, params } = buildLedgerWhere(filters, { includeStatus: true });
+        const rows = await this.sqliteDb.select(
+          `SELECT ${LEDGER_INDEX_SELECT} FROM work_entries ${where ? `WHERE ${where}` : ''} ORDER BY ${indexOrderSql(sortOption)}`,
+          params
+        );
+        return (rows || []).map(normalizeLedgerIndexRow);
+      } catch (err) {
+        console.error('SQLite queryLedgerIndex error:', err);
+        throw err;
+      }
+    }
+
+    // IndexedDB fallback (web preview only): same semantics, evaluated in JS
+    const all = await this.getAllEntries();
+    const indexed = all.map((entry) => ({ ...entry, ...computeIndexColumns(entry.dateTime) }));
+    return filterLedgerRows(indexed, filters)
+      .map(normalizeLedgerIndexRow)
+      .sort((a, b) => compareByDate(a, b, sortOption === 'date_asc' ? 'asc' : 'desc'));
+  }
+
+  // Full list-view rows for the given ids, returned in the order of `ids`.
+  async getLedgerRowsByIds(ids) {
+    await this.initPromise;
+    const unique = [...new Set((ids || []).map(String))];
+    if (unique.length === 0) return [];
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const byId = new Map();
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
+          const chunk = unique.slice(i, i + CHUNK_SIZE);
+          const placeholders = chunk.map(() => '?').join(',');
+          const rows = await this.sqliteDb.select(
+            `SELECT ${LIST_ENTRY_COLUMNS}, COALESCE(w.ts, 0) AS ts, COUNT(p.id) as proof_count
+             FROM work_entries w
+             LEFT JOIN proof_attachments p ON w.id = p.entry_id
+             WHERE w.id IN (${placeholders})
+             GROUP BY w.id`,
+            chunk
+          );
+          for (const r of rows || []) {
+            byId.set(String(r.id), this.mapSqliteEntryRow(r));
+          }
+        }
+        return unique.filter((id) => byId.has(id)).map((id) => byId.get(id));
+      } catch (err) {
+        console.error('SQLite getLedgerRowsByIds error:', err);
+        throw err;
+      }
+    }
+
+    if (!this.idb) return [];
+    const found = await Promise.all(unique.map((id) => this.getEntry(id)));
+    return found.filter(Boolean);
+  }
+
+  // Counts across all entries: total, per status, and per game (used by the filter menus and totals)
+  async getLedgerFacets() {
+    await this.initPromise;
+    const statusCounts = {};
+    const gameCounts = {};
+    let total = 0;
+
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const statusRows = await this.sqliteDb.select('SELECT status, COUNT(*) AS cnt FROM work_entries GROUP BY status');
+        for (const r of statusRows || []) {
+          const cnt = Number(r.cnt) || 0;
+          statusCounts[r.status] = cnt;
+          total += cnt;
+        }
+        const gameRows = await this.sqliteDb.select(`SELECT ${GAME_SQL_EXPR} AS g, COUNT(*) AS cnt FROM work_entries GROUP BY g`);
+        for (const r of gameRows || []) {
+          gameCounts[r.g] = (gameCounts[r.g] || 0) + (Number(r.cnt) || 0);
+        }
+      } catch (err) {
+        console.error('SQLite getLedgerFacets error:', err);
+        throw err;
+      }
+      return { total, statusCounts, gameCounts };
+    }
+
+    const all = await this.getAllEntries();
+    for (const e of all) {
+      total++;
+      statusCounts[e.status] = (statusCounts[e.status] || 0) + 1;
+      const game = e.game || 'World of Warcraft';
+      gameCounts[game] = (gameCounts[game] || 0) + 1;
+    }
+    return { total, statusCounts, gameCounts };
+  }
+
+  // Latest game and currency, used to pre-fill new entries (the most recent entry by date)
+  async getLatestEntryDefaults() {
+    await this.initPromise;
+    if (this.isDesktop && this.sqliteDb) {
+      try {
+        const gameRows = await this.sqliteDb.select(
+          "SELECT TRIM(game) AS game FROM work_entries WHERE TRIM(COALESCE(game, '')) <> '' ORDER BY COALESCE(ts, 0) DESC, id ASC LIMIT 1"
+        );
+        const curRows = await this.sqliteDb.select(
+          `SELECT ${CURRENCY_SQL_EXPR} AS cur FROM work_entries ORDER BY COALESCE(ts, 0) DESC, id ASC LIMIT 1`
+        );
+        return { game: gameRows?.[0]?.game || '', currency: curRows?.[0]?.cur || '' };
+      } catch (err) {
+        console.error('SQLite getLatestEntryDefaults error:', err);
+        throw err;
+      }
+    }
+
+    const all = await this.getAllEntries();
+    const latestGame = all.find((e) => typeof e?.game === 'string' && e.game.trim());
+    return { game: latestGame ? latestGame.game.trim() : '', currency: all[0]?.currency || '' };
   }
 
   async getEntry(id) {
@@ -1020,9 +1167,11 @@ export class StorageDB {
       }
 
       try {
+        const storedDateTime = cleanEntry.dateTime || new Date().toISOString();
+        const indexColumns = computeIndexColumns(storedDateTime);
         await this.sqliteDb.execute(
-          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, teammateNotes, orderId, feeRate, sourcePaid, feeType, boosterPaid, platformFee, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
+          `INSERT OR REPLACE INTO work_entries (id, title, game, source, teamMode, teammates, income, currency, exchangeRate, rateUnit, status, dateTime, hours, notes, link, pot, teamInputMode, teammateCuts, teammateNotes, orderId, feeRate, sourcePaid, feeType, boosterPaid, platformFee, ts, date_label, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s', 'now'))`,
           [
             cleanEntry.id,
             cleanEntry.title || 'Untitled Work',
@@ -1035,7 +1184,7 @@ export class StorageDB {
             finalRate,
             finalUnit,
             cleanEntry.status || 'Working',
-            cleanEntry.dateTime || new Date().toISOString(),
+            storedDateTime,
             Number(cleanEntry.hours) || 0,
             cleanEntry.notes || '',
             finalLink,
@@ -1049,12 +1198,19 @@ export class StorageDB {
             finalFeeType,
             finalBoosterPaid,
             finalPlatformFee,
+            indexColumns.ts,
+            indexColumns.date_label,
           ]
         );
 
-        // Sync proof attachments
+        // Sync proof attachments by upserting what the caller sent, then pruning rows it no
+        // longer has. Deleting everything first would lose all screenshots if any insert failed,
+        // and the pool does not allow wrapping these statements in one transaction.
         if (Array.isArray(cleanEntry.proofs)) {
-          await this.sqliteDb.execute('DELETE FROM proof_attachments WHERE entry_id = ?', [cleanEntry.id]);
+          // Metadata-only placeholders (from list queries) don't describe the full proof set,
+          // so pruning is skipped whenever one is present.
+          const hasPlaceholders = cleanEntry.proofs.some((p) => p && !p.data && !p.data_blob);
+          const keptIds = [];
           for (const p of cleanEntry.proofs) {
             if (p && (p.data || p.data_blob)) {
               const proofId = (!p.id || (p.entry_id && p.entry_id !== cleanEntry.id))
@@ -1071,6 +1227,18 @@ export class StorageDB {
                   Number(p.size) || 0,
                   p.createdAt || new Date().toISOString(),
                 ]
+              );
+              keptIds.push(proofId);
+            }
+          }
+          if (!hasPlaceholders) {
+            if (keptIds.length === 0) {
+              await this.sqliteDb.execute('DELETE FROM proof_attachments WHERE entry_id = ?', [cleanEntry.id]);
+            } else {
+              const slots = keptIds.map(() => '?').join(', ');
+              await this.sqliteDb.execute(
+                `DELETE FROM proof_attachments WHERE entry_id = ? AND id NOT IN (${slots})`,
+                [cleanEntry.id, ...keptIds]
               );
             }
           }
@@ -1615,62 +1783,77 @@ export class StorageDB {
    * 4. Settings & Key-Value Persistence
    * ========================================================================= */
 
+  // App-wide settings live in the canonical booster database, so every profile reads the same values.
+  // Per-profile settings (last currency per profile, the work draft) live in the active profile's database.
+  isPerProfileSettingKey(key) {
+    return key === 'checkpoint_work_draft'
+      || key.startsWith('checkpoint_work_last_currency_')
+      || key.startsWith('checkpoint_currency_')
+      || key.startsWith('checkpoint_last_auto_snapshot_date_');
+  }
+
+  // Opens a handle to a profile's database without rebinding this.sqliteDb, so reading a setting never
+  // switches the active profile's connection.
+  async openSettingsHandle(profileId) {
+    const Database = (await import('@tauri-apps/plugin-sql')).default;
+    const db = await Database.load(this.getSqliteDbPathForProfile(profileId));
+    await db.execute(`CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );`);
+    return db;
+  }
+
+  getCanonicalSettingsDb() {
+    if (this.sqliteDbs.booster) return Promise.resolve(this.sqliteDbs.booster);
+    if (!this._canonicalSettingsPromise) {
+      this._canonicalSettingsPromise = this.openSettingsHandle('booster').catch((err) => {
+        this._canonicalSettingsPromise = null;
+        throw err;
+      });
+    }
+    return this._canonicalSettingsPromise;
+  }
+
+  async getSettingsDb(key) {
+    if (this.isPerProfileSettingKey(key)) {
+      return this.sqliteDb || this.openSettingsHandle(this.getActiveProfile());
+    }
+    return this.getCanonicalSettingsDb();
+  }
+
   async getSetting(key, fallback = null) {
     await this.initPromise;
 
-    const legacyKeyMap = {
-      checkpoint_currency: 'nodrapay_currency',
-      checkpoint_gold_rate_toman: 'nodrapay_gold_rate_toman',
-      checkpoint_tab: 'nodrapay_tab',
-      checkpoint_last_auto_snapshot_date: 'vault_last_auto_snapshot_date',
-      checkpoint_quick_last_game: 'vault_quick_last_game',
-      checkpoint_quick_last_custom_game: 'vault_quick_last_custom_game',
-      checkpoint_quick_last_source: 'vault_quick_last_source',
-      checkpoint_quick_last_currency: 'vault_quick_last_currency',
-      checkpoint_work_draft: 'vault_work_draft',
-      checkpoint_user_saved_sources_v2: 'vault_user_saved_sources_v2',
-      checkpoint_user_saved_sources: 'vault_user_saved_sources_v2',
-      checkpoint_saved_teammates_v1: 'vault_saved_teammates_v1',
-      checkpoint_analytics_timeframe: 'vault_analytics_timeframe',
-      checkpoint_close_to_tray: 'nodrapay_close_to_tray',
-      checkpoint_minimize_to_tray: 'nodrapay_minimize_to_tray',
-      checkpoint_language: 'nodrapay_language',
-      checkpoint_v2_seeded: 'nodrapay_v2_seeded',
-    };
-
-    const keysToTry = [key];
-    if (legacyKeyMap[key]) {
-      keysToTry.push(legacyKeyMap[key]);
-    }
-
-    for (const k of keysToTry) {
-      if (this.isDesktop && this.sqliteDb) {
-        try {
-          const rows = await this.sqliteDb.select('SELECT value FROM app_settings WHERE key = ? LIMIT 1', [k]);
-          if (rows && rows.length > 0) {
-            try {
-              return JSON.parse(rows[0].value);
-            } catch (e) {
-              return rows[0].value;
-            }
-          }
-        } catch (err) {
-          console.error('SQLite getSetting error:', err);
-        }
-      }
-
-      if (typeof localStorage !== 'undefined') {
-        const val = localStorage.getItem(k);
-        if (val !== null) {
+    if (this.isDesktop) {
+      try {
+        const db = await this.getSettingsDb(key);
+        const rows = await db.select('SELECT value FROM app_settings WHERE key = ? LIMIT 1', [key]);
+        if (rows && rows.length > 0) {
           try {
-            return JSON.parse(val);
+            return JSON.parse(rows[0].value);
           } catch (e) {
-            return val;
+            return rows[0].value;
           }
+        }
+      } catch (err) {
+        console.error('SQLite getSetting error:', err);
+      }
+      return fallback;
+    }
+
+    // Browser (IndexedDB) mode has no SQLite, so settings are kept in localStorage there
+    if (typeof localStorage !== 'undefined') {
+      const val = localStorage.getItem(key);
+      if (val !== null) {
+        try {
+          return JSON.parse(val);
+        } catch (e) {
+          return val;
         }
       }
     }
-
     return fallback;
   }
 
@@ -1678,20 +1861,104 @@ export class StorageDB {
     await this.initPromise;
     const strVal = typeof value === 'string' ? value : JSON.stringify(value);
 
-    if (this.isDesktop && this.sqliteDb) {
+    if (this.isDesktop) {
       try {
-        await this.sqliteDb.execute(
+        const db = await this.getSettingsDb(key);
+        await db.execute(
           `INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, strftime('%s', 'now'))`,
           [key, strVal]
         );
       } catch (err) {
         console.error('SQLite setSetting error:', err);
       }
+      return;
     }
 
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(key, strVal);
     }
+  }
+
+  // One-time import of settings that earlier builds kept in localStorage and in each profile database.
+  // Where a setting exists in more than one place, the freshest copy wins (see settingsMigration.js).
+  // localStorage itself is left untouched.
+  async migrateLocalStorageSettings() {
+    if (!this.isDesktop || typeof localStorage === 'undefined') return;
+
+    const canonical = await this.getCanonicalSettingsDb();
+    const done = await canonical.select("SELECT value FROM app_settings WHERE key = 'checkpoint_settings_migrated_v2' LIMIT 1");
+    if (done && done.length > 0) return;
+
+    const readRow = async (db, key) => {
+      const rows = await db.select('SELECT value, updated_at FROM app_settings WHERE key = ? LIMIT 1', [key]);
+      return rows && rows.length > 0 ? { value: rows[0].value, updatedAt: rows[0].updated_at } : null;
+    };
+    const readLocal = (key, legacyKey) => {
+      const raw = localStorage.getItem(key);
+      return raw !== null ? raw : (legacyKey ? localStorage.getItem(legacyKey) : null);
+    };
+    const write = (db, key, value) => db.execute(
+      `INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, strftime('%s', 'now'))`,
+      [key, value]
+    );
+
+    const booster = canonical;
+    const advertiserDb = await this.openSettingsHandle('advertiser');
+
+    const APP_WIDE = [
+      ['checkpoint_custom_categories_v1', 'vault_custom_categories_v1'],
+      ['checkpoint_user_saved_sources_v2', 'vault_user_saved_sources_v2'],
+      ['checkpoint_saved_teammates_v1', 'vault_saved_teammates_v1'],
+      ['checkpoint_gold_rate_toman', 'nodrapay_gold_rate_toman'],
+      ['checkpoint_usd_rate_toman', null],
+      ['checkpoint_eur_rate_usd', null],
+      ['checkpoint_currency', 'nodrapay_currency'],
+      ['checkpoint_close_to_tray', 'nodrapay_close_to_tray'],
+      ['checkpoint_minimize_to_tray', 'nodrapay_minimize_to_tray'],
+      ['checkpoint_auto_backup_enabled', null],
+      ['checkpoint_auto_backup_path', null],
+      ['checkpoint_auto_backup_frequency', null],
+      ['checkpoint_auto_backup_retention', null],
+      ['checkpoint_telemetry_enabled', null],
+      ['checkpoint_tab', 'nodrapay_tab'],
+      ['checkpoint_ledger_date_format', null],
+      ['checkpoint_last_known_version', null],
+      ['checkpoint_analytics_timeframe', 'vault_analytics_timeframe'],
+      ['checkpoint_tray_notified', null],
+      ['checkpoint_advertiser_last_fee_percent', null],
+      ['checkpoint_gold_ratio_tour_seen_version', null],
+    ];
+    for (const [key, legacy] of APP_WIDE) {
+      const candidates = [
+        { value: readLocal(key, legacy), fromLocalStorage: true },
+        await readRow(booster, key),
+        await readRow(advertiserDb, key),
+      ].filter(Boolean);
+      const chosen = chooseMigratedValue(candidates);
+      if (chosen !== null) await write(booster, key, chosen);
+    }
+
+    // Per-profile currency: the mirror first, then the profile's own database
+    for (const profileId of ['booster', 'advertiser']) {
+      const db = profileId === 'booster' ? booster : advertiserDb;
+      for (const key of [`checkpoint_currency_${profileId}`, `checkpoint_work_last_currency_${profileId}`]) {
+        const chosen = chooseMigratedValue([
+          { value: localStorage.getItem(key), fromLocalStorage: true },
+          await readRow(db, key),
+        ]);
+        if (chosen !== null) await write(db, key, chosen);
+      }
+    }
+
+    // The draft already lives in each profile's database and is read from the active one.
+    // Only fill it from localStorage when the active database has none.
+    const activeDb = this.sqliteDb || booster;
+    if (!(await readRow(activeDb, 'checkpoint_work_draft'))) {
+      const legacyDraft = readLocal('checkpoint_work_draft', 'vault_work_draft');
+      if (legacyDraft !== null) await write(activeDb, 'checkpoint_work_draft', legacyDraft);
+    }
+
+    await write(booster, 'checkpoint_settings_migrated_v2', 'true');
   }
 
   /* =========================================================================

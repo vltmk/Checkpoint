@@ -18,26 +18,12 @@ const LEGACY_PRESETS = new Set([
 ]);
 
 const SAVED_SOURCES_KEY = 'checkpoint_user_saved_sources_v2';
-const LEGACY_SAVED_SOURCES_KEY = 'vault_user_saved_sources_v2';
 
-export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter seller, broker, or client...', prefixIcon = null }) {
+export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter seller, broker, or client...', prefixIcon = null, ariaLabel }) {
   const { language, isRtl, formatNumber } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
-  const [savedSources, setSavedSources] = useState(() => {
-    try {
-      // Purge old preset key from localStorage
-      localStorage.removeItem('vault_saved_sources');
-      const saved = localStorage.getItem(SAVED_SOURCES_KEY) || localStorage.getItem(LEGACY_SAVED_SOURCES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((s) => typeof s === 'string' && !LEGACY_PRESETS.has(s.toLowerCase().trim()));
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [savedSources, setSavedSources] = useState([]);
 
   // Hydrate saved sources from SQLite trackerDB
   useEffect(() => {
@@ -47,9 +33,6 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
         if (Array.isArray(parsed) && parsed.length > 0) {
           const clean = parsed.filter((s) => typeof s === 'string' && !LEGACY_PRESETS.has(s.toLowerCase().trim()));
           setSavedSources(clean);
-          try {
-            localStorage.setItem(SAVED_SOURCES_KEY, JSON.stringify(clean));
-          } catch (e) {}
         }
       }
     }).catch(() => {});
@@ -101,7 +84,6 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
 
   const saveToStorage = (sourcesList) => {
     try {
-      localStorage.setItem(SAVED_SOURCES_KEY, JSON.stringify(sourcesList));
       trackerDB.setSetting(SAVED_SOURCES_KEY, sourcesList).catch(() => {});
     } catch (e) {}
   };
@@ -233,6 +215,7 @@ export function SourceCombobox({ value = '', onChange, placeholder = 'e.g. Enter
         <input
           ref={inputRef}
           type="text"
+          aria-label={ariaLabel}
           name="checkpoint_job_source"
           autoComplete="off"
           autoCorrect="off"

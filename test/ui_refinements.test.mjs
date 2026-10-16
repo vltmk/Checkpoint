@@ -34,8 +34,8 @@ test('LedgerView implements narrow vertical category column anchored to the left
   assert.ok(ledgerCode.includes("{/* Line 2: Notes only (Category is displayed on the left vertical column) */}"));
 });
 
-test('LedgerView implements left border faded glow and preserves 135deg mask composite', () => {
-  assert.ok(ledgerCode.includes("boxShadow: `2px 0 10px ${accentColor}40"));
+test('LedgerView implements left game-colour accent bar and preserves 135deg mask composite', () => {
+  assert.ok(ledgerCode.includes('backgroundColor: accentColor'));
   assert.ok(ledgerCode.includes("linear-gradient(135deg"));
   assert.ok(ledgerCode.includes("maskComposite"));
 });

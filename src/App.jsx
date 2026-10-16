@@ -1,20 +1,16 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, lazy, Suspense } from 'react';
 import { trackerDB } from './lib/db';
 import { STATUS_CONFIG, generateDiscordReceiptText, convertEntryCurrency, formatMoney } from './lib/currencies';
 import { Navbar } from './components/Navbar';
 import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
 import { LedgerView } from './components/views/LedgerView';
-import { AnalyticsView } from './components/views/AnalyticsView';
-import { WorkModal } from './components/WorkModal';
-import { OrderCalculatorPopover } from './components/OrderCalculatorPopover';
-import { ReceiptModal } from './components/ReceiptModal';
-import { SettingsModal } from './components/SettingsModal';
-import { ShortcutsModal } from './components/ShortcutsModal';
+// Chart.js and react-chartjs-2 only matter on the Analytics tab, so keep them out of the startup bundle
+const AnalyticsView = lazy(() =>
+  import('./components/views/AnalyticsView').then((m) => ({ default: m.AnalyticsView }))
+);
 import { Lightbox } from './components/Lightbox';
-import { NotificationCenter } from './components/NotificationCenter';
-import { UpdateModal } from './components/UpdateModal';
 import { ContextMenu } from './components/ui/ContextMenu';
-import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from './components/ui/Dialog';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, hasOpenDialog } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { toLocalISOString } from './components/ui/DateTimePicker';
@@ -41,6 +37,7 @@ import {
   dismissNotificationItem,
   clearAllNotificationHistory,
   compareSemver,
+  saveStoredNotifications,
 } from './lib/notifications';
 import {
   isTauri,
@@ -57,6 +54,7 @@ import {
   pruneOldBackupsNative,
   generateLedgerFingerprint,
   openAppAwareUrl,
+  closeWindow,
 } from './lib/desktop';
 import {
   initTelemetry,
@@ -67,6 +65,43 @@ import {
 } from './lib/telemetry';
 
 import { useLanguage, formatShamsiDate } from './lib/i18n';
+import { sortLedgerRows } from './lib/ledgerQuery';
+
+// True once `open` has been true, and stays true afterwards
+const useHasBeenOpen = (open) => {
+  const [hasBeenOpen, setHasBeenOpen] = useState(Boolean(open));
+  useEffect(() => {
+    if (open) setHasBeenOpen(true);
+  }, [open]);
+  return hasBeenOpen || Boolean(open);
+};
+
+// Large modals are code-split and fetched the first time they open. After that they stay mounted,
+// so their close animations and internal state behave exactly as before.
+const lazyModal = (loader) => {
+  const Lazy = lazy(loader);
+  return function LazyModal(props) {
+    const mounted = useHasBeenOpen(props.isOpen);
+    if (!mounted) return null;
+    return (
+      <Suspense fallback={null}>
+        <Lazy {...props} />
+      </Suspense>
+    );
+  };
+};
+
+const WorkModal = lazyModal(() => import('./components/WorkModal').then((m) => ({ default: m.WorkModal })));
+const OrderCalculatorPopover = lazyModal(() =>
+  import('./components/OrderCalculatorPopover').then((m) => ({ default: m.OrderCalculatorPopover }))
+);
+const ReceiptModal = lazyModal(() => import('./components/ReceiptModal').then((m) => ({ default: m.ReceiptModal })));
+const SettingsModal = lazyModal(() => import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal })));
+const ShortcutsModal = lazyModal(() => import('./components/ShortcutsModal').then((m) => ({ default: m.ShortcutsModal })));
+const NotificationCenter = lazyModal(() =>
+  import('./components/NotificationCenter').then((m) => ({ default: m.NotificationCenter }))
+);
+const UpdateModal = lazyModal(() => import('./components/UpdateModal').then((m) => ({ default: m.UpdateModal })));
 
 // Defensive Settings Parsing Utilities
 const parseBooleanSetting = (val, fallback = false) => {
@@ -90,27 +125,101 @@ const parseStringSetting = (val, fallback = '', allowedList = null) => {
   return val;
 };
 
+// Quoted CSV text cell. Values that start with a formula trigger get a leading apostrophe so
+// spreadsheet apps show them as text instead of evaluating them (e.g. a title "=HYPERLINK(...)").
+const csvText = (value) => {
+  let text = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+const buildLedgerCsv = (list, globalCurrency, goldRateTOMAN) => {
+  const headers = [
+    'ID',
+    'Date & Time',
+    'Game',
+    'Work Title',
+    'Seller / Source',
+    'Currency',
+    'Income Amount',
+    'Applied Rate (Toman/1k G)',
+    'Status',
+    'Notes',
+    'Has Proof Attached',
+  ];
+
+  const rows = list.map((e) => [
+    e.id,
+    e.dateTime,
+    csvText(e.game || ''),
+    csvText(e.title || ''),
+    csvText(e.source || ''),
+    csvText(e.currency || globalCurrency),
+    e.income,
+    e.exchangeRate || goldRateTOMAN || 3200,
+    e.status,
+    csvText(e.notes || ''),
+    e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
+  ]);
+
+  return String.fromCharCode(0xfeff) + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+};
+
+const saveCsvFile = async (fileName, csvContent) => {
+  if (isTauri()) {
+    const res = await saveFileNative({
+      defaultPath: fileName,
+      filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
+      content: csvContent,
+    });
+    if (res && (res.success || res.cancelled)) {
+      return;
+    }
+    console.warn('Native CSV save failed, falling back to browser download:', res?.error);
+  }
+
+  // Blob URL rather than a data: URI: encodeURI leaves '#' and '?' unescaped, so the
+  // browser would cut the file off at the first '#' (common in notes and order IDs).
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export default function App() {
   const { language, setLanguage, t, isRtl } = useLanguage();
   const isDesktop = isTauri();
   const [appVersion, setAppVersion] = useState(() => getStaticAppVersion());
-  const [entries, setEntries] = useState([]);
+  // The ledger view loads its own rows. App only tracks a version number that tells it to refresh.
+  const [ledgerVersion, setLedgerVersion] = useState(0);
+  // Analytics needs every entry, so they load only while the Analytics tab is open
+  const [analyticsEntries, setAnalyticsEntries] = useState([]);
+  // Latest game and currency, used to pre-fill new entries
+  const [latestEntryDefaults, setLatestEntryDefaults] = useState({ game: '', currency: '' });
+  // Full rows for the current selection (can span pages)
+  const [selectedRows, setSelectedRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Dual-Profile Architecture ('booster' | 'advertiser')
   const [activeProfileId, setActiveProfileIdState] = useState(() => getActiveProfileId());
   const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(() => !isProfileOnboardingCompleted());
   const [profileCounts, setProfileCounts] = useState({ booster: 0, advertiser: 0 });
+  const activeProfileCount = profileCounts[activeProfileId] || 0;
   const [isSwitchingProfile, setIsSwitchingProfile] = useState(false);
   const profileSwitchSeqRef = useRef(0);
   const isSwitchingProfileRef = useRef(false);
 
   // Desktop Tray & Window Preferences
   const [closeToTray, setCloseToTray] = useState(() => {
-    return parseBooleanSetting(localStorage.getItem('checkpoint_close_to_tray'), true);
+    return parseBooleanSetting(null, true);
   });
   const [minimizeToTray, setMinimizeToTray] = useState(() => {
-    return parseBooleanSetting(localStorage.getItem('checkpoint_minimize_to_tray'), false);
+    return parseBooleanSetting(null, false);
   });
 
   const closeToTrayRef = useRef(closeToTray);
@@ -125,27 +234,27 @@ export default function App() {
 
   // Automated Scheduled Backups to Custom Directory (Disabled by default)
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(() => {
-    return parseBooleanSetting(localStorage.getItem('checkpoint_auto_backup_enabled'), false);
+    return parseBooleanSetting(null, false);
   });
   const [autoBackupPath, setAutoBackupPath] = useState(() => {
-    return parseStringSetting(localStorage.getItem('checkpoint_auto_backup_path'), '');
+    return parseStringSetting(null, '');
   });
   const [autoBackupFrequency, setAutoBackupFrequency] = useState(() => {
-    return parseStringSetting(localStorage.getItem('checkpoint_auto_backup_frequency'), 'daily', ['daily', 'weekly', 'on_start']);
+    return parseStringSetting(null, 'daily', ['daily', 'weekly', 'on_start']);
   });
   const [autoBackupRetention, setAutoBackupRetention] = useState(() => {
-    return parseNumberSetting(localStorage.getItem('checkpoint_auto_backup_retention'), 5, 0);
+    return parseNumberSetting(null, 5, 0);
   });
 
   // Anonymous Usage Telemetry (Enabled by default)
   const [telemetryEnabled, setTelemetryEnabledState] = useState(() => {
-    return parseBooleanSetting(localStorage.getItem('checkpoint_telemetry_enabled'), true);
+    return parseBooleanSetting(null, true);
   });
 
   // Ledger Group Date Format ('relative' | 'yyyy-mm-dd' | 'dd-mm-yyyy' | 'mm-dd-yyyy' | 'month-d-yyyy')
   const [ledgerDateFormat, setLedgerDateFormatState] = useState(() => {
     return parseStringSetting(
-      localStorage.getItem('checkpoint_ledger_date_format'),
+      null,
       'relative',
       ['relative', 'yyyy-mm-dd', 'dd-mm-yyyy', 'mm-dd-yyyy', 'month-d-yyyy']
     );
@@ -154,13 +263,12 @@ export default function App() {
   const handleLedgerDateFormatChange = useCallback((newFmt) => {
     setLedgerDateFormatState(newFmt);
     try {
-      localStorage.setItem('checkpoint_ledger_date_format', newFmt);
     } catch (e) {}
   }, []);
 
   // Active View Tab ('ledger' | 'analytics')
   const [activeTab, setActiveTab] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_tab') || localStorage.getItem('nodrapay_tab');
+    const saved = null;
     if (saved === 'analytics') return 'analytics';
     return 'ledger';
   });
@@ -171,7 +279,7 @@ export default function App() {
 
   // User Currency Preferences (TOMAN | GOLD | USD | EUR)
   const [globalCurrency, setGlobalCurrency] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_currency') || localStorage.getItem('nodrapay_currency');
+    const saved = null;
     if (saved === 'WOW_GOLD' || saved === 'GOLD') return 'GOLD';
     if (saved === 'USD') return 'USD';
     if (saved === 'EUR') return 'EUR';
@@ -180,19 +288,19 @@ export default function App() {
 
   // Gold Exchange Rate in Toman (default 3,200 Toman per 1,000 Gold)
   const [goldRateTOMAN, setGoldRateTOMAN] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_gold_rate_toman') || localStorage.getItem('nodrapay_gold_rate_toman');
+    const saved = null;
     return parseNumberSetting(saved, 3200, 1);
   });
 
   // USD Exchange Rate in Toman (default 95,000 Toman per 1 USD)
   const [usdRateTOMAN, setUsdRateTOMAN] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_usd_rate_toman');
+    const saved = null;
     return parseNumberSetting(saved, 95000, 1);
   });
 
   // EUR Exchange Rate in USD (default 1.08 USD per 1 EUR)
   const [eurRateUSD, setEurRateUSD] = useState(() => {
-    const saved = localStorage.getItem('checkpoint_eur_rate_usd');
+    const saved = null;
     return parseNumberSetting(saved, 1.08, 0.01);
   });
 
@@ -207,8 +315,7 @@ export default function App() {
       const list = await loadCategories();
       setCategories(list);
       if (reloadEntries) {
-        const all = await trackerDB.getAllEntries();
-        setEntries(all);
+        setLedgerVersion((v) => v + 1);
       }
       return list;
     } catch (e) {
@@ -245,6 +352,8 @@ export default function App() {
   const [selectedEntryIds, setSelectedEntryIds] = useState(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // The ledger filters on a deferred copy, so typing stays responsive while large lists re-filter
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [statusFilter, setStatusFilter] = useState('');
   const [isDiscordBatchCopied, setIsDiscordBatchCopied] = useState(false);
   const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
@@ -268,7 +377,6 @@ export default function App() {
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const hasNotifiedUpdateThisSession = useRef(false);
-  const searchInputRef = useRef(null);
 
   // Data Loading
   const loadData = useCallback(async () => {
@@ -299,88 +407,85 @@ export default function App() {
               setIsNotificationCenterOpen(true);
             }
             await trackerDB.setSetting('checkpoint_last_known_version', v);
-            localStorage.setItem('checkpoint_last_known_version', v);
           } catch (e) {}
         }
       });
 
-      const all = await trackerDB.getAllEntries();
-      setEntries(all);
+      setLedgerVersion((v) => v + 1);
       refreshCategories().catch(() => {});
 
       // Also hydrate persistent settings from SQLite / DB
-      const savedCur = await trackerDB.getSetting('checkpoint_currency', null);
-      if (savedCur && ['TOMAN', 'GOLD'].includes(savedCur)) {
+      // Settings are pure reads, so fetch them together; reading them one by one was a chain of round trips at startup
+      const [
+        savedCur,
+        savedRate,
+        savedUsdRate,
+        savedEurRate,
+        savedCloseToTray,
+        savedMinToTray,
+        savedAutoBackupEnabled,
+        savedAutoBackupPath,
+        savedAutoBackupFreq,
+        savedAutoBackupRetention,
+        savedTelemetry,
+        savedTab,
+      ] = await Promise.all([
+        trackerDB.getSetting('checkpoint_currency', null),
+        trackerDB.getSetting('checkpoint_gold_rate_toman', null),
+        trackerDB.getSetting('checkpoint_usd_rate_toman', null),
+        trackerDB.getSetting('checkpoint_eur_rate_usd', null),
+        trackerDB.getSetting('checkpoint_close_to_tray', null),
+        trackerDB.getSetting('checkpoint_minimize_to_tray', null),
+        trackerDB.getSetting('checkpoint_auto_backup_enabled', null),
+        trackerDB.getSetting('checkpoint_auto_backup_path', null),
+        trackerDB.getSetting('checkpoint_auto_backup_frequency', null),
+        trackerDB.getSetting('checkpoint_auto_backup_retention', null),
+        trackerDB.getSetting('checkpoint_telemetry_enabled', null),
+        trackerDB.getSetting('checkpoint_tab', null),
+      ]);
+      if (savedCur && ['TOMAN', 'GOLD', 'USD', 'EUR'].includes(savedCur)) {
         setGlobalCurrency(savedCur);
-        localStorage.setItem('checkpoint_currency', savedCur);
       }
-      const savedRate = await trackerDB.getSetting('checkpoint_gold_rate_toman', null);
       if (savedRate !== null) {
         const parsedRate = parseNumberSetting(savedRate, 3200, 1);
         setGoldRateTOMAN(parsedRate);
-        localStorage.setItem('checkpoint_gold_rate_toman', String(parsedRate));
       }
-      const savedUsdRate = await trackerDB.getSetting('checkpoint_usd_rate_toman', null);
       if (savedUsdRate !== null) {
         const parsedUsd = parseNumberSetting(savedUsdRate, 95000, 1);
         setUsdRateTOMAN(parsedUsd);
-        localStorage.setItem('checkpoint_usd_rate_toman', String(parsedUsd));
       }
-      const savedEurRate = await trackerDB.getSetting('checkpoint_eur_rate_usd', null);
       if (savedEurRate !== null) {
         const parsedEur = parseNumberSetting(savedEurRate, 1.08, 0.01);
         setEurRateUSD(parsedEur);
-        localStorage.setItem('checkpoint_eur_rate_usd', String(parsedEur));
       }
-      const savedCloseToTray = await trackerDB.getSetting('checkpoint_close_to_tray', null);
       if (savedCloseToTray !== null) {
         const val = parseBooleanSetting(savedCloseToTray, true);
         setCloseToTray(val);
-        localStorage.setItem('checkpoint_close_to_tray', String(val));
       }
-      const savedMinToTray = await trackerDB.getSetting('checkpoint_minimize_to_tray', null);
       if (savedMinToTray !== null) {
         const val = parseBooleanSetting(savedMinToTray, false);
         setMinimizeToTray(val);
-        localStorage.setItem('checkpoint_minimize_to_tray', String(val));
       }
-      const savedAutoBackupEnabled = await trackerDB.getSetting('checkpoint_auto_backup_enabled', null);
       if (savedAutoBackupEnabled !== null) {
         const val = parseBooleanSetting(savedAutoBackupEnabled, false);
         setAutoBackupEnabled(val);
-        localStorage.setItem('checkpoint_auto_backup_enabled', String(val));
       }
-      const savedAutoBackupPath = await trackerDB.getSetting('checkpoint_auto_backup_path', null);
       if (savedAutoBackupPath && typeof savedAutoBackupPath === 'string') {
         setAutoBackupPath(savedAutoBackupPath);
-        localStorage.setItem('checkpoint_auto_backup_path', savedAutoBackupPath);
       }
-      const savedAutoBackupFreq = await trackerDB.getSetting('checkpoint_auto_backup_frequency', null);
       if (savedAutoBackupFreq && ['on_start', 'daily', 'weekly'].includes(savedAutoBackupFreq)) {
         setAutoBackupFrequency(savedAutoBackupFreq);
-        localStorage.setItem('checkpoint_auto_backup_frequency', savedAutoBackupFreq);
       }
-      const savedAutoBackupRetention = await trackerDB.getSetting('checkpoint_auto_backup_retention', null);
       if (savedAutoBackupRetention !== null) {
         const parsedRet = parseNumberSetting(savedAutoBackupRetention, 5, 0);
         setAutoBackupRetention(parsedRet);
-        localStorage.setItem('checkpoint_auto_backup_retention', String(parsedRet));
       }
-      const savedTelemetry = await trackerDB.getSetting('checkpoint_telemetry_enabled', null);
       if (savedTelemetry !== null) {
         const val = parseBooleanSetting(savedTelemetry, true);
         setTelemetryEnabledState(val);
-        localStorage.setItem('checkpoint_telemetry_enabled', String(val));
       }
-      const savedTab = await trackerDB.getSetting('checkpoint_tab', null);
       if (savedTab === 'ledger' || savedTab === 'analytics') {
         setActiveTab(savedTab);
-        localStorage.setItem('checkpoint_tab', savedTab);
-      }
-      const savedTheme = await trackerDB.getSetting('checkpoint_theme', null);
-      if (savedTheme === 'light' || savedTheme === 'dark') {
-        setTheme(savedTheme);
-        localStorage.setItem('checkpoint_theme', savedTheme);
       }
       trackerDB.getProfileCounts?.().then((counts) => {
         if (counts) setProfileCounts(counts);
@@ -395,8 +500,7 @@ export default function App() {
   // Lightweight entry reload without full app re-hydration
   const reloadEntries = useCallback(async () => {
     try {
-      const all = await trackerDB.getAllEntries();
-      setEntries(all);
+      setLedgerVersion((v) => v + 1);
       trackerDB.getProfileCounts?.().then((counts) => {
         if (counts) setProfileCounts(counts);
       }).catch(() => {});
@@ -420,17 +524,13 @@ export default function App() {
       await trackerDB.switchProfile(newProfileId);
       if (profileSwitchSeqRef.current !== seq) return;
 
-      const freshEntries = await trackerDB.getAllEntries();
-      if (profileSwitchSeqRef.current !== seq) return;
-
-      setEntries(freshEntries);
+      setLedgerVersion((v) => v + 1);
       refreshCategories().catch(() => {});
 
       // Restore profile-specific preferred currency if configured
-      const savedProfileCurrency = localStorage.getItem(`checkpoint_currency_${newProfileId}`);
-      if (savedProfileCurrency && (savedProfileCurrency === 'TOMAN' || savedProfileCurrency === 'GOLD')) {
+      const savedProfileCurrency = await trackerDB.getSetting(`checkpoint_currency_${newProfileId}`, null);
+      if (savedProfileCurrency && ['TOMAN', 'GOLD', 'USD', 'EUR'].includes(savedProfileCurrency)) {
         setGlobalCurrency(savedProfileCurrency);
-        localStorage.setItem('checkpoint_currency', savedProfileCurrency);
       }
 
       trackerDB.getProfileCounts?.().then((counts) => {
@@ -632,6 +732,29 @@ export default function App() {
     };
   }, [loadData]);
 
+  // Analytics works on every entry, so it loads them only while its tab is open
+  useEffect(() => {
+    if (activeTab !== 'analytics') return undefined;
+    let cancelled = false;
+    trackerDB.getAllEntries().then((rows) => {
+      if (!cancelled) setAnalyticsEntries(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, ledgerVersion, activeProfileId]);
+
+  // Latest game and currency for pre-filling new entries
+  useEffect(() => {
+    let cancelled = false;
+    trackerDB.getLatestEntryDefaults().then((defaults) => {
+      if (!cancelled) setLatestEntryDefaults(defaults);
+    }).catch((err) => console.warn('Could not read latest entry defaults:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [ledgerVersion, activeProfileId]);
+
   // Desktop Window & System Tray Event Listeners
   useEffect(() => {
     if (!isDesktop) return;
@@ -642,7 +765,6 @@ export default function App() {
     const setupDesktopListeners = async () => {
       try {
         unlistenTray = await listenToTrayEvents({
-          onQuickAdd: () => setIsQuickAddOpen(true),
           onSettings: () => setIsSettingsOpen(true),
         });
 
@@ -672,7 +794,6 @@ export default function App() {
   const handleCloseToTrayChange = async (val) => {
     const boolVal = parseBooleanSetting(val, true);
     setCloseToTray(boolVal);
-    localStorage.setItem('checkpoint_close_to_tray', String(boolVal));
     try {
       await trackerDB.setSetting('checkpoint_close_to_tray', String(boolVal));
     } catch (e) {}
@@ -681,7 +802,6 @@ export default function App() {
   const handleMinimizeToTrayChange = async (val) => {
     const boolVal = parseBooleanSetting(val, false);
     setMinimizeToTray(boolVal);
-    localStorage.setItem('checkpoint_minimize_to_tray', String(boolVal));
     try {
       await trackerDB.setSetting('checkpoint_minimize_to_tray', String(boolVal));
     } catch (e) {}
@@ -690,7 +810,6 @@ export default function App() {
   const handleAutoBackupEnabledChange = async (val) => {
     const boolVal = parseBooleanSetting(val, false);
     setAutoBackupEnabled(boolVal);
-    localStorage.setItem('checkpoint_auto_backup_enabled', String(boolVal));
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_enabled', String(boolVal));
     } catch (e) {}
@@ -699,7 +818,6 @@ export default function App() {
   const handleAutoBackupPathChange = async (val) => {
     const pathStr = typeof val === 'string' ? val : '';
     setAutoBackupPath(pathStr);
-    localStorage.setItem('checkpoint_auto_backup_path', pathStr);
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_path', pathStr);
     } catch (e) {}
@@ -708,7 +826,6 @@ export default function App() {
   const handleAutoBackupFrequencyChange = async (val) => {
     const freqStr = parseStringSetting(val, 'daily', ['daily', 'weekly', 'on_start']);
     setAutoBackupFrequency(freqStr);
-    localStorage.setItem('checkpoint_auto_backup_frequency', freqStr);
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_frequency', freqStr);
     } catch (e) {}
@@ -717,7 +834,6 @@ export default function App() {
   const handleAutoBackupRetentionChange = async (val) => {
     const num = parseNumberSetting(val, 5, 0);
     setAutoBackupRetention(num);
-    localStorage.setItem('checkpoint_auto_backup_retention', String(num));
     try {
       await trackerDB.setSetting('checkpoint_auto_backup_retention', String(num));
     } catch (e) {}
@@ -726,17 +842,12 @@ export default function App() {
   const handleTelemetryEnabledChange = async (val) => {
     const boolVal = Boolean(val);
     setTelemetryEnabledState(boolVal);
-    localStorage.setItem('checkpoint_telemetry_enabled', String(boolVal));
     await setTelemetryEnabled(boolVal);
   };
 
   const handleThemeChange = async (newTheme) => {
     const validTheme = newTheme === 'light' ? 'light' : 'dark';
     setTheme(validTheme);
-    localStorage.setItem('checkpoint_theme', validTheme);
-    try {
-      await trackerDB.setSetting('checkpoint_theme', validTheme);
-    } catch (e) {}
   };
 
   const handleManualAutoBackup = () => {
@@ -787,7 +898,6 @@ export default function App() {
   // Tab Switcher
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    localStorage.setItem('checkpoint_tab', tab);
     trackerDB.setSetting('checkpoint_tab', tab);
   };
 
@@ -795,9 +905,8 @@ export default function App() {
   const handleCurrencyChange = (newCurr) => {
     const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (['TOMAN', 'GOLD', 'USD', 'EUR'].includes(newCurr) ? newCurr : 'TOMAN');
     setGlobalCurrency(cur);
-    localStorage.setItem('checkpoint_currency', cur);
     if (activeProfileId) {
-      localStorage.setItem(`checkpoint_currency_${activeProfileId}`, cur);
+      trackerDB.setSetting(`checkpoint_currency_${activeProfileId}`, cur).catch(() => {});
     }
     trackerDB.setSetting('checkpoint_currency', cur);
   };
@@ -805,21 +914,18 @@ export default function App() {
   const handleGoldRateTOMANChange = (newRate) => {
     const r = Number(newRate) || 3200;
     setGoldRateTOMAN(r);
-    localStorage.setItem('checkpoint_gold_rate_toman', String(r));
     trackerDB.setSetting('checkpoint_gold_rate_toman', String(r));
   };
 
   const handleUsdRateTOMANChange = (newRate) => {
     const r = Number(newRate) || 95000;
     setUsdRateTOMAN(r);
-    localStorage.setItem('checkpoint_usd_rate_toman', String(r));
     trackerDB.setSetting('checkpoint_usd_rate_toman', String(r));
   };
 
   const handleEurRateUSDChange = (newRate) => {
     const r = Number(newRate) || 1.08;
     setEurRateUSD(r);
-    localStorage.setItem('checkpoint_eur_rate_usd', String(r));
     trackerDB.setSetting('checkpoint_eur_rate_usd', String(r));
   };
 
@@ -850,8 +956,8 @@ export default function App() {
 
   // Delete Single Entry (Called after in-line confirmation)
   const handleDeleteEntry = async (id) => {
-    const itemToDelete = entries.find((e) => e.id === id);
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+    // Undo needs the full record, screenshots included
+    const itemToDelete = (await trackerDB.getEntry(id)) || null;
     await trackerDB.deleteEntry(id);
     await reloadEntries();
 
@@ -867,9 +973,8 @@ export default function App() {
   // Bulk Delete Entries
   const handleBulkDelete = async (ids) => {
     if (!ids || ids.length === 0) return;
-    const idSet = new Set(ids);
-    const itemsToDelete = entries.filter((e) => idSet.has(e.id));
-    setEntries((prev) => prev.filter((e) => !idSet.has(e.id)));
+    // Undo needs full records, screenshots included
+    const itemsToDelete = (await Promise.all(ids.map((id) => trackerDB.getEntry(id)))).filter(Boolean);
     await trackerDB.bulkDeleteEntries(ids);
     await reloadEntries();
 
@@ -902,22 +1007,33 @@ export default function App() {
   // Bulk Update Status
   const handleBulkUpdateStatus = async (ids, nextStatus) => {
     if (!ids || ids.length === 0 || !nextStatus) return;
-    const idSet = new Set(ids);
-    setEntries((prev) =>
-      prev.map((e) => (idSet.has(e.id) ? { ...e, status: nextStatus, updatedAt: new Date().toISOString() } : e))
-    );
     await trackerDB.bulkUpdateStatus(ids, nextStatus);
     await reloadEntries();
   };
 
+  // Full rows for the selection, refreshed when the selection or the data changes
+  useEffect(() => {
+    let cancelled = false;
+    if (selectedEntryIds.size === 0) {
+      setSelectedRows([]);
+      return undefined;
+    }
+    trackerDB.getLedgerRowsByIds(Array.from(selectedEntryIds)).then((rows) => {
+      if (!cancelled) setSelectedRows(rows);
+    }).catch((err) => console.warn('Could not read the selection:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEntryIds, ledgerVersion]);
+
   const selectedSum = useMemo(() => {
     if (selectedEntryIds.size === 0) return 0;
-    return entries.reduce((sum, e) => {
+    return sortLedgerRows(selectedRows, 'date_desc').reduce((sum, e) => {
       if (!selectedEntryIds.has(e.id)) return sum;
       if (e.status === 'Failed') return sum;
       return sum + convertEntryCurrency(e, globalCurrency, { goldRateTOMAN, usdRateTOMAN, eurRateUSD });
     }, 0);
-  }, [entries, selectedEntryIds, globalCurrency, goldRateTOMAN, usdRateTOMAN, eurRateUSD]);
+  }, [selectedRows, selectedEntryIds, globalCurrency, goldRateTOMAN, usdRateTOMAN, eurRateUSD]);
 
   const handleBatchStatusChange = useCallback(async (status) => {
     if (selectedEntryIds.size === 0) return;
@@ -940,7 +1056,7 @@ export default function App() {
 
   const handleBatchCopyDiscord = useCallback(async () => {
     if (selectedEntryIds.size === 0) return;
-    const selectedEntriesList = entries.filter((e) => selectedEntryIds.has(e.id));
+    const selectedEntriesList = sortLedgerRows(selectedRows, 'date_desc');
     if (selectedEntriesList.length === 0) return;
     const isFa = language === 'fa';
     const now = new Date();
@@ -999,72 +1115,19 @@ Exported via CHECKPOINT Desktop
     copyTextNative(md);
     setIsDiscordBatchCopied(true);
     setTimeout(() => setIsDiscordBatchCopied(false), 2000);
-  }, [selectedEntryIds, entries, language, selectedSum, globalCurrency, activeProfileId]);
+  }, [selectedEntryIds, selectedRows, language, selectedSum, globalCurrency, activeProfileId]);
 
   // Bulk Export CSV
   const handleBulkExportCsv = useCallback(async (selectedIds) => {
-    const listToExport = entries.filter((e) => selectedIds.includes(e.id));
+    const listToExport = sortLedgerRows(await trackerDB.getLedgerRowsByIds(selectedIds), 'date_desc');
     if (listToExport.length === 0) {
       return;
     }
 
-    const headers = [
-      'ID',
-      'Date & Time',
-      'Game',
-      'Work Title',
-      'Seller / Source',
-      'Currency',
-      'Income Amount',
-      'Applied Rate (Toman/1k G)',
-      'Status',
-      'Notes',
-      'Has Proof Attached',
-    ];
-
-    const rows = listToExport.map((e) => [
-      e.id,
-      e.dateTime,
-      `"${(e.game || '').replace(/"/g, '""')}"`,
-      `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.source || '').replace(/"/g, '""')}"`,
-      `"${e.currency || globalCurrency}"`,
-      e.income,
-      e.exchangeRate || goldRateTOMAN || 3200,
-      e.status,
-      `"${(e.notes || '').replace(/"/g, '""')}"`,
-      e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
-    ]);
-
-    const csvContent =
-      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-
+    const csvContent = buildLedgerCsv(listToExport, globalCurrency, goldRateTOMAN);
     const fileName = `checkpoint_selected_${listToExport.length}_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
-
-    if (isTauri()) {
-      const res = await saveFileNative({
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
-        content: csvContent,
-      });
-      if (res && res.success) {
-        return;
-      }
-      if (res && res.cancelled) {
-        return;
-      }
-      console.warn('Native bulk CSV save failed, falling back to browser download:', res?.error);
-    }
-
-    // Web Fallback
-    const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [entries, globalCurrency, goldRateTOMAN]);
+    await saveCsvFile(fileName, csvContent);
+  }, [globalCurrency, goldRateTOMAN]);
 
   // Purge / Clear All Data
   const handleClearAllData = async (purgeSnapshots = false) => {
@@ -1094,8 +1157,6 @@ Exported via CHECKPOINT Desktop
         })),
       };
 
-      // Optimistic update: immediately show duplicated record in UI
-      setEntries((prev) => [copy, ...prev]);
       if (activeTab !== 'ledger') {
         setActiveTab('ledger');
       }
@@ -1112,29 +1173,14 @@ Exported via CHECKPOINT Desktop
   // Status Change / Flip
   const handleFlipStatus = async (id, currentStatus, targetStatus = null) => {
     const nextStatus = targetStatus || STATUS_CONFIG[currentStatus]?.next || 'Paid';
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: nextStatus, updatedAt: new Date().toISOString() } : e))
-    );
-
-    const entry = await trackerDB.getEntry(id);
-    if (!entry) return;
-
-    const updated = {
-      ...entry,
-      status: nextStatus,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await trackerDB.saveEntry(updated);
+    // Targeted UPDATE: loading and re-saving the full record would also rewrite every screenshot blob
+    await trackerDB.bulkUpdateStatus([id], nextStatus);
     await reloadEntries();
   };
 
   // Update Source Paid (Advertiser Dual-Settlement)
   const handleUpdateSourcePaid = async (id, sourcePaid) => {
     const val = sourcePaid ? 1 : 0;
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, sourcePaid: val, updatedAt: new Date().toISOString() } : e))
-    );
     await trackerDB.updateSourcePaid(id, val);
     await reloadEntries();
   };
@@ -1142,9 +1188,6 @@ Exported via CHECKPOINT Desktop
   // Update Booster Paid (Advertiser Dual-Settlement)
   const handleUpdateBoosterPaid = async (id, boosterPaid) => {
     const val = boosterPaid ? 1 : 0;
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, boosterPaid: val, updatedAt: new Date().toISOString() } : e))
-    );
     await trackerDB.updateBoosterPaid(id, val);
     await reloadEntries();
   };
@@ -1215,71 +1258,19 @@ Exported via CHECKPOINT Desktop
 
   // Export CSV
   const handleExportCsv = useCallback(async () => {
-    if (entries.length === 0) {
+    const allEntries = await trackerDB.getAllEntries();
+    if (allEntries.length === 0) {
       return;
     }
 
-    const headers = [
-      'ID',
-      'Date & Time',
-      'Game',
-      'Work Title',
-      'Seller / Source',
-      'Currency',
-      'Income Amount',
-      'Applied Rate (Toman/1k G)',
-      'Status',
-      'Notes',
-      'Has Proof Attached',
-    ];
-
-    const rows = entries.map((e) => [
-      e.id,
-      e.dateTime,
-      `"${(e.game || '').replace(/"/g, '""')}"`,
-      `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.source || '').replace(/"/g, '""')}"`,
-      `"${e.currency || globalCurrency}"`,
-      e.income,
-      e.exchangeRate || goldRateTOMAN || 3200,
-      e.status,
-      `"${(e.notes || '').replace(/"/g, '""')}"`,
-      e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
-    ]);
-
-    const csvContent =
-      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-
+    const csvContent = buildLedgerCsv(allEntries, globalCurrency, goldRateTOMAN);
     const fileName = `checkpoint_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
-
-    if (isTauri()) {
-      const res = await saveFileNative({
-        defaultPath: fileName,
-        filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
-        content: csvContent,
-      });
-      if (res && res.success) {
-        return;
-      }
-      if (res && res.cancelled) {
-        return;
-      }
-      console.warn('Native CSV save failed, falling back to browser download:', res?.error);
-    }
-
-    // Web Fallback
-    const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [entries, globalCurrency, goldRateTOMAN]);
+    await saveCsvFile(fileName, csvContent);
+  }, [globalCurrency, goldRateTOMAN]);
 
   // Export JSON Backup
   const handleExportJson = useCallback(async () => {
-    if (entries.length === 0) {
+    if (activeProfileCount === 0) {
       return;
     }
 
@@ -1348,7 +1339,7 @@ Exported via CHECKPOINT Desktop
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }, [
-    entries,
+    activeProfileCount,
     globalCurrency,
     goldRateTOMAN,
     appVersion,
@@ -1402,13 +1393,13 @@ Exported via CHECKPOINT Desktop
           if (Array.isArray(pref.savedSources) && pref.savedSources.length > 0) {
             await trackerDB.setSetting('checkpoint_user_saved_sources_v2', pref.savedSources);
             try {
-              localStorage.setItem('checkpoint_user_saved_sources_v2', JSON.stringify(pref.savedSources));
+              trackerDB.setSetting('checkpoint_user_saved_sources_v2', pref.savedSources).catch(() => {});
             } catch (e) {}
           }
           if (Array.isArray(pref.savedTeammates) && pref.savedTeammates.length > 0) {
             await trackerDB.setSetting('checkpoint_saved_teammates_v1', pref.savedTeammates);
             try {
-              localStorage.setItem('checkpoint_saved_teammates_v1', JSON.stringify(pref.savedTeammates));
+              trackerDB.setSetting('checkpoint_saved_teammates_v1', pref.savedTeammates).catch(() => {});
             } catch (e) {}
           }
         }
@@ -1562,7 +1553,16 @@ Exported via CHECKPOINT Desktop
       let foundEntry = null;
       if (cardEl) {
         const entryId = cardEl.getAttribute('data-entry-id');
-        foundEntry = entries.find((item) => String(item.id) === String(entryId)) || null;
+        foundEntry = entryId ? { id: entryId } : null;
+        if (entryId) {
+          // Rows only carry list fields; the menu gets the full record a moment later
+          trackerDB.getEntry(entryId).then((full) => {
+            if (!full) return;
+            setContextMenuState((prev) =>
+              prev.isOpen && prev.targetEntry?.id === full.id ? { ...prev, targetEntry: full } : prev
+            );
+          }).catch(() => {});
+        }
       }
 
       setContextMenuState({
@@ -1575,7 +1575,7 @@ Exported via CHECKPOINT Desktop
 
     window.addEventListener('contextmenu', handleContextMenu);
     return () => window.removeEventListener('contextmenu', handleContextMenu);
-  }, [entries]);
+  }, []);
 
   // Keyboard Shortcuts Listener
   const appModalsRef = useRef({});
@@ -1593,7 +1593,6 @@ Exported via CHECKPOINT Desktop
     isShortcutsOpen,
     handleOpenWorkModal,
     handleTabChange,
-    searchInputRef,
     handleSwitchProfileToggle,
   };
 
@@ -1611,6 +1610,9 @@ Exported via CHECKPOINT Desktop
           setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
         }
+        // Dialogs close themselves on Escape (topmost only, with their unsaved-changes checks).
+        // Closing them here as well would bypass those checks.
+        if (hasOpenDialog()) return;
         if (state.isCalculatorOpen) {
           setIsCalculatorOpen(false);
           return;
@@ -1654,13 +1656,10 @@ Exported via CHECKPOINT Desktop
         return;
       }
 
-      // Ctrl + F (Focus Search in Ledger)
+      // Ctrl + F (Focus Search in Ledger): switch to the ledger; Navbar moves focus to the visible search field
       if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyF' || e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         state.handleTabChange?.('ledger');
-        setTimeout(() => {
-          state.searchInputRef?.current?.focus();
-        }, 100);
         return;
       }
 
@@ -1709,9 +1708,6 @@ Exported via CHECKPOINT Desktop
       if ((e.code === 'Slash' || e.key === '/') && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
         state.handleTabChange?.('ledger');
-        setTimeout(() => {
-          state.searchInputRef?.current?.focus();
-        }, 50);
         return;
       }
 
@@ -1737,7 +1733,7 @@ Exported via CHECKPOINT Desktop
   }, [activeProfileId]);
 
   return (
-    <div className="w-full h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden select-none border border-zinc-200/80 dark:border-zinc-800/80 shadow-2xl">
+    <div className="w-full h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80">
       {/* 1. Desktop Unified Top Navigation Bar */}
       <Navbar
         activeTab={activeTab}
@@ -1757,7 +1753,7 @@ Exported via CHECKPOINT Desktop
         minimizeToTray={minimizeToTray}
         onOpenWorkModal={handleOpenWorkModal}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        entriesCount={entries.length}
+        entriesCount={activeProfileCount}
         appVersion={appVersion}
         updateInfo={updateInfo}
         onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
@@ -1765,8 +1761,8 @@ Exported via CHECKPOINT Desktop
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
         activeProfileId={activeProfileId}
         onProfileChange={handleProfileChange}
-        boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? entries.length : 0)}
-        advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? entries.length : 0)}
+        boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? activeProfileCount : 0)}
+        advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? activeProfileCount : 0)}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         statusFilter={statusFilter}
@@ -1792,8 +1788,8 @@ Exported via CHECKPOINT Desktop
           unreadNotificationsCount={unreadNotificationsCount}
           activeProfileId={activeProfileId}
           onProfileChange={handleProfileChange}
-          boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? entries.length : 0)}
-          advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? entries.length : 0)}
+          boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? activeProfileCount : 0)}
+          advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? activeProfileCount : 0)}
         />
       )}
 
@@ -1822,7 +1818,7 @@ Exported via CHECKPOINT Desktop
                 <ErrorBoundary>
                   {activeTab === 'ledger' && (
                     <LedgerView
-                      entries={entries}
+                      dataVersion={ledgerVersion}
                       categories={categories}
                       globalCurrency={globalCurrency}
                       onCurrencyChange={handleCurrencyChange}
@@ -1839,7 +1835,6 @@ Exported via CHECKPOINT Desktop
                       onBulkDelete={handleBulkDelete}
                       onBulkUpdateStatus={handleBulkUpdateStatus}
                       onBulkExportCsv={handleBulkExportCsv}
-                      searchInputRef={searchInputRef}
                       externalTeammateFilter={externalTeammateFilter}
                       onClearExternalTeammateFilter={handleClearExternalTeammateFilter}
                       externalSourceFilter={externalSourceFilter}
@@ -1856,7 +1851,7 @@ Exported via CHECKPOINT Desktop
                       onUpdateSourcePaid={handleUpdateSourcePaid}
                       onUpdateBoosterPaid={handleUpdateBoosterPaid}
                       ledgerDateFormat={ledgerDateFormat}
-                      searchQuery={searchQuery}
+                      searchQuery={deferredSearchQuery}
                       onSearchQueryChange={setSearchQuery}
                       statusFilter={statusFilter}
                       onStatusFilterChange={setStatusFilter}
@@ -1864,14 +1859,16 @@ Exported via CHECKPOINT Desktop
                   )}
 
                   {activeTab === 'analytics' && (
-                    <AnalyticsView
-                      entries={entries}
-                      globalCurrency={globalCurrency}
-                      goldRateTOMAN={goldRateTOMAN}
-                      usdRateTOMAN={usdRateTOMAN}
-                      eurRateUSD={eurRateUSD}
-                      activeProfileId={activeProfileId}
-                    />
+                    <Suspense fallback={null}>
+                      <AnalyticsView
+                        entries={analyticsEntries}
+                        globalCurrency={globalCurrency}
+                        goldRateTOMAN={goldRateTOMAN}
+                        usdRateTOMAN={usdRateTOMAN}
+                        eurRateUSD={eurRateUSD}
+                        activeProfileId={activeProfileId}
+                      />
+                    </Suspense>
                   )}
                 </ErrorBoundary>
               </motion.div>
@@ -1917,7 +1914,7 @@ Exported via CHECKPOINT Desktop
         goldRateTOMAN={goldRateTOMAN}
         onOpenLightbox={handleOpenLightbox}
         categories={categories}
-        entries={entries}
+        latestEntryDefaults={latestEntryDefaults}
         onRefreshCategories={refreshCategories}
         activeProfileId={activeProfileId}
         usdRateTOMAN={usdRateTOMAN}
@@ -1970,7 +1967,7 @@ Exported via CHECKPOINT Desktop
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onClearAllData={handleClearAllData}
-        entriesCount={entries.length}
+        entriesCount={activeProfileCount}
         appVersion={appVersion}
         updateInfo={updateInfo}
         onCheckUpdates={handleCheckUpdates}
@@ -2097,8 +2094,8 @@ Exported via CHECKPOINT Desktop
             <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
               <p className="text-zinc-900 dark:text-zinc-200 font-medium">
                 {exportConfirm === 'csv'
-                  ? `Export ${entries.length} records to a formatted .csv spreadsheet?`
-                  : `Save a complete backup with ${entries.length} records and proofs?`}
+                  ? `Export ${activeProfileCount} records to a formatted .csv spreadsheet?`
+                  : `Save a complete backup with ${activeProfileCount} records and proofs?`}
               </p>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                 {exportConfirm === 'csv'

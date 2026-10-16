@@ -29,6 +29,7 @@ import {
 import MoneyDisplay from './ui/MoneyDisplay';
 import { Button } from './ui/Button';
 import { FrostedGlass } from './ui/FrostedGlass';
+import { useModalFocus } from './ui/useModalFocus';
 
 export function OrderCalculatorPopover({
   isOpen,
@@ -38,6 +39,8 @@ export function OrderCalculatorPopover({
   onTransferToWorkModal,
   className = '',
 }) {
+  const panelRef = useRef(null);
+  useModalFocus({ open: isOpen, containerRef: panelRef, onClose });
   const { language, isRtl } = useLanguage();
   const shouldReduceMotion = useReducedMotion();
   const drawerRef = useRef(null);
@@ -260,6 +263,8 @@ export function OrderCalculatorPopover({
               className
             )}
             dir={isRtl ? 'rtl' : 'ltr'}
+            ref={panelRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
           >
