@@ -230,7 +230,7 @@ export function DialogFooter({ children, className }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 relative z-10',
+        'flex items-center justify-end gap-2 px-5 py-3 border-t border-zinc-200/80 dark:border-zinc-800/80 shrink-0 bg-zinc-50/50 dark:bg-zinc-900/50 relative z-30',
         className
       )}
     >

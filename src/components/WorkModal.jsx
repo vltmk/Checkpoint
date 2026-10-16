@@ -1476,6 +1476,296 @@ export function WorkModal({
     </div>
   );
 
+  // Fields shared by the booster and advertiser forms, so the two stay visually identical
+  const gameSourceRow = (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <Select ariaLabel={t('work.gamePlatform')}
+          value={formData.game}
+          onChange={handleGameSelect}
+          options={GAME_OPTIONS}
+          prefixIcon={
+            <Tooltip content={`${t('work.gamePlatform')} *`}>
+              <span className="inline-flex items-center cursor-default">
+                <GameIcon game={formData.game} categories={categories} className="w-4 h-4" />
+              </span>
+            </Tooltip>
+          }
+          className={cn(
+            fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60'
+          )}
+        />
+        {formData.isCustomGame && (
+          <div className="mt-2">
+            <Input aria-label={t('work.gamePlatform')}
+              required
+              value={formData.customGameText}
+              onChange={(e) => updateFormData({ customGameText: e.target.value })}
+              prefixIcon={
+                <Tooltip content={t('work.gamePlatform')}>
+                  <Tag className="w-4 h-4 text-zinc-400" />
+                </Tooltip>
+              }
+              placeholder={t('work.customGamePlaceholder') + ' *'}
+              className={cn(
+                fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+              )}
+            />
+          </div>
+        )}
+      </div>
+
+      <div>
+        <SourceCombobox ariaLabel={t('work.sellerSource')}
+          value={formData.source}
+          onChange={(val) => updateFormData({ source: val })}
+          prefixIcon={
+            <Tooltip content={t('work.sellerSource')}>
+              <span className="inline-flex items-center cursor-default">
+                <Store className="w-4 h-4 text-zinc-400" />
+              </span>
+            </Tooltip>
+          }
+          placeholder={isAdvertiser
+            ? (language === 'fa' ? 'سورس / کانال مشتری: G2G، FunPay... (اختیاری)' : 'Channel / source: G2G, FunPay, client... (optional)')
+            : (language === 'fa' ? 'سورس، دیسکورد مشتری... (اختیاری)' : 'Job source, seller, client... (optional)')}
+        />
+      </div>
+    </div>
+  );
+
+  const titleField = (
+    <div>
+      <Input aria-label={(entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense title') : t('work.workTitle'))}
+        ref={titleInputRef}
+        required
+        value={formData.title}
+        onChange={(e) => updateFormData({ title: e.target.value })}
+        prefixIcon={
+          <Tooltip content={`${entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense Title') : t('work.workTitle')} *`}>
+            <span className="inline-flex items-center cursor-default">
+              <Tag className="w-4 h-4 text-zinc-400" />
+            </span>
+          </Tooltip>
+        }
+        placeholder={
+          entryType === 'expense'
+            ? (language === 'fa' ? 'عنوان هزینه / بدهی... *' : 'Expense / Debt title... *')
+            : `${t('work.titlePlaceholder')} *`
+        }
+        className={cn(
+          'h-9 transition-colors',
+          fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
+        )}
+      />
+      {entryType === 'expense' && (
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+          <span className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+            {language === 'fa' ? 'عناوین سریع:' : 'Quick tags:'}
+          </span>
+          {[
+            { en: 'Boost / Carry', fa: 'خرید بوست' },
+            { en: 'Gold Purchase', fa: 'خرید گلد' },
+            { en: 'Gear / Token', fa: 'توکن / گیر' },
+            { en: 'Commission', fa: 'کمیسیون' },
+          ].map((chip) => (
+            <button
+              key={chip.en}
+              type="button"
+              onClick={() => updateFormData({ title: language === 'fa' ? chip.fa : chip.en })}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
+            >
+              {language === 'fa' ? chip.fa : chip.en}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const dateField = (
+    <div>
+      <DateTimePicker
+        value={formData.dateTime}
+        onChange={(iso) => updateFormData({ dateTime: iso })}
+        className={cn(
+          fieldErrors.dateTime && 'border-rose-500/80 ring-1 ring-rose-500/60'
+        )}
+      />
+    </div>
+  );
+
+  const orderIdField = (
+    <Input aria-label={language === 'fa' ? 'شناسه سفارش' : 'Order ID'}
+      dir="auto"
+      value={formData.orderId}
+      onChange={(e) => updateFormData({ orderId: e.target.value })}
+      prefixIcon={
+        <Tooltip content={language === 'fa' ? 'شناسه سفارش (اختیاری)' : 'Order ID (optional)'}>
+          <span className="inline-flex items-center cursor-default">
+            <Hash className="w-4 h-4 text-zinc-400" />
+          </span>
+        </Tooltip>
+      }
+      placeholder={language === 'fa' ? 'شناسه سفارش (اختیاری)' : 'Order ID (optional)'}
+      className="h-9 font-mono text-xs"
+    />
+  );
+
+  const activeDefaultRate = isClassic ? 7000 : (goldRateTOMAN || 3200);
+
+  // Gold rate override is optional in both forms: a compact toggle that expands into the rate input
+  const rateControl = (
+    activeCategorySupportsGold && (
+      !isCustomRateActive ? (
+        <Tooltip
+          content={
+            language === 'fa'
+              ? `تنظیم نرخ گلد دلخواه (فعال: ${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} ت)`
+              : `Custom gold rate (Active: ${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} T)`
+          }
+        >
+          <button
+            type="button"
+            onClick={() => setIsCustomRateActive(true)}
+            className="h-9 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1.5 text-xs font-mono shrink-0 transition-colors cursor-pointer select-none"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5 text-zinc-400" />
+            <span>{isClassic ? '1 G' : '1k G'}</span>
+          </button>
+        </Tooltip>
+      ) : (
+        <div className="flex items-center gap-1 shrink-0">
+          <NumberStepperInput aria-label={t('work.exchangeRate')}
+            value={formData.exchangeRate}
+            onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
+            step={isClassic ? 100 : 50}
+            placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
+            className="w-32 sm:w-36"
+            prefixIcon={
+              <Tooltip content={t('work.exchangeRate')}>
+                <span className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 font-medium cursor-default select-none px-0.5">
+                  <ArrowRightLeft className="w-3 h-3 text-zinc-400" />
+                  <span>{isClassic ? '1 G' : '1k G'}</span>
+                </span>
+              </Tooltip>
+            }
+          />
+          {Number(formData.exchangeRate) !== (isClassic ? 7000 : Number(goldRateTOMAN || 3200)) && (
+            <Tooltip content={language === 'fa' ? `بازنشانی به نرخ فعال (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} ت)` : `Reset to active rate (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} T)`}>
+              <button aria-label={t('a11y.resetToActiveRate', 'Reset to active rate')}
+                type="button"
+                onClick={() => updateFormData({ exchangeRate: String(isClassic ? 7000 : (goldRateTOMAN || 3200)) })}
+                className="h-9 w-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip content={language === 'fa' ? 'بستن و استفاده از نرخ پیش‌فرض' : 'Dismiss and use default rate'}>
+            <button aria-label={t('a11y.dismissCustomRate', 'Dismiss and use default rate')}
+              type="button"
+              onClick={() => {
+                setIsCustomRateActive(false);
+                updateFormData({ exchangeRate: String(isClassic ? 7000 : (goldRateTOMAN || 3200)) });
+              }}
+              className="h-9 w-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
+        </div>
+      )
+    )
+  );
+
+  const amountValue = isAdvertiser
+    ? (entryType === 'expense' ? formData.income : formData.pot)
+    : (formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income);
+
+  const handleAmountChange = (e) => {
+    if (isAdvertiser) {
+      handleAdvertiserClientPriceChange(e.target.value);
+    } else if (formData.teamMode && formData.teamInputMode === 'pot') {
+      handlePotChange(e.target.value);
+    } else {
+      handleIncomeChange(e.target.value);
+    }
+  };
+
+  const amountTooltip = entryType === 'expense'
+    ? (language === 'fa' ? 'مبلغ هزینه / بدهی' : 'Expense Amount')
+    : isAdvertiser
+      ? (language === 'fa' ? 'مبلغ ناخالص سورس (Source Price)' : 'Source Price (Gross)')
+      : formData.teamMode
+        ? (formData.teamInputMode === 'pot'
+          ? (language === 'fa' ? 'مجموع پات کار تیمی' : 'Total Pot Amount')
+          : (language === 'fa' ? 'سهم من از کار تیمی' : 'My Cut Amount'))
+        : (language === 'fa' ? 'مبلغ دریافتی / دستمزد' : 'Work Amount / Income');
+
+  const amountPlaceholder = entryType === 'expense'
+    ? (language === 'fa' ? 'مبلغ هزینه / بدهی... *' : 'Expense amount... *')
+    : isAdvertiser
+      ? (language === 'fa' ? 'مبلغ ناخالص سورس... *' : 'Source price (gross)... *')
+      : formData.teamMode
+        ? (formData.teamInputMode === 'pot'
+          ? (language === 'fa' ? 'مجموع پات... *' : 'Total pot amount... *')
+          : (language === 'fa' ? 'سهم من... *' : 'My cut amount... *'))
+        : (language === 'fa' ? 'مبلغ دریافتی... *' : 'Amount / Income... *');
+
+  const amountRow = (
+    <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
+      <div className="w-[120px] sm:w-[125px] shrink-0">
+        <Select ariaLabel={(language === 'fa' ? 'ارز' : 'Currency')}
+          value={formData.currency}
+          onChange={(val) => updateFormData({ currency: val })}
+          options={availableCurrencyOptions}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <NumberStepperInput aria-label={(language === 'fa' ? 'مبلغ' : 'Amount')}
+          value={amountValue}
+          onChange={handleAmountChange}
+          currency={formData.currency}
+          prefixIcon={
+            <Tooltip content={amountTooltip}>
+              <span className="inline-flex items-center cursor-default">
+                {entryType === 'expense' ? (
+                  <TrendingDown className="w-4 h-4 text-rose-500/80" />
+                ) : formData.currency === 'GOLD' ? (
+                  <Coins className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80" />
+                ) : (
+                  <CircleDollarSign className="w-4 h-4 text-zinc-400" />
+                )}
+              </span>
+            </Tooltip>
+          }
+          placeholder={amountPlaceholder}
+          required
+          className={cn(
+            fieldErrors.income && 'border-rose-500/80 ring-1 ring-rose-500/60'
+          )}
+        />
+      </div>
+
+      {/* Order calculator (advertiser income only): works out profit and booster payout from the source price */}
+      {isAdvertiser && entryType !== 'expense' && (
+        <Tooltip content={language === 'fa' ? 'محاسبه‌گر سود و سهم بوستر' : 'Calculate order & booster cuts'}>
+          <button aria-label={language === 'fa' ? 'محاسبه‌گر سود و سهم بوستر' : 'Calculate order & booster cuts'}
+            type="button"
+            onClick={() => setIsCalculatorOpen(true)}
+            className="h-9 w-9 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center justify-center shrink-0 transition-colors cursor-pointer select-none"
+          >
+            <Calculator className="w-3.5 h-3.5" />
+          </button>
+        </Tooltip>
+      )}
+
+      {/* Gold Exchange Rate: Optional Activation as part of the Amount/Income field */}
+      {rateControl}
+    </div>
+  );
+
   return (
     <>
       <Dialog
@@ -1618,149 +1908,25 @@ export function WorkModal({
             </div>
           )}
 
-          {isAdvertiser ? (
-            /* ================= ADVERTISER PROFILE FORM ================= */
-            <div className="space-y-4">
-              {/* Row 1: Game & Seller Source */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                    <span className="flex items-center gap-1.5">
-                      <GameIcon game={formData.game} categories={categories} className="w-3.5 h-3.5" />
-                      <span>{t('work.gamePlatform')} *</span>
-                    </span>
-                    {fieldErrors.game && (
-                      <span className="text-[9px] text-rose-400 font-medium">Required</span>
-                    )}
-                  </label>
-                  <Select ariaLabel={t('work.gamePlatform')}
-                    value={formData.game}
-                    onChange={handleGameSelect}
-                    options={GAME_OPTIONS}
-                  />
-                  {formData.isCustomGame && (
-                    <div className="mt-2">
-                      <Input aria-label={t('work.gamePlatform')}
-                        required
-                        value={formData.customGameText}
-                        onChange={(e) => updateFormData({ customGameText: e.target.value })}
-                        placeholder={t('work.customGamePlaceholder')}
-                        className={cn(
-                          fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
-                        )}
-                      />
-                    </div>
-                  )}
-                </div>
+          <div className="space-y-4">
+            {/* Row 1: Game & Seller Source */}
+            {gameSourceRow}
 
-                <div>
-                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                    <span>{language === 'fa' ? 'سورس / کانال مشتری' : 'Channel / Source'}</span>
-                    <span className={cn('text-[9px] text-zinc-500 leading-normal', isRtl && 'font-farsi')}>{language === 'fa' ? 'سورس‌های ذخیره' : 'Saved Sources'}</span>
-                  </label>
-                  <SourceCombobox ariaLabel={t('work.sellerSource')}
-                    value={formData.source}
-                    onChange={(val) => updateFormData({ source: val })}
-                    placeholder={language === 'fa' ? 'مثال: Personal, G2G, FunPay یا مشتری...' : 'e.g. Personal, G2G, FunPay, Client...'}
-                  />
-                </div>
+            {/* Row 2: Work Title (advertiser adds an Order ID beside it) */}
+            {isAdvertiser ? (
+              <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_11rem] gap-3 items-start">
+                {titleField}
+                {orderIdField}
               </div>
+            ) : (
+              titleField
+            )}
 
-              {/* Row 2: Work Title & Order ID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between h-4 leading-none', isRtl && 'font-farsi')}>
-                    <span>{t('work.workTitle')} *</span>
-                    {fieldErrors.title && (
-                      <span className="text-[9px] text-rose-400 font-medium">Required</span>
-                    )}
-                  </label>
-                  <Input aria-label={(entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense title') : t('work.workTitle'))}
-                    ref={titleInputRef}
-                    required
-                    value={formData.title}
-                    onChange={(e) => updateFormData({ title: e.target.value })}
-                    placeholder={entryType === 'expense' ? (language === 'fa' ? 'مثال: خرید بوست، خرید گلد، کمیسیون...' : 'e.g. Boost / Carry bought, Gold Purchase, Commission...') : t('work.titlePlaceholder')}
-                    className={cn(
-                      'h-9 transition-colors',
-                      fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
-                    )}
-                  />
-                  {entryType === 'expense' && (
-                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <span className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-                        {language === 'fa' ? 'عناوین سریع:' : 'Quick tags:'}
-                      </span>
-                      {[
-                        { en: 'Boost / Carry', fa: 'خرید بوست' },
-                        { en: 'Gold Purchase', fa: 'خرید گلد' },
-                        { en: 'Gear / Token', fa: 'توکن / گیر' },
-                        { en: 'Commission', fa: 'کمیسیون' },
-                      ].map((chip) => (
-                        <button
-                          key={chip.en}
-                          type="button"
-                          onClick={() => updateFormData({ title: language === 'fa' ? chip.fa : chip.en })}
-                          className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
-                        >
-                          {language === 'fa' ? chip.fa : chip.en}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {/* Row 3: Date & Time */}
+            {dateField}
 
-                <div>
-                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between h-4 leading-none', isRtl && 'font-farsi')}>
-                    <span className="flex items-center gap-1">
-                      <Hash className="w-3 h-3 text-zinc-400" />
-                      <span>{language === 'fa' ? 'شناسه سفارش' : 'Order ID'}</span>
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleClipboardAutoFill}
-                        title={language === 'fa' ? 'خواندن سفارش از کلیپ‌بورد' : 'Parse order from clipboard'}
-                        className="inline-flex items-center gap-1 text-[9px] font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-                      >
-                        <Copy className="w-2.5 h-2.5" />
-                        <span>{pasteSuccess ? (language === 'fa' ? 'خوانده شد!' : 'Parsed!') : (language === 'fa' ? 'خواندن خودکار' : 'Smart Fill')}</span>
-                      </button>
-                      <span className="text-[9px] text-zinc-500 font-normal">
-                        {language === 'fa' ? 'اختیاری' : 'Optional'}
-                      </span>
-                    </div>
-                  </label>
-                  <div className="relative" dir="ltr">
-                    <Input aria-label={(language === 'fa' ? 'شناسه سفارش' : 'Order ID')}
-                      value={formData.orderId}
-                      onChange={(e) => updateFormData({ orderId: e.target.value })}
-                      placeholder={language === 'fa' ? 'مثال: #ORD-98234...' : 'e.g. #ORD-98234...'}
-                      className="font-mono text-xs pl-7 h-9 text-left"
-                    />
-                    <Hash className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 3: Date & Time */}
-              <div>
-                <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                  <span>{t('work.dateTime')} *</span>
-                  {fieldErrors.dateTime && (
-                    <span className="text-[9px] text-rose-400 font-medium">Required</span>
-                  )}
-                </label>
-                <DateTimePicker
-                  value={formData.dateTime}
-                  onChange={(iso) => updateFormData({ dateTime: iso })}
-                  className={cn(
-                    fieldErrors.dateTime && 'border-rose-500/80 ring-1 ring-rose-500/60'
-                  )}
-                />
-              </div>
-
-              {/* Row 4: Assigned Booster(s) */}
+            {/* Row 4: Teammates (booster team mode / advertiser assigned boosters) */}
+            {isAdvertiser ? (
               <AnimatePresence initial={false}>
                 {entryType === 'income' && (formData.teamMode || (formData.teammates && formData.teammates.length > 0)) && (
                   <motion.div
@@ -1770,103 +1936,92 @@ export function WorkModal({
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-                          <Users className="w-3.5 h-3.5 text-zinc-400" />
-                          <span>{language === 'fa' ? 'بوستر(ها)ی مجری' : 'Assigned Booster(s)'}</span>
-                        </label>
-                        <span className={cn('text-[10px] text-zinc-500', isRtl && 'font-farsi')}>
-                          {formData.teammates?.length > 0
-                            ? `${formatNumber(formData.teammates.length)} ${language === 'fa' ? 'بوستر انتخاب شده' : 'booster(s)'}`
-                            : (language === 'fa' ? 'اختیاری (در صورت تخصیص)' : 'Optional (unassigned if empty)')}
-                        </span>
-                      </div>
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
                       <TeammatesCombobox ariaLabel={t('work.teammatesCrew')}
                         value={formData.teammates}
                         onChange={handleTeammatesChange}
-                        placeholder={language === 'fa' ? 'نام بوستر را وارد کرده و Enter بزنید...' : 'Type booster username and press Enter...'}
+                        prefixIcon={
+                          <Tooltip content={language === 'fa' ? 'بوستر(ها)ی مجری' : 'Assigned booster(s)'}>
+                            <span className="inline-flex items-center cursor-default">
+                              <Users className="w-4 h-4 text-zinc-400" />
+                            </span>
+                          </Tooltip>
+                        }
+                        placeholder={language === 'fa' ? 'بوستر(ها)ی مجری: نام را وارد کرده و Enter بزنید... (اختیاری)' : 'Assigned booster(s): type username, press Enter... (optional)'}
                       />
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+            ) : (
+              <AnimatePresence initial={false}>
+                {entryType === 'income' && formData.teamMode && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className={cn('flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
+                          <Users className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
+                          <span className="text-zinc-400 dark:text-zinc-600">•</span>
+                          <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
+                        </div>
 
-              {/* Row 5: Financial Engine */}
-              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
-                  <div className={activeCategorySupportsGold ? 'sm:col-span-7' : 'sm:col-span-12'}>
-                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                      <span className="flex items-center gap-1.5">
-                        <span>
-                          {entryType === 'expense'
-                            ? (language === 'fa' ? 'مبلغ هزینه / پرداختی *' : 'Expense Amount *')
-                            : (language === 'fa' ? 'مبلغ ناخالص سورس (Source Price) *' : 'Source Price (Gross) *')}
-                        </span>
-                        {entryType !== 'expense' && (
+                        {/* Mode Selector: Input Pot vs Input My Cut */}
+                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
                           <button
                             type="button"
-                            onClick={() => setIsCalculatorOpen(true)}
-                            title={language === 'fa' ? 'محاسبه گر سود و سهم بوستر' : 'Calculate order & booster cuts'}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-700/80 transition-colors cursor-pointer select-none"
+                            onClick={() => updateFormData({ teamInputMode: 'pot' })}
+                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                              formData.teamInputMode === 'pot'
+                                ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
+                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            }`}
                           >
-                            <Calculator className="w-2.5 h-2.5 text-zinc-400 dark:text-zinc-500" />
-                            <span>{language === 'fa' ? 'محاسبه' : 'Calculate'}</span>
+                            {language === 'fa' ? 'پات کل' : 'Pot'}
                           </button>
-                        )}
-                      </span>
-                      {fieldErrors.income && (
-                        <span className="text-[9px] text-rose-400 font-medium">Required</span>
-                      )}
-                    </label>
-                    <div className="flex gap-2">
-                      <div className="w-[125px] shrink-0">
-                        <Select ariaLabel={(language === 'fa' ? 'ارز' : 'Currency')}
-                          value={formData.currency}
-                          onChange={(val) => updateFormData({ currency: val })}
-                          options={availableCurrencyOptions}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <NumberStepperInput aria-label={(language === 'fa' ? 'مبلغ' : 'Amount')}
-                          value={entryType === 'expense' ? formData.income : formData.pot}
-                          onChange={(e) => handleAdvertiserClientPriceChange(e.target.value)}
-                          currency={formData.currency}
-                          placeholder={formData.currency === 'GOLD' ? '10,000' : '100,000'}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {activeCategorySupportsGold && (
-                    <div className="sm:col-span-5">
-                      <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between', isRtl && 'font-farsi')}>
-                        <span className="truncate">{t('work.exchangeRate')}</span>
-                        {Number(formData.exchangeRate) !== Number(goldRateTOMAN) ? (
                           <button
                             type="button"
-                            onClick={() => updateFormData({ exchangeRate: String(goldRateTOMAN || 3200) })}
-                            className="text-[9px] text-zinc-400 hover:text-zinc-200 underline select-none shrink-0"
+                            onClick={() => updateFormData({ teamInputMode: 'income' })}
+                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
+                              formData.teamInputMode === 'income'
+                                ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
+                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                            }`}
                           >
-                            {language === 'fa' ? `ریست (${goldRateTOMAN?.toLocaleString()} ت)` : `Reset (${goldRateTOMAN?.toLocaleString()} T)`}
+                            {language === 'fa' ? 'سهم من' : 'My Cut'}
                           </button>
-                        ) : (
-                          <span className="text-[9px] text-zinc-500 shrink-0">
-                            {language === 'fa' ? `فعال (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}ک` : goldRateTOMAN} ت)` : `Active (${goldRateTOMAN >= 1000 ? `${(goldRateTOMAN / 1000).toFixed(1)}k` : goldRateTOMAN} T)`}
-                          </span>
-                        )}
-                      </label>
-                      <NumberStepperInput aria-label={t('work.exchangeRate')}
-                        value={formData.exchangeRate}
-                        onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
-                        step={50}
-                        placeholder={String(goldRateTOMAN || 3200)}
+                        </div>
+                      </div>
+
+                      <TeammatesCombobox ariaLabel={t('work.teammatesCrew')}
+                        value={formData.teammates}
+                        onChange={handleTeammatesChange}
+                        prefixIcon={
+                          <Tooltip content={t('work.teammatesCrew')}>
+                            <span className="inline-flex items-center cursor-default">
+                              <Users className="w-4 h-4 text-zinc-400" />
+                            </span>
+                          </Tooltip>
+                        }
+                        placeholder={language === 'fa' ? 'نام هم‌تیمی را وارد کرده و Enter بزنید...' : 'Type teammate username and press Enter...'}
                       />
                     </div>
-                  )}
-                </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
 
+            {/* Row 5: Financial Engine */}
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-2.5">
+              {amountRow}
+
+              {isAdvertiser ? (
                 <AnimatePresence initial={false}>
                   {entryType === 'income' && (
                     <motion.div
@@ -2109,473 +2264,7 @@ export function WorkModal({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
-
-              {/* Row 6: Notes */}
-              <div>
-                <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 mb-1.5', isRtl && 'font-farsi')}>
-                  {t('work.notes')}
-                </label>
-                <Textarea aria-label={t('work.notes')}
-                  rows={2}
-                  value={formData.notes}
-                  onChange={(e) => updateFormData({ notes: e.target.value })}
-                  placeholder={t('work.notesPlaceholder')}
-                />
-              </div>
-
-              {/* Row 7: Reference Link / URL */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-                    {detectedLink ? (
-                      renderPlatformIcon(detectedLink.platform, 'w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300 shrink-0')
-                    ) : (
-                      <Link2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    )}
-                    <span>{t('work.link')}</span>
-                  </label>
-
-                  {detectedLink ? (
-                    <div
-                      className="flex items-center gap-1.5 text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300 shadow-2xs"
-                      dir="ltr"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="font-medium">
-                        {language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label}
-                      </span>
-                      <span className="text-zinc-400 dark:text-zinc-500">
-                        {detectedLink.appLaunchable
-                          ? '• ' + (language === 'fa' ? 'برنامه دسکتاپ' : 'Desktop App')
-                          : '• ' + (language === 'fa' ? 'مرورگر' : 'Browser')}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[9px] text-zinc-500 lowercase">
-                      Optional
-                    </span>
-                  )}
-                </div>
-
-                <div className="relative flex items-center">
-                  <Input aria-label={t('work.link')}
-                    type="text"
-                    value={formData.link}
-                    onChange={(e) => updateFormData({ link: e.target.value })}
-                    placeholder={t('work.linkPlaceholder')}
-                    className={cn(
-                      'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 transition-colors',
-                      detectedLink && 'border-zinc-300 dark:border-zinc-700/80 pr-8',
-                      isRtl && 'text-left'
-                    )}
-                    dir="ltr"
-                  />
-                  {detectedLink && (
-                    <div className="absolute right-2.5 pointer-events-none text-zinc-400 dark:text-zinc-500 flex items-center">
-                      {renderPlatformIcon(detectedLink.platform, 'w-3.5 h-3.5')}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 8: Proof Upload & Screenshot Paste */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <label className={cn('block text-[10px] font-medium uppercase tracking-wider text-zinc-400', isRtl && 'font-farsi')}>
-                      {t('work.proof')}
-                    </label>
-                    <AnimatePresence>
-                      {proofPasted && (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60"
-                        >
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{language === 'fa' ? 'اسکرین‌شات پیوست شد' : 'Proof attached'}</span>
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                                  </div>
-
-                <div
-                  role="button"
-                                    tabIndex={0}
-                                    aria-label={t('work.clickUpload')}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        fileInputRef.current?.click();
-                                      }
-                                    }}
-                                    onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragOver(true);
-                  }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl px-3 py-2.5 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${
-                    isDragOver
-                      ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
-                      : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
-                  }`}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        handleFiles(e.target.files);
-                        e.target.value = '';
-                      }
-                    }}
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                  />
-                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"><ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className={cn('font-medium text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>{t('work.clickUpload')}</span><span className="inline-flex items-center gap-0.5 ms-1" aria-hidden="true"><Kbd>Ctrl</Kbd><Kbd>V</Kbd></span></div>
-                </div>
-
-                {proofs.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap mt-2.5">
-                    {proofs.map((proof, idx) => (
-                      <div
-                        key={proof.id || idx}
-                        className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
-                      >
-                        <img
-                          src={proof.data}
-                          alt={proof.name || 'Proof'}
-                          onClick={() =>
-                            onOpenLightbox?.(proof.data, proof.name || 'Attached Proof')
-                          }
-                          className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveProof(idx);
-                          }}
-                          className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-zinc-100 transition-colors"
-                          title="Remove attachment"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* ================= BOOSTER PROFILE FORM ================= */
-            <div className="space-y-4">
-              {/* Row 1: Game & Seller Source */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Select ariaLabel={t('work.gamePlatform')}
-                    value={formData.game}
-                    onChange={handleGameSelect}
-                    options={GAME_OPTIONS}
-                    prefixIcon={
-                      <Tooltip content={`${t('work.gamePlatform')} *`}>
-                        <span className="inline-flex items-center cursor-default">
-                          <GameIcon game={formData.game} categories={categories} className="w-4 h-4" />
-                        </span>
-                      </Tooltip>
-                    }
-                    className={cn(
-                      fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60'
-                    )}
-                  />
-                  {formData.isCustomGame && (
-                    <div className="mt-2">
-                      <Input aria-label={t('work.gamePlatform')}
-                        required
-                        value={formData.customGameText}
-                        onChange={(e) => updateFormData({ customGameText: e.target.value })}
-                        prefixIcon={
-                          <Tooltip content={t('work.gamePlatform')}>
-                            <Tag className="w-4 h-4 text-zinc-400" />
-                          </Tooltip>
-                        }
-                        placeholder={t('work.customGamePlaceholder') + ' *'}
-                        className={cn(
-                          fieldErrors.game && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
-                        )}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <SourceCombobox ariaLabel={t('work.sellerSource')}
-                    value={formData.source}
-                    onChange={(val) => updateFormData({ source: val })}
-                    prefixIcon={
-                      <Tooltip content={t('work.sellerSource')}>
-                        <span className="inline-flex items-center cursor-default">
-                          <Store className="w-4 h-4 text-zinc-400" />
-                        </span>
-                      </Tooltip>
-                    }
-                    placeholder={language === 'fa' ? 'سورس، دیسکورد مشتری... (اختیاری)' : 'Job source, seller, client... (optional)'}
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Work Title */}
-              <div>
-                <Input aria-label={(entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense title') : t('work.workTitle'))}
-                  ref={titleInputRef}
-                  required
-                  value={formData.title}
-                  onChange={(e) => updateFormData({ title: e.target.value })}
-                  prefixIcon={
-                    <Tooltip content={`${entryType === 'expense' ? (language === 'fa' ? 'عنوان هزینه' : 'Expense Title') : t('work.workTitle')} *`}>
-                      <span className="inline-flex items-center cursor-default">
-                        <Tag className="w-4 h-4 text-zinc-400" />
-                      </span>
-                    </Tooltip>
-                  }
-                  placeholder={
-                    entryType === 'expense'
-                      ? (language === 'fa' ? 'عنوان هزینه / بدهی... *' : 'Expense / Debt title... *')
-                      : `${t('work.titlePlaceholder')} *`
-                  }
-                  className={cn(
-                    'h-9 transition-colors',
-                    fieldErrors.title && 'border-rose-500/80 ring-1 ring-rose-500/60 focus:border-rose-500'
-                  )}
-                />
-                {entryType === 'expense' && (
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    <span className={cn('text-[10px] text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
-                      {language === 'fa' ? 'عناوین سریع:' : 'Quick tags:'}
-                    </span>
-                    {[
-                      { en: 'Boost / Carry', fa: 'خرید بوست' },
-                      { en: 'Gold Purchase', fa: 'خرید گلد' },
-                      { en: 'Gear / Token', fa: 'توکن / گیر' },
-                      { en: 'Commission', fa: 'کمیسیون' },
-                    ].map((chip) => (
-                      <button
-                        key={chip.en}
-                        type="button"
-                        onClick={() => updateFormData({ title: language === 'fa' ? chip.fa : chip.en })}
-                        className="text-[10px] px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors"
-                      >
-                        {language === 'fa' ? chip.fa : chip.en}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Row 3: Date & Time */}
-              <div>
-                <DateTimePicker
-                  value={formData.dateTime}
-                  onChange={(iso) => updateFormData({ dateTime: iso })}
-                  className={cn(
-                    fieldErrors.dateTime && 'border-rose-500/80 ring-1 ring-rose-500/60'
-                  )}
-                />
-              </div>
-
-              {/* Row 4: Team Mode (Only rendered when entryType === 'income' && formData.teamMode) */}
-              <AnimatePresence initial={false}>
-                {entryType === 'income' && formData.teamMode && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2, ease: 'easeInOut' }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80 space-y-2.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className={cn('flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal', isRtl && 'font-farsi')}>
-                          <Users className="w-3.5 h-3.5 text-zinc-400" />
-                          <span>{formatNumber(totalTeamMembers)} {language === 'fa' ? 'سهم کل' : 'total shares'}</span>
-                          <span className="text-zinc-400 dark:text-zinc-600">•</span>
-                          <span className="text-zinc-500">({language === 'fa' ? `شما + ${formatNumber(formData.teammates.length)} هم‌تیمی` : `You + ${formData.teammates.length} teammate`})</span>
-                        </div>
-
-                        {/* Mode Selector: Input Pot vs Input My Cut */}
-                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-md border border-zinc-200 dark:border-zinc-800 text-[10px]" dir="ltr">
-                          <button
-                            type="button"
-                            onClick={() => updateFormData({ teamInputMode: 'pot' })}
-                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                              formData.teamInputMode === 'pot'
-                                ? 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            {language === 'fa' ? 'پات کل' : 'Pot'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateFormData({ teamInputMode: 'income' })}
-                            className={`px-2 py-0.5 rounded font-medium transition-colors ${
-                              formData.teamInputMode === 'income'
-                                ? 'bg-white dark:bg-zinc-800 text-emerald-700 dark:text-emerald-300 font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
-                                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-                            }`}
-                          >
-                            {language === 'fa' ? 'سهم من' : 'My Cut'}
-                          </button>
-                        </div>
-                      </div>
-
-                      <TeammatesCombobox ariaLabel={t('work.teammatesCrew')}
-                        value={formData.teammates}
-                        onChange={handleTeammatesChange}
-                        prefixIcon={
-                          <Tooltip content={t('work.teammatesCrew')}>
-                            <span className="inline-flex items-center cursor-default">
-                              <Users className="w-4 h-4 text-zinc-400" />
-                            </span>
-                          </Tooltip>
-                        }
-                        placeholder={language === 'fa' ? 'نام هم‌تیمی را وارد کرده و Enter بزنید...' : 'Type teammate username and press Enter...'}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Row 5: Financial Engine */}
-              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/60 space-y-2.5">
-                <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
-                  <div className="w-[120px] sm:w-[125px] shrink-0">
-                    <Select ariaLabel={(language === 'fa' ? 'ارز' : 'Currency')}
-                      value={formData.currency}
-                      onChange={(val) => updateFormData({ currency: val })}
-                      options={availableCurrencyOptions}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <NumberStepperInput aria-label={(language === 'fa' ? 'مبلغ' : 'Amount')}
-                      value={formData.teamMode && formData.teamInputMode === 'pot' ? formData.pot : formData.income}
-                      onChange={(e) => {
-                        if (formData.teamMode && formData.teamInputMode === 'pot') {
-                          handlePotChange(e.target.value);
-                        } else {
-                          handleIncomeChange(e.target.value);
-                        }
-                      }}
-                      currency={formData.currency}
-                      prefixIcon={
-                        <Tooltip content={
-                          entryType === 'expense'
-                            ? (language === 'fa' ? 'مبلغ هزینه / بدهی' : 'Expense Amount')
-                            : formData.teamMode
-                            ? (formData.teamInputMode === 'pot'
-                              ? (language === 'fa' ? 'مجموع پات کار تیمی' : 'Total Pot Amount')
-                              : (language === 'fa' ? 'سهم من از کار تیمی' : 'My Cut Amount'))
-                            : (language === 'fa' ? 'مبلغ دریافتی / دستمزد' : 'Work Amount / Income')
-                        }>
-                          <span className="inline-flex items-center cursor-default">
-                            {entryType === 'expense' ? (
-                              <TrendingDown className="w-4 h-4 text-rose-500/80" />
-                            ) : formData.currency === 'GOLD' ? (
-                              <Coins className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80" />
-                            ) : (
-                              <CircleDollarSign className="w-4 h-4 text-zinc-400" />
-                            )}
-                          </span>
-                        </Tooltip>
-                      }
-                      placeholder={
-                        entryType === 'expense'
-                          ? (language === 'fa' ? 'مبلغ هزینه / بدهی... *' : 'Expense amount... *')
-                          : formData.teamMode
-                          ? (formData.teamInputMode === 'pot'
-                            ? (language === 'fa' ? 'مجموع پات... *' : 'Total pot amount... *')
-                            : (language === 'fa' ? 'سهم من... *' : 'My cut amount... *'))
-                          : (language === 'fa' ? 'مبلغ دریافتی... *' : 'Amount / Income... *')
-                      }
-                      required
-                      className={cn(
-                        fieldErrors.income && 'border-rose-500/80 ring-1 ring-rose-500/60'
-                      )}
-                    />
-                  </div>
-
-                  {/* Gold Exchange Rate: Optional Activation as part of the Amount/Income field */}
-                  {activeCategorySupportsGold && (
-                    !isCustomRateActive ? (
-                      <Tooltip
-                        content={
-                          language === 'fa'
-                            ? `تنظیم نرخ گلد دلخواه (فعال: ${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} ت)`
-                            : `Custom gold rate (Active: ${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} T)`
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomRateActive(true)}
-                          className="h-9 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1.5 text-xs font-mono shrink-0 transition-colors cursor-pointer select-none"
-                        >
-                          <ArrowRightLeft className="w-3.5 h-3.5 text-zinc-400" />
-                          <span>{isClassic ? '1 G' : '1k G'}</span>
-                        </button>
-                      </Tooltip>
-                    ) : (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <NumberStepperInput aria-label={t('work.exchangeRate')}
-                          value={formData.exchangeRate}
-                          onChange={(e) => updateFormData({ exchangeRate: normalizeDigits(e.target.value) })}
-                          step={isClassic ? 100 : 50}
-                          placeholder={isClassic ? '7,000' : String(goldRateTOMAN || 3200)}
-                          className="w-32 sm:w-36"
-                          prefixIcon={
-                            <Tooltip content={t('work.exchangeRate')}>
-                              <span className="flex items-center gap-1 text-[11px] font-mono text-zinc-400 font-medium cursor-default select-none px-0.5">
-                                <ArrowRightLeft className="w-3 h-3 text-zinc-400" />
-                                <span>{isClassic ? '1 G' : '1k G'}</span>
-                              </span>
-                            </Tooltip>
-                          }
-                        />
-                        {Number(formData.exchangeRate) !== (isClassic ? 7000 : Number(goldRateTOMAN || 3200)) && (
-                          <Tooltip content={language === 'fa' ? `بازنشانی به نرخ فعال (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} ت)` : `Reset to active rate (${(isClassic ? 7000 : (goldRateTOMAN || 3200)).toLocaleString()} T)`}>
-                            <button aria-label={t('a11y.resetToActiveRate', 'Reset to active rate')}
-                              type="button"
-                              onClick={() => updateFormData({ exchangeRate: String(isClassic ? 7000 : (goldRateTOMAN || 3200)) })}
-                              className="h-9 w-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0 cursor-pointer"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          </Tooltip>
-                        )}
-                        <Tooltip content={language === 'fa' ? 'بستن و استفاده از نرخ پیش‌فرض' : 'Dismiss and use default rate'}>
-                          <button aria-label={t('a11y.dismissCustomRate', 'Dismiss and use default rate')}
-                            type="button"
-                            onClick={() => {
-                              setIsCustomRateActive(false);
-                              updateFormData({ exchangeRate: String(isClassic ? 7000 : (goldRateTOMAN || 3200)) });
-                            }}
-                            className="h-9 w-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shrink-0 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    )
-                  )}
-                </div>
-
-                {/* Team Split Live Indicator (Visible only when 'Pot' mode is selected) */}
+              ) : (
                 <AnimatePresence initial={false}>
                   {entryType === 'income' && formData.teamMode && formData.teamInputMode === 'pot' && (
                     <motion.div
@@ -2686,150 +2375,150 @@ export function WorkModal({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
-
-              {/* Row 6: Notes */}
-              <div>
-                <Textarea aria-label={t('work.notes')}
-                  rows={2}
-                  value={formData.notes}
-                  onChange={(e) => updateFormData({ notes: e.target.value })}
-                  placeholder={language === 'fa' ? 'یادداشت، شرایط سفارش یا جزئیات کار... (اختیاری)' : 'Add notes, customer requirements, or details... (optional)'}
-                />
-              </div>
-
-              {/* Row 7: Reference Link / URL */}
-              <div className="relative flex items-center">
-                <Input aria-label={t('work.link')}
-                  type="text"
-                  value={formData.link}
-                  onChange={(e) => updateFormData({ link: e.target.value })}
-                  prefixIcon={
-                    <Tooltip content={detectedLink ? (language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label) : t('work.link')}>
-                      <span className="inline-flex items-center cursor-default">
-                        {detectedLink ? (
-                          renderPlatformIcon(detectedLink.platform, 'w-4 h-4 text-zinc-700 dark:text-zinc-300 shrink-0')
-                        ) : (
-                          <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
-                        )}
-                      </span>
-                    </Tooltip>
-                  }
-                  placeholder={language === 'fa' ? 'لینک شیت، دیسکورد، استریم یا چت مشتری... (اختیاری)' : 'Reference URL, sheet, Discord message... (optional)'}
-                  className={cn(
-                    'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 transition-colors',
-                    detectedLink && 'pr-28 rtl:pr-8 rtl:pl-28'
-                  )}
-                  dir="ltr"
-                />
-                {detectedLink && (
-                  <div className="absolute right-2 rtl:right-auto rtl:left-2 flex items-center pointer-events-none">
-                    <div
-                      className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300"
-                      dir="ltr"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="font-medium truncate max-w-[80px]">
-                        {language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Row 8: Proof Upload & Screenshot Paste */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <AnimatePresence>
-                      {proofPasted && (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60"
-                        >
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>{language === 'fa' ? 'اسکرین‌شات پیوست شد' : 'Proof attached'}</span>
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                                  </div>
-
-                <div
-                  role="button"
-                                    tabIndex={0}
-                                    aria-label={t('work.clickUpload')}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        fileInputRef.current?.click();
-                                      }
-                                    }}
-                                    onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragOver(true);
-                  }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl px-3 py-2.5 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${
-                    isDragOver
-                      ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
-                      : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
-                  }`}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        handleFiles(e.target.files);
-                        e.target.value = '';
-                      }
-                    }}
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                  />
-                  <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"><ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className={cn('font-medium text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>{t('work.clickUpload')}</span><span className="inline-flex items-center gap-0.5 ms-1" aria-hidden="true"><Kbd>Ctrl</Kbd><Kbd>V</Kbd></span></div>
-                </div>
-
-                {proofs.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap mt-2.5">
-                    {proofs.map((proof, idx) => (
-                      <div
-                        key={proof.id || idx}
-                        className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
-                      >
-                        <img
-                          src={proof.data}
-                          alt={proof.name || 'Proof'}
-                          onClick={() =>
-                            onOpenLightbox?.(proof.data, proof.name || 'Attached Proof')
-                          }
-                          className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveProof(idx);
-                          }}
-                          className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-zinc-100 transition-colors"
-                          title="Remove attachment"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          )}
+
+            {/* Row 6: Notes */}
+            <div>
+              <Textarea aria-label={t('work.notes')}
+                rows={2}
+                value={formData.notes}
+                onChange={(e) => updateFormData({ notes: e.target.value })}
+                placeholder={language === 'fa' ? 'یادداشت، شرایط سفارش یا جزئیات کار... (اختیاری)' : 'Add notes, customer requirements, or details... (optional)'}
+              />
+            </div>
+
+            {/* Row 7: Reference Link / URL */}
+            <div className="relative flex items-center">
+              <Input aria-label={t('work.link')}
+                type="text"
+                value={formData.link}
+                onChange={(e) => updateFormData({ link: e.target.value })}
+                prefixIcon={
+                  <Tooltip content={detectedLink ? (language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label) : t('work.link')}>
+                    <span className="inline-flex items-center cursor-default">
+                      {detectedLink ? (
+                        renderPlatformIcon(detectedLink.platform, 'w-4 h-4 text-zinc-700 dark:text-zinc-300 shrink-0')
+                      ) : (
+                        <Link2 className="w-4 h-4 text-zinc-400 shrink-0" />
+                      )}
+                    </span>
+                  </Tooltip>
+                }
+                placeholder={language === 'fa' ? 'لینک شیت، دیسکورد، استریم یا چت مشتری... (اختیاری)' : 'Reference URL, sheet, Discord message... (optional)'}
+                className={cn(
+                  'text-xs bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-300 transition-colors',
+                  detectedLink && 'pr-28 rtl:pr-8 rtl:pl-28'
+                )}
+                dir="ltr"
+              />
+              {detectedLink && (
+                <div className="absolute right-2 rtl:right-auto rtl:left-2 flex items-center pointer-events-none">
+                  <div
+                    className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/60 text-zinc-700 dark:text-zinc-300"
+                    dir="ltr"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-medium truncate max-w-[80px]">
+                      {language === 'fa' && detectedLink.labelFa ? detectedLink.labelFa : detectedLink.label}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Row 8: Proof Upload & Screenshot Paste */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <AnimatePresence>
+                    {proofPasted && (
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/60"
+                      >
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{language === 'fa' ? 'اسکرین‌شات پیوست شد' : 'Proof attached'}</span>
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+                                </div>
+
+              <div
+                role="button"
+                                  tabIndex={0}
+                                  aria-label={t('work.clickUpload')}
+                                  onClick={() => fileInputRef.current?.click()}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      fileInputRef.current?.click();
+                                    }
+                                  }}
+                                  onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-xl px-3 py-2.5 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 ${
+                  isDragOver
+                    ? 'border-zinc-400 bg-zinc-100 dark:bg-zinc-900'
+                    : 'border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/40 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60'
+                }`}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFiles(e.target.files);
+                      e.target.value = '';
+                    }
+                  }}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                />
+                <div className="flex items-center justify-center gap-2 text-xs text-zinc-500 dark:text-zinc-400"><ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /><span className={cn('font-medium text-zinc-700 dark:text-zinc-300', isRtl && 'font-farsi')}>{t('work.clickUpload')}</span><span className="inline-flex items-center gap-0.5 ms-1" aria-hidden="true"><Kbd>Ctrl</Kbd><Kbd>V</Kbd></span></div>
+              </div>
+
+              {proofs.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap mt-2.5">
+                  {proofs.map((proof, idx) => (
+                    <div
+                      key={proof.id || idx}
+                      className="group relative h-16 w-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900"
+                    >
+                      <img
+                        src={proof.data}
+                        alt={proof.name || 'Proof'}
+                        onClick={() =>
+                          onOpenLightbox?.(proof.data, proof.name || 'Attached Proof')
+                        }
+                        className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveProof(idx);
+                        }}
+                        className="absolute top-1 right-1 p-0.5 rounded bg-black/80 hover:bg-rose-600 text-zinc-300 hover:text-zinc-100 transition-colors"
+                        title="Remove attachment"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
 
         {/* Footer with Anchored Status Selector */}
