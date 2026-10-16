@@ -334,7 +334,7 @@ const LedgerRow = React.memo(function LedgerRow({
         ) : (
           /* 2. Standard Work Record Card */
           <div
-            dir="ltr"
+            dir={isRtl ? 'rtl' : 'ltr'}
             data-entry-id={entry.id}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -416,7 +416,7 @@ const LedgerRow = React.memo(function LedgerRow({
           >
             {/* Left accent bar in the game colour: solid and inset, so it reads as a marker instead of a blurred glow */}
             <div
-              className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full pointer-events-none transition-opacity duration-150 opacity-80 group-hover:opacity-100"
+              className="absolute start-0 top-2 bottom-2 w-[3px] rounded-e-full pointer-events-none transition-opacity duration-150 opacity-80 group-hover:opacity-100"
               style={{ backgroundColor: accentColor }}
             />
 
@@ -444,7 +444,7 @@ const LedgerRow = React.memo(function LedgerRow({
               }}
               title={isSelected ? 'Deselect (or Shift+Click for range)' : 'Select (or Shift+Click for range)'}
               className={cn(
-                'absolute -top-1 -left-1 z-20 w-4 h-4 rounded-[2.5px] border flex items-center justify-center transition-all duration-100 shadow-xs after:absolute after:-inset-2.5 after:content-[\'\']',
+                'absolute -top-1 -start-1 z-20 w-4 h-4 rounded-[2.5px] border flex items-center justify-center transition-all duration-100 shadow-xs after:absolute after:-inset-2.5 after:content-[\'\']',
                 isSelected
                   ? 'bg-zinc-900 border-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-900 scale-100 opacity-100'
                   : isSelectMode
@@ -457,10 +457,11 @@ const LedgerRow = React.memo(function LedgerRow({
 
             {/* Narrow vertical category column anchored to the left */}
             <div
-              className="flex items-center justify-center shrink-0 w-5 sm:w-6 border-r border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/40 select-none py-2 rounded-l-lg"
+              className="flex items-center justify-center shrink-0 w-5 sm:w-6 border-e border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/40 select-none py-2 rounded-s-lg"
               title={entry.game}
             >
               <span
+                dir="ltr"
                 className="text-[10px] font-semibold tracking-widest uppercase text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors whitespace-nowrap truncate max-h-[60px]"
                 style={{
                   writingMode: 'vertical-rl',
@@ -876,7 +877,7 @@ const LedgerRow = React.memo(function LedgerRow({
                     aria-expanded={isStatusPickerOpen}
                     title={language === 'fa' ? `تغییر وضعیت (${STATUS_LABELS[entry.status] || entry.status})` : `Change status (${STATUS_LABELS[entry.status] || entry.status})`}
                     className={cn(
-                      'inline-flex items-center gap-1 pl-1.5 pr-1 py-px rounded-md text-[10px] font-medium leading-normal whitespace-nowrap border transition-colors cursor-pointer select-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500',
+                      'inline-flex items-center gap-1 ps-1.5 pe-1 py-px rounded-md text-[10px] font-medium leading-normal whitespace-nowrap border transition-colors cursor-pointer select-none active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500',
                       STATUS_STYLES[entry.status]?.badgeClass || 'bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-800'
                     )}
                   >
@@ -913,7 +914,7 @@ const LedgerRow = React.memo(function LedgerRow({
                   return (
                     <Tooltip
                       content={
-                        <div className="max-w-[260px] space-y-0.5 text-left rtl:text-right">
+                        <div className="max-w-[260px] space-y-0.5 text-start">
                           <div className={cn("font-medium", isCopiedLink ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-800 dark:text-zinc-200")}>
                             {isCopiedLink ? t('ledger.copiedLink', 'Copied link to clipboard!') : tooltipLabel}
                           </div>
