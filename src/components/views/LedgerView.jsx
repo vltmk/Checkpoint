@@ -334,7 +334,7 @@ const LedgerRow = React.memo(function LedgerRow({
         ) : (
           /* 2. Standard Work Record Card */
           <div
-            dir={isRtl ? 'rtl' : 'ltr'}
+            dir="ltr"
             data-entry-id={entry.id}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -550,7 +550,7 @@ const LedgerRow = React.memo(function LedgerRow({
                 <div className="min-w-0 flex-1 space-y-0.5">
                   {/* Line 1: Title, Proof Indicator, Seller Badge & Timestamp */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-normal">
+                    <span dir="auto" className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-normal">
                       {entry.title}
                     </span>
                     {entry.proofs && entry.proofs.length > 0 && (
@@ -640,14 +640,14 @@ const LedgerRow = React.memo(function LedgerRow({
 
                   {/* Line 2: Notes only (Category is displayed on the left vertical column) */}
                   {entry.notes && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 min-w-0 leading-normal">
+                    <div dir="auto" className="flex items-center gap-1.5 text-[10px] text-zinc-500 min-w-0 leading-normal">
                       <FormattedInlineNotes text={entry.notes} />
                     </div>
                   )}
 
                 {/* Line 3: Interactive Settlement Pills, Payouts & Teammate Badges in Advertiser Mode */}
                 {isAdvertiser ? (
-                  <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[10px]">
+                  <div dir={isRtl ? 'rtl' : 'ltr'} className="flex items-center gap-2 flex-wrap w-fit max-w-full pt-0.5 text-[10px]">
                     {/* Each payout toggle sits beside the amount it settles */}
                     <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap">
                       <div className="flex items-center gap-1.5 min-w-0">
