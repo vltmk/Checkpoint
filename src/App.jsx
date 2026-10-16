@@ -56,6 +56,7 @@ import {
   openAppAwareUrl,
   closeWindow,
 } from './lib/desktop';
+import { isAutoBackupDue } from './lib/autoBackup';
 import {
   initTelemetry,
   incrementLocalWorkCount,
@@ -172,9 +173,8 @@ const saveCsvFile = async (fileName, csvContent) => {
       filters: [{ name: 'CSV Spreadsheet', extensions: ['csv'] }],
       content: csvContent,
     });
-    if (res && (res.success || res.cancelled)) {
-      return;
-    }
+    if (res && res.success) return true;
+    if (res && res.cancelled) return false;
     console.warn('Native CSV save failed, falling back to browser download:', res?.error);
   }
 
@@ -189,6 +189,7 @@ const saveCsvFile = async (fileName, csvContent) => {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  return true;
 };
 
 export default function App() {
@@ -245,6 +246,9 @@ export default function App() {
   const [autoBackupRetention, setAutoBackupRetention] = useState(() => {
     return parseNumberSetting(null, 5, 0);
   });
+
+  // True while a scheduled backup is writing, so overlapping checks cannot write the same backup twice
+  const autoBackupRunningRef = useRef(false);
 
   // Anonymous Usage Telemetry (Enabled by default)
   const [telemetryEnabled, setTelemetryEnabledState] = useState(() => {
@@ -618,74 +622,82 @@ export default function App() {
     }
   }, [isDesktop, appVersion]);
 
-  // Execute scheduled automated backups (if enabled)
+  // Runs a scheduled folder backup when one is due. Backup Now passes force: it always writes and rethrows
+  // failures so the button can report them. Every real attempt is recorded in 'checkpoint_auto_backup_status'.
   const runScheduledAutoBackup = useCallback(async (opts = {}) => {
-    if (!isDesktop || !autoBackupEnabled || !autoBackupPath) return;
+    const isManual = opts.force === true;
+    if (!isDesktop || !autoBackupEnabled || !autoBackupPath) {
+      if (isManual) throw new Error('No backup folder selected');
+      return { status: 'skipped' };
+    }
+    if (autoBackupRunningRef.current && !isManual) return { status: 'busy' };
+
+    autoBackupRunningRef.current = true;
     try {
-      const isManual = opts.force === true;
+      const now = Date.now();
       const lastRunStr = await trackerDB.getSetting('checkpoint_last_auto_backup_timestamp', '');
       const lastRun = lastRunStr ? Number(lastRunStr) : 0;
-      const now = Date.now();
 
-      let intervalMs = 24 * 60 * 60 * 1000; // daily default
-      if (autoBackupFrequency === 'on_start') {
-        intervalMs = 0;
-      } else if (autoBackupFrequency === 'weekly') {
-        intervalMs = 7 * 24 * 60 * 60 * 1000;
+      if (!isManual && !isAutoBackupDue({ frequency: autoBackupFrequency, lastRunMs: lastRun, nowMs: now, source: opts.source })) {
+        return { status: 'not_due' };
       }
 
-      if (isManual || now - lastRun >= intervalMs) {
-        const entries = await trackerDB.getAllEntries();
-        const currentFingerprint = generateLedgerFingerprint(entries, globalCurrency, goldRateTOMAN);
-        const lastFingerprint = await trackerDB.getSetting('checkpoint_last_auto_backup_hash', '');
+      const entries = await trackerDB.getAllEntries();
+      const currentFingerprint = generateLedgerFingerprint(entries, globalCurrency, goldRateTOMAN);
+      const lastFingerprint = await trackerDB.getSetting('checkpoint_last_auto_backup_hash', '');
 
-        // Smart Change Detection: Skip export if no financial/entry data changed and not a manual trigger
-        if (!isManual && currentFingerprint === lastFingerprint && lastRun > 0) {
-          await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
-          return;
-        }
-
-        const fullEntries = await trackerDB.getAllEntriesFull();
-        let currentCategories = [];
-        try {
-          currentCategories = await loadCategories();
-        } catch (e) {}
-
-        const backupData = {
-          app: 'CHECKPOINT',
-          version: appVersion || '0.0.0',
-          exportDate: new Date().toISOString(),
-          type: isManual ? 'manual_auto_backup' : 'scheduled_auto_backup',
-          currency: globalCurrency,
-          goldRateTOMAN,
-          categories: currentCategories,
-          entriesCount: fullEntries.length,
-          entries: fullEntries,
-        };
-
-        const todayStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const fileName = `checkpoint_autobackup_${todayStr}.json`;
-        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
-        const sep = autoBackupPath.includes('\\') ? '\\' : '/';
-        const fullPath = `${autoBackupPath.replace(/[/\\]+$/, '')}${sep}${fileName}`;
-
-        await writeTextFile(fullPath, JSON.stringify(backupData, null, 2));
+      // Smart Change Detection: Skip export if no financial/entry data changed and not a manual trigger
+      if (!isManual && currentFingerprint === lastFingerprint && lastRun > 0) {
         await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
-        await trackerDB.setSetting('checkpoint_last_auto_backup_hash', currentFingerprint);
-
-        // Auto-Pruning: Enforce retention limit (e.g. keep last N backups)
-        if (autoBackupRetention > 0) {
-          await pruneOldBackupsNative({
-            backupDir: autoBackupPath,
-            maxFiles: autoBackupRetention,
-          });
-        }
+        return { status: 'unchanged' };
       }
+
+      const fullEntries = await trackerDB.getAllEntriesFull();
+      let currentCategories = [];
+      try {
+        currentCategories = await loadCategories();
+      } catch (e) {}
+
+      const backupData = {
+        app: 'CHECKPOINT',
+        version: appVersion || '0.0.0',
+        exportDate: new Date().toISOString(),
+        type: isManual ? 'manual_auto_backup' : 'scheduled_auto_backup',
+        currency: globalCurrency,
+        goldRateTOMAN,
+        categories: currentCategories,
+        entriesCount: fullEntries.length,
+        entries: fullEntries,
+      };
+
+      const todayStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fileName = `checkpoint_autobackup_${todayStr}.json`;
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const sep = autoBackupPath.includes('\\') ? '\\' : '/';
+      const fullPath = `${autoBackupPath.replace(/[/\\]+$/, '')}${sep}${fileName}`;
+
+      await writeTextFile(fullPath, JSON.stringify(backupData, null, 2));
+      await trackerDB.setSetting('checkpoint_last_auto_backup_timestamp', String(now));
+      await trackerDB.setSetting('checkpoint_last_auto_backup_hash', currentFingerprint);
+      await trackerDB.setSetting('checkpoint_auto_backup_status', { ok: true, at: now, fileName });
+
+      // Auto-Pruning: Enforce retention limit (e.g. keep last N backups)
+      if (autoBackupRetention > 0) {
+        await pruneOldBackupsNative({
+          backupDir: autoBackupPath,
+          maxFiles: autoBackupRetention,
+        });
+      }
+      return { status: 'written', fileName };
     } catch (err) {
       console.warn('[AutoBackup] Backup execution failed:', err);
-      if (opts.force) {
-        throw err;
-      }
+      const message = String(err?.message || err);
+      await trackerDB.setSetting('checkpoint_auto_backup_status', { ok: false, at: Date.now(), error: message });
+      if (isManual) throw err;
+      sendDesktopNotification({ title: 'CHECKPOINT auto-backup failed', body: message });
+      return { status: 'error', error: message };
+    } finally {
+      autoBackupRunningRef.current = false;
     }
   }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN]);
 
@@ -699,6 +711,16 @@ export default function App() {
     runScheduledAutoBackupRef.current = runScheduledAutoBackup;
   }, [runScheduledAutoBackup]);
 
+  // Backup check on launch and whenever the auto-backup settings change. Settings load asynchronously
+  // after the first render, so this runs off the hydrated values rather than a fixed startup timer.
+  useEffect(() => {
+    if (!isDesktop || !autoBackupEnabled || !autoBackupPath) return undefined;
+    const timer = setTimeout(() => {
+      runScheduledAutoBackupRef.current?.({ source: 'change' });
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency]);
+
   // Initial application bootstrap and background synchronization timers (runs once on mount)
   useEffect(() => {
     loadData();
@@ -708,14 +730,13 @@ export default function App() {
     // Initial background feed sync & telemetry shortly after render
     const timer = setTimeout(() => {
       syncFeedsRef.current?.({ silent: true });
-      runScheduledAutoBackupRef.current?.();
       initTelemetry();
     }, 700);
 
     // Periodic polling every 4 hours for long-running / tray sessions
     const intervalTimer = setInterval(() => {
       syncFeedsRef.current?.({ silent: true });
-      runScheduledAutoBackupRef.current?.();
+      runScheduledAutoBackupRef.current?.({ source: 'interval' });
       flushDailyTelemetry();
     }, 4 * 60 * 60 * 1000);
 
@@ -761,6 +782,7 @@ export default function App() {
 
     let unlistenTray = null;
     let unlistenClose = null;
+    let unlistenResize = null;
 
     const setupDesktopListeners = async () => {
       try {
@@ -777,6 +799,17 @@ export default function App() {
             await closeWindow();
           }
         });
+
+        // Minimize to Tray: a minimized window is hidden so it lives only in the tray (restored via tray click)
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        unlistenResize = await getCurrentWindow().onResized(async () => {
+          if (!minimizeToTrayRef.current) return;
+          try {
+            if (await getCurrentWindow().isMinimized()) {
+              await hideWindow();
+            }
+          } catch (e) {}
+        });
       } catch (e) {
         console.warn('Failed to setup desktop listeners:', e);
       }
@@ -787,6 +820,7 @@ export default function App() {
     return () => {
       if (unlistenTray) unlistenTray();
       if (unlistenClose) unlistenClose();
+      if (unlistenResize) unlistenResize();
     };
   }, [isDesktop]);
 
@@ -855,9 +889,15 @@ export default function App() {
   };
 
   // Manual Check for Updates
+  // Returns the check result so the settings panel can report "up to date" or a failed check
   const handleCheckUpdates = async () => {
     setIsCheckingUpdates(true);
-    const res = await checkForUpdate({ timeoutMs: 7000 });
+    let res;
+    try {
+      res = await checkForUpdate({ timeoutMs: 7000 });
+    } catch (err) {
+      res = { available: false, error: err?.message || String(err) };
+    }
     setIsCheckingUpdates(false);
     if (res && res.available) {
       setUpdateInfo(res);
@@ -867,6 +907,7 @@ export default function App() {
       await saveStoredNotifications(updated);
       setIsUpdateModalOpen(true);
     }
+    return res;
   };
 
   // Notification Actions
@@ -1130,9 +1171,16 @@ Exported via CHECKPOINT Desktop
   }, [globalCurrency, goldRateTOMAN]);
 
   // Purge / Clear All Data
+  // Returns false when the wipe failed, so the settings panel can say so
   const handleClearAllData = async (purgeSnapshots = false) => {
-    await trackerDB.clearAll(purgeSnapshots);
+    let ok = false;
+    try {
+      ok = (await trackerDB.clearAll(purgeSnapshots)) !== false;
+    } catch (err) {
+      console.error('Clear all data failed:', err);
+    }
     await loadData();
+    return ok;
   };
 
   // Duplicate Entry
@@ -1260,18 +1308,18 @@ Exported via CHECKPOINT Desktop
   const handleExportCsv = useCallback(async () => {
     const allEntries = await trackerDB.getAllEntries();
     if (allEntries.length === 0) {
-      return;
+      return false;
     }
 
     const csvContent = buildLedgerCsv(allEntries, globalCurrency, goldRateTOMAN);
     const fileName = `checkpoint_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
-    await saveCsvFile(fileName, csvContent);
+    return saveCsvFile(fileName, csvContent);
   }, [globalCurrency, goldRateTOMAN]);
 
   // Export JSON Backup
   const handleExportJson = useCallback(async () => {
     if (activeProfileCount === 0) {
-      return;
+      return false;
     }
 
     // Retrieve all records with complete full-res screenshot proofs
@@ -1318,10 +1366,10 @@ Exported via CHECKPOINT Desktop
         content: backupData,
       });
       if (res && res.success) {
-        return;
+        return true;
       }
       if (res && res.cancelled) {
-        return;
+        return false;
       }
       console.warn('Native JSON backup save failed, falling back to browser download:', res?.error);
     }
@@ -1338,6 +1386,7 @@ Exported via CHECKPOINT Desktop
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    return true;
   }, [
     activeProfileCount,
     globalCurrency,
@@ -1352,7 +1401,8 @@ Exported via CHECKPOINT Desktop
     autoBackupRetention,
   ]);
 
-  // Import JSON Restore
+  // Import JSON Restore. Returns { status: 'imported', count } | { status: 'cancelled' } | { status: 'invalid' | 'error' }
+  // so the settings panel can confirm the restore or explain why it did not happen.
   const handleImportJson = async (fileOrRaw) => {
     try {
       let json = null;
@@ -1361,14 +1411,14 @@ Exported via CHECKPOINT Desktop
         const res = await openFileNative({
           filters: [{ name: 'JSON Backup', extensions: ['json'] }],
         });
-        if (!res || res.cancelled) return;
+        if (!res || res.cancelled) return { status: 'cancelled' };
         if (!res.success || !res.content) {
-          return;
+          return { status: 'error' };
         }
         try {
           json = JSON.parse(res.content);
         } catch (e) {
-          return;
+          return { status: 'invalid' };
         }
       } else if (fileOrRaw instanceof File) {
         const text = await fileOrRaw.text();
@@ -1379,7 +1429,7 @@ Exported via CHECKPOINT Desktop
         json = fileOrRaw;
       }
 
-      if (!json) return;
+      if (!json) return { status: 'invalid' };
 
       let importedList = [];
       if (Array.isArray(json)) {
@@ -1414,14 +1464,22 @@ Exported via CHECKPOINT Desktop
           }
         }
       } else {
-        return;
+        return { status: 'invalid' };
+      }
+
+      // Entries without an id are skipped by bulkImport, so only count the ones that will be written
+      const count = importedList.filter((entry) => entry && entry.id).length;
+      if (count === 0 && importedList.length > 0) {
+        return { status: 'invalid' };
       }
 
       await trackerDB.bulkImport(importedList);
       await loadData();
       await refreshCategories();
+      return { status: 'imported', count };
     } catch (err) {
       console.error('Failed to import JSON backup:', err);
+      return { status: 'error' };
     }
   };
 

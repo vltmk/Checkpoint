@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
   Trash2,
   Check,
+  X,
   History,
   RotateCcw,
   ShieldCheck,
@@ -111,12 +112,87 @@ export function SettingsModal({
   const [manualBackupState, setManualBackupState] = useState('idle'); // 'idle' | 'running' | 'success' | 'no_folder_error' | 'error'
   const [snapshotRestoreState, setSnapshotRestoreState] = useState('idle'); // 'idle' | 'restoring' | 'success' | 'error'
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [restoreResult, setRestoreResult] = useState(null); // { state: 'running' | 'success' | 'error', count?, reason? }
+  const [updateCheck, setUpdateCheck] = useState(null); // { state: 'upToDate' | 'error' | 'desktopOnly', at, message? }
+  const [clearResult, setClearResult] = useState(null); // { state: 'running' | 'success' | 'error', purged? }
   const [exportJsonState, setExportJsonState] = useState('idle');
   const [exportCsvState, setExportCsvState] = useState('idle');
   const [highlightBackup, setHighlightBackup] = useState(false);
+  const [lastBackupStatus, setLastBackupStatus] = useState(null); // { ok, at, fileName?, error? } from the last backup attempt
+  const [retentionDraft, setRetentionDraft] = useState(String(autoBackupRetention));
+  const backupFeedbackTimerRef = useRef(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const isDesktop = isTauri();
+
+  const refreshBackupStatus = () => {
+    trackerDB.getSetting('checkpoint_auto_backup_status', null)
+      .then((status) => setLastBackupStatus(status && typeof status === 'object' ? status : null))
+      .catch(() => {});
+  };
+
+  // Shows a transient button state; 'ms' > 0 returns the button to idle after that long
+  const setBackupFeedback = (state, ms = 0) => {
+    clearTimeout(backupFeedbackTimerRef.current);
+    setManualBackupState(state);
+    if (ms > 0) {
+      backupFeedbackTimerRef.current = setTimeout(() => setManualBackupState('idle'), ms);
+    }
+  };
+
+  // Runs an export and reports it on the button. 'success' only when a file was saved, not when the save dialog was cancelled
+  const runExport = async (setState, exporter) => {
+    setState('running');
+    let outcome = 'error';
+    try {
+      const saved = await exporter?.();
+      outcome = saved === false ? 'idle' : 'success';
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+    setState(outcome);
+    if (outcome !== 'idle') {
+      setTimeout(() => setState('idle'), 1800);
+    }
+  };
+
+  const feedbackLabel = (state, idleLabel) => {
+    if (state === 'success') return language === 'fa' ? 'ذخیره شد' : 'Saved';
+    if (state === 'error') return language === 'fa' ? 'خطا در خروجی' : 'Export failed';
+    return idleLabel;
+  };
+
+  const feedbackClass = (state) => {
+    if (state === 'success') return 'border-emerald-500/60 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10';
+    if (state === 'error') return 'border-rose-500/70 text-rose-600 dark:text-rose-400 bg-rose-500/10';
+    return '';
+  };
+
+  const feedbackIcon = (state, DefaultIcon) => {
+    if (state === 'success') return <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />;
+    if (state === 'error') return <X className="w-4 h-4 text-rose-500 shrink-0" />;
+    return <DefaultIcon className="w-4 h-4 text-zinc-400 shrink-0" />;
+  };
+
+  const commitRetention = () => {
+    const parsed = Math.floor(Number(retentionDraft));
+    if (retentionDraft.trim() === '' || !Number.isFinite(parsed) || parsed < 0) {
+      setRetentionDraft(String(autoBackupRetention));
+      return;
+    }
+    const clamped = Math.min(parsed, 365);
+    setRetentionDraft(String(clamped));
+    if (clamped !== autoBackupRetention) {
+      onAutoBackupRetentionChange?.(clamped);
+    }
+  };
+
+  const formatBackupTime = (ts) => {
+    const date = new Date(ts);
+    return Number.isNaN(date.getTime())
+      ? ''
+      : date.toLocaleString(language === 'fa' ? 'fa-IR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  };
 
   const handleDeleteCategory = async (cat) => {
     const remaining = categories.filter((c) => (c.id || c.name) !== (cat.id || cat.name));
@@ -154,8 +230,15 @@ export function SettingsModal({
           setSelectedSnapshot(list[0].id);
         }
       });
+      refreshBackupStatus();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    setRetentionDraft(String(autoBackupRetention));
+  }, [autoBackupRetention]);
+
+  useEffect(() => () => clearTimeout(backupFeedbackTimerRef.current), []);
 
   const currencyOptions = [
     {
@@ -198,13 +281,47 @@ export function SettingsModal({
     });
   }, [ledgerDateFormatOptions, getDatePatternPreview, language]);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onImportJson?.(file);
-      e.target.value = '';
-      onClose();
+  // Maps the App's import result to the status line. Cancelling the file dialog leaves no message.
+  const toRestoreResult = (res) => {
+    if (!res || res.status === 'cancelled') return null;
+    if (res.status === 'imported') return { state: 'success', count: res.count };
+    return { state: 'error', reason: res.status };
+  };
+
+  const restoreJson = async () => {
+    if (!isDesktop) {
+      fileInputRef.current?.click();
+      return;
     }
+    setRestoreResult({ state: 'running' });
+    const res = await onImportJson?.();
+    setRestoreResult(toRestoreResult(res));
+  };
+
+  // The modal stays open after a web restore so the confirmation is visible
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setRestoreResult({ state: 'running' });
+    const res = await onImportJson?.(file);
+    setRestoreResult(toRestoreResult(res));
+  };
+
+  const checkUpdatesNow = async () => {
+    if (!isDesktop) {
+      setUpdateCheck({ state: 'desktopOnly', at: Date.now() });
+      return;
+    }
+    const res = await onCheckUpdates?.();
+    if (res?.available) {
+      // The update modal takes over from here
+      setUpdateCheck(null);
+      return;
+    }
+    setUpdateCheck(res?.error
+      ? { state: 'error', at: Date.now(), message: res.error }
+      : { state: 'upToDate', at: Date.now() });
   };
 
   const handleRestoreSnapshot = async () => {
@@ -235,6 +352,46 @@ export function SettingsModal({
       setTheme(nextTheme);
     }
   };
+
+  const frequencyOptions = [
+    { value: 'on_start', label: language === 'fa' ? 'هنگام شروع برنامه' : 'On app start' },
+    { value: 'daily', label: language === 'fa' ? 'روزانه' : 'Daily' },
+    { value: 'weekly', label: language === 'fa' ? 'هفتگی' : 'Weekly' },
+  ];
+
+  const backupButtonLabel = manualBackupState === 'running'
+    ? (language === 'fa' ? 'در حال پشتیبان‌گیری…' : 'Backing up…')
+    : manualBackupState === 'success'
+      ? (language === 'fa' ? 'پشتیبان ذخیره شد' : 'Backup saved')
+      : manualBackupState === 'error'
+        ? (language === 'fa' ? 'پشتیبان ناموفق' : 'Backup failed')
+        : t('settings.backupNow');
+  const backupButtonIcon = manualBackupState === 'success'
+    ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+    : manualBackupState === 'error'
+      ? <X className="w-3.5 h-3.5 text-rose-500" />
+      : <RotateCw className={cn('w-3.5 h-3.5 text-zinc-400', manualBackupState === 'running' && 'animate-spin')} />;
+  const backupButtonClass = feedbackClass(manualBackupState);
+
+  // Status line under the backup controls: the outcome of the latest attempt (manual or automatic)
+  let backupStatusText = language === 'fa' ? 'هنوز نسخه پشتیبانی ثبت نشده است' : 'No backup has been written yet';
+  let backupStatusTone = 'text-zinc-500 dark:text-zinc-400';
+  let BackupStatusIcon = History;
+  if (manualBackupState === 'no_folder_error') {
+    backupStatusText = language === 'fa' ? 'ابتدا یک پوشه برای پشتیبان انتخاب کنید' : 'Choose a backup folder first';
+    backupStatusTone = 'text-rose-600 dark:text-rose-400';
+    BackupStatusIcon = X;
+  } else if (manualBackupState === 'running') {
+    backupStatusText = language === 'fa' ? 'در حال نوشتن فایل پشتیبان…' : 'Writing backup file…';
+  } else if (lastBackupStatus?.ok === false) {
+    backupStatusText = `${language === 'fa' ? 'آخرین پشتیبان ناموفق بود' : 'Last backup failed'}: ${formatBackupTime(lastBackupStatus.at)} — ${lastBackupStatus.error || ''}`;
+    backupStatusTone = 'text-rose-600 dark:text-rose-400';
+    BackupStatusIcon = X;
+  } else if (lastBackupStatus?.ok) {
+    backupStatusText = `${language === 'fa' ? 'آخرین پشتیبان' : 'Last backup'}: ${formatBackupTime(lastBackupStatus.at)}${lastBackupStatus.fileName ? ` · ${lastBackupStatus.fileName}` : ''}`;
+    backupStatusTone = 'text-emerald-700 dark:text-emerald-400';
+    BackupStatusIcon = Check;
+  }
 
   // Category Tab Definitions
   const TABS = [
@@ -783,6 +940,42 @@ export function SettingsModal({
                           </button>
 
                           <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1 min-w-0">
+                              <label className={cn('block text-[11px] font-medium text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                                {t('settings.frequency')}
+                              </label>
+                              <Select
+                                value={autoBackupFrequency}
+                                onChange={(val) => onAutoBackupFrequencyChange?.(val)}
+                                options={frequencyOptions}
+                                className="h-7 text-xs bg-white dark:bg-zinc-950"
+                              />
+                            </div>
+                            <div className="space-y-1 min-w-0">
+                              <label htmlFor="autoBackupRetention" className={cn('block text-[11px] font-medium text-zinc-500 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                                {t('settings.retention')}
+                              </label>
+                              <Input
+                                id="autoBackupRetention"
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={365}
+                                value={retentionDraft}
+                                onChange={(e) => setRetentionDraft(e.target.value)}
+                                onBlur={commitRetention}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitRetention();
+                                }}
+                                className="h-7 text-xs bg-white dark:bg-zinc-950"
+                              />
+                              <p className={cn('text-[10px] text-zinc-400 dark:text-zinc-500', isRtl && 'font-farsi')}>
+                                {language === 'fa' ? '۰ یعنی همه فایل‌ها نگه داشته شوند' : '0 keeps every backup file'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
                             <Button
                               variant="secondary"
                               size="xs"
@@ -803,25 +996,33 @@ export function SettingsModal({
                               disabled={manualBackupState === 'running'}
                               onClick={async () => {
                                 if (!autoBackupPath) {
-                                  setManualBackupState('no_folder_error');
-                                  setTimeout(() => setManualBackupState('idle'), 2500);
+                                  setBackupFeedback('no_folder_error', 2500);
                                   return;
                                 }
-                                setManualBackupState('running');
+                                setBackupFeedback('running');
                                 try {
                                   await onManualAutoBackup?.();
-                                  setManualBackupState('success');
-                                  setTimeout(() => setManualBackupState('idle'), 1800);
+                                  setBackupFeedback('success', 2500);
                                 } catch (err) {
-                                  setManualBackupState('error');
-                                  setTimeout(() => setManualBackupState('idle'), 2500);
+                                  console.error('Manual backup failed:', err);
+                                  setBackupFeedback('error', 3500);
                                 }
+                                refreshBackupStatus();
                               }}
-                              className={cn('justify-center gap-1.5 h-7 text-xs', isRtl && 'font-farsi')}
+                              className={cn('justify-center gap-1.5 h-7 text-xs', backupButtonClass, isRtl && 'font-farsi')}
                             >
-                              <RotateCw className={cn('w-3.5 h-3.5 text-zinc-400', manualBackupState === 'running' && 'animate-spin')} />
-                              <span>{t('settings.backupNow')}</span>
+                              {backupButtonIcon}
+                              <span>{backupButtonLabel}</span>
                             </Button>
+                          </div>
+
+                          <div
+                            role="status"
+                            aria-live="polite"
+                            className={cn('flex items-start gap-1.5 text-[11px] leading-snug', backupStatusTone, isRtl && 'font-farsi')}
+                          >
+                            <BackupStatusIcon className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span className="min-w-0 break-words">{backupStatusText}</span>
                           </div>
                         </div>
                       )}
@@ -886,27 +1087,19 @@ export function SettingsModal({
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={async () => {
-                          setExportJsonState('success');
-                          await onExportJson?.();
-                          setTimeout(() => setExportJsonState('idle'), 1800);
-                        }}
-                        className={cn('justify-start gap-2 text-xs py-2 h-auto leading-relaxed', isRtl && 'font-farsi')}
+                        disabled={exportJsonState === 'running'}
+                        onClick={() => runExport(setExportJsonState, onExportJson)}
+                        className={cn('justify-start gap-2 text-xs py-2 h-auto leading-relaxed', feedbackClass(exportJsonState), isRtl && 'font-farsi')}
                       >
-                        <Upload className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span>{t('settings.fullJsonBackup')}</span>
+                        {feedbackIcon(exportJsonState, Upload)}
+                        <span>{feedbackLabel(exportJsonState, t('settings.fullJsonBackup'))}</span>
                       </Button>
 
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => {
-                          if (isDesktop) {
-                            onImportJson?.();
-                          } else {
-                            fileInputRef.current?.click();
-                          }
-                        }}
+                        disabled={restoreResult?.state === 'running'}
+                        onClick={restoreJson}
                         className={cn('justify-start gap-2 text-xs py-2 h-auto leading-relaxed', isRtl && 'font-farsi')}
                       >
                         <Download className="w-4 h-4 text-zinc-400 shrink-0" />
@@ -916,17 +1109,43 @@ export function SettingsModal({
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={async () => {
-                          setExportCsvState('success');
-                          await onExportCsv?.();
-                          setTimeout(() => setExportCsvState('idle'), 1800);
-                        }}
-                        className={cn('justify-start gap-2 text-xs sm:col-span-2 py-2 h-auto leading-relaxed', isRtl && 'font-farsi')}
+                        disabled={exportCsvState === 'running'}
+                        onClick={() => runExport(setExportCsvState, onExportCsv)}
+                        className={cn('justify-start gap-2 text-xs sm:col-span-2 py-2 h-auto leading-relaxed', feedbackClass(exportCsvState), isRtl && 'font-farsi')}
                       >
-                        <FileSpreadsheet className="w-4 h-4 text-zinc-400 shrink-0" />
-                        <span>{t('settings.exportCsv')}</span>
+                        {feedbackIcon(exportCsvState, FileSpreadsheet)}
+                        <span>{feedbackLabel(exportCsvState, t('settings.exportCsv'))}</span>
                       </Button>
                     </div>
+
+                    {restoreResult && restoreResult.state !== 'running' && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className={cn(
+                          'flex items-start gap-1.5 text-[11px] leading-snug',
+                          restoreResult.state === 'success' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
+                          isRtl && 'font-farsi'
+                        )}
+                      >
+                        {restoreResult.state === 'success'
+                          ? <Check className="w-3 h-3 mt-0.5 shrink-0" />
+                          : <X className="w-3 h-3 mt-0.5 shrink-0" />}
+                        <span className="min-w-0 break-words">
+                          {restoreResult.state === 'success'
+                            ? (language === 'fa'
+                              ? `${formatNumber(restoreResult.count)} رکورد بازیابی شد`
+                              : `Restored ${formatNumber(restoreResult.count)} records from the file.`)
+                            : restoreResult.reason === 'invalid'
+                              ? (language === 'fa'
+                                ? 'این فایل پشتیبان معتبر CHECKPOINT نیست.'
+                                : 'This file is not a valid CHECKPOINT backup.')
+                              : (language === 'fa'
+                                ? 'بازیابی ناموفق بود. دفتر کار را بررسی کنید و دوباره تلاش کنید.'
+                                : 'Restore failed. Check your ledger, then try again.')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -954,7 +1173,11 @@ export function SettingsModal({
                   <div className="p-3 rounded-xl bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between gap-3">
                     <div>
                       <div className={cn('text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5', isRtl && 'font-farsi')}>
-                        <span>{updateInfo?.available ? `${t('settings.updateAvailable')}: v${updateInfo.version}` : t('settings.upToDate')}</span>
+                        <span>{updateInfo?.available
+                          ? `${t('settings.updateAvailable')}: v${updateInfo.version}`
+                          : updateCheck?.state === 'error'
+                            ? (language === 'fa' ? 'بررسی به‌روزرسانی ناموفق بود' : 'Could not check for updates')
+                            : t('settings.upToDate')}</span>
                         {appVersion && (
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
                             v{appVersion}
@@ -964,6 +1187,33 @@ export function SettingsModal({
                       <p className={cn('text-[11px] text-zinc-500 mt-0.5', isRtl && 'font-farsi')}>
                         {updateInfo?.available ? 'A new official update is available.' : 'Running the official production build.'}
                       </p>
+                      {!updateInfo?.available && updateCheck && (
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className={cn(
+                            'mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug',
+                            updateCheck.state === 'upToDate' && 'text-emerald-700 dark:text-emerald-400',
+                            updateCheck.state === 'error' && 'text-rose-600 dark:text-rose-400',
+                            updateCheck.state === 'desktopOnly' && 'text-zinc-500 dark:text-zinc-400',
+                            isRtl && 'font-farsi'
+                          )}
+                        >
+                          {updateCheck.state === 'upToDate' && <Check className="w-3 h-3 mt-0.5 shrink-0" />}
+                          {updateCheck.state === 'error' && <X className="w-3 h-3 mt-0.5 shrink-0" />}
+                          <span className="min-w-0 break-words">
+                            {updateCheck.state === 'upToDate' && (language === 'fa'
+                              ? `نسخه شما به‌روز است · بررسی شد ${formatBackupTime(updateCheck.at)}`
+                              : `You're on the latest version · checked ${formatBackupTime(updateCheck.at)}`)}
+                            {updateCheck.state === 'error' && (language === 'fa'
+                              ? 'اتصال اینترنت را بررسی کنید و دوباره تلاش کنید.'
+                              : 'Check your connection and try again.')}
+                            {updateCheck.state === 'desktopOnly' && (language === 'fa'
+                              ? 'بررسی به‌روزرسانی فقط در نسخه دسکتاپ انجام می‌شود.'
+                              : 'Update checks run in the desktop app.')}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {updateInfo?.available ? (
@@ -984,7 +1234,7 @@ export function SettingsModal({
                         variant="secondary"
                         size="xs"
                         disabled={isCheckingUpdates}
-                        onClick={onCheckUpdates}
+                        onClick={checkUpdatesNow}
                         className={cn('gap-1.5 text-xs h-7', isRtl && 'font-farsi')}
                       >
                         <RotateCw className={cn('w-3 h-3 text-zinc-400', isCheckingUpdates && 'animate-spin')} />
@@ -1065,6 +1315,32 @@ export function SettingsModal({
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>{t('settings.clearAllData')}</span>
                     </Button>
+
+                    {clearResult && (
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className={cn(
+                          'flex items-start gap-1.5 text-[11px] leading-snug',
+                          clearResult.state === 'success' && 'text-emerald-700 dark:text-emerald-400',
+                          clearResult.state === 'error' && 'text-rose-600 dark:text-rose-400',
+                          clearResult.state === 'running' && 'text-zinc-500 dark:text-zinc-400',
+                          isRtl && 'font-farsi'
+                        )}
+                      >
+                        {clearResult.state === 'success' && <Check className="w-3 h-3 mt-0.5 shrink-0" />}
+                        {clearResult.state === 'error' && <X className="w-3 h-3 mt-0.5 shrink-0" />}
+                        <span className="min-w-0 break-words">
+                          {clearResult.state === 'running' && (language === 'fa' ? 'در حال حذف…' : 'Deleting…')}
+                          {clearResult.state === 'success' && (language === 'fa'
+                            ? `تمام رکوردهای دفتر کار حذف شد${clearResult.purged ? ' و اسنپ‌شات‌ها نیز حذف شدند' : ''}.`
+                            : `All ledger records were deleted${clearResult.purged ? ' and so were the snapshots' : isDesktop ? '; snapshots were kept' : ''}.`)}
+                          {clearResult.state === 'error' && (language === 'fa'
+                            ? 'حذف اطلاعات انجام نشد. دوباره تلاش کنید.'
+                            : 'Could not clear the data. Try again.')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -1143,9 +1419,19 @@ export function SettingsModal({
             size="sm"
             disabled={clearConfirmText.trim() !== 'DELETE'}
             onClick={async () => {
-              await onClearAllData?.(purgeSnapshots);
+              const purged = purgeSnapshots;
               setIsClearConfirmOpen(false);
-              onClose();
+              setClearResult({ state: 'running' });
+              const ok = await onClearAllData?.(purged);
+              setClearResult({ state: ok === true ? 'success' : 'error', purged });
+              if (ok === true) {
+                setClearConfirmText('');
+                // Snapshot list may have been purged, so refresh the restore picker
+                trackerDB.listSnapshots().then((list) => {
+                  setSnapshots(list || []);
+                  setSelectedSnapshot(list?.[0]?.id || '');
+                }).catch(() => {});
+              }
             }}
           >
             {t('common.confirm')}

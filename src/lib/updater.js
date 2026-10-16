@@ -91,6 +91,12 @@ export async function checkForUpdate({ timeoutMs = 12000 } = {}) {
   } catch (err) {
     const msg = err?.message || String(err);
     console.info('[Updater] Official updater plugin check error:', msg);
+    // Reported separately from "up to date" so the settings panel can tell the user the check failed
+    return {
+      available: false,
+      currentVersion,
+      error: msg,
+    };
   }
 
   return {
