@@ -29,36 +29,22 @@ export function compareSemver(v1, v2) {
  * that has no entry, so a release can never go out without Farsi notes.
  */
 export const RELEASE_NOTES_REGISTRY = {
-  '5.0.0': {
+  '5.0.1': {
     date: '2026-10-21',
     title: {
-      en: "What's New in Checkpoint v5.0.0",
-      fa: 'تغییرات نسخه ۵.۰.۰',
+      en: "What's New in Checkpoint v5.0.1",
+      fa: 'تغییرات نسخه ۵.۰.۱',
     },
     summary: {
-      en: 'A new ledger with a running balance for every booster, client and platform.',
-      fa: 'دفتر کل جدید با مانده جاری برای هر بوستر، مشتری و پلتفرم.',
+      en: 'Games and custom categories are back in the Add Work forms.',
+      fa: 'بازی‌ها و دسته‌بندی‌های سفارشی دوباره در فرم‌های افزودن کار هستند.',
     },
     items: {
       en: [
-        { tag: 'new', text: 'Advertiser overview: what you owe, what you are owed, what you keep.' },
-        { tag: 'new', text: 'Settle up in any currency, with advances and undo.' },
-        { tag: 'new', text: 'Platform withdrawal fees, remembered per platform.' },
-        { tag: 'new', text: 'Every job keeps its own exchange rates.' },
-        { tag: 'new', text: 'Simpler Booster profile: Overview, Jobs, Clients, Reports.' },
-        { tag: 'new', text: 'Redesigned lists with game icons, times and daily groups.' },
-        { tag: 'new', text: 'New receipts and payout slips.' },
-        { tag: 'improved', text: 'Your data is upgraded in place, with a backup first.' },
+        { tag: 'fixed', text: 'Pick a game, or add a new category, right in the order and job forms.' },
       ],
       fa: [
-        { tag: 'new', text: 'خلاصه ادورتایزر: چقدر بدهکارید، چقدر طلب دارید و چقدر برایتان می‌ماند.' },
-        { tag: 'new', text: 'تسویه با هر ارز، همراه با پیش‌پرداخت و بازگردانی.' },
-        { tag: 'new', text: 'کارمزد برداشت پلتفرم‌ها، به‌ازای هر پلتفرم ذخیره می‌شود.' },
-        { tag: 'new', text: 'هر کار نرخ‌های تبدیل خودش را نگه می‌دارد.' },
-        { tag: 'new', text: 'پروفایل بوستر ساده‌تر: خلاصه، کارها، مشتری‌ها، گزارش‌ها.' },
-        { tag: 'new', text: 'لیست‌های بازطراحی‌شده با آیکن بازی، ساعت و گروه‌بندی روزانه.' },
-        { tag: 'new', text: 'رسید و فیش تسویه جدید.' },
-        { tag: 'improved', text: 'داده‌های شما با پشتیبان‌گیری قبلی، درجا ارتقا می‌یابند.' },
+        { tag: 'fixed', text: 'بازی را انتخاب یا دسته‌بندی جدید را مستقیم در فرم سفارش و کار اضافه کنید.' },
       ],
     },
   },

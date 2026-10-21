@@ -28,7 +28,7 @@ const LedgerReceipt = lazy(() => import('./LedgerReceipt').then((m) => ({ defaul
 /** The Advertiser profile's screens and the dialogs they open. App.jsx only decides which tab is active. */
 const CURRENCY_CHOICES = ['TOMAN', 'USD', 'EUR', 'GOLD'];
 
-export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categories, newOrderSignal, quote }) {
+export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categories, onRefreshCategories, newOrderSignal, quote }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, status, error } = ledger;
@@ -141,8 +141,8 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
 
       <PaymentDialog open={payment.open} mode={payment.mode} partyId={payment.partyId} advance={payment.advance} onClose={() => setPayment((p) => ({ ...p, open: false }))} />
       {isBooster
-        ? <JobModal open={order.open} existing={order.existing} categories={categories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />
-        : <OrderModal open={order.open} existing={order.existing} initial={order.initial} categories={categories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />}
+        ? <JobModal open={order.open} existing={order.existing} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />
+        : <OrderModal open={order.open} existing={order.existing} initial={order.initial} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />}
       <ExpenseDialog open={expenseOpen} onClose={() => setExpenseOpen(false)} />
       <Suspense fallback={null}>
         <LedgerReceipt

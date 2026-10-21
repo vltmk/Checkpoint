@@ -63,3 +63,35 @@ test('i18n contains translations for categories and cropper', () => {
   assert.ok(i18nCode.includes("'categories.accentColor': 'Accent Color'"));
   assert.ok(i18nCode.includes("'categories.accentColor': 'رنگ شاخص'"));
 });
+
+test('categorySupportsGold follows the category setting, then the name, and never blocks an empty game', () => {
+  const src = categoriesCode.match(/export function categorySupportsGold[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const categorySupportsGold = new Function(`${src}; return categorySupportsGold;`)();
+  const list = [
+    { name: 'World of Warcraft', supportsGold: true },
+    { name: 'Valorant', supportsGold: false },
+    { name: 'Gold Game', supportsGold: true },
+    { name: 'Legacy Game' },
+  ];
+  assert.equal(categorySupportsGold('', list), true);
+  assert.equal(categorySupportsGold(undefined, list), true);
+  assert.equal(categorySupportsGold(' valorant ', list), false);
+  assert.equal(categorySupportsGold('GOLD GAME', list), true);
+  assert.equal(categorySupportsGold('Legacy Game', list), false);
+  assert.equal(categorySupportsGold('World of Warcraft Classic', []), true);
+  assert.equal(categorySupportsGold('Elden Ring', []), false);
+});
+
+test('both Add Work modals pick the game from the categories and can create one in place', () => {
+  const read = (f) => fs.readFileSync(path.join(rootDir, 'src', 'components', 'ledger', f), 'utf8');
+  for (const file of ['OrderModal.jsx', 'JobModal.jsx']) {
+    const code = read(file);
+    assert.ok(code.includes('<GameField'), `${file} uses the game picker`);
+    assert.ok(code.includes('<CategoryModal'), `${file} can open the category editor`);
+    assert.ok(code.includes('categorySupportsGold'), `${file} gates Gold on the category`);
+    assert.ok(!code.includes('list="lg-games"'), `${file} no longer has the bare text input`);
+  }
+  const shell = read('LedgerShell.jsx');
+  assert.equal((shell.match(/onRefreshCategories=\{onRefreshCategories\}/g) || []).length, 2);
+  assert.ok(appCode.includes('onRefreshCategories={refreshCategories}'));
+});

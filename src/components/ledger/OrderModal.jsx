@@ -6,6 +6,8 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { DateTimePicker, toLocalISOString } from '../ui/DateTimePicker';
 import { CURRENCIES } from '../../lib/currencies';
+import { categorySupportsGold } from '../../lib/categories';
+import { CategoryModal } from '../ui/CategoryModal';
 import { KNOWN_PLATFORMS, isPlatformName, suggestedFeePct } from '../../lib/ledger/platforms';
 import { slug } from '../../lib/ledger/legacyMapper';
 import { quoteShareTexts, splitEvenly } from '../../lib/ledger/quote';
@@ -16,6 +18,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { RateLockFields } from './RateLockFields';
+import { GameField } from './GameField';
 import { rateFormFor, rateFieldsFromForm } from '../../lib/ledger/rateLock';
 import { LifeDot, Money } from './parts';
 
@@ -35,7 +38,7 @@ const toInputText = (minor, currency) => (minor ? String(fromMinor(minor, curren
  *
  * `initial` carries a quote from the calculator: { clientPrice, currency, platformFeePct, platform, boosterCount, boosterPool }.
  */
-export function OrderModal({ open, onClose, existing = null, initial = null, categories = [], onSaved }) {
+export function OrderModal({ open, onClose, existing = null, initial = null, categories = [], onRefreshCategories, onSaved }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, partyById, displayCurrency } = ledger;
@@ -58,6 +61,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
   const [link, setLink] = useState('');
   const [payoutDate, setPayoutDate] = useState('');
   const [busy, setBusy] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   // a ref, not state: Ctrl+Enter pressed twice in one tick must not start two saves before React re-renders
   const savingRef = useRef(false);
   // the names the form was loaded with, so an unchanged person keeps their id instead of being re-resolved by name
@@ -139,6 +143,14 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
   const feePctNum = Math.min(100, Math.max(0, Number(feePct) || 0));
   const feeMinor = Math.round((grossMinor * feePctNum) / 100);
   const receivable = Math.max(0, grossMinor - feeMinor);
+
+  // Gold is offered only for games whose category supports it; an order already in gold keeps the choice
+  const goldOk = categorySupportsGold(game, categories);
+  const currencyChoices = Object.keys(CURRENCIES).filter((c) => c !== 'GOLD' || goldOk || currency === 'GOLD');
+  const pickGame = (name, list = categories) => {
+    setGame(name);
+    if (currency === 'GOLD' && !categorySupportsGold(name, list)) setCurrency('USD');
+  };
 
   const cutNum = Number(cutValue) || 0;
   const myCutMinor = cutMode === 'percent' ? Math.round((receivable * Math.min(100, cutNum)) / 100) : toMinor(parseAmountShorthand(cutValue) ?? 0, currency);
@@ -251,6 +263,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
   const labelCls = 'text-xs text-zinc-500';
 
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="max-w-xl">
       <div
         className="flex flex-col max-h-[92vh]"
@@ -264,6 +277,8 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
             <span className={labelCls}>{f.t('lg.order.title', 'What is the order?')}</span>
             <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={f.t('lg.order.titleHint', 'e.g. Mythic+ 15 timed, 4 runs')} className="mt-1" />
           </label>
+
+          <GameField label={f.t('lg.order.game', 'Game')} value={game} onChange={pickGame} categories={categories} onAdd={() => setCategoryOpen(true)} />
 
           <div>
             <span className={labelCls}>{f.t('lg.order.from', 'Where is it from?')}</span>
@@ -292,7 +307,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
               <span className={labelCls}>{f.t('lg.order.price', 'The order pays')}</span>
               <Input dir="ltr" inputMode="decimal" value={grossText} onChange={(e) => setGrossText(e.target.value)} placeholder="100" hasError={grossText.trim() !== '' && grossMajor === null} className="mt-1 text-base tabular-nums" />
             </label>
-            <Select value={currency} onChange={setCurrency} options={Object.keys(CURRENCIES).map((c) => ({ value: c, label: c }))} ariaLabel={f.t('lg.currency', 'Currency')} className="w-24" />
+            <Select value={currency} onChange={setCurrency} options={currencyChoices.map((c) => ({ value: c, label: c }))} ariaLabel={f.t('lg.currency', 'Currency')} className="w-24" />
             <label className="block w-24">
               <span className={labelCls}>{f.t('lg.order.fee', 'Platform fee %')}</span>
               <Input dir="ltr" inputMode="decimal" value={feePct} onChange={(e) => setFeePct(e.target.value)} className="mt-1 tabular-nums" />
@@ -364,11 +379,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
           <details>
             <summary className="text-xs text-zinc-500 cursor-pointer select-none hover:text-zinc-800 dark:hover:text-zinc-200">{f.t('lg.order.more', 'More details')}</summary>
             <div className="mt-2 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
-                <Input list="lg-games" value={game} onChange={(e) => setGame(e.target.value)} placeholder={f.t('lg.order.game', 'Game')} aria-label={f.t('lg.order.game', 'Game')} />
-                <datalist id="lg-games">{categories.map((c) => <option key={c.id || c.name} value={c.name} />)}</datalist>
-              </div>
+              <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
               <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder={f.t('lg.order.link', 'Link to the order')} aria-label={f.t('lg.order.link', 'Link to the order')} dir="ltr" />
               <div>
                 <span className={labelCls}>{f.t('lg.order.payout', 'Platform pays you on (optional)')}</span>
@@ -394,6 +405,13 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
         </DialogFooter>
       </div>
     </Dialog>
+    {/* beside the dialog, not inside it, so its keys and focus stay its own */}
+    <CategoryModal
+      isOpen={categoryOpen}
+      onClose={() => setCategoryOpen(false)}
+      onSave={async (cat, list) => { await onRefreshCategories?.(); pickGame(cat.name, list || [cat, ...categories]); }}
+    />
+    </>
   );
 }
 

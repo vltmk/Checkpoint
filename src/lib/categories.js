@@ -200,6 +200,18 @@ export function getCategoryByName(name, categoriesList = []) {
 }
 
 /**
+ * Whether a game offers Gold as a currency. A category's own setting wins; a game that is not a category yet
+ * is judged by its name, and an empty game does not restrict anything.
+ */
+export function categorySupportsGold(name, categoriesList = []) {
+  const clean = typeof name === 'string' ? name.trim().toLowerCase() : '';
+  if (!clean) return true;
+  const cat = categoriesList.find((c) => c.name?.trim().toLowerCase() === clean);
+  if (cat && cat.supportsGold !== undefined) return Boolean(cat.supportsGold);
+  return clean.includes('world of warcraft');
+}
+
+/**
  * Intelligently merge imported categories into existing category registry.
  */
 export function mergeCategories(existing = [], imported = []) {

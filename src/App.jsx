@@ -1370,6 +1370,7 @@ export default function App() {
                         onTabChange={handleTabChange}
                         onCurrencyChange={handleCurrencyChange}
                         categories={categories}
+                        onRefreshCategories={refreshCategories}
                         newOrderSignal={newOrderSignal}
                         quote={ledgerQuote}
                       />

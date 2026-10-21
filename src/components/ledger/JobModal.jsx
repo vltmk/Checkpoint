@@ -6,6 +6,8 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { DateTimePicker, toLocalISOString } from '../ui/DateTimePicker';
 import { CURRENCIES } from '../../lib/currencies';
+import { categorySupportsGold } from '../../lib/categories';
+import { CategoryModal } from '../ui/CategoryModal';
 import { parseAmountShorthand, toMinor, fromMinor, normalizeCurrency } from '../../lib/ledger/money';
 import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
 import { UNKNOWN_PAYER_ID, slug } from '../../lib/ledger/legacyMapper';
@@ -15,6 +17,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { RateLockFields } from './RateLockFields';
+import { GameField } from './GameField';
 import { rateFormFor, rateFieldsFromForm } from '../../lib/ledger/rateLock';
 import { LifeDot, Money, Segmented } from './parts';
 
@@ -26,7 +29,7 @@ const toInputText = (minor, currency) => (minor ? String(fromMinor(minor, curren
  * Add or edit a job. The common case is three fields: what, who pays, how much. Everything else is opt-in:
  * "already paid", splitting with teammates, a platform fee, notes.
  */
-export function JobModal({ open, onClose, existing = null, categories = [] }) {
+export function JobModal({ open, onClose, existing = null, categories = [], onRefreshCategories }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, partyById, displayCurrency } = ledger;
@@ -48,6 +51,7 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
   const [teamOn, setTeamOn] = useState(false);
   const [rows, setRows] = useState([blankRow()]);
   const [busy, setBusy] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [error, setError] = useState('');
   const savingRef = useRef(false);
   const loadedRef = useRef({ payer: null, payerId: null });
@@ -123,6 +127,13 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
   const feePctNum = payerIsPlatform ? Math.min(100, Math.max(0, Number(feePct) || 0)) : 0;
   const feeMinor = Math.round((grossMinor * feePctNum) / 100);
   const receivable = Math.max(0, grossMinor - feeMinor);
+  // Gold is offered only for games whose category supports it; a job already in gold keeps the choice
+  const goldOk = categorySupportsGold(game, categories);
+  const currencyChoices = Object.keys(CURRENCIES).filter((c) => c !== 'GOLD' || goldOk || currency === 'GOLD');
+  const pickGame = (name, list = categories) => {
+    setGame(name);
+    if (currency === 'GOLD' && !categorySupportsGold(name, list)) setCurrency('TOMAN');
+  };
   const amountOf = (r) => { const v = parseAmountShorthand(r.amountText); return v === null ? 0 : toMinor(v, currency); };
   const named = teamOn ? rows.filter((r) => r.name.trim()) : [];
   const teamTotal = named.reduce((s, r) => s + amountOf(r), 0);
@@ -190,6 +201,7 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
 
   const label = 'text-xs text-zinc-500';
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="max-w-lg">
       <div className="flex flex-col max-h-[92vh]" onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); }}>
         <DialogHeader onClose={onClose}>
@@ -209,6 +221,8 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
               className="mt-1 w-full min-h-[5.5rem] resize-y rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/80 dark:border-zinc-800/80 px-3 py-2 text-sm leading-relaxed text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none focus:border-zinc-300 dark:focus:border-zinc-700 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-all duration-100"
             />
           </label>
+
+          <GameField label={f.t('lg.order.game', 'Game')} value={game} onChange={pickGame} categories={categories} onAdd={() => setCategoryOpen(true)} />
 
           <div>
             <span className={label}>{f.t('lg.job.payer', 'Who pays you?')}</span>
@@ -230,7 +244,7 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
               <span className={label}>{teamOn ? f.t('lg.job.total', 'Total for the job') : f.t('lg.job.earn', 'You earn')}</span>
               <Input dir="ltr" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} placeholder={f.t('lg.amount.hint', 'e.g. 3m, 250k, 1,200,000')} hasError={amountText.trim() !== '' && major === null} className="mt-1 text-base tabular-nums" />
             </label>
-            <Select value={currency} onChange={setCurrency} options={Object.keys(CURRENCIES).map((c) => ({ value: c, label: c }))} ariaLabel={f.t('lg.currency', 'Currency')} className="w-24" />
+            <Select value={currency} onChange={setCurrency} options={currencyChoices.map((c) => ({ value: c, label: c }))} ariaLabel={f.t('lg.currency', 'Currency')} className="w-24" />
           </div>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -286,11 +300,7 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
           <details>
             <summary className="text-xs text-zinc-500 cursor-pointer select-none hover:text-zinc-800 dark:hover:text-zinc-200">{f.t('lg.order.more', 'More details')}</summary>
             <div className="mt-2 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
-                <Input list="lg-games" value={game} onChange={(e) => setGame(e.target.value)} placeholder={f.t('lg.order.game', 'Game')} aria-label={f.t('lg.order.game', 'Game')} />
-                <datalist id="lg-games">{categories.map((c) => <option key={c.id || c.name} value={c.name} />)}</datalist>
-              </div>
+              <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
               {payerIsPlatform && (
                 <label className="flex items-center gap-2 text-xs text-zinc-500">
                   {f.t('lg.order.fee', 'Platform fee %')}
@@ -311,5 +321,12 @@ export function JobModal({ open, onClose, existing = null, categories = [] }) {
         </DialogFooter>
       </div>
     </Dialog>
+    {/* beside the dialog, not inside it, so its keys and focus stay its own */}
+    <CategoryModal
+      isOpen={categoryOpen}
+      onClose={() => setCategoryOpen(false)}
+      onSave={async (cat, list) => { await onRefreshCategories?.(); pickGame(cat.name, list || [cat, ...categories]); }}
+    />
+    </>
   );
 }
