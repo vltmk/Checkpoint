@@ -10,10 +10,6 @@ const rootDir = path.resolve(__dirname, '..');
 
 const profilesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'profiles.js'), 'utf8');
 const dbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
-const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8');
-const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8');
-const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8');
-const receiptCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ReceiptModal.jsx'), 'utf8');
 const settingsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'SettingsModal.jsx'), 'utf8');
 const onboardingCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'ProfileOnboardingModal.jsx'), 'utf8');
 const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
@@ -46,37 +42,6 @@ test('db.js: physically separates SQLite database paths and IndexedDB names per 
   assert.ok(dbCode.includes("sourcePaid: 'ALTER TABLE work_entries ADD COLUMN sourcePaid INTEGER DEFAULT 0;'"));
 });
 
-test('WorkModal.jsx: implements Order ID, sourcePaid toggle, and fee presets for Advertiser', () => {
-  assert.ok(workModalCode.includes("isAdvertiser"));
-  assert.ok(workModalCode.includes("orderId"));
-  assert.ok(workModalCode.includes("sourcePaid"));
-  assert.ok(workModalCode.includes("handleAdvertiserFeeRateChange"));
-});
-
-test('LedgerView.jsx: displays Net Profit, Order ID chip, and 1-click sourcePaid settlement pill', () => {
-  assert.ok(ledgerCode.includes("activeProfileId"));
-  assert.ok(ledgerCode.includes("onUpdateSourcePaid"));
-  assert.ok(ledgerCode.includes("settlementFilter"));
-  assert.ok(ledgerCode.includes("sourcePaid"));
-});
-
-test('AnalyticsView.jsx: renders Advertiser KPIs and Cashflow Float balance card', () => {
-  assert.ok(analyticsCode.includes("isAdvertiser"));
-  assert.ok(analyticsCode.includes("totalClientVolume"));
-  assert.ok(analyticsCode.includes("totalBoosterPayouts"));
-  assert.ok(analyticsCode.includes("pendingInflow"));
-  assert.ok(analyticsCode.includes("pendingOutflow"));
-  assert.ok(analyticsCode.includes("marginPercentage"));
-});
-
-test('ReceiptModal.jsx: supports dual mode toggle for Client Receipt and Booster Payout Slip', () => {
-  assert.ok(receiptCode.includes("activeProfileId"));
-  assert.ok(receiptCode.includes("receiptMode"));
-  assert.ok(receiptCode.includes("isAdvertiser"));
-  assert.ok(receiptCode.includes("handleCopyText"));
-  assert.ok(receiptCode.includes("handleCopyDiscord"));
-});
-
 test('SettingsModal.jsx: displays active profile badge and isolated database name', () => {
   assert.ok(settingsCode.includes("activeProfileId"));
   assert.ok(settingsCode.includes("checkpoint_advertiser.db"));
@@ -92,86 +57,12 @@ test('db.js & profiles: two-way settlement columns and methods', () => {
   assert.ok(profilesCode.includes("checkpoint_eur_rate_usd"));
 });
 
-test('WorkModal & LedgerView: dual settlement and feeType support', () => {
-  assert.ok(workModalCode.includes("boosterPaid"));
-  assert.ok(workModalCode.includes("feeType"));
-  assert.ok(workModalCode.includes("platformFee"));
-  assert.ok(ledgerCode.includes("onUpdateBoosterPaid"));
-  assert.ok(ledgerCode.includes("boosterPaid"));
-  assert.ok(ledgerCode.includes("booster_due"));
-  assert.ok(ledgerCode.includes("booster_paid"));
-});
-
 test('Navbar.jsx & App.jsx: advertiser order calculator topbar integration', () => {
   const navbarCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'Navbar.jsx'), 'utf8');
   assert.ok(navbarCode.includes("OrderCalculatorPopover"));
   assert.ok(navbarCode.includes("isCalculatorOpen"));
   assert.ok(navbarCode.includes("onToggleCalculator"));
   assert.ok(appCode.includes("handleTransferFromCalculator"));
-  assert.ok(appCode.includes("handleUpdateBoosterPaid"));
   assert.ok(appCode.includes("isCalculatorOpen"));
 });
-
-test('db.js & App.jsx: cached connection persistence and smooth profile transitions', () => {
-  // Connection caching in db.js
-  assert.ok(dbCode.includes('this.sqliteDbs = {};'));
-  assert.ok(dbCode.includes('this.idbDbs = {};'));
-  assert.ok(dbCode.includes('this.sqliteDbs[targetProfile] = db;'));
-  assert.ok(dbCode.includes('this._switchPromise'));
-
-  // Ensure switchProfile and getProfileCounts never close pools
-  assert.ok(!dbCode.includes('await closeSqlitePool(this.sqliteDb, oldPath)'));
-  assert.ok(!dbCode.includes('await closeSqlitePool(tempDb, pPath)'));
-
-  // App.jsx sequence tracking and dedicated switching state
-  assert.ok(appCode.includes('profileSwitchSeqRef'));
-  assert.ok(appCode.includes('isSwitchingProfile'));
-  assert.ok(appCode.includes('profileSwitchSeqRef.current !== seq'));
-
-  // LedgerView pagination boundary and reset safety
-  assert.ok(ledgerCode.includes('activeProfileId, searchQuery, statusFilter'));
-  assert.ok(ledgerCode.includes('currentPage > totalPages'));
-  assert.ok(fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'useLedgerData.js'), 'utf8').includes('Math.min(currentPage, totalPages)'));
-});
-
-test('EUR currency preservation: db.js, WorkModal, and NumberStepperInput support EUR without coercion to TOMAN', () => {
-  const updatedDbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
-  const updatedWorkModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8');
-  const updatedStepperCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'NumberStepperInput.jsx'), 'utf8');
-  const updatedMoneyDisplayCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'MoneyDisplay.jsx'), 'utf8');
-
-  // Verify db.js allows EUR in saveEntry and getEntry
-  assert.ok(
-    updatedDbCode.includes("if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(cleanEntry.currency)) cleanEntry.currency = 'TOMAN';"),
-    'db.js saveEntry must include EUR in allowed currencies'
-  );
-  assert.ok(
-    updatedDbCode.includes("if (!['USD', 'EUR', 'TOMAN', 'GOLD'].includes(entry.currency)) entry.currency = 'TOMAN';"),
-    'db.js getEntry must include EUR in allowed currencies'
-  );
-
-  // Verify WorkModal preserves EUR and remembers profile currency
-  assert.ok(
-    updatedWorkModalCode.includes('checkpoint_work_last_currency_'),
-    'WorkModal must persist last used currency per profile'
-  );
-  assert.ok(
-    updatedWorkModalCode.includes("formData.currency === 'USD' || formData.currency === 'EUR'"),
-    'WorkModal must allow decimals for EUR and USD'
-  );
-
-  // Verify NumberStepperInput allows decimals for EUR
-  assert.ok(
-    updatedStepperCode.includes("currency === 'USD' || currency === 'EUR'"),
-    'NumberStepperInput must enable decimal support for EUR and USD'
-  );
-
-  // Verify MoneyDisplay normalizes without clobbering USD
-  assert.ok(
-    !updatedMoneyDisplayCode.includes("fromCurrency === 'USD' ? 'TOMAN'"),
-    'MoneyDisplay should not force fromCurrency USD to TOMAN'
-  );
-});
-
-
 

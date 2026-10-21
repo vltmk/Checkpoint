@@ -1,0 +1,289 @@
+/**
+ * selectors.js - view models for the v2 screens, built from engine.js. Pure: pass in a context, rates and `now`.
+ * Money leaves here as integer minor units in the display currency, with isApproximate when currencies mixed.
+ */
+import {
+  partyBalance,
+  partyBalanceDisplay,
+  agingDays,
+  payerReceivables,
+  exposureByCurrency,
+  marginSummary,
+  expensesByCurrency,
+  needsAttention,
+  orderMarginMinor,
+  orderMoneyState,
+  orderReceivableMinor,
+  activeSharesOf,
+  shareAppliedMinor,
+  isShareEarned,
+  orderRateOpts,
+  paymentRateOpts,
+  payerKey,
+  DEAD_LIFECYCLES,
+} from './engine.js';
+import { UNASSIGNED_PARTY_ID } from './legacyMapper.js';
+import { collapseBuckets, convertMinor, normalizeCurrency } from './money.js';
+
+const sumBuckets = (list) => {
+  const out = {};
+  for (const b of list) for (const [c, n] of Object.entries(b || {})) out[c] = (out[c] || 0) + n;
+  return out;
+};
+
+const subBuckets = (a, b) => {
+  const out = { ...a };
+  for (const [c, n] of Object.entries(b || {})) out[c] = (out[c] || 0) - n;
+  return out;
+};
+
+/** People (boosters/teammates) with a balance, sorted by what I owe them. */
+export function peopleList(ctx, parties, { rates, displayCurrency, now = Date.now(), kinds = ['booster'] } = {}) {
+  const rows = [];
+  for (const party of parties) {
+    if (!kinds.includes(party.kind)) continue;
+    const bal = partyBalance(ctx, party.id);
+    const disp = partyBalanceDisplay(bal, displayCurrency, rates);
+    // archiving hides a settled person, never money that is still owed or held
+    if (party.archived && disp.netMinor === 0) continue;
+    const mine = ctx.shares.filter((s) => s.partyId === party.id && activeSharesOf(ctx, s.orderId).some((x) => x.id === s.id));
+    const openOrders = new Set(mine.filter((s) => ctx.orderById.get(s.orderId)?.lifecycle !== 'done').map((s) => s.orderId)).size;
+    const totalOrders = new Set(mine.map((s) => s.orderId)).size;
+    rows.push({
+      party,
+      balance: bal,
+      display: disp,
+      agingDays: agingDays(ctx, party.id, now),
+      openOrders,
+      totalOrders,
+    });
+  }
+  return rows.sort((a, b) => b.display.netMinor - a.display.netMinor || a.party.name.localeCompare(b.party.name));
+}
+
+/** Everything the cockpit needs, already collapsed to the display currency. */
+export function cockpitSummary(ctx, parties, { rates, displayCurrency, now = Date.now(), flaggedOrderIds = [] } = {}) {
+  const people = peopleList(ctx, parties, { rates, displayCurrency, now });
+  const counted = people.filter((p) => p.party.id !== UNASSIGNED_PARTY_ID);
+  const owedNow = counted.reduce((s, p) => s + p.display.owedNowMinor, 0);
+  const committed = counted.reduce((s, p) => s + p.display.committedMinor, 0);
+  const advances = counted.reduce((s, p) => s + p.display.advanceMinor, 0);
+  const approximate = counted.some((p) => p.display.isApproximate);
+
+  const payerIds = [...new Set(ctx.orders.filter((o) => o.kind !== 'expense').map(payerKey))];
+  const payers = payerIds.map((id) => {
+    const r = payerReceivables(ctx, id, now);
+    const held = collapseBuckets(r.held, displayCurrency, rates);
+    const releasable = collapseBuckets(r.releasable, displayCurrency, rates);
+    const overdue = collapseBuckets(r.overdue, displayCurrency, rates);
+    return { payerId: id, heldMinor: held.minor, releasableMinor: releasable.minor, overdueMinor: overdue.minor, isApproximate: held.isApproximate || releasable.isApproximate };
+  }).filter((p) => p.heldMinor + p.releasableMinor > 0);
+  const owedToMe = payers.reduce((s, p) => s + p.heldMinor + p.releasableMinor, 0);
+
+  const margin = marginSummary(ctx);
+  const expenses = expensesByCurrency(ctx);
+  const realized = collapseBuckets(subBuckets(margin.realized, expenses), displayCurrency, rates);
+  const pipeline = collapseBuckets(margin.pipeline, displayCurrency, rates);
+  const exposure = collapseBuckets(exposureByCurrency(ctx), displayCurrency, rates);
+
+  return {
+    currency: displayCurrency,
+    owedNowMinor: owedNow,
+    committedMinor: committed,
+    advancesMinor: advances,
+    owedToMeMinor: owedToMe,
+    payers,
+    realizedMarginMinor: realized.minor,
+    pipelineMarginMinor: pipeline.minor,
+    exposureMinor: exposure.minor,
+    isApproximate: approximate || realized.isApproximate || pipeline.isApproximate || exposure.isApproximate || payers.some((p) => p.isApproximate),
+    people,
+    attention: needsAttention(ctx, { now, flaggedOrderIds }),
+  };
+}
+
+/** One row per order for the Orders table: waterfall numbers, per-person share status, and money state. */
+export function orderRows(ctx, partyById) {
+  return ctx.orders
+    .filter((o) => o.kind !== 'expense')
+    .map((order) => {
+      const dead = DEAD_LIFECYCLES.has(order.lifecycle);
+      const shares = ctx.shares
+        .filter((s) => s.orderId === order.id && s.state !== 'cancelled')
+        .map((share) => {
+          const applied = Math.min(share.amountMinor, shareAppliedMinor(ctx, share.id));
+          return {
+            share,
+            party: partyById.get(share.partyId) || { id: share.partyId, name: '?' },
+            appliedMinor: applied,
+            outstandingMinor: Math.max(0, share.amountMinor - applied),
+            paid: applied >= share.amountMinor,
+            partlyPaid: applied > 0 && applied < share.amountMinor,
+            earned: isShareEarned(share, order),
+          };
+        });
+      return {
+        order,
+        dead,
+        receivableMinor: orderReceivableMinor(order),
+        marginMinor: dead ? 0 : orderMarginMinor(ctx, order),
+        shares,
+        money: orderMoneyState(ctx, order),
+        payer: partyById.get(order.payerId) || null,
+      };
+    })
+    .sort((a, b) => Date.parse(b.order.dateTime) - Date.parse(a.order.dateTime));
+}
+
+/**
+ * Statement for one person: shares and payments in date order, with a running balance (positive = I owe them).
+ * Mixed currencies are converted at the supplied rates, so the running column is approximate then.
+ */
+export function partyStatement(ctx, partyId, { rates, displayCurrency }) {
+  const events = [];
+  for (const share of ctx.shares) {
+    if (share.partyId !== partyId || share.state === 'cancelled') continue;
+    const order = ctx.orderById.get(share.orderId);
+    if (!order || DEAD_LIFECYCLES.has(order.lifecycle)) continue;
+    events.push({
+      type: 'share',
+      at: Date.parse(order.dateTime),
+      id: share.id,
+      order,
+      share,
+      amountMinor: share.amountMinor,
+      currency: normalizeCurrency(order.currency),
+      earned: isShareEarned(share, order),
+      appliedMinor: Math.min(share.amountMinor, shareAppliedMinor(ctx, share.id)),
+    });
+  }
+  const voided = new Set(ctx.payments.filter((p) => p.voidsPaymentId).map((p) => p.voidsPaymentId));
+  for (const p of ctx.payments) {
+    if (p.partyId !== partyId || p.direction !== 'out' || p.kind === 'expense' || p.voidsPaymentId) continue;
+    events.push({
+      type: 'payment',
+      at: Date.parse(p.dateTime),
+      id: p.id,
+      payment: p,
+      amountMinor: p.amountMinor,
+      currency: normalizeCurrency(p.currency),
+      voided: voided.has(p.id),
+      allocations: ctx.allocations.filter((a) => a.paymentId === p.id),
+    });
+  }
+  events.sort((a, b) => a.at - b.at || (a.type === 'share' ? -1 : 1));
+  let running = 0;
+  let approximate = false;
+  for (const e of events) {
+    if (e.voided) {
+      e.runningMinor = running;
+      continue;
+    }
+    const inDisplay = convertMinor(e.amountMinor, e.currency, displayCurrency, rates, e.type === 'share' ? orderRateOpts(e.order) : paymentRateOpts(e.payment));
+    if (normalizeCurrency(e.currency) !== normalizeCurrency(displayCurrency)) approximate = true;
+    running += e.type === 'share' ? inDisplay : -inDisplay;
+    e.runningMinor = running;
+  }
+  const balance = partyBalance(ctx, partyId);
+  return {
+    events,
+    balance,
+    display: partyBalanceDisplay(balance, displayCurrency, rates),
+    isApproximate: approximate,
+  };
+}
+
+/** Which sections of a statement go into an exported message: shares not yet fully paid, plus recent payments. */
+export function statementSummaryLines(statement, { maxPayments = 5 } = {}) {
+  const unpaid = statement.events.filter((e) => e.type === 'share' && e.earned && e.appliedMinor < e.amountMinor);
+  const payments = statement.events.filter((e) => e.type === 'payment' && !e.voided).slice(-maxPayments);
+  return { unpaid, payments };
+}
+
+export { sumBuckets };
+
+/**
+ * Margin report for live (non-failed, non-refunded) income orders, grouped by month, platform or game.
+ * Amounts are converted to the display currency per order at the supplied rates.
+ */
+export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy = 'month', monthKey = (iso) => String(iso || '').slice(0, 7) }) {
+  const groups = new Map();
+  let approximate = false;
+  const conv = (minor, cur, opts) => {
+    if (normalizeCurrency(cur) !== normalizeCurrency(displayCurrency)) approximate = true;
+    return convertMinor(minor, cur, displayCurrency, rates, opts);
+  };
+  const keyOfOrder = (order) => {
+    if (groupBy === 'platform') return payerKey(order) ? partyById.get(order.payerId)?.name || order.source || '' : '';
+    if (groupBy === 'game') return order.game || '';
+    return monthKey(order.dateTime);
+  };
+  const group = (key) => {
+    if (!groups.has(key)) groups.set(key, { key, orders: 0, volumeMinor: 0, feeMinor: 0, boostersMinor: 0, marginMinor: 0, expensesMinor: 0, keepMinor: 0 });
+    return groups.get(key);
+  };
+  for (const order of ctx.orders) {
+    if (order.kind === 'expense' || DEAD_LIFECYCLES.has(order.lifecycle)) continue;
+    const g = group(keyOfOrder(order));
+    const shareSum = activeSharesOf(ctx, order.id).reduce((s, x) => s + x.amountMinor, 0);
+    g.orders += 1;
+    const lock = orderRateOpts(order);
+    g.volumeMinor += conv(order.grossMinor, order.currency, lock);
+    g.feeMinor += conv(order.platformFeeMinor || 0, order.currency, lock);
+    g.boostersMinor += conv(shareSum, order.currency, lock);
+    g.marginMinor += conv(orderMarginMinor(ctx, order), order.currency, lock);
+  }
+
+  // Expenses (withdrawal fees, repairs, ...). A fee that belongs to a payout is spread over the orders that payout
+  // paid, in proportion to what it paid on each, so it lands on the right game, platform and month. Anything else
+  // is booked where it happened: its own month, its own platform, or "not set" for game.
+  for (const e of ctx.effectivePayments) {
+    if (e.kind !== 'expense') continue;
+    const total = conv(e.amountMinor, e.currency, paymentRateOpts(e));
+    const covered = e.relatedPaymentId
+      ? ctx.liveAllocations.filter((a) => a.paymentId === e.relatedPaymentId && a.targetType === 'order' && ctx.orderById.has(a.targetId))
+      : [];
+    if (covered.length) {
+      const weights = covered.map((a) => {
+        const o = ctx.orderById.get(a.targetId);
+        return { order: o, w: Math.max(1, conv(a.appliedMinor, o.currency, orderRateOpts(o))) };
+      });
+      const sum = weights.reduce((x, y) => x + y.w, 0);
+      let given = 0;
+      weights.forEach((x, i) => {
+        const part = i === weights.length - 1 ? total - given : Math.round((total * x.w) / sum);
+        given += part;
+        group(keyOfOrder(x.order)).expensesMinor += part;
+      });
+    } else {
+      const key = groupBy === 'month' ? monthKey(e.dateTime) : groupBy === 'platform' ? partyById.get(e.partyId)?.name || '' : '';
+      group(key).expensesMinor += total;
+    }
+  }
+
+  for (const g of groups.values()) g.keepMinor = g.marginMinor - g.expensesMinor;
+  const rows = [...groups.values()].sort((a, b) => (groupBy === 'month' ? b.key.localeCompare(a.key) : b.keepMinor - a.keepMinor));
+  const totals = rows.reduce(
+    (t, r) => ({
+      orders: t.orders + r.orders, volumeMinor: t.volumeMinor + r.volumeMinor, feeMinor: t.feeMinor + r.feeMinor,
+      boostersMinor: t.boostersMinor + r.boostersMinor, marginMinor: t.marginMinor + r.marginMinor,
+      expensesMinor: t.expensesMinor + r.expensesMinor, keepMinor: t.keepMinor + r.keepMinor,
+    }),
+    { orders: 0, volumeMinor: 0, feeMinor: 0, boostersMinor: 0, marginMinor: 0, expensesMinor: 0, keepMinor: 0 }
+  );
+  return { rows, totals, isApproximate: approximate };
+}
+
+/** What each booster has earned, been paid and is still owed, in the display currency. */
+export function boosterReport(ctx, parties, { rates, displayCurrency }) {
+  return parties
+    .filter((p) => p.kind === 'booster')
+    .map((party) => {
+      const bal = partyBalance(ctx, party.id);
+      const d = partyBalanceDisplay(bal, displayCurrency, rates);
+      const orders = new Set(ctx.shares.filter((s) => s.partyId === party.id && s.state !== 'cancelled').map((s) => s.orderId)).size;
+      return { party, orders, earnedMinor: d.paidMinor + d.payableMinor + d.committedMinor, paidMinor: d.paidMinor, owedMinor: d.payableMinor + d.committedMinor, isApproximate: d.isApproximate };
+    })
+    .filter((r) => r.orders > 0)
+    .sort((a, b) => b.earnedMinor - a.earnedMinor);
+}

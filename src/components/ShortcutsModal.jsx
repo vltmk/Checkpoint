@@ -6,35 +6,47 @@ import { Keyboard } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
 
-export function ShortcutsModal({ isOpen, onClose }) {
+export function ShortcutsModal({ isOpen, onClose, activeProfileId = 'booster' }) {
   const { t, language, isRtl } = useLanguage();
+  const isAdvertiser = activeProfileId === 'advertiser';
 
   const shortcutGroups = [
     {
       group: language === 'fa' ? 'عملیات و ثبت' : 'Actions & Entry',
       items: [
-        { keys: ['N'], desc: language === 'fa' ? 'افزودن کار' : 'Add work record' },
-        { keys: ['Q'], desc: language === 'fa' ? 'ماشین حساب سفارشات (ادورتایزر)' : 'Order calculator (Advertiser)' },
+        { keys: ['N'], desc: isAdvertiser ? (language === 'fa' ? 'سفارش جدید' : 'New order') : (language === 'fa' ? 'افزودن کار' : 'Add a job') },
+        { keys: ['T'], desc: language === 'fa' ? 'تغییر ارز اصلی (تومان، دلار، یورو، گلد)' : 'Cycle the main currency (Toman, USD, EUR, Gold)' },
+        ...(isAdvertiser ? [{ keys: ['Q'], desc: language === 'fa' ? 'ماشین حساب سفارشات (ادورتایزر)' : 'Order calculator (Advertiser)' }] : []),
         { keys: ['Ctrl', 'Shift', 'P'], desc: language === 'fa' ? 'جابجایی سریع پروفایل (بوستر / ادورتایزر)' : 'Quick profile switch (Booster ⇄ Advertiser)' },
         { keys: ['Ctrl', 'V'], desc: language === 'fa' ? 'چسباندن اسکرین‌شات از کلیپ‌بورد' : 'Paste screenshot proof into modal' },
         { keys: ['C'], desc: language === 'fa' ? 'کپی اسکرین‌شات رسید (در پنجره رسید)' : 'Copy receipt screenshot (in Receipt view)' },
         { keys: ['Esc'], desc: language === 'fa' ? 'بستن پنجره‌ها یا لغو انتخاب' : 'Close dialogs, cancel confirmation, or clear selection' },
       ],
     },
-    {
+    ...(isAdvertiser ? [] : [{
       group: language === 'fa' ? 'انتخاب چندگانه و عملیات دسته‌ای' : 'Multi-Select & Bulk Actions',
       items: [
         { keys: ['S'], desc: language === 'fa' ? 'فعال/غیرفعال کردن حالت انتخاب چندگانه' : 'Toggle multi-selection mode' },
         { keys: ['Shift', 'Click'], desc: language === 'fa' ? 'انتخاب بازه‌ای از کارها' : 'Select range between jobs' },
         { keys: ['Ctrl', 'A'], desc: language === 'fa' ? 'انتخاب همه کارهای صفحه' : 'Select all jobs on current page (in select mode)' },
       ],
-    },
+    }]),
     {
       group: language === 'fa' ? 'پیمایش و صفحات' : 'Navigation & Views',
       items: [
-        { keys: ['1'], desc: language === 'fa' ? 'رفتن به تب دفتر (Ledger)' : 'Jump to Ledger tab' },
-        { keys: ['2'], desc: language === 'fa' ? 'رفتن به تب آمار (Analytics)' : 'Jump to Analytics tab' },
-        { keys: ['/'], desc: language === 'fa' ? 'فوکوس روی نوار جستجو (یا Ctrl+F)' : 'Focus search bar (or Ctrl+F)' },
+        ...(isAdvertiser
+          ? [
+              { keys: ['1'], desc: language === 'fa' ? 'خلاصه' : 'Overview' },
+              { keys: ['2'], desc: language === 'fa' ? 'سفارش‌ها' : 'Orders' },
+              { keys: ['3'], desc: language === 'fa' ? 'بوسترها' : 'Boosters' },
+              { keys: ['4'], desc: language === 'fa' ? 'پول' : 'Money' },
+              { keys: ['5'], desc: language === 'fa' ? 'گزارش‌ها' : 'Reports' },
+            ]
+          : [
+              { keys: ['1'], desc: language === 'fa' ? 'رفتن به تب دفتر (Ledger)' : 'Jump to Ledger tab' },
+              { keys: ['2'], desc: language === 'fa' ? 'رفتن به تب آمار (Analytics)' : 'Jump to Analytics tab' },
+            ]),
+        { keys: ['/'], desc: language === 'fa' ? 'رفتن به کادر جستجو (یا Ctrl+F)' : 'Go to the search box (or Ctrl+F)' },
         { keys: ['?'], desc: language === 'fa' ? 'نمایش کلیدهای میانبر' : 'Open shortcuts cheat sheet' },
       ],
     },

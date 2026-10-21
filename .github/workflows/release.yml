@@ -50,7 +50,13 @@ jobs:
         id: release_notes
         shell: pwsh
         run: |
+          # the notes hold Farsi text: read the script's output as UTF-8, and stop the release if it has no notes
+          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
           $notes = node scripts/extractReleaseNotes.mjs "${{ github.ref_name }}"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Release notes are missing or incomplete (Farsi and English are both required)."
+            exit 1
+          }
           $delimiter = [System.Guid]::NewGuid().ToString()
           "body<<$delimiter" >> $env:GITHUB_OUTPUT
           $notes >> $env:GITHUB_OUTPUT

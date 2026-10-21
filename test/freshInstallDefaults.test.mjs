@@ -8,19 +8,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const workModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'WorkModal.jsx'), 'utf8').replace(/\r\n/g, '\n');
-const sourceComboboxCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'SourceCombobox.jsx'), 'utf8');
-const teammatesComboboxCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'TeammatesCombobox.jsx'), 'utf8');
 const dbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
 const categoriesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'categories.js'), 'utf8');
 const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currencies.js'), 'utf8');
-const receiptModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ReceiptModal.jsx'), 'utf8');
-
-test('WorkModal: does not default source to Direct Client and sanitizes legacy drafts', () => {
-  assert.ok(!workModalCode.includes("formData.source.trim() || 'Direct Client'"));
-  assert.ok(workModalCode.includes("parsed.source === 'Direct Client' ? '' : parsed.source"));
-  assert.ok(workModalCode.includes("source: formData.source ? formData.source.trim() :"));
-});
 
 test('db.js: does not inject Direct Client into SQLite schema, migrations, or saveEntry', () => {
   assert.ok(!dbCode.includes("ALTER TABLE work_entries ADD COLUMN source TEXT DEFAULT 'Direct Client';"));
@@ -29,26 +19,12 @@ test('db.js: does not inject Direct Client into SQLite schema, migrations, or sa
   assert.ok(dbCode.includes("finalSource = typeof cleanEntry.source === 'string' ? cleanEntry.source.trim() : ''"));
 });
 
-test('SourceCombobox & TeammatesCombobox: disable browser autocomplete and default to empty lists', () => {
-  assert.ok(sourceComboboxCode.includes('autoComplete="off"'));
-  assert.ok(teammatesComboboxCode.includes('autoComplete="off"'));
-  assert.ok(sourceComboboxCode.includes('useState([])'));
-  assert.ok(teammatesComboboxCode.includes('useState([])'));
-});
-
 test('categories.js: DEFAULT_CATEGORIES contains only World of Warcraft categories', () => {
   assert.ok(categoriesCode.includes('cat_wow_retail'));
   assert.ok(categoriesCode.includes('cat_wow_classic'));
   assert.ok(!categoriesCode.includes('cat_diablo'));
   assert.ok(!categoriesCode.includes('cat_valorant'));
   assert.ok(!categoriesCode.includes('cat_poe'));
-});
-
-test('currencies.js and ReceiptModal: empty source displays as dash instead of Direct Client', () => {
-  assert.ok(currenciesCode.includes("Source     = ${entry.source || '-'}$"));
-  assert.ok(!currenciesCode.includes("Source     = ${entry.source || 'Direct Client'}$"));
-  assert.ok(receiptModalCode.includes("Job Source: ${safeEntry.source || '-'}$"));
-  assert.ok(!receiptModalCode.includes("Job Source: ${safeEntry.source || 'Direct Client'}$"));
 });
 
 test('db.js: REQUIRED_WORK_ENTRY_COLUMNS and migrations include pot, teamInputMode, and teammateCuts', () => {
@@ -61,9 +37,4 @@ test('db.js: REQUIRED_WORK_ENTRY_COLUMNS and migrations include pot, teamInputMo
   assert.ok(dbCode.includes('w.pot, w.teamInputMode, w.teammateCuts'));
   assert.ok(dbCode.includes('cleanEntry.pot = finalPot;'));
   assert.ok(dbCode.includes('cleanEntry.teamInputMode = finalTeamInputMode;'));
-});
-
-test('WorkModal: preserves teamInputMode and pot on editingEntry and submission', () => {
-  assert.ok(workModalCode.includes("teamInputMode: editingEntry.teamInputMode || (editingEntry.pot !== null && editingEntry.pot !== undefined ? 'pot' : 'income')"));
-  assert.ok(workModalCode.includes("teamInputMode: isAdvertiser ? 'pot' : (formData.teamMode ? formData.teamInputMode : 'pot')"));
 });

@@ -65,6 +65,8 @@ export function OrderCalculatorPopover({
   // Optional Marketplace & Splits disclosure
   const [isMarketplaceSplitsOpen, setIsMarketplaceSplitsOpen] = useState(false);
   const [platformFeePct, setPlatformFeePct] = useState('0');
+  // which marketplace chip was picked, so the new order can start with that platform as its payer
+  const [platformId, setPlatformId] = useState(null);
 
   // Inline rates editor in Step 1
   const [showRatesEditor, setShowRatesEditor] = useState(false);
@@ -195,6 +197,7 @@ export function OrderCalculatorPopover({
     setFeeType('percent');
     setBoosterCount(1);
     setPlatformFeePct('0');
+    setPlatformId(null);
     setIsPerBooster(false);
     setConfirmedSteps(new Set());
     setActiveStep(1);
@@ -223,6 +226,8 @@ export function OrderCalculatorPopover({
       perBoosterCut: calculation.perBoosterCut,
       platformFeePct: cleanPlatformFee,
       platformFeeAmount: calculation.platformFeeAmount,
+      // only while the chip still matches the typed fee; typing a different % means it is no longer that platform's fee
+      platform: PLATFORM_FEE_PRESETS.find((p) => p.id === platformId && p.id !== 'direct' && String(p.pct) === String(platformFeePct))?.label || '',
     });
     onClose?.();
   };
@@ -972,7 +977,7 @@ export function OrderCalculatorPopover({
                                         <button
                                           key={p.id}
                                           type="button"
-                                          onClick={() => setPlatformFeePct(String(p.pct))}
+                                          onClick={() => { setPlatformFeePct(String(p.pct)); setPlatformId(p.id); }}
                                           className={cn(
                                             'flex-1 py-1 px-1.5 rounded-md text-[10px] font-medium border transition-colors cursor-pointer text-center',
                                             isSelected
@@ -1156,7 +1161,7 @@ export function OrderCalculatorPopover({
                     onClick={handleTransfer}
                     className="h-8 px-3.5 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
                   >
-                    <span>{language === 'fa' ? 'انتقال به ثبت کار' : 'Transfer to Work'}</span>
+                    <span>{language === 'fa' ? 'ساخت سفارش' : 'Create order'}</span>
                     <ArrowRight className={cn('w-3.5 h-3.5', isRtl && 'rotate-180')} />
                   </Button>
                 </div>

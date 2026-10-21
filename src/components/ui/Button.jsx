@@ -22,7 +22,7 @@ export function Button({
     outline:
       'bg-transparent text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200/80 dark:text-zinc-300 dark:hover:bg-zinc-900 dark:hover:text-zinc-100 dark:border-zinc-800/80',
     ghost:
-      'bg-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/80 border border-transparent',
+      'bg-transparent text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100/80 dark:text-zinc-400 dark:hover:text-zinc-200 dark:hover:bg-zinc-900/80 border border-transparent',
     danger:
       'bg-rose-500/10 text-rose-600 hover:bg-rose-500/15 dark:bg-rose-500/15 dark:text-rose-400 dark:hover:bg-rose-500/20 border border-transparent',
   };

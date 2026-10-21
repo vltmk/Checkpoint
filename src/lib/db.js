@@ -31,8 +31,12 @@ import {
   normalizeLedgerIndexRow,
 } from './ledgerQuery';
 
+import { createIdbBackend, createLedgerIdbStores, createSqliteBackend } from './ledger/ledgerBackends';
+import { createLedgerStore } from './ledger/ledgerStore';
+
 const DB_NAME_IDB = 'CheckpointDB_v1';
-const DB_VERSION_IDB = 1;
+// v2 adds the ledger object stores (parties, orders, shares, payments...); existing stores are untouched.
+const DB_VERSION_IDB = 2;
 const STORE_ENTRIES = 'work_entries';
 const STORE_SETTINGS = 'app_settings';
 const STORE_SNAPSHOTS = 'db_snapshots';
@@ -591,6 +595,10 @@ export class StorageDB {
     `);
 
     await this.ensureWorkEntryColumns();
+
+    // 5. v2 ledger tables (parties, orders, shares, payments). Additive: work_entries is never altered by this.
+    await createSqliteBackend(this.sqliteDb).ensureSchema();
+
     this.storageStatus = {
       ...this.storageStatus,
       schema: 'ready',
@@ -756,6 +764,7 @@ export class StorageDB {
         if (!db.objectStoreNames.contains(STORE_SNAPSHOTS)) {
           db.createObjectStore(STORE_SNAPSHOTS, { keyPath: 'id' });
         }
+        createLedgerIdbStores(db);
       };
 
       request.onsuccess = (event) => {
@@ -1754,6 +1763,7 @@ export class StorageDB {
       try {
         await this.sqliteDb.execute('DELETE FROM proof_attachments');
         await this.sqliteDb.execute('DELETE FROM work_entries');
+        await createLedgerStore(createSqliteBackend(this.sqliteDb)).clearAll();
         if (purgeSnapshots) {
           try {
             await this.sqliteDb.execute('DELETE FROM db_snapshots');
@@ -1767,7 +1777,7 @@ export class StorageDB {
     }
 
     if (!this.idb) return false;
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const stores = purgeSnapshots && this.idb.objectStoreNames.contains(STORE_SNAPSHOTS)
         ? [STORE_ENTRIES, STORE_SNAPSHOTS]
         : [STORE_ENTRIES];
@@ -1777,6 +1787,53 @@ export class StorageDB {
       transaction.oncomplete = () => resolve(true);
       transaction.onerror = (e) => reject(e.target.error);
     });
+    await createLedgerStore(createIdbBackend(this.idb)).clearAll();
+    return true;
+  }
+
+  /* =========================================================================
+   * 3b. Ledger v2 (parties, orders, shares, payments)
+   * ========================================================================= */
+
+  // The store bound to a profile's own database. Cached per profile, so switching profiles never mixes data.
+  async getLedgerStore(profileId = null) {
+    await this.initPromise;
+    const pid = profileId || this.activeProfile || 'booster';
+    this._ledgerStores = this._ledgerStores || {};
+    const handle = this.isDesktop ? this.sqliteDbs[pid] || (pid === this.activeProfile ? this.sqliteDb : null) : this.idbDbs[pid] || (pid === this.activeProfile ? this.idb : null);
+    if (!handle) throw this.createUnavailableStorageError('ledger');
+    const cached = this._ledgerStores[pid];
+    if (cached && cached.handle === handle) return cached.store;
+    const store = createLedgerStore(this.isDesktop ? createSqliteBackend(handle) : createIdbBackend(handle));
+    await store.init();
+    this._ledgerStores[pid] = { handle, store };
+    return store;
+  }
+
+  /**
+   * Upgrade a profile's legacy work_entries into the v2 ledger. Runs once per database (a version marker is
+   * written last), takes a safety snapshot first, and never modifies or deletes legacy rows.
+   * Returns { migrated, counts?, flagged } so the UI can show a one-time "your data was upgraded" notice.
+   */
+  async ensureLedgerMigrated(profileId = null) {
+    await this.initPromise;
+    const pid = profileId || this.activeProfile || 'booster';
+    const store = await this.getLedgerStore(pid);
+    if (Number(await store.getMeta('schemaVersion')) >= 2) return { migrated: false };
+    if (pid !== this.activeProfile) return { migrated: false, reason: 'inactive_profile' };
+    const entries = await this.getAllEntries();
+    const result = await store.migrateLegacy(entries, {
+      profile: pid,
+      beforeWrite: async () => {
+        // a snapshot only exists on desktop; on web the untouched work_entries store is the rollback copy
+        if (this.isDesktop && entries.length > 0) {
+          const ok = await this.createSnapshot('Before ledger upgrade');
+          if (!ok) throw new Error('Could not create the safety snapshot, so the upgrade was not started.');
+        }
+      },
+    });
+    // desktop takes a snapshot first; on web the untouched work_entries store is the rollback copy
+    return result.migrated ? { ...result, flagged: result.counts.flaggedOrders, snapshot: this.isDesktop && entries.length > 0 } : result;
   }
 
   /* =========================================================================
@@ -1989,12 +2046,20 @@ export class StorageDB {
       const entries = await this.getAllEntriesFull();
       const version = await getAppVersion();
       const profileId = this.activeProfile || 'booster';
+      // v2 ledger data rides along, so restoring a snapshot brings back orders and payments, not just legacy rows
+      let ledger = null;
+      try {
+        ledger = await (await this.getLedgerStore(profileId)).exportAll();
+      } catch (e) {
+        console.warn('Snapshot: ledger data unavailable, saving legacy entries only.', e);
+      }
       const snapshot = {
         app: 'CHECKPOINT',
         profile: profileId,
         version: version || '0.0.0',
         timestamp: new Date().toISOString(),
         entries,
+        ledger,
       };
 
       const id = 'snap_' + Date.now();
@@ -2049,6 +2114,9 @@ export class StorageDB {
           if (snapshot && Array.isArray(snapshot.entries)) {
             await this.clearAll();
             await this.bulkImport(snapshot.entries);
+            if (snapshot.ledger && snapshot.ledger.meta) {
+              await (await this.getLedgerStore()).importAll(snapshot.ledger);
+            }
             return true;
           }
         }

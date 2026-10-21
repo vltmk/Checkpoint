@@ -1,21 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { trackerDB } from './lib/db';
-import { STATUS_CONFIG, generateDiscordReceiptText, convertEntryCurrency, formatMoney } from './lib/currencies';
 import { Navbar } from './components/Navbar';
-import { MobileHeader, MobileBottomNav } from './components/MobileNavigation';
-import { LedgerView } from './components/views/LedgerView';
-// Chart.js and react-chartjs-2 only matter on the Analytics tab, so keep them out of the startup bundle
-const AnalyticsView = lazy(() =>
-  import('./components/views/AnalyticsView').then((m) => ({ default: m.AnalyticsView }))
-);
-import { Lightbox } from './components/Lightbox';
 import { ContextMenu } from './components/ui/ContextMenu';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, hasOpenDialog } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { toLocalISOString } from './components/ui/DateTimePicker';
 import { ProfileOnboardingModal } from './components/ui/ProfileOnboardingModal';
-import { UndoToast } from './components/ui/UndoToast';
 import {
   getActiveProfileId,
   setActiveProfileId,
@@ -27,7 +17,7 @@ import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, getAppVersion, getStaticAppVersion } from './lib/updater';
 import { loadCategories, importCategories } from './lib/categories';
-import { fetchAnnouncements, resetAnnouncementState } from './lib/announcements';
+import { fetchAnnouncements } from './lib/announcements';
 import {
   getStoredNotifications,
   mergeNotificationsIntoHistory,
@@ -43,30 +33,47 @@ import {
   isTauri,
   saveFileNative,
   openFileNative,
-  copyTextNative,
   enforceMinWindowSize,
   hideWindow,
   showWindow,
   sendTrayNotification,
-  resetTrayNotificationFlag,
   listenToTrayEvents,
   sendDesktopNotification,
   pruneOldBackupsNative,
   generateLedgerFingerprint,
-  openAppAwareUrl,
   closeWindow,
 } from './lib/desktop';
 import { isAutoBackupDue } from './lib/autoBackup';
 import {
   initTelemetry,
-  incrementLocalWorkCount,
   flushDailyTelemetry,
-  isTelemetryEnabled,
   setTelemetryEnabled,
 } from './lib/telemetry';
 
-import { useLanguage, formatShamsiDate } from './lib/i18n';
-import { sortLedgerRows } from './lib/ledgerQuery';
+import { useLanguage } from './lib/i18n';
+import { LedgerProvider } from './components/ledger/LedgerProvider';
+import { ledgerFingerprint, buildOrdersCsv } from './lib/ledger/backup';
+
+// The Advertiser screens are code-split: Booster users never download them
+const LedgerShell = lazy(() => import('./components/ledger/LedgerShell').then((m) => ({ default: m.LedgerShell })));
+
+// Screens of both profiles (v2 ledger): home, orders / jobs, people / clients, money, reports
+const LEDGER_TABS = ['cockpit', 'orders', 'people', 'money', 'analytics'];
+
+// Focus the search box of the screen that is showing; when it has none, open the Orders / Jobs list and focus its box.
+function focusLedgerSearch(openOrdersTab) {
+  const focus = () => {
+    const el = document.querySelector('[data-ledger-search]');
+    if (!el) return false;
+    el.focus();
+    el.select?.();
+    return true;
+  };
+  if (focus()) return;
+  openOrdersTab?.();
+  // the new screen mounts after its transition
+  setTimeout(focus, 260);
+}
 
 // True once `open` has been true, and stays true afterwards
 const useHasBeenOpen = (open) => {
@@ -92,11 +99,9 @@ const lazyModal = (loader) => {
   };
 };
 
-const WorkModal = lazyModal(() => import('./components/WorkModal').then((m) => ({ default: m.WorkModal })));
 const OrderCalculatorPopover = lazyModal(() =>
   import('./components/OrderCalculatorPopover').then((m) => ({ default: m.OrderCalculatorPopover }))
 );
-const ReceiptModal = lazyModal(() => import('./components/ReceiptModal').then((m) => ({ default: m.ReceiptModal })));
 const SettingsModal = lazyModal(() => import('./components/SettingsModal').then((m) => ({ default: m.SettingsModal })));
 const ShortcutsModal = lazyModal(() => import('./components/ShortcutsModal').then((m) => ({ default: m.ShortcutsModal })));
 const NotificationCenter = lazyModal(() =>
@@ -124,46 +129,6 @@ const parseStringSetting = (val, fallback = '', allowedList = null) => {
   if (typeof val !== 'string' || !val) return fallback;
   if (allowedList && !allowedList.includes(val)) return fallback;
   return val;
-};
-
-// Quoted CSV text cell. Values that start with a formula trigger get a leading apostrophe so
-// spreadsheet apps show them as text instead of evaluating them (e.g. a title "=HYPERLINK(...)").
-const csvText = (value) => {
-  let text = value === null || value === undefined ? '' : String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return `"${text.replace(/"/g, '""')}"`;
-};
-
-const buildLedgerCsv = (list, globalCurrency, goldRateTOMAN) => {
-  const headers = [
-    'ID',
-    'Date & Time',
-    'Game',
-    'Work Title',
-    'Seller / Source',
-    'Currency',
-    'Income Amount',
-    'Applied Rate (Toman/1k G)',
-    'Status',
-    'Notes',
-    'Has Proof Attached',
-  ];
-
-  const rows = list.map((e) => [
-    e.id,
-    e.dateTime,
-    csvText(e.game || ''),
-    csvText(e.title || ''),
-    csvText(e.source || ''),
-    csvText(e.currency || globalCurrency),
-    e.income,
-    e.exchangeRate || goldRateTOMAN || 3200,
-    e.status,
-    csvText(e.notes || ''),
-    e.proofs && e.proofs.length > 0 ? 'YES' : 'NO',
-  ]);
-
-  return String.fromCharCode(0xfeff) + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 };
 
 const saveCsvFile = async (fileName, csvContent) => {
@@ -198,12 +163,6 @@ export default function App() {
   const [appVersion, setAppVersion] = useState(() => getStaticAppVersion());
   // The ledger view loads its own rows. App only tracks a version number that tells it to refresh.
   const [ledgerVersion, setLedgerVersion] = useState(0);
-  // Analytics needs every entry, so they load only while the Analytics tab is open
-  const [analyticsEntries, setAnalyticsEntries] = useState([]);
-  // Latest game and currency, used to pre-fill new entries
-  const [latestEntryDefaults, setLatestEntryDefaults] = useState({ game: '', currency: '' });
-  // Full rows for the current selection (can span pages)
-  const [selectedRows, setSelectedRows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Dual-Profile Architecture ('booster' | 'advertiser')
@@ -211,7 +170,6 @@ export default function App() {
   const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(() => !isProfileOnboardingCompleted());
   const [profileCounts, setProfileCounts] = useState({ booster: 0, advertiser: 0 });
   const activeProfileCount = profileCounts[activeProfileId] || 0;
-  const [isSwitchingProfile, setIsSwitchingProfile] = useState(false);
   const profileSwitchSeqRef = useRef(0);
   const isSwitchingProfileRef = useRef(false);
 
@@ -270,12 +228,14 @@ export default function App() {
     } catch (e) {}
   }, []);
 
-  // Active View Tab ('ledger' | 'analytics')
-  const [activeTab, setActiveTab] = useState(() => {
-    const saved = null;
-    if (saved === 'analytics') return 'analytics';
-    return 'ledger';
-  });
+  // Active view: cockpit (home) | orders (Orders / Jobs) | people (Boosters / Clients) | money | analytics (Reports)
+  const [activeTab, setActiveTab] = useState('cockpit');
+  // A saved tab from an older version (the old 'ledger' tab) falls back to the home screen
+  const visibleTab = LEDGER_TABS.includes(activeTab) ? activeTab : 'cockpit';
+
+  // Advertiser: "New order" requests from the top bar, the N shortcut and the calculator
+  const [newOrderSignal, setNewOrderSignal] = useState(0);
+  const [ledgerQuote, setLedgerQuote] = useState(null);
 
   // Interface Theme ('dark' | 'light') via next-themes
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -307,6 +267,7 @@ export default function App() {
     const saved = null;
     return parseNumberSetting(saved, 1.08, 0.01);
   });
+  const ledgerRates = useMemo(() => ({ goldRateTOMAN, usdRateTOMAN, eurRateUSD }), [goldRateTOMAN, usdRateTOMAN, eurRateUSD]);
 
   // Order Calculator State
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -327,47 +288,13 @@ export default function App() {
     }
   }, []);
 
-  // Modals State
-  const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState(null);
-
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [receiptEntry, setReceiptEntry] = useState(null);
-  const [externalTeammateFilter, setExternalTeammateFilter] = useState('');
-  const [externalSourceFilter, setExternalSourceFilter] = useState('');
-  const handleClearExternalTeammateFilter = useCallback(() => setExternalTeammateFilter(''), []);
-  const handleClearExternalSourceFilter = useCallback(() => setExternalSourceFilter(''), []);
-
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialScrollSection, setSettingsInitialScrollSection] = useState(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(null); // null | 'csv' | 'json'
 
   // Context Menu State
-  const [contextMenuState, setContextMenuState] = useState({
-    isOpen: false,
-    x: 0,
-    y: 0,
-    rect: null,
-    targetEntry: null,
-  });
-
-  // Lifted selection state for context menu & ledger synchronization
-  const [selectedEntryIds, setSelectedEntryIds] = useState(new Set());
-  const [isSelectMode, setIsSelectMode] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  // The ledger filters on a deferred copy, so typing stays responsive while large lists re-filter
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [isDiscordBatchCopied, setIsDiscordBatchCopied] = useState(false);
-  const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
-  const [undoDeleteState, setUndoDeleteState] = useState({ isOpen: false, items: [], count: 0 });
-
-  const [lightboxData, setLightboxData] = useState({
-    isOpen: false,
-    imgSrc: '',
-    caption: '',
-  });
+  const [contextMenuState, setContextMenuState] = useState({ isOpen: false, x: 0, y: 0, rect: null });
 
   // Software Updates & Announcements State
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -384,7 +311,6 @@ export default function App() {
 
   // Data Loading
   const loadData = useCallback(async () => {
-    const startTime = Date.now();
     try {
       // Hydrate runtime app version asynchronously and check for upgrade
       getAppVersion().then(async (v) => {
@@ -488,7 +414,7 @@ export default function App() {
         const val = parseBooleanSetting(savedTelemetry, true);
         setTelemetryEnabledState(val);
       }
-      if (savedTab === 'ledger' || savedTab === 'analytics') {
+      if (LEDGER_TABS.includes(savedTab)) {
         setActiveTab(savedTab);
       }
       trackerDB.getProfileCounts?.().then((counts) => {
@@ -501,25 +427,12 @@ export default function App() {
     }
   }, []);
 
-  // Lightweight entry reload without full app re-hydration
-  const reloadEntries = useCallback(async () => {
-    try {
-      setLedgerVersion((v) => v + 1);
-      trackerDB.getProfileCounts?.().then((counts) => {
-        if (counts) setProfileCounts(counts);
-      }).catch(() => {});
-    } catch (err) {
-      console.error('Failed to reload entries:', err);
-    }
-  }, []);
-
   // Profile Switching & Background Synchronization
   const handleProfileChange = useCallback(async (newProfileId) => {
     if (!newProfileId || newProfileId === activeProfileId) return;
 
     const seq = ++profileSwitchSeqRef.current;
     isSwitchingProfileRef.current = true;
-    setIsSwitchingProfile(true);
 
     setActiveProfileId(newProfileId);
     setActiveProfileIdState(newProfileId);
@@ -546,7 +459,6 @@ export default function App() {
       console.error('Failed to switch profile:', e);
     } finally {
       if (profileSwitchSeqRef.current === seq) {
-        setIsSwitchingProfile(false);
         isSwitchingProfileRef.current = false;
       }
     }
@@ -643,7 +555,14 @@ export default function App() {
       }
 
       const entries = await trackerDB.getAllEntries();
-      const currentFingerprint = generateLedgerFingerprint(entries, globalCurrency, goldRateTOMAN);
+      // The v2 ledger has to count as "changed" too, or orders made on the new screens would never be backed up
+      let ledgerExport = null;
+      try {
+        ledgerExport = await (await trackerDB.getLedgerStore()).exportAll();
+      } catch (e) {
+        console.warn('[AutoBackup] Ledger data unavailable, backing up legacy entries only:', e);
+      }
+      const currentFingerprint = `${generateLedgerFingerprint(entries, globalCurrency, goldRateTOMAN)}|${ledgerFingerprint(ledgerExport)}`;
       const lastFingerprint = await trackerDB.getSetting('checkpoint_last_auto_backup_hash', '');
 
       // Smart Change Detection: Skip export if no financial/entry data changed and not a manual trigger
@@ -668,6 +587,8 @@ export default function App() {
         categories: currentCategories,
         entriesCount: fullEntries.length,
         entries: fullEntries,
+        profile: activeProfileId,
+        ledger: ledgerExport,
       };
 
       const todayStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -699,7 +620,7 @@ export default function App() {
     } finally {
       autoBackupRunningRef.current = false;
     }
-  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN]);
+  }, [isDesktop, autoBackupEnabled, autoBackupPath, autoBackupFrequency, autoBackupRetention, appVersion, globalCurrency, goldRateTOMAN, activeProfileId]);
 
   const syncFeedsRef = useRef(syncFeeds);
   useEffect(() => {
@@ -725,7 +646,7 @@ export default function App() {
   useEffect(() => {
     loadData();
     showWindow();
-    enforceMinWindowSize(800, 560);
+    enforceMinWindowSize(960, 640);
 
     // Initial background feed sync & telemetry shortly after render
     const timer = setTimeout(() => {
@@ -752,29 +673,6 @@ export default function App() {
       window.removeEventListener('focus', handleFocus);
     };
   }, [loadData]);
-
-  // Analytics works on every entry, so it loads them only while its tab is open
-  useEffect(() => {
-    if (activeTab !== 'analytics') return undefined;
-    let cancelled = false;
-    trackerDB.getAllEntries().then((rows) => {
-      if (!cancelled) setAnalyticsEntries(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, ledgerVersion, activeProfileId]);
-
-  // Latest game and currency for pre-filling new entries
-  useEffect(() => {
-    let cancelled = false;
-    trackerDB.getLatestEntryDefaults().then((defaults) => {
-      if (!cancelled) setLatestEntryDefaults(defaults);
-    }).catch((err) => console.warn('Could not read latest entry defaults:', err));
-    return () => {
-      cancelled = true;
-    };
-  }, [ledgerVersion, activeProfileId]);
 
   // Desktop Window & System Tray Event Listeners
   useEffect(() => {
@@ -931,11 +829,6 @@ export default function App() {
     setNotifications(updated);
   };
 
-  const handleResetAnnouncements = async () => {
-    await resetAnnouncementState();
-    await syncFeeds({ silent: false });
-  };
-
   // Tab Switcher
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -982,194 +875,6 @@ export default function App() {
     }
   };
 
-  // Save Entry (Create / Edit)
-  const handleSaveEntry = async (entryData) => {
-    const isNew = !editingEntry;
-    await trackerDB.saveEntry(entryData);
-    setIsWorkModalOpen(false);
-    setEditingEntry(null);
-    await reloadEntries();
-    if (isNew) {
-      handleTabChange('ledger');
-      incrementLocalWorkCount();
-    }
-  };
-
-  // Delete Single Entry (Called after in-line confirmation)
-  const handleDeleteEntry = async (id) => {
-    // Undo needs the full record, screenshots included
-    const itemToDelete = (await trackerDB.getEntry(id)) || null;
-    await trackerDB.deleteEntry(id);
-    await reloadEntries();
-
-    if (itemToDelete) {
-      setUndoDeleteState({
-        isOpen: true,
-        items: [itemToDelete],
-        count: 1,
-      });
-    }
-  };
-
-  // Bulk Delete Entries
-  const handleBulkDelete = async (ids) => {
-    if (!ids || ids.length === 0) return;
-    // Undo needs full records, screenshots included
-    const itemsToDelete = (await Promise.all(ids.map((id) => trackerDB.getEntry(id)))).filter(Boolean);
-    await trackerDB.bulkDeleteEntries(ids);
-    await reloadEntries();
-
-    if (itemsToDelete.length > 0) {
-      setUndoDeleteState({
-        isOpen: true,
-        items: itemsToDelete,
-        count: itemsToDelete.length,
-      });
-    }
-  };
-
-  // Undo Delete (Restores deleted entries)
-  const handleUndoDelete = async () => {
-    const { items } = undoDeleteState;
-    if (!items || items.length === 0) return;
-
-    setUndoDeleteState({ isOpen: false, items: [], count: 0 });
-
-    try {
-      for (const item of items) {
-        await trackerDB.saveEntry(item);
-      }
-      await reloadEntries();
-    } catch (e) {
-      console.error('Failed to undo delete:', e);
-    }
-  };
-
-  // Bulk Update Status
-  const handleBulkUpdateStatus = async (ids, nextStatus) => {
-    if (!ids || ids.length === 0 || !nextStatus) return;
-    await trackerDB.bulkUpdateStatus(ids, nextStatus);
-    await reloadEntries();
-  };
-
-  // Full rows for the selection, refreshed when the selection or the data changes
-  useEffect(() => {
-    let cancelled = false;
-    if (selectedEntryIds.size === 0) {
-      setSelectedRows([]);
-      return undefined;
-    }
-    trackerDB.getLedgerRowsByIds(Array.from(selectedEntryIds)).then((rows) => {
-      if (!cancelled) setSelectedRows(rows);
-    }).catch((err) => console.warn('Could not read the selection:', err));
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedEntryIds, ledgerVersion]);
-
-  const selectedSum = useMemo(() => {
-    if (selectedEntryIds.size === 0) return 0;
-    return sortLedgerRows(selectedRows, 'date_desc').reduce((sum, e) => {
-      if (!selectedEntryIds.has(e.id)) return sum;
-      if (e.status === 'Failed') return sum;
-      return sum + convertEntryCurrency(e, globalCurrency, { goldRateTOMAN, usdRateTOMAN, eurRateUSD });
-    }, 0);
-  }, [selectedRows, selectedEntryIds, globalCurrency, goldRateTOMAN, usdRateTOMAN, eurRateUSD]);
-
-  const handleBatchStatusChange = useCallback(async (status) => {
-    if (selectedEntryIds.size === 0) return;
-    const ids = Array.from(selectedEntryIds);
-    await handleBulkUpdateStatus(ids, status);
-  }, [selectedEntryIds, handleBulkUpdateStatus]);
-
-  const handleBatchDeleteFromNav = useCallback(async () => {
-    if (selectedEntryIds.size === 0) return;
-    const ids = Array.from(selectedEntryIds);
-    await handleBulkDelete(ids);
-    setSelectedEntryIds(new Set());
-    setIsSelectMode(false);
-  }, [selectedEntryIds, handleBulkDelete]);
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedEntryIds(new Set());
-    setIsSelectMode(false);
-  }, []);
-
-  const handleBatchCopyDiscord = useCallback(async () => {
-    if (selectedEntryIds.size === 0) return;
-    const selectedEntriesList = sortLedgerRows(selectedRows, 'date_desc');
-    if (selectedEntriesList.length === 0) return;
-    const isFa = language === 'fa';
-    const now = new Date();
-    const dateStr = isFa
-      ? formatShamsiDate(now, { month: 'long', day: 'numeric', year: 'numeric' })
-      : now.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-
-    const totalSumFormatted = formatMoney(selectedSum, globalCurrency, false, isFa);
-
-    const itemsText = selectedEntriesList.map((entry, idx) => {
-      const entryCur = entry.currency && entry.currency !== 'DEFAULT' ? entry.currency : globalCurrency;
-      const amountStr = formatMoney(entry.income || 0, entryCur, false, isFa);
-      const orderIdPart = entry.orderId ? `#${entry.orderId} | ` : '';
-      const st = STATUS_CONFIG[entry.status]?.label || entry.status || 'Paid';
-      const sourcePart = entry.source ? ` [${entry.source}]` : '';
-
-      if (activeProfileId === 'advertiser') {
-        const clientPrice = entry.pot || entry.income || 0;
-        const formattedClient = formatMoney(clientPrice, entryCur, false, isFa);
-        const payout = Math.max(0, (entry.pot || 0) - (entry.income || 0));
-        const payoutStr = payout > 0 ? ` (Payout: ${formatMoney(payout, entryCur, false, isFa)})` : '';
-        return `${idx + 1}. ${orderIdPart}${entry.title || 'Order'}${sourcePart} | ${formattedClient} | ${st}${payoutStr}`;
-      }
-
-      const teamPart = entry.teammates && entry.teammates.length > 0 ? ` (@${entry.teammates.join(', @')})` : '';
-      return `${idx + 1}. ${orderIdPart}${entry.title || 'Job'}${sourcePart} | ${amountStr} | ${st}${teamPart}`;
-    }).join('\n');
-
-    let md = '';
-    if (isFa) {
-      md = `\`\`\`ini
-[ گزارش دسته‌ای چک‌پوینت - CHECKPOINT ]
-تاریخ        = ${dateStr}
-تعداد کارها   = ${selectedEntriesList.length}
-مجموع کارکرد  = ${totalSumFormatted}
-ارز پایه     = ${globalCurrency}
---------------------------------------------------
-${itemsText}
---------------------------------------------------
-ثبت شده توسط CHECKPOINT Desktop
-\`\`\``;
-    } else {
-      md = `\`\`\`ini
-[ CHECKPOINT - BATCH SUMMARY ]
-Date        = ${dateStr}
-Total Jobs  = ${selectedEntriesList.length}
-Total Earned= ${totalSumFormatted}
-Base Unit   = ${globalCurrency}
---------------------------------------------------
-${itemsText}
---------------------------------------------------
-Exported via CHECKPOINT Desktop
-\`\`\``;
-    }
-
-    copyTextNative(md);
-    setIsDiscordBatchCopied(true);
-    setTimeout(() => setIsDiscordBatchCopied(false), 2000);
-  }, [selectedEntryIds, selectedRows, language, selectedSum, globalCurrency, activeProfileId]);
-
-  // Bulk Export CSV
-  const handleBulkExportCsv = useCallback(async (selectedIds) => {
-    const listToExport = sortLedgerRows(await trackerDB.getLedgerRowsByIds(selectedIds), 'date_desc');
-    if (listToExport.length === 0) {
-      return;
-    }
-
-    const csvContent = buildLedgerCsv(listToExport, globalCurrency, goldRateTOMAN);
-    const fileName = `checkpoint_selected_${listToExport.length}_jobs_${new Date().toISOString().slice(0, 10)}.csv`;
-    await saveCsvFile(fileName, csvContent);
-  }, [globalCurrency, goldRateTOMAN]);
-
   // Purge / Clear All Data
   // Returns false when the wipe failed, so the settings panel can say so
   const handleClearAllData = async (purgeSnapshots = false) => {
@@ -1183,142 +888,39 @@ Exported via CHECKPOINT Desktop
     return ok;
   };
 
-  // Duplicate Entry
-  const handleDuplicateEntry = async (id) => {
-    try {
-      const original = await trackerDB.getEntry(id);
-      if (!original) return;
-
-      const newId = 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-      const copy = {
-        ...original,
-        id: newId,
-        title: `${original.title} (Copy)`,
-        dateTime: toLocalISOString(new Date()),
-        status: original.status || 'Pending',
-        updatedAt: new Date().toISOString(),
-        proofs: (original.proofs || []).map((p) => ({
-          ...p,
-          id: 'proof_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-          entry_id: newId,
-          createdAt: new Date().toISOString(),
-        })),
-      };
-
-      if (activeTab !== 'ledger') {
-        setActiveTab('ledger');
-      }
-
-      await trackerDB.saveEntry(copy);
-      await reloadEntries();
-      incrementLocalWorkCount();
-    } catch (err) {
-      console.error('Failed to duplicate entry:', err);
-      await reloadEntries();
-    }
-  };
-
-  // Status Change / Flip
-  const handleFlipStatus = async (id, currentStatus, targetStatus = null) => {
-    const nextStatus = targetStatus || STATUS_CONFIG[currentStatus]?.next || 'Paid';
-    // Targeted UPDATE: loading and re-saving the full record would also rewrite every screenshot blob
-    await trackerDB.bulkUpdateStatus([id], nextStatus);
-    await reloadEntries();
-  };
-
-  // Update Source Paid (Advertiser Dual-Settlement)
-  const handleUpdateSourcePaid = async (id, sourcePaid) => {
-    const val = sourcePaid ? 1 : 0;
-    await trackerDB.updateSourcePaid(id, val);
-    await reloadEntries();
-  };
-
-  // Update Booster Paid (Advertiser Dual-Settlement)
-  const handleUpdateBoosterPaid = async (id, boosterPaid) => {
-    const val = boosterPaid ? 1 : 0;
-    await trackerDB.updateBoosterPaid(id, val);
-    await reloadEntries();
-  };
-
-  // Transfer Calculated Order Data to WorkModal
+  // A calculator quote becomes the starting point of a new order (Advertiser) or job (Booster)
   const handleTransferFromCalculator = useCallback((calcData) => {
-    const isMultiBooster = calcData?.boosterCount > 1;
-    const partialEntry = {
-      pot: String(calcData?.clientPrice || ''),
-      clientPrice: calcData?.clientPrice,
-      income: String(calcData?.income || ''),
-      feeRate: String(calcData?.feeRate || '15'),
-      feeType: calcData?.feeType || 'percent',
-      platformFee: calcData?.platformFeePct || 0,
-      currency: calcData?.currency || 'USD',
-      sourcePaid: false,
-      boosterPaid: false,
-      notes: isMultiBooster
-        ? `Booster Pool: ${calcData.boosterPool} (${calcData.boosterCount}x @ ${calcData.perBoosterCut})`
-        : '',
-    };
-    setEditingEntry(partialEntry);
-    setIsWorkModalOpen(true);
+    setLedgerQuote(calcData || null);
+    setNewOrderSignal((n) => n + 1);
     setIsCalculatorOpen(false);
   }, []);
 
-  // Modal Openers
-  const handleOpenWorkModal = async (entry = null) => {
-    if (entry && entry.id) {
-      const full = await trackerDB.getEntry(entry.id);
-      setEditingEntry(full || entry);
-    } else {
-      setEditingEntry(null);
-    }
-    setIsWorkModalOpen(true);
-  };
-
-  const handleOpenReceipt = async (entry) => {
-    if (!entry) return;
-    const full = await trackerDB.getEntry(entry.id);
-    setReceiptEntry(full || entry);
-    setIsReceiptModalOpen(true);
-  };
-
-  const handleOpenLightbox = async (imgSrcOrEntry, caption) => {
-    if (typeof imgSrcOrEntry === 'string' && (imgSrcOrEntry.startsWith('data:') || imgSrcOrEntry.startsWith('http') || imgSrcOrEntry.startsWith('blob:'))) {
-      setLightboxData({
-        isOpen: true,
-        imgSrc: imgSrcOrEntry,
-        caption: caption || 'Screenshot Proof',
-      });
-      return;
-    }
-
-    const targetId = typeof imgSrcOrEntry === 'string' ? imgSrcOrEntry : imgSrcOrEntry?.id;
-    if (typeof targetId === 'string' && targetId) {
-      const full = await trackerDB.getEntry(targetId);
-      if (full && full.proofs && full.proofs.length > 0 && full.proofs[0]?.data) {
-        setLightboxData({
-          isOpen: true,
-          imgSrc: full.proofs[0].data,
-          caption: caption || full.title || 'Screenshot Proof',
-        });
-        return;
-      }
-    }
+  // Opens the new order / job form
+  const handleOpenWorkModal = () => {
+    setLedgerQuote(null);
+    setNewOrderSignal((n) => n + 1);
   };
 
   // Export CSV
   const handleExportCsv = useCallback(async () => {
-    const allEntries = await trackerDB.getAllEntries();
-    if (allEntries.length === 0) {
-      return false;
-    }
-
-    const csvContent = buildLedgerCsv(allEntries, globalCurrency, goldRateTOMAN);
-    const fileName = `checkpoint_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
-    return saveCsvFile(fileName, csvContent);
-  }, [globalCurrency, goldRateTOMAN]);
+    // One row per order or job from the ledger, with price, fee, team, margin and paid state
+    const data = await (await trackerDB.getLedgerStore()).loadAll();
+    if (data.orders.length === 0) return false;
+    const fileName = `checkpoint_orders_${new Date().toISOString().slice(0, 10)}.csv`;
+    return saveCsvFile(fileName, String.fromCharCode(0xfeff) + buildOrdersCsv(data));
+  }, []);
 
   // Export JSON Backup
   const handleExportJson = useCallback(async () => {
-    if (activeProfileCount === 0) {
+    // v2 orders, people and payments ride along in every backup
+    let ledger = null;
+    try {
+      ledger = await (await trackerDB.getLedgerStore()).exportAll();
+    } catch (e) {
+      console.warn('Ledger data could not be read for the backup:', e);
+    }
+    const ledgerHasData = Boolean(ledger && (ledger.orders.length > 0 || ledger.payments.length > 0));
+    if (activeProfileCount === 0 && !ledgerHasData) {
       return false;
     }
 
@@ -1355,6 +957,8 @@ Exported via CHECKPOINT Desktop
       },
       entriesCount: fullEntries.length,
       entries: fullEntries,
+      profile: activeProfileId,
+      ledger,
     };
 
     const fileName = `checkpoint_backup_${new Date().toISOString().slice(0, 10)}.json`;
@@ -1399,6 +1003,7 @@ Exported via CHECKPOINT Desktop
     autoBackupPath,
     autoBackupFrequency,
     autoBackupRetention,
+    activeProfileId,
   ]);
 
   // Import JSON Restore. Returns { status: 'imported', count } | { status: 'cancelled' } | { status: 'invalid' | 'error' }
@@ -1432,10 +1037,16 @@ Exported via CHECKPOINT Desktop
       if (!json) return { status: 'invalid' };
 
       let importedList = [];
+      // A v2 backup may hold orders and payments only (no legacy entries at all)
+      // (a ledger exported from the other profile is not merged into this one)
+      const importedLedger = !Array.isArray(json) && json.ledger && typeof json.ledger === 'object'
+        && (!json.profile || json.profile === activeProfileId)
+        ? json.ledger
+        : null;
       if (Array.isArray(json)) {
         importedList = json;
-      } else if (json.entries && Array.isArray(json.entries)) {
-        importedList = json.entries;
+      } else if ((json.entries && Array.isArray(json.entries)) || importedLedger) {
+        importedList = Array.isArray(json.entries) ? json.entries : [];
         if (json.goldRateTOMAN) handleGoldRateTOMANChange(json.goldRateTOMAN);
         if (json.currency) handleCurrencyChange(json.currency);
         if (json.preferences && typeof json.preferences === 'object') {
@@ -1474,9 +1085,21 @@ Exported via CHECKPOINT Desktop
       }
 
       await trackerDB.bulkImport(importedList);
+
+      // Bring the same data into the v2 ledger. Merging never overwrites what is already there.
+      const ledgerStore = await trackerDB.getLedgerStore();
+      let ledgerCount = 0;
+      if (importedLedger) {
+        await ledgerStore.mergeAll(importedLedger);
+        ledgerCount = Array.isArray(importedLedger.orders) ? importedLedger.orders.length : 0;
+      } else if (count > 0) {
+        await ledgerStore.importLegacyEntries(importedList, { profile: activeProfileId });
+      }
+
       await loadData();
       await refreshCategories();
-      return { status: 'imported', count };
+      setLedgerVersion((v) => v + 1);
+      return { status: 'imported', count: count || ledgerCount };
     } catch (err) {
       console.error('Failed to import JSON backup:', err);
       return { status: 'error' };
@@ -1484,63 +1107,13 @@ Exported via CHECKPOINT Desktop
   };
 
 
-  const lastClosedContextTargetRef = useRef(null);
-
-  // Context Menu Handlers
   const handleCloseContextMenu = useCallback(() => {
-    setContextMenuState((prev) => {
-      if (prev.isOpen) {
-        lastClosedContextTargetRef.current = {
-          id: prev.targetEntry?.id,
-          time: Date.now(),
-        };
-      }
-      return { ...prev, isOpen: false, targetEntry: null, rect: null };
-    });
+    setContextMenuState((prev) => ({ ...prev, isOpen: false, rect: null }));
   }, []);
-
-  const handleOpenEntryContextMenu = useCallback((entry, position) => {
-    // Prevent immediate re-opening if clicking the same trigger button that just closed it
-    if (
-      lastClosedContextTargetRef.current &&
-      lastClosedContextTargetRef.current.id === entry.id &&
-      Date.now() - lastClosedContextTargetRef.current.time < 250
-    ) {
-      lastClosedContextTargetRef.current = null;
-      return;
-    }
-
-    setContextMenuState({
-      isOpen: true,
-      x: position.x,
-      y: position.y,
-      rect: position.rect || null,
-      targetEntry: entry,
-    });
-  }, []);
-
-  const handleContextAddWork = useCallback(() => {
-    if (activeTab !== 'ledger') {
-      setActiveTab('ledger');
-    }
-    handleOpenWorkModal();
-  }, [activeTab]);
-
-  const handleContextToggleSelectMode = useCallback(() => {
-    if (activeTab !== 'ledger') {
-      setActiveTab('ledger');
-    }
-    setIsSelectMode((prev) => {
-      const next = !prev;
-      if (!next) {
-        setSelectedEntryIds(new Set());
-      }
-      return next;
-    });
-  }, [activeTab]);
 
   const handleContextToggleCurrency = useCallback(() => {
-    handleCurrencyChange(globalCurrency === 'TOMAN' ? 'GOLD' : 'TOMAN');
+    const order = ['TOMAN', 'USD', 'EUR', 'GOLD'];
+    handleCurrencyChange(order[(order.indexOf(globalCurrency) + 1) % order.length]);
   }, [globalCurrency, handleCurrencyChange]);
 
   const handleContextExport = useCallback(() => {
@@ -1555,39 +1128,6 @@ Exported via CHECKPOINT Desktop
   const handleContextShortcuts = useCallback(() => {
     setIsShortcutsOpen(true);
   }, []);
-
-  const handleContextCopyDiscord = useCallback(
-    async (entry, receiptMode = null) => {
-      if (!entry) return;
-      const text = generateDiscordReceiptText(entry, {
-        language,
-        globalCurrency,
-        activeProfileId,
-        receiptMode,
-      });
-      await copyTextNative(text);
-    },
-    [language, globalCurrency, activeProfileId]
-  );
-
-  const handleContextBulkMarkPaid = useCallback(async () => {
-    if (selectedEntryIds.size === 0) return;
-    await handleBulkUpdateStatus(Array.from(selectedEntryIds), 'Paid');
-    setSelectedEntryIds(new Set());
-    setIsSelectMode(false);
-  }, [selectedEntryIds, handleBulkUpdateStatus]);
-
-  const handleContextBulkExportCsv = useCallback(async () => {
-    if (selectedEntryIds.size === 0) return;
-    await handleBulkExportCsv(Array.from(selectedEntryIds));
-  }, [selectedEntryIds, handleBulkExportCsv]);
-
-  const handleContextBulkDelete = useCallback(async () => {
-    if (selectedEntryIds.size === 0) return;
-    await handleBulkDelete(Array.from(selectedEntryIds));
-    setSelectedEntryIds(new Set());
-    setIsSelectMode(false);
-  }, [selectedEntryIds, handleBulkDelete]);
 
   // Global Context Menu Listener (with editable input bypass)
   useEffect(() => {
@@ -1606,29 +1146,7 @@ Exported via CHECKPOINT Desktop
 
       e.preventDefault();
 
-      // Check if user right-clicked on an individual job card
-      const cardEl = target.closest('[data-entry-id]');
-      let foundEntry = null;
-      if (cardEl) {
-        const entryId = cardEl.getAttribute('data-entry-id');
-        foundEntry = entryId ? { id: entryId } : null;
-        if (entryId) {
-          // Rows only carry list fields; the menu gets the full record a moment later
-          trackerDB.getEntry(entryId).then((full) => {
-            if (!full) return;
-            setContextMenuState((prev) =>
-              prev.isOpen && prev.targetEntry?.id === full.id ? { ...prev, targetEntry: full } : prev
-            );
-          }).catch(() => {});
-        }
-      }
-
-      setContextMenuState({
-        isOpen: true,
-        x: e.clientX,
-        y: e.clientY,
-        targetEntry: foundEntry,
-      });
+      setContextMenuState({ isOpen: true, x: e.clientX, y: e.clientY, rect: null });
     };
 
     window.addEventListener('contextmenu', handleContextMenu);
@@ -1640,18 +1158,17 @@ Exported via CHECKPOINT Desktop
   appModalsRef.current = {
     contextMenuState,
     handleCloseContextMenu,
-    lightboxData,
     isNotificationCenterOpen,
     isUpdateModalOpen,
     exportConfirm,
-    isWorkModalOpen,
     isCalculatorOpen,
-    isReceiptModalOpen,
     isSettingsOpen,
     isShortcutsOpen,
     handleOpenWorkModal,
     handleTabChange,
     handleSwitchProfileToggle,
+    globalCurrency,
+    handleCurrencyChange,
   };
 
   useEffect(() => {
@@ -1662,10 +1179,6 @@ Exported via CHECKPOINT Desktop
       if (e.key === 'Escape') {
         if (state.contextMenuState?.isOpen) {
           state.handleCloseContextMenu?.();
-          return;
-        }
-        if (state.lightboxData?.isOpen) {
-          setLightboxData({ isOpen: false, imgSrc: '', caption: '' });
           return;
         }
         // Dialogs close themselves on Escape (topmost only, with their unsaved-changes checks).
@@ -1687,16 +1200,6 @@ Exported via CHECKPOINT Desktop
           setExportConfirm(null);
           return;
         }
-        if (state.isWorkModalOpen) {
-          setIsWorkModalOpen(false);
-          setEditingEntry(null);
-          return;
-        }
-        if (state.isReceiptModalOpen) {
-          setIsReceiptModalOpen(false);
-          setReceiptEntry(null);
-          return;
-        }
         if (state.isSettingsOpen) {
           setIsSettingsOpen(false);
           return;
@@ -1714,24 +1217,24 @@ Exported via CHECKPOINT Desktop
         return;
       }
 
-      // Ctrl + F (Focus Search in Ledger): switch to the ledger; Navbar moves focus to the visible search field
+      // Ctrl + F (Focus Search): the search box of the screen you are on, else the Orders / Jobs list
       if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyF' || e.key === 'f' || e.key === 'F')) {
+        // never yank the user out from under an open dialog and the draft they are typing in it
+        if (hasOpenDialog()) return;
         e.preventDefault();
-        state.handleTabChange?.('ledger');
+        focusLedgerSearch(() => state.handleTabChange?.('orders'));
         return;
       }
 
       const isAnyModalOpen =
         state.contextMenuState?.isOpen ||
-        state.isWorkModalOpen ||
         state.isCalculatorOpen ||
-        state.isReceiptModalOpen ||
         state.isSettingsOpen ||
         state.isShortcutsOpen ||
         state.isNotificationCenterOpen ||
         state.isUpdateModalOpen ||
-        state.lightboxData?.isOpen ||
-        Boolean(state.exportConfirm);
+        Boolean(state.exportConfirm) ||
+        hasOpenDialog();
 
       if (isAnyModalOpen) return;
 
@@ -1762,10 +1265,10 @@ Exported via CHECKPOINT Desktop
         return;
       }
 
-      // '/' Hotkey focuses Ledger Search (Only when no modifiers are active)
+      // '/' Hotkey focuses the search box (Only when no modifiers are active)
       if ((e.code === 'Slash' || e.key === '/') && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         e.preventDefault();
-        state.handleTabChange?.('ledger');
+        focusLedgerSearch(() => state.handleTabChange?.('orders'));
         return;
       }
 
@@ -1774,15 +1277,23 @@ Exported via CHECKPOINT Desktop
         if (activeProfileId === 'advertiser') {
           setIsCalculatorOpen((prev) => !prev);
         }
+      } else if ((e.code === 'KeyT' || e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // T: cycle the main currency every amount is shown in (Toman, USD, EUR, Gold), for both profiles
+        e.preventDefault();
+        const order = ['TOMAN', 'USD', 'EUR', 'GOLD'];
+        const next = order[(order.indexOf(state.globalCurrency) + 1) % order.length];
+        state.handleCurrencyChange?.(next);
       } else if (e.code === 'KeyN' || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         state.handleOpenWorkModal?.();
-      } else if (e.code === 'Digit1' || e.key === '1') {
-        e.preventDefault();
-        state.handleTabChange?.('ledger');
-      } else if (e.code === 'Digit2' || e.key === '2') {
-        e.preventDefault();
-        state.handleTabChange?.('analytics');
+      } else if (/^Digit[1-5]$/.test(e.code || '') || /^[1-5]$/.test(e.key)) {
+        const n = Number(e.key) || Number(String(e.code).slice(-1));
+        // Advertiser: 1 Overview, 2 Orders, 3 Boosters, 4 Money, 5 Reports. Booster: 1 Overview, 2 Jobs, 3 Clients, 4 Reports.
+        const tab = activeProfileId === 'advertiser' ? LEDGER_TABS[n - 1] : ['cockpit', 'orders', 'people', 'analytics'][n - 1];
+        if (tab) {
+          e.preventDefault();
+          state.handleTabChange?.(tab);
+        }
       }
     };
 
@@ -1794,7 +1305,7 @@ Exported via CHECKPOINT Desktop
     <div className="w-full h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col selection:bg-zinc-800 overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80">
       {/* 1. Desktop Unified Top Navigation Bar */}
       <Navbar
-        activeTab={activeTab}
+        activeTab={visibleTab}
         onTabChange={handleTabChange}
         globalCurrency={globalCurrency}
         onCurrencyChange={handleCurrencyChange}
@@ -1821,35 +1332,7 @@ Exported via CHECKPOINT Desktop
         onProfileChange={handleProfileChange}
         boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? activeProfileCount : 0)}
         advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? activeProfileCount : 0)}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        selectedCount={selectedEntryIds.size}
-        selectedSum={selectedSum}
-        onBatchStatusChange={handleBatchStatusChange}
-        onBatchDelete={handleBatchDeleteFromNav}
-        onCopyDiscordBatch={handleBatchCopyDiscord}
-        isDiscordBatchCopied={isDiscordBatchCopied}
-        onClearSelection={handleClearSelection}
       />
-
-      {/* 2. Mobile Top Header (Only on Web viewports) */}
-      {!isDesktop && (
-        <MobileHeader
-          globalCurrency={globalCurrency}
-          appVersion={appVersion}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenWorkModal={handleOpenWorkModal}
-          onOpenCalculator={() => setIsCalculatorOpen((prev) => !prev)}
-          onOpenNotifications={() => setIsNotificationCenterOpen(true)}
-          unreadNotificationsCount={unreadNotificationsCount}
-          activeProfileId={activeProfileId}
-          onProfileChange={handleProfileChange}
-          boosterEntriesCount={profileCounts.booster || (activeProfileId === 'booster' ? activeProfileCount : 0)}
-          advertiserEntriesCount={profileCounts.advertiser || (activeProfileId === 'advertiser' ? activeProfileCount : 0)}
-        />
-      )}
 
       {/* 3. Main Centered Mini-App Workspace */}
       <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-50 dark:bg-zinc-950 gpu-scroll">
@@ -1865,86 +1348,39 @@ Exported via CHECKPOINT Desktop
               ))}
             </div>
           ) : (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`${activeTab}-${activeProfileId}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
-              >
-                <ErrorBoundary>
-                  {activeTab === 'ledger' && (
-                    <LedgerView
-                      dataVersion={ledgerVersion}
-                      categories={categories}
-                      globalCurrency={globalCurrency}
-                      onCurrencyChange={handleCurrencyChange}
-                      goldRateTOMAN={goldRateTOMAN}
-                      usdRateTOMAN={usdRateTOMAN}
-                      eurRateUSD={eurRateUSD}
-                      onSaveRates={handleSaveRates}
-                      onOpenWorkModal={handleOpenWorkModal}
-                      onOpenReceipt={handleOpenReceipt}
-                      onOpenLightbox={handleOpenLightbox}
-                      onFlipStatus={handleFlipStatus}
-                      onDuplicateEntry={handleDuplicateEntry}
-                      onDeleteEntry={handleDeleteEntry}
-                      onBulkDelete={handleBulkDelete}
-                      onBulkUpdateStatus={handleBulkUpdateStatus}
-                      onBulkExportCsv={handleBulkExportCsv}
-                      externalTeammateFilter={externalTeammateFilter}
-                      onClearExternalTeammateFilter={handleClearExternalTeammateFilter}
-                      externalSourceFilter={externalSourceFilter}
-                      onClearExternalSourceFilter={handleClearExternalSourceFilter}
-                      isSelectMode={isSelectMode}
-                      onToggleSelectMode={setIsSelectMode}
-                      selectedEntryIds={selectedEntryIds}
-                      onSelectionChange={setSelectedEntryIds}
-                      contextMenuTargetId={contextMenuState.isOpen ? contextMenuState.targetEntry?.id : null}
-                      confirmDeleteEntryId={confirmDeleteEntryId}
-                      onConfirmDeleteChange={setConfirmDeleteEntryId}
-                      onOpenEntryContextMenu={handleOpenEntryContextMenu}
-                      activeProfileId={activeProfileId}
-                      onUpdateSourcePaid={handleUpdateSourcePaid}
-                      onUpdateBoosterPaid={handleUpdateBoosterPaid}
-                      ledgerDateFormat={ledgerDateFormat}
-                      searchQuery={deferredSearchQuery}
-                      onSearchQueryChange={setSearchQuery}
-                      statusFilter={statusFilter}
-                      onStatusFilterChange={setStatusFilter}
-                    />
-                  )}
-
-                  {activeTab === 'analytics' && (
+            <LedgerProvider
+              profileId={activeProfileId}
+              dataVersion={ledgerVersion}
+              rates={ledgerRates}
+              displayCurrency={globalCurrency}
+            >
+              <AnimatePresence mode="wait">
+                <motion.div
+                  // Both profiles switch screens inside one mounted shell, so an open dialog and its draft survive any tab change
+                  key={activeProfileId}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
+                >
+                  <ErrorBoundary>
                     <Suspense fallback={null}>
-                      <AnalyticsView
-                        entries={analyticsEntries}
-                        globalCurrency={globalCurrency}
-                        goldRateTOMAN={goldRateTOMAN}
-                        usdRateTOMAN={usdRateTOMAN}
-                        eurRateUSD={eurRateUSD}
-                        activeProfileId={activeProfileId}
+                      <LedgerShell
+                        activeTab={visibleTab}
+                        onTabChange={handleTabChange}
+                        onCurrencyChange={handleCurrencyChange}
+                        categories={categories}
+                        newOrderSignal={newOrderSignal}
+                        quote={ledgerQuote}
                       />
                     </Suspense>
-                  )}
-                </ErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
+                  </ErrorBoundary>
+                </motion.div>
+              </AnimatePresence>
+            </LedgerProvider>
           )}
         </div>
       </main>
-
-      {/* 4. Mobile Bottom Navigation Bar (Only on Web viewports) */}
-      {!isDesktop && (
-        <MobileBottomNav
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          onOpenWorkModal={() => handleOpenWorkModal()}
-          onOpenCalculator={() => setIsCalculatorOpen((prev) => !prev)}
-          activeProfileId={activeProfileId}
-        />
-      )}
 
       {/* Root Order Calculator Sliding Drawer */}
       <OrderCalculatorPopover
@@ -1960,49 +1396,6 @@ Exported via CHECKPOINT Desktop
       />
 
       {/* Modals & Dialogs */}
-      <WorkModal
-        isOpen={isWorkModalOpen}
-        onClose={() => {
-          setIsWorkModalOpen(false);
-          setEditingEntry(null);
-        }}
-        onSave={handleSaveEntry}
-        editingEntry={editingEntry}
-        globalCurrency={globalCurrency}
-        goldRateTOMAN={goldRateTOMAN}
-        onOpenLightbox={handleOpenLightbox}
-        categories={categories}
-        latestEntryDefaults={latestEntryDefaults}
-        onRefreshCategories={refreshCategories}
-        activeProfileId={activeProfileId}
-        usdRateTOMAN={usdRateTOMAN}
-        eurRateUSD={eurRateUSD}
-        onSaveRates={handleSaveRates}
-      />
-
-      <ReceiptModal
-        isOpen={isReceiptModalOpen}
-        onClose={() => {
-          setIsReceiptModalOpen(false);
-          setReceiptEntry(null);
-        }}
-        entry={receiptEntry}
-        globalCurrency={globalCurrency}
-        onOpenLightbox={handleOpenLightbox}
-        activeProfileId={activeProfileId}
-        onFilterTeammate={(name) => {
-          setIsReceiptModalOpen(false);
-          setReceiptEntry(null);
-          setActiveTab('ledger');
-          setExternalTeammateFilter(name);
-        }}
-        onFilterSource={(source) => {
-          setIsReceiptModalOpen(false);
-          setReceiptEntry(null);
-          setActiveTab('ledger');
-          setExternalSourceFilter(source);
-        }}
-      />
 
       <SettingsModal
         isOpen={isSettingsOpen}
@@ -2055,43 +1448,16 @@ Exported via CHECKPOINT Desktop
         isOpen={contextMenuState.isOpen}
         position={{ x: contextMenuState.x, y: contextMenuState.y, rect: contextMenuState.rect }}
         onClose={handleCloseContextMenu}
-        targetEntry={contextMenuState.targetEntry}
-        selectedCount={selectedEntryIds.size}
-        isTargetInSelection={
-          contextMenuState.targetEntry ? selectedEntryIds.has(contextMenuState.targetEntry.id) : false
-        }
-        isSelectMode={isSelectMode}
         globalCurrency={globalCurrency}
         activeProfileId={activeProfileId}
         theme={currentTheme}
-        onAddWork={handleContextAddWork}
-        onToggleSelectMode={handleContextToggleSelectMode}
+        onAddWork={handleOpenWorkModal}
         onToggleCurrency={handleContextToggleCurrency}
         onExport={handleContextExport}
         onReload={handleContextReload}
         onOpenShortcuts={handleContextShortcuts}
         onThemeChange={handleThemeChange}
         onLanguageChange={setLanguage}
-        onFlipStatus={handleFlipStatus}
-        onEditEntry={(entry) => handleOpenWorkModal(entry)}
-        onDuplicateEntry={(entry) => handleDuplicateEntry(entry.id)}
-        onViewReceipt={(entry) => handleOpenReceipt(entry)}
-        onCopyDiscordReceipt={handleContextCopyDiscord}
-        onAddScreenshot={(entry) => handleOpenWorkModal(entry)}
-        onOpenLink={(entry) => openAppAwareUrl(entry.link)}
-        onDeleteEntry={(entry) => {
-          if (activeTab !== 'ledger') {
-            setActiveTab('ledger');
-          }
-          setConfirmDeleteEntryId(entry.id);
-        }}
-        onBulkMarkPaid={handleContextBulkMarkPaid}
-        onBulkExportCsv={handleContextBulkExportCsv}
-        onDeselectAll={() => {
-          setSelectedEntryIds(new Set());
-          setIsSelectMode(false);
-        }}
-        onBulkDelete={handleContextBulkDelete}
       />
 
       <NotificationCenter
@@ -2114,13 +1480,7 @@ Exported via CHECKPOINT Desktop
       <ShortcutsModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
-      />
-
-      <Lightbox
-        isOpen={lightboxData.isOpen}
-        onClose={() => setLightboxData({ isOpen: false, imgSrc: '', caption: '' })}
-        imgSrc={lightboxData.imgSrc}
-        caption={lightboxData.caption}
+        activeProfileId={activeProfileId}
       />
 
       {/* Compact Export Confirmation Dialog (Alt + E / Alt + B) */}
@@ -2203,13 +1563,6 @@ Exported via CHECKPOINT Desktop
         }}
       />
 
-      {/* Transient Floating Undo Delete Safety Net Toast */}
-      <UndoToast
-        isOpen={undoDeleteState.isOpen}
-        count={undoDeleteState.count}
-        onUndo={handleUndoDelete}
-        onDismiss={() => setUndoDeleteState({ isOpen: false, items: [], count: 0 })}
-      />
     </div>
   );
 }

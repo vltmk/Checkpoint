@@ -68,15 +68,3 @@ test('sanitizePriceInput: handles empty, invalid or falsy inputs', () => {
   assert.equal(sanitizePriceInput('0'), '0');
   assert.equal(sanitizePriceInput(60699), '60699');
 });
-
-test('UI wiring: NumberStepperInput and WorkModal integrate sanitizePriceInput & onPaste', () => {
-  const stepperSrc = fs.readFileSync(path.join(rootDir, 'src/components/ui/NumberStepperInput.jsx'), 'utf8');
-  assert.ok(stepperSrc.includes('sanitizePriceInput'), 'NumberStepperInput must import and use sanitizePriceInput');
-  assert.ok(stepperSrc.includes('onPaste='), 'NumberStepperInput must have onPaste handler');
-
-  const workModalSrc = fs.readFileSync(path.join(rootDir, 'src/components/WorkModal.jsx'), 'utf8');
-  assert.ok(workModalSrc.includes('sanitizePriceInput'), 'WorkModal must import and use sanitizePriceInput');
-  assert.ok(workModalSrc.includes('handlePotChange = (newPotStr) => {'), 'WorkModal must define handlePotChange');
-  assert.ok(workModalSrc.includes('handleIncomeChange = (newIncomeStr) => {'), 'WorkModal must define handleIncomeChange');
-
-});

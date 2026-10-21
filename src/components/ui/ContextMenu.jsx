@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Plus,
-  Zap,
-  CheckSquare,
   Check,
   RotateCw,
   Download,
@@ -13,38 +11,18 @@ import {
   Moon,
   Globe,
   Keyboard,
-  Edit3,
-  Copy,
-  Receipt,
-  Trash2,
   ChevronRight,
   ChevronLeft,
-  FileSpreadsheet,
-  CheckCircle2,
-  FileImage,
-  ExternalLink,
-  XSquare,
 } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
 import { FrostedGlass } from './FrostedGlass';
-import {
-  DiscordIcon,
-  TelegramIcon,
-  SteamIcon,
-  GoogleSheetsIcon,
-  GithubIcon,
-} from './Icons';
-import { detectAppLink } from '../../lib/appLinks';
-import { openAppAwareUrl } from '../../lib/desktop';
-import { STATUSES, STATUS_CONFIG } from '../../lib/currencies';
 
 /**
  * Apple-grade Context Menu Component
  * Features:
  * - Fluid critically damped spring physics (motion/react)
  * - Screen boundary clamping (never overflows edges)
- * - Multi-selection context awareness
  * - Bi-directional submenu flipping (horizontal & vertical)
  * - 100ms triangle hover intent buffer for diagonal mouse paths
  * - Tactile active press response (active:scale-[0.98])
@@ -54,35 +32,16 @@ export function ContextMenu({
   isOpen,
   position = { x: 0, y: 0 },
   onClose,
-  targetEntry = null,
-  selectedCount = 0,
-  isTargetInSelection = false,
-  isSelectMode = false,
   globalCurrency = 'TOMAN',
   activeProfileId = 'booster',
   theme = 'dark',
   onAddWork,
-  onToggleSelectMode,
   onToggleCurrency,
   onExport,
   onReload,
   onOpenShortcuts,
   onThemeChange,
   onLanguageChange,
-  onFlipStatus,
-  // Single entry actions
-  onEditEntry,
-  onDuplicateEntry,
-  onViewReceipt,
-  onCopyDiscordReceipt,
-  onAddScreenshot,
-  onOpenLink,
-  onDeleteEntry,
-  // Bulk selection actions
-  onBulkMarkPaid,
-  onBulkExportCsv,
-  onDeselectAll,
-  onBulkDelete,
 }) {
   const { language, t, isRtl } = useLanguage();
   const menuRef = useRef(null);
@@ -91,11 +50,10 @@ export function ContextMenu({
   const [flipSubmenuLeft, setFlipSubmenuLeft] = useState(false);
   const [flipSubmenuUp, setFlipSubmenuUp] = useState(false);
   const [isConstrained, setIsConstrained] = useState(false);
-  const [activeSubmenu, setActiveSubmenu] = useState(null); // null | 'theme' | 'language' | 'status'
+  const [activeSubmenu, setActiveSubmenu] = useState(null); // null | 'theme' | 'language'
   const submenuTimeoutRef = useRef(null);
   const themeTriggerRef = useRef(null);
   const languageTriggerRef = useRef(null);
-  const statusTriggerRef = useRef(null);
   const [submenuAnchor, setSubmenuAnchor] = useState({ top: 0, height: 28 });
   const [measuredMenuWidth, setMeasuredMenuWidth] = useState(224);
 
@@ -117,7 +75,7 @@ export function ContextMenu({
     const menuEl = el?.querySelector('.checkpoint-frosted-menu');
     // Measure actual DOM dimensions if available, with realistic fallback
     const menuWidth = menuEl?.offsetWidth || el?.offsetWidth || 224;
-    const menuHeight = el?.offsetHeight || (targetEntry ? 280 : 340);
+    const menuHeight = el?.offsetHeight || 300;
     setMeasuredMenuWidth(menuWidth);
 
     const viewportWidth = window.innerWidth;
@@ -288,7 +246,7 @@ export function ContextMenu({
     setTransformOrigin(`${originY} ${originX}`);
     setFlipSubmenuLeft(shouldFlipSubmenuLeft);
     setFlipSubmenuUp(shouldFlipSubmenuUp);
-  }, [isOpen, position.x, position.y, position.rect, targetEntry, selectedCount, isSelectMode, isRtl]);
+  }, [isOpen, position.x, position.y, position.rect, isRtl]);
 
   // Click outside and escape listeners
   useEffect(() => {
@@ -322,7 +280,7 @@ export function ContextMenu({
 
   // Submenu Hover Intent Handlers with 100ms Triangle Safe Zone
   const updateSubmenuAnchor = useCallback((name) => {
-    const triggerEl = name === 'status' ? statusTriggerRef.current : name === 'theme' ? themeTriggerRef.current : name === 'language' ? languageTriggerRef.current : null;
+    const triggerEl = name === 'theme' ? themeTriggerRef.current : name === 'language' ? languageTriggerRef.current : null;
     if (triggerEl && menuRef.current) {
       const menuRect = menuRef.current.getBoundingClientRect();
       const triggerRect = triggerEl.getBoundingClientRect();
@@ -381,23 +339,6 @@ export function ContextMenu({
 
   if (!isOpen) return null;
 
-  const showBulkActions = selectedCount > 1 && isTargetInSelection;
-
-  const linkInfo = targetEntry?.link ? detectAppLink(targetEntry.link) : null;
-  const isApp = linkInfo?.appLaunchable;
-  const linkLabel = linkInfo
-    ? (isApp
-        ? (language === 'fa' && linkInfo.labelFa ? `باز کردن در ${linkInfo.labelFa}` : `Open in ${linkInfo.label} App`)
-        : (language === 'fa' && linkInfo.labelFa ? `باز کردن ${linkInfo.labelFa}` : `Open ${linkInfo.label}`))
-    : t('ledger.openLink', 'Open Link');
-
-  let LinkIcon = ExternalLink;
-  if (linkInfo?.platform === 'discord') LinkIcon = DiscordIcon;
-  else if (linkInfo?.platform === 'telegram') LinkIcon = TelegramIcon;
-  else if (linkInfo?.platform === 'steam') LinkIcon = SteamIcon;
-  else if (linkInfo?.platform === 'sheets') LinkIcon = GoogleSheetsIcon;
-  else if (linkInfo?.platform === 'github') LinkIcon = GithubIcon;
-
   return (
     <div
       ref={menuRef}
@@ -427,268 +368,96 @@ export function ContextMenu({
             : 'overflow-visible'
         )}
       >
-        {/* ==================================================================== */}
-        {/* 1. DEDICATED BULK MULTI-SELECTION CONTEXT MENU                        */}
-        {/* ==================================================================== */}
-        {showBulkActions ? (
-          <>
-            <div className={cn(
-              "px-2 py-1 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/50 mb-0.5",
-              isRtl && 'font-farsi'
-            )}>
-              <span>{t('contextMenu.selectMode')}</span>
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                {selectedCount} {language === 'fa' ? 'مورد' : 'selected'}
-              </span>
-            </div>
+        <ContextMenuItem
+          icon={<Plus className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />}
+          label={activeProfileId === 'advertiser' ? t('lg.newOrder', 'New order') : t('lg.job.new', 'Add a job')}
+          shortcut="N"
+          onClick={() => executeAction(onAddWork)}
+        />
 
-            <ContextMenuItem
-              icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
-              label={`${t('contextMenu.markSelectedPaid')} (${selectedCount})`}
-              onClick={() => executeAction(onBulkMarkPaid)}
-            />
+        <MenuDivider />
 
-            <ContextMenuItem
-              icon={<FileSpreadsheet className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={`${t('contextMenu.exportSelectedCsv')} (${selectedCount})`}
-              onClick={() => executeAction(onBulkExportCsv)}
-            />
-
-            <ContextMenuItem
-              icon={<XSquare className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.deselectAll', 'Deselect All')}
-              onClick={() => executeAction(onDeselectAll)}
-            />
-
-            <MenuDivider />
-
-            <ContextMenuItem
-              icon={<Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />}
-              label={`${t('contextMenu.deleteSelected')} (${selectedCount})`}
-              isDestructive
-              onClick={() => executeAction(onBulkDelete)}
-            />
-          </>
-        ) : targetEntry ? (
-          /* ==================================================================== */
-          /* 2. DEDICATED WORK ROW CONTEXT MENU                                    */
-          /* ==================================================================== */
-          <>
-            {/* Section 1: Receipts, Discord MD & External Links */}
-            <ContextMenuItem
-              icon={<Receipt className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={activeProfileId === 'advertiser' ? (language === 'fa' ? 'مشاهده فاکتور / رسید' : 'View Order Receipt') : t('ledger.clientReceipt', 'Client Receipt')}
-              onClick={() => executeAction(() => onViewReceipt?.(targetEntry))}
-            />
-
-            {activeProfileId === 'advertiser' ? (
-              <>
-                <ContextMenuItem
-                  icon={<DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-                  label={language === 'fa' ? 'رسید مشتری (دیسکورد)' : 'Client Receipt (Discord)'}
-                  onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry, 'client'))}
-                />
-                {targetEntry.teammates && targetEntry.teammates.length > 0 && (
-                  <ContextMenuItem
-                    icon={<DiscordIcon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />}
-                    label={language === 'fa' ? 'فیش تسویه بوستر (دیسکورد)' : 'Booster Payout Slip (Discord)'}
-                    onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry, 'booster'))}
-                  />
-                )}
-              </>
+        <ContextMenuItem
+          icon={
+            globalCurrency === 'GOLD' ? (
+              <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             ) : (
-              <ContextMenuItem
-                icon={<DiscordIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
-                label={t('contextMenu.copyDiscord')}
-                onClick={() => executeAction(() => onCopyDiscordReceipt?.(targetEntry))}
-              />
-            )}
+              <Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            )
+          }
+          label={t('contextMenu.toggleCurrency')}
+          shortcut="T"
+          suffix={
+            <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase">{globalCurrency}</span>
+          }
+          onClick={() => executeAction(onToggleCurrency)}
+        />
 
-            {targetEntry.link && (
-              <ContextMenuItem
-                icon={<LinkIcon className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-                label={linkLabel}
-                onClick={() => executeAction(() => (onOpenLink ? onOpenLink(targetEntry) : openAppAwareUrl(targetEntry.link)))}
-              />
-            )}
+        <ContextMenuItem
+          icon={<Download className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
+          label={t('contextMenu.exportBackups')}
+          shortcut="Alt+E"
+          onClick={() => executeAction(onExport)}
+        />
 
-            <MenuDivider />
+        <ContextMenuItem
+          icon={<RotateCw className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
+          label={t('contextMenu.reload')}
+          shortcut="Ctrl+R"
+          onClick={() => executeAction(onReload)}
+        />
 
-            {/* Status Submenu Trigger */}
-            <div
-              ref={statusTriggerRef}
-              className="relative"
-              onMouseEnter={() => handleSubmenuTriggerMouseEnter('status')}
-              onMouseLeave={handleSubmenuTriggerMouseLeave}
-            >
-              <ContextMenuItem
-                icon={
-                  <span
-                    className={cn(
-                      'w-2 h-2 rounded-full shrink-0',
-                      STATUS_CONFIG[targetEntry.status]?.color === 'emerald'
-                        ? 'bg-emerald-500'
-                        : STATUS_CONFIG[targetEntry.status]?.color === 'amber'
-                        ? 'bg-amber-500'
-                        : STATUS_CONFIG[targetEntry.status]?.color === 'sky'
-                        ? 'bg-sky-500'
-                        : STATUS_CONFIG[targetEntry.status]?.color === 'rose'
-                        ? 'bg-rose-500'
-                        : 'bg-zinc-500'
-                    )}
-                  />
-                }
-                label={t('ledger.status', 'Status')}
-                hasSubmenu
-                isSubmenuOpen={activeSubmenu === 'status'}
-                isRtl={isRtl}
-                flipSubmenuLeft={flipSubmenuLeft}
-                suffix={
-                  <span className="text-[10px] text-zinc-400 font-medium">
-                    {t('status.' + targetEntry.status, STATUS_CONFIG[targetEntry.status]?.label || targetEntry.status)}
-                  </span>
-                }
-              />
-            </div>
+        <MenuDivider />
 
-            <MenuDivider />
+        {/* Theme Submenu Trigger */}
+        <div
+          ref={themeTriggerRef}
+          className="relative"
+          onMouseEnter={() => handleSubmenuTriggerMouseEnter('theme')}
+          onMouseLeave={handleSubmenuTriggerMouseLeave}
+        >
+          <ContextMenuItem
+            icon={
+              theme === 'dark' ? (
+                <Moon className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
+              ) : (
+                <Sun className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              )
+            }
+            label={t('contextMenu.theme')}
+            hasSubmenu
+            isSubmenuOpen={activeSubmenu === 'theme'}
+            isRtl={isRtl}
+            flipSubmenuLeft={flipSubmenuLeft}
+          />
+        </div>
 
-            {/* Section 2: Editing, Screenshots & Duplication */}
-            <ContextMenuItem
-              icon={<Edit3 className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.editWork')}
-              onClick={() => executeAction(() => onEditEntry?.(targetEntry))}
-            />
+        {/* Language Submenu Trigger */}
+        <div
+          ref={languageTriggerRef}
+          className="relative"
+          onMouseEnter={() => handleSubmenuTriggerMouseEnter('language')}
+          onMouseLeave={handleSubmenuTriggerMouseLeave}
+        >
+          <ContextMenuItem
+            icon={<Globe className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
+            label={t('contextMenu.language')}
+            hasSubmenu
+            isSubmenuOpen={activeSubmenu === 'language'}
+            isRtl={isRtl}
+            flipSubmenuLeft={flipSubmenuLeft}
+          />
+        </div>
 
-            <ContextMenuItem
-              icon={<FileImage className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('ledger.addScreenshot', 'Add Screenshot')}
-              onClick={() => executeAction(() => (onAddScreenshot ? onAddScreenshot(targetEntry) : onEditEntry?.(targetEntry)))}
-            />
+        <MenuDivider />
 
-            <ContextMenuItem
-              icon={<Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.duplicateWork')}
-              onClick={() => executeAction(() => onDuplicateEntry?.(targetEntry))}
-            />
-
-            <MenuDivider />
-
-            {/* Section 3: Destructive Delete */}
-            <ContextMenuItem
-              icon={<Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />}
-              label={t('contextMenu.deleteWork')}
-              isDestructive
-              onClick={() => executeAction(() => onDeleteEntry?.(targetEntry))}
-            />
-          </>
-        ) : (
-          /* ==================================================================== */
-          /* 3. DEDICATED GENERAL / CANVAS ACTIONS MENU                            */
-          /* ==================================================================== */
-          <>
-            <ContextMenuItem
-              icon={<Plus className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />}
-              label={t('contextMenu.addWork')}
-              shortcut="N"
-              onClick={() => executeAction(onAddWork)}
-            />
-
-            <ContextMenuItem
-              icon={<CheckSquare className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.selectMode')}
-              shortcut="S"
-              isChecked={isSelectMode}
-              onClick={() => executeAction(onToggleSelectMode)}
-            />
-
-            <MenuDivider />
-
-            <ContextMenuItem
-              icon={
-                globalCurrency === 'GOLD' ? (
-                  <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                ) : (
-                  <Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                )
-              }
-              label={t('contextMenu.toggleCurrency')}
-              shortcut="T"
-              suffix={
-                <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase">
-                  {globalCurrency === 'GOLD' ? 'GOLD' : 'TOMAN'}
-                </span>
-              }
-              onClick={() => executeAction(onToggleCurrency)}
-            />
-
-            <ContextMenuItem
-              icon={<Download className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.exportBackups')}
-              shortcut="Alt+E"
-              onClick={() => executeAction(onExport)}
-            />
-
-            <ContextMenuItem
-              icon={<RotateCw className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.reload')}
-              shortcut="Ctrl+R"
-              onClick={() => executeAction(onReload)}
-            />
-
-            <MenuDivider />
-
-            {/* Theme Submenu Trigger */}
-            <div
-              ref={themeTriggerRef}
-              className="relative"
-              onMouseEnter={() => handleSubmenuTriggerMouseEnter('theme')}
-              onMouseLeave={handleSubmenuTriggerMouseLeave}
-            >
-              <ContextMenuItem
-                icon={
-                  theme === 'dark' ? (
-                    <Moon className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
-                  ) : (
-                    <Sun className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  )
-                }
-                label={t('contextMenu.theme')}
-                hasSubmenu
-                isSubmenuOpen={activeSubmenu === 'theme'}
-                isRtl={isRtl}
-                flipSubmenuLeft={flipSubmenuLeft}
-              />
-            </div>
-
-            {/* Language Submenu Trigger */}
-            <div
-              ref={languageTriggerRef}
-              className="relative"
-              onMouseEnter={() => handleSubmenuTriggerMouseEnter('language')}
-              onMouseLeave={handleSubmenuTriggerMouseLeave}
-            >
-              <ContextMenuItem
-                icon={<Globe className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-                label={t('contextMenu.language')}
-                hasSubmenu
-                isSubmenuOpen={activeSubmenu === 'language'}
-                isRtl={isRtl}
-                flipSubmenuLeft={flipSubmenuLeft}
-              />
-            </div>
-
-            <MenuDivider />
-
-            {/* Shortcuts */}
-            <ContextMenuItem
-              icon={<Keyboard className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
-              label={t('contextMenu.shortcuts')}
-              shortcut="?"
-              onClick={() => executeAction(onOpenShortcuts)}
-            />
-          </>
-        )}
+        {/* Shortcuts */}
+        <ContextMenuItem
+          icon={<Keyboard className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />}
+          label={t('contextMenu.shortcuts')}
+          shortcut="?"
+          onClick={() => executeAction(onOpenShortcuts)}
+        />
       </FrostedGlass>
 
       {/* Flyout Submenu rendered as sibling to ensure independent Backdrop Root */}
@@ -718,34 +487,6 @@ export function ContextMenu({
                   isChecked={theme === 'light'}
                   onClick={() => executeAction(() => onThemeChange?.('light'))}
                 />
-              </>
-            )}
-            {activeSubmenu === 'status' && targetEntry && (
-              <>
-                {STATUSES.map((st) => (
-                  <ContextMenuItem
-                    key={st}
-                    icon={
-                      <span
-                        className={cn(
-                          'w-2 h-2 rounded-full shrink-0',
-                          STATUS_CONFIG[st]?.color === 'emerald'
-                            ? 'bg-emerald-500'
-                            : STATUS_CONFIG[st]?.color === 'amber'
-                            ? 'bg-amber-500'
-                            : STATUS_CONFIG[st]?.color === 'blue'
-                            ? 'bg-blue-500'
-                            : STATUS_CONFIG[st]?.color === 'rose'
-                            ? 'bg-rose-500'
-                            : 'bg-zinc-500'
-                        )}
-                      />
-                    }
-                    label={t('status.' + st, STATUS_CONFIG[st]?.label || st)}
-                    isChecked={targetEntry.status === st}
-                    onClick={() => executeAction(() => onFlipStatus?.(targetEntry.id, targetEntry.status, st))}
-                  />
-                ))}
               </>
             )}
             {activeSubmenu === 'language' && (

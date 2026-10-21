@@ -3,12 +3,14 @@
  */
 
 import { convertCurrency, CURRENCIES } from './currencies.js';
+import { KNOWN_PLATFORMS } from './ledger/platforms.js';
 
+const PLATFORM_LABEL_FA = { funpay: 'فان‌پی', eldorado: 'الدورادو' };
+
+// "Direct" plus every marketplace whose usual fee is known; the list itself lives in ledger/platforms.js
 export const PLATFORM_FEE_PRESETS = [
   { id: 'direct', label: 'Direct', labelFa: 'مستقیم', pct: 0 },
-  { id: 'g2g', label: 'G2G', labelFa: 'G2G', pct: 9.99 },
-  { id: 'funpay', label: 'FunPay', labelFa: 'فان‌پی', pct: 7 },
-  { id: 'eldorado', label: 'Eldorado', labelFa: 'الدورادو', pct: 10 },
+  ...KNOWN_PLATFORMS.filter((p) => p.feePct !== null).map((p) => ({ id: p.id, label: p.label, labelFa: PLATFORM_LABEL_FA[p.id] || p.label, pct: p.feePct })),
 ];
 
 export const ADVERTISER_FEE_PRESETS = ['15', '20', '25', '30', '35'];

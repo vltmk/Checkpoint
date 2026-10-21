@@ -7,26 +7,6 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
-test('SettingsModal cleanly retires cockpitFluidEnabled and fluid toggle', () => {
-  const settingsModalCode = fs.readFileSync(
-    path.join(rootDir, 'src/components/SettingsModal.jsx'),
-    'utf8'
-  );
-
-  assert.ok(!settingsModalCode.includes('cockpitFluidEnabled'));
-  assert.ok(!settingsModalCode.includes('onCockpitFluidEnabledChange'));
-});
-
-test('HUD progressbar provides accessible role and aria attributes', () => {
-  const ledgerCode = fs.readFileSync(
-    path.join(rootDir, 'src/components/views/LedgerView.jsx'),
-    'utf8'
-  );
-  assert.match(ledgerCode, /role="progressbar"/);
-  assert.match(ledgerCode, /Job settlement distribution/);
-  assert.match(ledgerCode, /aria-valuenow=/);
-});
-
 test('desktop.js exports reactive window lifecycle tracking methods', async () => {
   const desktop = await import('../src/lib/desktop.js');
 
@@ -68,21 +48,6 @@ test('desktop.js exports reactive window lifecycle tracking methods', async () =
   assert.equal(focusNotified[focusNotified.length - 1], true);
 
   unsubscribeFocus();
-});
-
-test('i18n contains English and Persian translations for cockpit fluid settings', () => {
-  const i18nCode = fs.readFileSync(
-    path.join(rootDir, 'src/lib/i18n.jsx'),
-    'utf8'
-  );
-
-  // English
-  assert.match(i18nCode, /'settings\.cockpitVisuals':\s*'Power Saver'/);
-  assert.match(i18nCode, /'settings\.cockpitFluid':\s*'Cockpit Animation'/);
-
-  // Persian
-  assert.match(i18nCode, /'settings\.cockpitVisuals':\s*'صرفه‌جویی در مصرف انرژی'/);
-  assert.match(i18nCode, /'settings\.cockpitFluid':\s*'انیمیشن کاکپیت'/);
 });
 
 test('Simulated cadence limiter clamps frame rate on 144Hz-360Hz intervals', () => {

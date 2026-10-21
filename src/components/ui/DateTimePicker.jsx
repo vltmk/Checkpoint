@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -80,22 +81,41 @@ export function DateTimePicker({
   const hourInputRef = useRef(null);
   const minuteInputRef = useRef(null);
 
-  // Auto-scroll modal container down when calendar opens so 'Done' button is in view
-  useEffect(() => {
-    if (isOpen && autoScrollOnOpen) {
-      const timer = setTimeout(() => {
-        if (popoverBottomRef.current) {
-          popoverBottomRef.current.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
-            inline: 'nearest',
-          });
-        }
-      }, 60);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, autoScrollOnOpen]);
+  // The calendar is drawn in a portal with fixed coordinates, so it can never stretch or be clipped by the dialog
+  // or scroll area the field sits in. It opens below the field, flips above when there is no room, and scrolls
+  // inside itself if the window is shorter than the calendar.
+  const popoverRef = useRef(null);
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    const place = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 8;
+      const gap = 6;
+      const width = Math.min(320, vw - pad * 2);
+      const left = Math.max(pad, Math.min(isRtl ? r.right - width : r.left, vw - width - pad));
+      const below = vh - r.bottom - gap - pad;
+      const above = r.top - gap - pad;
+      const up = dropUp ? above >= 300 || above > below : below < 400 && above > below;
+      // The field can itself be partly or fully outside the window (a tall dialog in a short window), so the
+      // anchor is clamped: the calendar always lies fully inside the viewport.
+      const bottom = up ? Math.max(pad, vh - r.top + gap) : undefined;
+      const top = up ? undefined : Math.max(pad, Math.min(r.bottom + gap, vh - 220 - pad));
+      const room = up ? vh - bottom - pad : vh - top - pad;
+      setPos({ left, width, up, top, bottom, maxHeight: Math.max(200, Math.min(room, 560)) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [isOpen, isRtl, dropUp]);
 
   // Calendar Engine Type: 'shamsi' (Solar Hijri) or 'gregorian'
   const [calendarType, setCalendarType] = useState(() => (language === 'fa' ? 'shamsi' : 'gregorian'));
@@ -155,7 +175,8 @@ export function DateTimePicker({
     if (!isOpen) return;
 
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      const inside = (containerRef.current && containerRef.current.contains(e.target)) || (popoverRef.current && popoverRef.current.contains(e.target));
+      if (!inside) {
         setIsOpen(false);
         setViewMode('days');
       }
@@ -477,9 +498,13 @@ export function DateTimePicker({
       </div>
 
       {/* Popover with Custom Calendar & Time Picker */}
+      {typeof document !== 'undefined' && createPortal(
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && pos && (
           <FrostedGlass
+            ref={popoverRef}
+            role="dialog"
+            aria-label={language === 'fa' ? 'انتخاب تاریخ و زمان' : 'Choose date and time'}
             as="motion.div"
             variant="popover"
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
@@ -487,12 +512,8 @@ export function DateTimePicker({
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
             dir={isRtl ? 'rtl' : 'ltr'}
-            className={cn(
-              'absolute z-50 w-full sm:w-[320px] rounded-xl p-3 space-y-3',
-              isRtl ? 'right-0' : 'left-0',
-              dropUp ? 'origin-bottom' : 'origin-top',
-              dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-            )}
+            style={{ position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
+            className={cn('z-[70] rounded-xl p-3 space-y-3 overflow-y-auto overscroll-contain', pos.up ? 'origin-bottom' : 'origin-top')}
           >
             {/* 1. Quick Presets Header */}
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
@@ -944,7 +965,9 @@ export function DateTimePicker({
             </div>
           </FrostedGlass>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 }

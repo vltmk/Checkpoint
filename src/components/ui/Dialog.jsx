@@ -223,7 +223,7 @@ export function DialogTitle({ children, className }) {
 }
 
 export function DialogContent({ children, className }) {
-  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1 relative z-20', className)}>{children}</div>;
+  return <div className={cn('p-5 space-y-4 overflow-y-auto flex-1 min-h-0 relative z-20', className)}>{children}</div>;
 }
 
 export function DialogFooter({ children, className }) {

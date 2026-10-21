@@ -17,13 +17,15 @@ import {
   Zap,
   Megaphone,
   Calculator,
-  Search,
   Trash2,
   Info,
+  Gauge,
+  Users,
+  Wallet,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
-import { Kbd } from './ui/Tooltip';
 import { CheckpointLogo, TomanIcon, DiscordIcon } from './ui/Icons';
 import { ProfilePopover } from './ui/ProfilePopover';
 import { STATUSES, STATUS_CONFIG, formatMoney } from '../lib/currencies';
@@ -78,50 +80,16 @@ export function Navbar({
   eurRateUSD = 1.08,
   onSaveRates,
   onTransferFromCalculator,
-  searchQuery = '',
-  onSearchQueryChange,
-  statusFilter = 'ALL',
-  onStatusFilterChange,
-  selectedCount = 0,
-  selectedSum = 0,
-  onBatchStatusChange,
-  onBatchDelete,
-  onCopyDiscordBatch,
-  isDiscordBatchCopied = false,
-  onClearSelection,
 }) {
   const { t, formatNumber, isRtl, language } = useLanguage();
   const isDesktop = isTauri();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isRatesOpen, setIsRatesOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
-  const [isBatchStatusOpen, setIsBatchStatusOpen] = useState(false);
   const [tempRateTOMAN, setTempRateTOMAN] = useState(goldRateTOMAN);
   const [tempRateUSD, setTempRateUSD] = useState(usdRateTOMAN);
   const [tempRateEUR, setTempRateEUR] = useState(eurRateUSD);
   const ratesDropdownRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const batchStatusRef = useRef(null);
-  const brandRef = useRef(null);
-  const [brandRightOffset, setBrandRightOffset] = useState(150);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const expandedSearchRef = useRef(null);
-  const expandedSearchInputRef = useRef(null);
-
-  // Track right edge of Checkpoint logo & profile switcher so search overlay stops cleanly before it
-  useEffect(() => {
-    const updateBrandOffset = () => {
-      if (brandRef.current) {
-        const offset = brandRef.current.offsetLeft + brandRef.current.offsetWidth;
-        if (offset > 0) {
-          setBrandRightOffset(offset + 8);
-        }
-      }
-    };
-    updateBrandOffset();
-    window.addEventListener('resize', updateBrandOffset);
-    return () => window.removeEventListener('resize', updateBrandOffset);
-  }, [activeProfileId, language, isSearchExpanded]);
 
   useEffect(() => {
     setTempRateTOMAN(goldRateTOMAN);
@@ -200,54 +168,6 @@ export function Navbar({
     dismissTour();
   };
 
-  // Keyboard shortcut listener for Omnibar search focus (Ctrl+K, /, Esc)
-  useEffect(() => {
-    // Single place that decides which visible search field receives focus:
-    // the omnibar at lg+, or the expanded field on narrower viewports.
-    const focusSearch = () => {
-      if (window.innerWidth < 1024) {
-        setIsSearchExpanded(true);
-        setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
-      } else {
-        searchInputRef.current?.focus();
-      }
-    };
-
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault();
-        focusSearch();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
-        e.preventDefault();
-        focusSearch();
-        return;
-      }
-      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-        const target = e.target;
-        const tag = target?.tagName?.toLowerCase();
-        if (tag !== 'input' && tag !== 'textarea' && !target?.isContentEditable) {
-          e.preventDefault();
-          focusSearch();
-        }
-      }
-      if (e.key === 'Escape' && isSearchExpanded) {
-        e.preventDefault();
-        setIsSearchExpanded(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSearchExpanded]);
-
-  // Auto-focus expanded search input on activation
-  useEffect(() => {
-    if (isSearchExpanded) {
-      setTimeout(() => expandedSearchInputRef.current?.focus(), 50);
-    }
-  }, [isSearchExpanded]);
-
   // Desktop window maximize state listener
   useEffect(() => {
     if (!isDesktop) return;
@@ -273,32 +193,27 @@ export function Navbar({
     };
   }, [isDesktop]);
 
-  // Click outside listener for Rates dropdown, tour guide, and expanded search
+  // Click outside listener for Rates dropdown and tour guide
   useEffect(() => {
-    if (!isRatesOpen && !showTourGuide && !isBatchStatusOpen && !isSearchExpanded) return;
+    if (!isRatesOpen && !showTourGuide) return;
 
     const handleClickOutside = (e) => {
       if (ratesDropdownRef.current && !ratesDropdownRef.current.contains(e.target)) {
         if (isRatesOpen) setIsRatesOpen(false);
         if (showTourGuide) dismissTour();
       }
-      if (batchStatusRef.current && !batchStatusRef.current.contains(e.target)) {
-        setIsBatchStatusOpen(false);
-      }
-      if (expandedSearchRef.current && !expandedSearchRef.current.contains(e.target)) {
-        setIsSearchExpanded(false);
-      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isRatesOpen, showTourGuide, isBatchStatusOpen, isSearchExpanded]);
+  }, [isRatesOpen, showTourGuide]);
 
   const handleSaveRate = () => {
     dismissTour();
-    const gRate = Number(tempRateTOMAN) || 3200;
-    const uRate = Number(tempRateUSD) || 95000;
-    const eRate = Number(tempRateEUR) || 1.08;
+    // an empty or invalid field keeps the rate you already had; it never snaps back to a built-in default
+    const gRate = Number(tempRateTOMAN) > 0 ? Number(tempRateTOMAN) : goldRateTOMAN;
+    const uRate = Number(tempRateUSD) > 0 ? Number(tempRateUSD) : usdRateTOMAN;
+    const eRate = Number(tempRateEUR) > 0 ? Number(tempRateEUR) : eurRateUSD;
     onGoldRateTOMANChange?.(gRate);
     onSaveRates?.({
       goldRateTOMAN: gRate,
@@ -353,7 +268,7 @@ export function Navbar({
       {/* 1. Left Region: Brand & Profile Dropdown, +Work, Tabs */}
       <div data-no-drag className="flex items-center gap-2 shrink-0 z-10">
         {/* Brand & Profile Switcher */}
-        <div ref={brandRef} className="relative z-50" data-no-drag>
+        <div className="relative z-50" data-no-drag>
           <button
             type="button"
             data-no-drag
@@ -393,15 +308,7 @@ export function Navbar({
         <div data-no-drag className="flex items-center">
           {activeProfileId === 'advertiser' ? (
             <div className="flex items-center gap-1.5 select-none">
-              <button
-                type="button"
-                onClick={() => onOpenWorkModal?.()}
-                title={`${t('nav.addWork')} (N)`}
-                className="flex items-center gap-1 h-7 px-2.5 rounded-md bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] text-[11px] font-medium shadow-xs border border-transparent transition-colors cursor-pointer select-none"
-              >
-                <Plus className="w-3 h-3 shrink-0" />
-                <span className={cn(isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
-              </button>
+              {/* New orders are started from the Overview and Orders screens (or with N), so the top bar keeps only the calculator */}
               <button
                 type="button"
                 onClick={onToggleCalculator}
@@ -419,137 +326,56 @@ export function Navbar({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => onOpenWorkModal?.()}
-              title={`${t('nav.addWork')} (N)`}
-              className="flex items-center gap-1 h-7 px-2.5 rounded-md bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 active:scale-[0.98] text-[11px] font-medium shadow-xs border border-transparent transition-all cursor-pointer select-none"
-            >
-              <Plus className="w-3 h-3 shrink-0" />
-              <span className={cn(isRtl && 'font-farsi')}>{t('nav.addWork')}</span>
-            </button>
+            null
           )}
         </div>
 
-        {/* View Switcher Pills */}
+        {/* View Switcher Pills. Booster: Ledger / Analytics. Advertiser: Overview, Orders, Boosters, Money, Reports. */}
         <div data-no-drag className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-md p-0.5 ml-1">
-          <button
-            type="button"
-            onClick={() => onTabChange?.('ledger')}
-            className={cn(
-              'flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
-              activeTab === 'ledger'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
-                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-            )}
-          >
-            <Layers className="w-3 h-3" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('nav.ledger')}</span>
-            {entriesCount > 0 && (
-              <span className="text-[9px] px-1 py-0 leading-none rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono">
-                {formatNumber(entriesCount)}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => onTabChange?.('analytics')}
-            className={cn(
-              'flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
-              activeTab === 'analytics'
-                ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
-                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-            )}
-          >
-            <BarChart3 className="w-3 h-3" />
-            <span className={cn(isRtl && 'font-farsi')}>{t('nav.analytics')}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Center Region: Centered Omnibar (lg+ only, collapses gracefully on smaller screens) */}
-      <div
-        data-tauri-drag-region
-        className="flex-1 flex items-center justify-center min-w-0 px-2 h-full cursor-default z-10"
-      >
-        <div
-          data-no-drag
-          className="hidden lg:flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/40 dark:focus-within:ring-zinc-600/40 rounded-lg px-2.5 h-7 w-full max-w-[300px] transition-all text-xs shadow-2xs"
-        >
-          <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-          
-          {statusFilter && statusFilter !== 'ALL' && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 shrink-0">
-              <span>{t('status.' + statusFilter, statusFilter)}</span>
-              <button aria-label={t('a11y.clearStatusFilter', 'Clear status filter')}
-                type="button"
-                onClick={() => onStatusFilterChange?.('')}
-                className="hover:text-rose-500"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </span>
-          )}
-
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchQueryChange?.(e.target.value)}
-            placeholder={t('common.search', 'Search or filter...')}
-            className="flex-1 bg-transparent border-0 outline-none p-0 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 min-w-0"
-          />
-
-          {searchQuery ? (
-            <button aria-label={t('a11y.clearSearch', 'Clear search')}
+          {(activeProfileId === 'advertiser'
+            ? [
+                { id: 'cockpit', icon: Gauge, label: t('nav.cockpit') },
+                { id: 'orders', icon: ClipboardList, label: t('nav.orders') },
+                { id: 'people', icon: Users, label: t('nav.people') },
+                { id: 'money', icon: Wallet, label: t('nav.money') },
+                { id: 'analytics', icon: BarChart3, label: t('nav.reports') },
+              ]
+            : [
+                { id: 'cockpit', icon: Gauge, label: t('nav.overview') },
+                { id: 'orders', icon: ClipboardList, label: t('nav.jobs') },
+                { id: 'people', icon: Users, label: t('nav.clients') },
+                { id: 'analytics', icon: BarChart3, label: t('nav.reports') },
+              ]
+          ).map(({ id, icon: Icon, label, count }) => (
+            <button
+              key={id}
               type="button"
-              onClick={() => onSearchQueryChange?.('')}
-              className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              onClick={() => onTabChange?.(id)}
+              aria-current={activeTab === id ? 'page' : undefined}
+              className={cn(
+                'flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
+                activeTab === id
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+              )}
             >
-              <X className="w-3.5 h-3.5" />
+              <Icon className="w-3 h-3" />
+              <span className={cn(isRtl && 'font-farsi')}>{label}</span>
+              {count > 0 && (
+                <span className="text-[9px] px-1 py-0 leading-none rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono">
+                  {formatNumber(count)}
+                </span>
+              )}
             </button>
-          ) : (
-            <Kbd className="shrink-0 text-[9px] text-zinc-400 dark:text-zinc-500">⌘K</Kbd>
-          )}
+          ))}
         </div>
       </div>
+
+      {/* 2. Center Region: empty drag area (search lives on the screens that have lists) */}
+      <div data-tauri-drag-region className="flex-1 min-w-0 h-full cursor-default z-10" />
 
       {/* 3. Right Region: Ghost Actions & Desktop Window Controls */}
       <div data-no-drag className="flex items-center gap-1 shrink-0 z-10">
-        {/* Compact Search Trigger Button (< lg) */}
-        <div className="flex lg:hidden items-center" data-no-drag>
-          {searchQuery ? (
-            <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700 text-xs shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setIsSearchExpanded(true)}
-                className="flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white cursor-pointer select-none"
-                title={`${t('common.search', 'Search')}: ${searchQuery}`}
-              >
-                <Search className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className="font-mono text-[11px] max-w-[80px] truncate">{searchQuery}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSearchQueryChange?.('')}
-                className="text-zinc-400 hover:text-rose-500 p-0.5 rounded transition-colors cursor-pointer"
-                title="Clear search"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsSearchExpanded(true)}
-              title={`${t('common.search', 'Search')} (⌘K)`}
-              aria-label="Search"
-              className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer select-none"
-            >
-              <Search className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
         {/* Software Update Badge */}
         {updateInfo && updateInfo.available && (
           <div data-no-drag className="flex items-center">
@@ -805,73 +631,6 @@ export function Navbar({
         )}
       </div>
 
-      {/* Full-width Search Bar Overlay (< lg: Replaces topbar elements when activated) */}
-      <AnimatePresence>
-        {isSearchExpanded && (
-          <motion.div
-            ref={expandedSearchRef}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
-            data-no-drag
-            style={{ left: brandRightOffset ? `${brandRightOffset}px` : '150px' }}
-            className={cn(
-              "absolute inset-y-0 bg-white dark:bg-zinc-900 px-2.5 z-40 flex items-center gap-2 border-b border-zinc-200/80 dark:border-zinc-800/80",
-              isDesktop ? "right-[96px]" : "right-0"
-            )}
-          >
-            <div className="flex-1 flex items-center gap-2 bg-zinc-100 dark:bg-zinc-950/80 border border-zinc-200/90 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus-within:border-zinc-400 dark:focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-400/40 dark:focus-within:ring-zinc-600/40 rounded-lg px-2.5 h-7 text-xs shadow-2xs">
-              <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 shrink-0" />
-              
-              {statusFilter && statusFilter !== 'ALL' && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 shrink-0">
-                  <span>{t('status.' + statusFilter, statusFilter)}</span>
-                  <button aria-label={t('a11y.clearStatusFilter', 'Clear status filter')}
-                    type="button"
-                    onClick={() => onStatusFilterChange?.('')}
-                    className="hover:text-rose-500"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              )}
-
-              <input
-                ref={expandedSearchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchQueryChange?.(e.target.value)}
-                placeholder={t('common.search', 'Search or filter...')}
-                className="flex-1 bg-transparent border-0 outline-none p-0 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 min-w-0"
-              />
-
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => onSearchQueryChange?.('')}
-                  className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-0.5"
-                  title="Clear search"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              ) : (
-                <Kbd className="shrink-0 text-[9px] text-zinc-400 dark:text-zinc-500">⌘K</Kbd>
-              )}
-            </div>
-
-            {/* Close / Done Button */}
-            <button
-              type="button"
-              onClick={() => setIsSearchExpanded(false)}
-              className="h-7 px-2.5 rounded-lg border border-zinc-200/90 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer select-none"
-            >
-              <span className={cn(isRtl && 'font-farsi')}>{language === 'fa' ? 'بستن' : 'Done'}</span>
-              <Kbd className="text-[9px]">Esc</Kbd>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </header>
   );
 }

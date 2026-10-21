@@ -334,7 +334,7 @@ export async function startDraggingWindow() {
   }
 }
 
-export async function enforceMinWindowSize(minWidth = 800, minHeight = 560) {
+export async function enforceMinWindowSize(minWidth = 960, minHeight = 640) {
   if (!isTauri()) return;
   try {
     const { getCurrentWindow, LogicalSize } = await import('@tauri-apps/api/window');

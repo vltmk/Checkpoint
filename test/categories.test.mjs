@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
 const categoriesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'categories.js'), 'utf8');
-const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8');
 const settingsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'SettingsModal.jsx'), 'utf8');
 const categoryModalCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'CategoryModal.jsx'), 'utf8');
 const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
@@ -56,15 +55,6 @@ test('SettingsModal allows deleting any category and migrates logs', () => {
 test('App.jsx exports categories and restores them on import', () => {
   assert.ok(appCode.includes('categories: currentCategories'));
   assert.ok(appCode.includes('importCategories(rawCategories)'));
-});
-
-test('LedgerView applies 135deg minimal mixed gradient on row border', () => {
-  assert.ok(ledgerCode.includes('linear-gradient(135deg'));
-  assert.ok(ledgerCode.includes('maskComposite'));
-});
-
-test('Category filter chips in LedgerView are monochromatic by default and accented when active', () => {
-  assert.ok(ledgerCode.includes("border-zinc-200 dark:border-zinc-800"));
 });
 
 test('i18n contains translations for categories and cropper', () => {

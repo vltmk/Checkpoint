@@ -11,9 +11,7 @@ const rootDir = path.resolve(__dirname, '..');
 const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currencies.js'), 'utf8').replace(/\r\n/g, '\n');
 const i18nCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const badgeCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'Badge.jsx'), 'utf8').replace(/\r\n/g, '\n');
-const ledgerCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'LedgerView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const ledgerQueryCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'ledgerQuery.js'), 'utf8');
-const analyticsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'views', 'AnalyticsView.jsx'), 'utf8').replace(/\r\n/g, '\n');
 
 test('STATUSES includes Failed in currencies.js', () => {
   assert.ok(currenciesCode.includes("export const STATUSES = ['Paid', 'Pending', 'Working', 'On Hold', 'Failed'];"));
@@ -32,8 +30,6 @@ test('STATUS_LABELS has Persian label for Failed in currencies.js', () => {
 test('i18n.jsx has translations for Failed in both English and Persian', () => {
   assert.ok(i18nCode.includes("'status.Failed': 'Failed'"));
   assert.ok(i18nCode.includes("'status.Failed': 'ناموفق'"));
-  assert.ok(i18nCode.includes("'receipt.orderValueFailed': 'Order Value (Unpaid)'"));
-  assert.ok(i18nCode.includes("'receipt.orderValueFailed': 'مبلغ سفارش (پرداخت‌نشده)'"));
 });
 
 test('STATUS_STYLES in Badge.jsx defines dual-theme classes for Failed', () => {
@@ -43,18 +39,6 @@ test('STATUS_STYLES in Badge.jsx defines dual-theme classes for Failed', () => {
   assert.ok(badgeCode.includes('bg-rose-500/10'));
   assert.ok(badgeCode.includes('dark:bg-rose-950/30'));
   assert.ok(badgeCode.includes('bg-rose-600 dark:bg-rose-400'));
-});
-
-test('LedgerView.jsx properly excludes Failed from day earnings and pending', () => {
-  assert.ok(ledgerCode.includes("item.status === 'Failed' ? 0 : convertEntryCurrency"));
-  assert.ok(ledgerQueryCode.includes("else if (e.status === 'Failed')"));
-  assert.ok(ledgerQueryCode.includes("totalFailed +="));
-});
-
-test('AnalyticsView.jsx properly calculates lostRevenue and excludes Failed from earnings', () => {
-  assert.ok(analyticsCode.includes("e.status === 'Failed'"));
-  assert.ok(analyticsCode.includes("lostRevenue +="));
-  assert.ok(analyticsCode.includes("e.status !== 'Failed'"));
 });
 
 test('Financial calculation simulation ignores Failed from earned and pending', () => {
