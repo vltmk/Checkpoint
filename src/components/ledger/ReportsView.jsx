@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { boosterReport, marginReport } from '../../lib/ledger/selectors';
+import { boosterReport, marginReport, reportSummary, toCsv } from '../../lib/ledger/selectors';
+import { fromMinor } from '../../lib/ledger/money';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { EmptyState, Money, Segmented } from './parts';
@@ -15,10 +16,17 @@ export function ReportsView() {
   const cur = displayCurrency || 'TOMAN';
   const isBooster = profileId === 'booster';
   const [groupBy, setGroupBy] = useState('month');
+  const [range, setRange] = useState('all');
+  const [copied, setCopied] = useState(false);
 
   const report = useMemo(
-    () => (ctx ? marginReport(ctx, partyById, { rates, displayCurrency: cur, groupBy: groupBy === 'booster' ? 'month' : groupBy, monthKey: f.monthKey }) : null),
-    [ctx, partyById, rates, cur, groupBy, f.monthKey]
+    () => (ctx
+      ? marginReport(ctx, partyById, {
+          rates, displayCurrency: cur, groupBy: groupBy === 'booster' ? 'month' : groupBy, monthKey: f.monthKey,
+          sinceMs: range === 'all' ? null : Date.now() - Number(range) * 86400000,
+        })
+      : null),
+    [ctx, partyById, rates, cur, groupBy, f.monthKey, range]
   );
   const people = useMemo(() => (ctx && !isBooster ? boosterReport(ctx, data.parties, { rates, displayCurrency: cur }) : []), [ctx, data, rates, cur, isBooster]);
 
@@ -42,6 +50,29 @@ export function ReportsView() {
   const maxEarned = Math.max(1, ...people.map((r) => r.earnedMinor));
   const th = 'text-xs font-normal text-zinc-500 pb-1.5';
 
+  const summary = report.rows.length ? reportSummary(report) : null;
+  const ranges = ['all', '30', '90', '365'].map((v) => ({ value: v, label: f.t(`lg.reports.range.${v}`, v === 'all' ? 'All time' : v === '365' ? '12 months' : `${v} days`) }));
+
+  const copyCsv = async () => {
+    const cols = [
+      [groups.find((g) => g.value === groupBy)?.label, (r) => label(r.key)],
+      [isBooster ? f.t('lg.reports.jobs', 'Jobs') : f.t('lg.reports.orders', 'Orders'), (r) => r.orders],
+      ...(showVolume ? [[f.t('lg.reports.volume', 'Volume'), (r) => fromMinor(r.volumeMinor, cur)]] : []),
+      ...(showFee ? [[f.t('lg.reports.fee', 'Platform fee'), (r) => fromMinor(r.feeMinor, cur)]] : []),
+      ...(showTeam ? [[isBooster ? f.t('lg.jobs.team', 'team') : f.t('lg.wf.boosters', 'Boosters'), (r) => fromMinor(r.boostersMinor, cur)]] : []),
+      [marginLabel, (r) => fromMinor(r.marginMinor, cur)],
+      ...(showExpenses ? [[f.t('lg.reports.fees', 'Fees and expenses'), (r) => fromMinor(r.expensesMinor, cur)], [f.t('lg.wf.margin', 'You keep'), (r) => fromMinor(r.keepMinor, cur)]] : []),
+    ];
+    const rows = [cols.map((c) => c[0]), ...report.rows.map((r) => cols.map((c) => c[1](r))), cols.map((c, i) => (i === 0 ? f.t('lg.reports.total', 'Total') : c[1](report.totals)))];
+    try {
+      await navigator.clipboard.writeText(toCsv(rows));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable: nothing to do, the table stays as is.
+    }
+  };
+
   const groups = [
     { value: 'month', label: f.t('lg.reports.month', 'Month') },
     { value: 'platform', label: isBooster ? f.t('lg.reports.client', 'Client') : f.t('lg.reports.platform', 'Platform') },
@@ -57,7 +88,37 @@ export function ReportsView() {
           <Segmented ariaLabel={f.t('lg.reports.groupBy', 'Group by')} value={groupBy} onChange={setGroupBy} options={groups} />
         </div>
 
-        {groupBy !== 'booster' ? (
+        {groupBy !== 'booster' && (
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <Segmented ariaLabel={f.t('lg.reports.range', 'Period')} value={range} onChange={setRange} options={ranges} />
+            {summary && (
+              <button type="button" onClick={copyCsv} className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                {copied ? f.t('lg.reports.copied', 'Copied') : f.t('lg.reports.copyCsv', 'Copy CSV')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {groupBy !== 'booster' && summary && (
+          <dl className="grid grid-cols-3 gap-4 mb-5 text-xs">
+            <div>
+              <dt className="text-zinc-500">{f.t('lg.reports.sumKept', 'Kept')}</dt>
+              <dd className="mt-0.5 text-base font-medium tabular-nums text-zinc-900 dark:text-zinc-100"><Money minor={summary.keepMinor} currency={cur} compact approx={report.isApproximate} /></dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">{f.t('lg.reports.sumAvg', 'Average per order')}</dt>
+              <dd className="mt-0.5 text-base font-medium tabular-nums text-zinc-900 dark:text-zinc-100"><Money minor={summary.avgPerOrderMinor} currency={cur} compact approx={report.isApproximate} /></dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">{f.t('lg.reports.sumTop', 'Best')}</dt>
+              <dd className="mt-0.5 text-base font-medium text-zinc-900 dark:text-zinc-100 truncate">{summary.top ? label(summary.top.key) : '—'}</dd>
+            </div>
+          </dl>
+        )}
+
+        {groupBy !== 'booster' && !report.rows.length ? (
+          <p className="py-6 text-center text-xs text-zinc-500">{f.t('lg.reports.noneInRange', 'No orders in this period.')}</p>
+        ) : groupBy !== 'booster' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-xs tabular-nums">
               <thead>

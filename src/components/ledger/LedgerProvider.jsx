@@ -118,7 +118,6 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       // people
       addPerson: (kind, name) => run((s) => s.ensureParty(kind, name)),
       // the currency this person is usually paid in: payments to them start in it
-      setPartyCurrency: (party, currency) => run((s) => s.saveParty({ ...party, defaultCurrency: currency || null })),
       setPartySettings: (partyId, patch) => run((s) => s.savePartySettings(partyId, patch)),
       renamePerson: (party, name) => run((s) => s.saveParty({ ...party, name })),
       archivePerson: (party, archived) => run((s) => s.saveParty({ ...party, archived: archived ? 1 : 0 })),

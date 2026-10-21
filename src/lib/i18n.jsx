@@ -88,10 +88,10 @@ export function formatLedgerGroupDate(dateInput, formatId = 'relative', language
     const dStr = d.toDateString();
 
     if (dStr === todayStr) {
-      return t ? t('ledger.today') : (language === 'fa' ? 'امروز' : 'Today');
+      return t ? t('ledger.today', language === 'fa' ? 'امروز' : 'Today') : (language === 'fa' ? 'امروز' : 'Today');
     }
     if (dStr === yesterdayStr) {
-      return t ? t('ledger.yesterday') : (language === 'fa' ? 'دیروز' : 'Yesterday');
+      return t ? t('ledger.yesterday', language === 'fa' ? 'دیروز' : 'Yesterday') : (language === 'fa' ? 'دیروز' : 'Yesterday');
     }
     if (language === 'fa') {
       return formatShamsiDate(d, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -151,7 +151,7 @@ export function formatLedgerGroupDate(dateInput, formatId = 'relative', language
 export function getDatePatternPreview(formatId, language = 'en', t) {
   const now = new Date();
   if (formatId === 'relative') {
-    const rel = t ? t('ledger.today') : (language === 'fa' ? 'امروز' : 'Today');
+    const rel = t ? t('ledger.today', language === 'fa' ? 'امروز' : 'Today') : (language === 'fa' ? 'امروز' : 'Today');
     const sub = language === 'fa' 
       ? formatShamsiDate(now, { month: 'short', day: 'numeric' })
       : now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

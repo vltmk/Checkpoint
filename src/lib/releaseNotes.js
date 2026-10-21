@@ -29,22 +29,32 @@ export function compareSemver(v1, v2) {
  * that has no entry, so a release can never go out without Farsi notes.
  */
 export const RELEASE_NOTES_REGISTRY = {
-  '5.0.1': {
+  '5.1.0': {
     date: '2026-10-21',
     title: {
-      en: "What's New in Checkpoint v5.0.1",
-      fa: 'تغییرات نسخه ۵.۰.۱',
+      en: "What's New in Checkpoint v5.1.0",
+      fa: 'تغییرات نسخه ۵.۱.۰',
     },
     summary: {
-      en: 'Games and custom categories are back in the Add Work forms.',
-      fa: 'بازی‌ها و دسته‌بندی‌های سفارشی دوباره در فرم‌های افزودن کار هستند.',
+      en: 'Better reports, a one-tap paid toggle, and screenshots in the order and job forms.',
+      fa: 'گزارش‌های بهتر، دکمه پرداخت‌شد با یک کلیک و پیوست تصویر در فرم سفارش و کار.',
     },
     items: {
       en: [
-        { tag: 'fixed', text: 'Pick a game, or add a new category, right in the order and job forms.' },
+        { tag: 'new', text: 'Reports: filter by the last 30 days, 90 days or 12 months.' },
+        { tag: 'new', text: 'Reports: see what you kept, the average per order and your best group at a glance.' },
+        { tag: 'new', text: 'Reports: copy any table as CSV.' },
+        { tag: 'new', text: 'Add screenshots while creating or editing an order or job, under More details.' },
+        { tag: 'improved', text: 'Paid sits next to the row actions and turns into Undo when you hover it.' },
+        { tag: 'improved', text: 'Order status now has a soft tint, so it reads as a button.' },
       ],
       fa: [
-        { tag: 'fixed', text: 'بازی را انتخاب یا دسته‌بندی جدید را مستقیم در فرم سفارش و کار اضافه کنید.' },
+        { tag: 'new', text: 'گزارش‌ها: فیلتر ۳۰ روز، ۹۰ روز یا ۱۲ ماه گذشته.' },
+        { tag: 'new', text: 'گزارش‌ها: سود خالص، میانگین هر سفارش و بهترین گروه در یک نگاه.' },
+        { tag: 'new', text: 'گزارش‌ها: کپی هر جدول به‌صورت CSV.' },
+        { tag: 'new', text: 'هنگام ساخت یا ویرایش سفارش و کار، در «جزئیات بیشتر» تصویر پیوست کنید.' },
+        { tag: 'improved', text: 'وضعیت پرداخت کنار دکمه‌های ردیف است و با نگه داشتن ماوس به «بازگردانی» تبدیل می‌شود.' },
+        { tag: 'improved', text: 'وضعیت سفارش حالا رنگ ملایم دارد و شبیه دکمه دیده می‌شود.' },
       ],
     },
   },

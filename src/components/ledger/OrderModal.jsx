@@ -18,6 +18,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { RateLockFields } from './RateLockFields';
+import { ProofField, useProofDraft } from './ProofField';
 import { GameField } from './GameField';
 import { rateFormFor, rateFieldsFromForm } from '../../lib/ledger/rateLock';
 import { LifeDot, Money } from './parts';
@@ -67,6 +68,10 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
   // the names the form was loaded with, so an unchanged person keeps their id instead of being re-resolved by name
   const loadedRef = useRef({ payer: null, payerId: null });
   const [error, setError] = useState('');
+  // set once the order is saved but a screenshot failed, so the next Save only retries the screenshots
+  const proofOnlyRef = useRef(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const proofs = useProofDraft({ open, ownerId: existing?.order?.id || null, onAdded: () => setMoreOpen(true) });
 
   // Known payers and boosters, for one-tap choices
   const payerChoices = useMemo(() => {
@@ -89,6 +94,8 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
     if (!open) return;
     setError('');
     setBusy(false);
+    setMoreOpen(false);
+    proofOnlyRef.current = null;
     if (existing) {
       const { order, shares } = existing;
       setTitle(order.title || '');
@@ -207,6 +214,11 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
     setBusy(true);
     setError('');
     try {
+      if (proofOnlyRef.current) {
+        await proofs.commit(proofOnlyRef.current);
+        onClose();
+        return;
+      }
       const payerKind = isPlatformName(payerName) || partyByName(payerName)?.kind === 'platform' ? 'platform' : 'client';
       // unchanged payer: keep the stored one (this is what protects the upgrade's placeholder payer)
       const payerUnchanged = existing && payerName.trim() === loadedRef.current.payer;
@@ -223,10 +235,11 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
         shares.push({ partyId, amountMinor: amountOf(r) });
       }
       const base = existing?.order || {};
+      const id = base.id || `ord_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
       const saved = await ledger.saveOrder({
         order: {
           ...base,
-          id: base.id || `ord_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+          id,
           kind: 'income',
           title: title.trim(),
           game: game.trim(),
@@ -250,6 +263,14 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
       if (payerId && payerKind === 'platform' && Math.abs(feePctNum - suggestedFeePct(payerName, partyByName(payerName))) > 0.0001) {
         await ledger.setPartySettings(payerId, { feePct: feePctNum });
       }
+      try {
+        await proofs.commit(id);
+      } catch {
+        proofOnlyRef.current = id;
+        onSaved?.(saved);
+        setError(f.t('lg.err.proofsFailed', 'Saved, but a screenshot could not be attached. Press Save to try again.'));
+        return;
+      }
       onSaved?.(saved);
       onClose();
     } catch (e) {
@@ -267,6 +288,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
     <Dialog open={open} onClose={onClose} maxWidth="max-w-xl">
       <div
         className="flex flex-col max-h-[92vh]"
+        onPaste={proofs.onPaste}
         onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); }}
       >
         <DialogHeader onClose={onClose}>
@@ -376,7 +398,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
             </div>
           </div>
 
-          <details>
+          <details open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
             <summary className="text-xs text-zinc-500 cursor-pointer select-none hover:text-zinc-800 dark:hover:text-zinc-200">{f.t('lg.order.more', 'More details')}</summary>
             <div className="mt-2 space-y-2">
               <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
@@ -394,6 +416,10 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
               </div>
               <RateLockFields value={rateForm} onChange={setRateForm} goldUnit={existing?.order?.rateUnit} />
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={f.t('lg.note.order', 'Notes')} aria-label={f.t('lg.note.order', 'Notes')} />
+              <div>
+                <span className={labelCls}>{f.t('lg.proofs', 'Screenshots')}</span>
+                <div className="mt-1"><ProofField draft={proofs} /></div>
+              </div>
             </div>
           </details>
 

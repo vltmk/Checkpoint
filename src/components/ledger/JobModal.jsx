@@ -17,6 +17,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { RateLockFields } from './RateLockFields';
+import { ProofField, useProofDraft } from './ProofField';
 import { GameField } from './GameField';
 import { rateFormFor, rateFieldsFromForm } from '../../lib/ledger/rateLock';
 import { LifeDot, Money, Segmented } from './parts';
@@ -55,6 +56,10 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
   const [error, setError] = useState('');
   const savingRef = useRef(false);
   const loadedRef = useRef({ payer: null, payerId: null });
+  // set once the job is saved but a screenshot failed, so the next Save only retries the screenshots
+  const proofOnlyRef = useRef(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const proofs = useProofDraft({ open, ownerId: existing?.order?.id || null, onAdded: () => setMoreOpen(true) });
 
   const clients = useMemo(() => {
     if (!ctx) return [];
@@ -79,6 +84,8 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
     if (!open) return;
     setError('');
     setBusy(false);
+    setMoreOpen(false);
+    proofOnlyRef.current = null;
     if (existing) {
       const { order, shares } = existing;
       const shown = order.payerId === UNKNOWN_PAYER_ID ? '' : order.payerId ? f.name(partyById.get(order.payerId)) : order.source || '';
@@ -162,6 +169,11 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
     setBusy(true);
     setError('');
     try {
+      if (proofOnlyRef.current) {
+        await proofs.commit(proofOnlyRef.current);
+        onClose();
+        return;
+      }
       const payerKind = payerIsPlatform ? 'platform' : 'client';
       const unchanged = existing && payerName.trim() === loadedRef.current.payer;
       const payerId = unchanged ? loadedRef.current.payerId : payerName.trim() ? (await ledger.addPerson(payerKind, payerName.trim())).id : null;
@@ -190,6 +202,13 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
       if (payerId && payerKind === 'platform' && Math.abs(feePctNum - suggestedFeePct(payerName, partyByName(payerName))) > 0.0001) {
         await ledger.setPartySettings(payerId, { feePct: feePctNum });
       }
+      try {
+        await proofs.commit(id);
+      } catch {
+        proofOnlyRef.current = id;
+        setError(f.t('lg.err.proofsFailed', 'Saved, but a screenshot could not be attached. Press Save to try again.'));
+        return;
+      }
       onClose();
     } catch (e) {
       setError(e?.message || f.t('lg.err.generic', 'That could not be saved.'));
@@ -203,7 +222,7 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
   return (
     <>
     <Dialog open={open} onClose={onClose} maxWidth="max-w-lg">
-      <div className="flex flex-col max-h-[92vh]" onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); }}>
+      <div className="flex flex-col max-h-[92vh]" onPaste={proofs.onPaste} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') save(); }}>
         <DialogHeader onClose={onClose}>
           <DialogTitle>{existing ? f.t('lg.job.edit', 'Edit job') : f.t('lg.job.new', 'Add a job')}</DialogTitle>
         </DialogHeader>
@@ -297,7 +316,7 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
             )}
           </div>
 
-          <details>
+          <details open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
             <summary className="text-xs text-zinc-500 cursor-pointer select-none hover:text-zinc-800 dark:hover:text-zinc-200">{f.t('lg.order.more', 'More details')}</summary>
             <div className="mt-2 space-y-2">
               <Input value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder={f.t('lg.order.ref', 'Order number')} aria-label={f.t('lg.order.ref', 'Order number')} />
@@ -310,6 +329,10 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
               <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder={f.t('lg.order.link', 'Link to the order')} aria-label={f.t('lg.order.link', 'Link to the order')} dir="ltr" />
               <RateLockFields value={rateForm} onChange={setRateForm} goldUnit={existing?.order?.rateUnit} />
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={f.t('lg.note.order', 'Notes')} aria-label={f.t('lg.note.order', 'Notes')} />
+              <div>
+                <span className={label}>{f.t('lg.proofs', 'Screenshots')}</span>
+                <div className="mt-1"><ProofField draft={proofs} /></div>
+              </div>
             </div>
           </details>
 

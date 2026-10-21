@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toBlob } from 'html-to-image';
-import { Camera, Check, CircleCheck, CirclePlay, CircleX, Clock, Copy, Loader2, MessageSquare, Store, StickyNote, Users } from 'lucide-react';
+import { Camera, Check, Pencil, CircleCheck, CirclePlay, CircleX, Clock, Copy, Loader2, MessageSquare, Store, StickyNote, Users } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { GameIcon } from '../ui/GameIcon';
@@ -72,7 +72,7 @@ function CopyFeedback({ done, Icon, className }) {
  * A receipt for one order, built from the ledger. Advertisers get the client's receipt and the boosters' payout slip;
  * boosters get a proof-of-work receipt. The same facts are on the card, in the copied text, and in the Discord block.
  */
-export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbox }) {
+export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbox, onEdit }) {
   const { language, isRtl } = useLanguage();
   const isAdvertiser = profileId === 'advertiser';
   const cardRef = useRef(null);
@@ -104,9 +104,18 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
       await new Promise((r) => setTimeout(r, 60));
       const dark = document.documentElement.classList.contains('dark') || !document.documentElement.classList.contains('light');
       const bg = dark ? '#09090b' : '#ffffff';
-      const blob = await toBlob(cardRef.current, {
+      // The picture has a 24px margin of background colour around the card. The card is border-box, so padding added
+      // to it would be taken out of its own fixed size and clip the content (overflow-hidden): grow the canvas by the
+      // same amount instead.
+      const MARGIN = 24;
+      const card = cardRef.current;
+      const blob = await toBlob(card, {
         pixelRatio: 2, backgroundColor: bg, cacheBust: true,
-        style: { padding: '24px', backgroundColor: bg, margin: '0' },
+        width: card.offsetWidth + MARGIN * 2,
+        height: card.offsetHeight + MARGIN * 2,
+        // the on-screen card's border and rounded corners are chrome, not part of the picture: keep the border's width
+        // (so nothing reflows) but make it invisible, and square the corners
+        style: { padding: `${MARGIN}px`, backgroundColor: bg, margin: '0', borderColor: 'transparent', borderRadius: '0' },
         filter: (node) => !(node.classList && node.classList.contains('hide-in-screenshot')),
       });
       if (!blob) throw new Error('No image was produced');
@@ -276,14 +285,17 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
       </DialogContent>
 
       <DialogFooter>
-        <div className="flex w-full items-center justify-between">
+        <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={capture} disabled={capturing} title="Copy the receipt as a picture (C or S)" aria-label="Copy the receipt as a picture" className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
             {capturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CopyFeedback done={copied === 'image'} Icon={Camera} className="h-4 w-4" />}
           </Button>
-          <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => copyText('discord')}><CopyFeedback done={copied === 'discord'} Icon={MessageSquare} className="h-3.5 w-3.5" /><span>Discord</span></Button>
             <Button variant="primary" size="sm" onClick={() => copyText('text')}><CopyFeedback done={copied === 'text'} Icon={Copy} className="h-3.5 w-3.5" /><span>{isFa ? 'کپی متن' : 'Copy text'}</span></Button>
           </div>
+          {onEdit && vm?.id && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(vm.id)}><Pencil className="h-3.5 w-3.5" /><span>{isFa ? 'ویرایش' : 'Edit'}</span></Button>
+          )}
         </div>
       </DialogFooter>
     </Dialog>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CircleCheck, ClipboardList, Clock, Percent, Plus, Search, SearchX, Store, Users } from 'lucide-react';
+import { ClipboardList, Clock, Percent, Plus, Search, SearchX, Store, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -11,8 +11,9 @@ import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, Meta, Money, Segmented, UndoLink } from './parts';
-import { RowActions } from './RowActions';
+import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, Meta, Money, Segmented, PaidToggle, TOOLBAR_INPUT } from './parts';
+import { RowActions, openOnBlankClick } from './RowActions';
+import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
 
 const PAGE = 40;
@@ -22,6 +23,7 @@ const LIFE_LABEL = { pending: 'Pending', working: 'Working', on_hold: 'On hold',
 /** The Booster's jobs: what I did, what it pays, and whether I have been paid. Splits and fees only appear when a job has them. */
 export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs, onOpenClient }) {
   const ledger = useLedger();
+  const proofIds = useOrderProofs();
   const f = useLedgerFormat();
   const { ctx, partyById, rates, displayCurrency } = ledger;
   const cur = displayCurrency || 'TOMAN';
@@ -82,9 +84,9 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
             { value: 'paid', label: f.t('lg.jobs.paid', 'Paid') },
           ]} />
         <div className="w-48">
-          <Input data-ledger-search prefixIcon={<Search className="w-3.5 h-3.5" />} value={local} onChange={(e) => setLocal(e.target.value)} placeholder={f.t('lg.jobs.search', 'Search jobs')} aria-label={f.t('lg.jobs.search', 'Search jobs')} />
+          <Input data-ledger-search className={TOOLBAR_INPUT} prefixIcon={<Search className="w-3.5 h-3.5" />} value={local} onChange={(e) => setLocal(e.target.value)} placeholder={f.t('lg.jobs.search', 'Search jobs')} aria-label={f.t('lg.jobs.search', 'Search jobs')} />
         </div>
-        <Button variant="primary" size="sm" className="ms-auto" onClick={onNewJob}><Plus className="w-3.5 h-3.5" />{f.t('lg.job.new', 'Add a job')}</Button>
+        <Button variant="primary" size="sm" className="ms-auto rounded-lg" onClick={onNewJob}><Plus className="w-3.5 h-3.5" />{f.t('lg.job.new', 'Add a job')}</Button>
       </div>
       {error && <p role="alert" className="mb-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
 
@@ -106,7 +108,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                     const mixed = normalizeCurrency(o.currency) !== normalizeCurrency(cur);
                     const feePct = o.grossMinor > 0 && o.platformFeeMinor > 0 ? Math.round((o.platformFeeMinor / o.grossMinor) * 1000) / 10 : 0;
                     return (
-                      <li key={o.id} className={cn('group flex gap-3 px-3 py-3 transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40 first:rounded-t-xl last:rounded-b-xl', r.dead && 'opacity-60')}>
+                      <li key={o.id} onClick={openOnBlankClick(() => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40 first:rounded-t-xl last:rounded-b-xl', r.dead && 'opacity-60')}>
                         <GameTile game={o.game} categories={categories} lifecycle={o.lifecycle} className="mt-0.5" />
 
                         <div className="flex min-w-0 flex-1 flex-col">
@@ -140,25 +142,15 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                                 onChange={(v) => guard(() => ledger.setLifecycle(o.id, v))}
                                 options={LIFECYCLES.map((l) => { const Icon = LIFE_ICON[l]; return { value: l, label: f.t(`lg.life.${l}`, LIFE_LABEL[l]), icon: <Icon className={cn('h-3.5 w-3.5', (LIFE_STYLE[l] || LIFE_STYLE.pending).text)} /> }; })}
                                 ariaLabel={f.t('lg.order.status', 'Status')}
-                                className={cn('!h-6 !px-1.5 !text-[11.5px] !border-transparent !bg-transparent hover:!bg-zinc-200/70 dark:hover:!bg-zinc-800', style.text)}
+                                className={cn('!h-6 !px-1.5 !text-[11.5px] !border-transparent', style.pill, style.text)}
                               />
                             </div>
-                            {!r.dead && (r.money.collected ? (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CircleCheck className="h-3.5 w-3.5" />{f.t('lg.jobs.paidStamp', 'Paid')}</span>
-                                <UndoLink revealOnHover applied={paymentsAppliedTo(ctx, 'order', o.id)} onUndo={() => guard(() => ledger.undoPaid('order', o.id))} undoLabel={f.t('lg.undo', 'Undo')} sharedLabel={f.t('lg.undo.shared', 'Part of a bigger payment')} sharedHelp={f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.')} />
+                            {!r.dead && !r.money.collected && (
+                              <span className="text-zinc-700 dark:text-zinc-400">
+                                {r.payer && r.payer.id !== UNKNOWN_PAYER_ID ? f.t('lg.waitingOn', 'Waiting on {name}', { name: f.name(r.payer) }) : f.t('lg.jobs.unpaidStamp', 'Not paid yet')}
+                                {r.money.partlyCollected && <> · <Money minor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} compact /> {f.t('lg.left', 'left')}</>}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-2">
-                                <span className="text-zinc-700 dark:text-zinc-400">
-                                  {r.payer && r.payer.id !== UNKNOWN_PAYER_ID ? f.t('lg.waitingOn', 'Waiting on {name}', { name: f.name(r.payer) }) : f.t('lg.jobs.unpaidStamp', 'Not paid yet')}
-                                  {r.money.partlyCollected && <> · <Money minor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} compact /> {f.t('lg.left', 'left')}</>}
-                                </span>
-                                <button type="button" onClick={() => guard(() => ledger.markOrderCollected(o.id))} className="inline-flex h-6 items-center gap-1 rounded-md border border-zinc-300 dark:border-zinc-700 px-2 font-medium text-zinc-800 dark:text-zinc-200 transition-colors hover:bg-zinc-200/70 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500">
-                                  <CircleCheck className="h-3 w-3" />{f.t('lg.jobs.markPaid', 'Mark paid')}
-                                </button>
-                              </span>
-                            ))}
+                            )}
                           </div>
                         </div>
 
@@ -167,7 +159,18 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                             <div className="text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100"><Money minor={r.marginMinor} currency={o.currency} /></div>
                             {mixed && <div className="text-[11px] tabular-nums text-zinc-500 dark:text-zinc-400"><Money minor={convertMinor(r.marginMinor, o.currency, cur, rates, orderRateOpts(o))} currency={cur} compact approx /></div>}
                           </div>
-                          <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} onReceipt={() => onReceipt(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                          <div className="flex items-center gap-2">
+                            {!r.dead && (
+                              <PaidToggle
+                                paid={r.money.collected}
+                                applied={paymentsAppliedTo(ctx, 'order', o.id)}
+                                onPay={() => guard(() => ledger.markOrderCollected(o.id))}
+                                onUndo={() => guard(() => ledger.undoPaid('order', o.id))}
+                                labels={{ paid: f.t('lg.jobs.paidStamp', 'Paid'), markPaid: f.t('lg.jobs.markPaid', 'Mark paid'), undo: f.t('lg.undo', 'Undo'), sharedHelp: f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.') }}
+                              />
+                            )}
+                            <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} onReceipt={() => onReceipt(o.id)} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                          </div>
                         </div>
                       </li>
                     );

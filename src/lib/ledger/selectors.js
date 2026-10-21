@@ -206,8 +206,10 @@ export { sumBuckets };
  * Margin report for live (non-failed, non-refunded) income orders, grouped by month, platform or game.
  * Amounts are converted to the display currency per order at the supplied rates.
  */
-export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy = 'month', monthKey = (iso) => String(iso || '').slice(0, 7) }) {
+export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy = 'month', sinceMs = null, monthKey = (iso) => String(iso || '').slice(0, 7) }) {
   const groups = new Map();
+  // `sinceMs` limits the report to orders (and expenses) dated on or after it; null means everything.
+  const inRange = (iso) => sinceMs == null || Date.parse(iso) >= sinceMs;
   let approximate = false;
   const conv = (minor, cur, opts) => {
     if (normalizeCurrency(cur) !== normalizeCurrency(displayCurrency)) approximate = true;
@@ -223,7 +225,7 @@ export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy =
     return groups.get(key);
   };
   for (const order of ctx.orders) {
-    if (order.kind === 'expense' || DEAD_LIFECYCLES.has(order.lifecycle)) continue;
+    if (order.kind === 'expense' || DEAD_LIFECYCLES.has(order.lifecycle) || !inRange(order.dateTime)) continue;
     const g = group(keyOfOrder(order));
     const shareSum = activeSharesOf(ctx, order.id).reduce((s, x) => s + x.amountMinor, 0);
     g.orders += 1;
@@ -253,9 +255,9 @@ export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy =
       weights.forEach((x, i) => {
         const part = i === weights.length - 1 ? total - given : Math.round((total * x.w) / sum);
         given += part;
-        group(keyOfOrder(x.order)).expensesMinor += part;
+        if (inRange(x.order.dateTime)) group(keyOfOrder(x.order)).expensesMinor += part;
       });
-    } else {
+    } else if (inRange(e.dateTime)) {
       const key = groupBy === 'month' ? monthKey(e.dateTime) : groupBy === 'platform' ? partyById.get(e.partyId)?.name || '' : '';
       group(key).expensesMinor += total;
     }
@@ -272,6 +274,28 @@ export function marginReport(ctx, partyById, { rates, displayCurrency, groupBy =
     { orders: 0, volumeMinor: 0, feeMinor: 0, boostersMinor: 0, marginMinor: 0, expensesMinor: 0, keepMinor: 0 }
   );
   return { rows, totals, isApproximate: approximate };
+}
+
+/** Headline numbers for a margin report: what was kept, the average per order and the group that kept the most. */
+export function reportSummary(report) {
+  const { totals, rows } = report;
+  const top = rows.length > 1 ? rows.reduce((a, b) => (b.keepMinor > a.keepMinor ? b : a)) : null;
+  return {
+    keepMinor: totals.keepMinor,
+    avgPerOrderMinor: totals.orders ? Math.round(totals.keepMinor / totals.orders) : 0,
+    top: top && top.keepMinor > 0 ? { key: top.key, keepMinor: top.keepMinor } : null,
+  };
+}
+
+/** Rows of cells -> CSV text. Text cells that a spreadsheet could read as a formula are defused with a leading quote. */
+export function toCsv(rows) {
+  const cell = (v) => {
+    if (typeof v === 'number') return String(v);
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return rows.map((r) => r.map(cell).join(',')).join('\n');
 }
 
 /** What each booster has earned, been paid and is still owed, in the display currency. */

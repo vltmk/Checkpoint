@@ -148,6 +148,7 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
         <LedgerReceipt
           open={receipt.open}
           onClose={() => setReceipt({ open: false, data: null })}
+          onEdit={(id) => { setReceipt({ open: false, data: null }); openOrder(id); }}
           receipt={receipt.data}
           profileId={ledger.profileId}
           onOpenLightbox={(src, caption) => setLightbox({ open: true, src, caption })}

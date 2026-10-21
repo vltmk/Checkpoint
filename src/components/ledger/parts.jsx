@@ -59,9 +59,13 @@ export function SectionTitle({ children, aside, className }) {
 }
 
 /** Pill-style segmented control for small filter sets. */
+// One control height (32px) for everything on a toolbar row: segmented filters, selects, search and buttons
+export const TOOLBAR_INPUT = 'h-8 rounded-lg';
+export const TOOLBAR_SELECT = 'h-8 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border-zinc-200/80 dark:border-zinc-800/80';
+
 export function Segmented({ value, onChange, options, ariaLabel }) {
   return (
-    <div role="tablist" aria-label={ariaLabel} className="inline-flex items-center rounded-md bg-zinc-100 dark:bg-zinc-900 p-0.5">
+    <div role="tablist" aria-label={ariaLabel} className="inline-flex h-8 items-center rounded-lg bg-zinc-100 dark:bg-zinc-900 p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -70,7 +74,7 @@ export function Segmented({ value, onChange, options, ariaLabel }) {
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'h-6 px-2.5 rounded text-[11px] font-medium transition-colors select-none',
+            'h-7 px-3 rounded-md text-xs font-medium transition-colors select-none',
             value === o.value
               ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
               : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
@@ -104,13 +108,13 @@ export function EmptyState({ icon: Icon, title, body, children }) {
  * grey = not started, blue = being worked on, amber = paused, green = done, red = failed, orange = disputed, violet = refunded.
  */
 export const LIFE_STYLE = {
-  pending: { dot: 'bg-zinc-400', text: 'text-zinc-600 dark:text-zinc-400', bar: 'border-zinc-300 dark:border-zinc-700' },
-  working: { dot: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', bar: 'border-sky-500/70' },
-  on_hold: { dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', bar: 'border-amber-500/70' },
-  done: { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', bar: 'border-emerald-500/60' },
-  failed: { dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', bar: 'border-rose-500/70' },
-  disputed: { dot: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-300', bar: 'border-orange-500/70' },
-  refunded: { dot: 'bg-violet-500', text: 'text-violet-700 dark:text-violet-300', bar: 'border-violet-500/70' },
+  pending: { dot: 'bg-zinc-400', text: 'text-zinc-600 dark:text-zinc-400', bar: 'border-zinc-300 dark:border-zinc-700', pill: '!bg-zinc-500/10 hover:!bg-zinc-500/20' },
+  working: { dot: 'bg-sky-500', text: 'text-sky-700 dark:text-sky-300', bar: 'border-sky-500/70', pill: '!bg-sky-500/10 hover:!bg-sky-500/20' },
+  on_hold: { dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', bar: 'border-amber-500/70', pill: '!bg-amber-500/10 hover:!bg-amber-500/20' },
+  done: { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', bar: 'border-emerald-500/60', pill: '!bg-emerald-500/10 hover:!bg-emerald-500/20' },
+  failed: { dot: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', bar: 'border-rose-500/70', pill: '!bg-rose-500/10 hover:!bg-rose-500/20' },
+  disputed: { dot: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-300', bar: 'border-orange-500/70', pill: '!bg-orange-500/10 hover:!bg-orange-500/20' },
+  refunded: { dot: 'bg-violet-500', text: 'text-violet-700 dark:text-violet-300', bar: 'border-violet-500/70', pill: '!bg-violet-500/10 hover:!bg-violet-500/20' },
 };
 
 export function LifeDot({ lifecycle, className }) {
@@ -133,6 +137,49 @@ export function UndoLink({ applied, onUndo, undoLabel, sharedLabel, sharedHelp, 
     );
   }
   return <span title={sharedHelp} className={cn('text-zinc-500', reveal, className)}>{sharedLabel}</span>;
+}
+
+/**
+ * Whether the money for a job has arrived, as one button.
+ *  - not paid: "Mark paid" (outline = an action you can take)
+ *  - paid: a green "Paid" pill; hover or focus turns it into "Undo" (voids the payment that covered only this job)
+ *  - paid as part of a bigger payment: the pill stays as it is and explains why it cannot be undone here
+ */
+export function PaidToggle({ paid, applied, onPay, onUndo, labels }) {
+  const base = 'inline-flex h-6 shrink-0 items-center rounded-md px-2 text-[11.5px] font-medium whitespace-nowrap transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500';
+  if (!paid) {
+    return (
+      <button type="button" onClick={onPay} className={cn(base, 'gap-1 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800')}>
+        <CircleCheck className="h-3 w-3" aria-hidden="true" />{labels.markPaid}
+      </button>
+    );
+  }
+  const undoable = Boolean(applied?.some((x) => x.exclusive));
+  const tone = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
+  if (!undoable) {
+    const shared = applied?.length > 0;
+    return (
+      <span title={shared ? labels.sharedHelp : undefined} className={cn(base, 'gap-1', tone)}>
+        <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />{labels.paid}
+      </span>
+    );
+  }
+  // both faces share one grid cell, so the button never changes width when it swaps
+  return (
+    <button
+      type="button"
+      onClick={onUndo}
+      aria-label={`${labels.paid}. ${labels.undo}`}
+      className={cn(base, 'group/paid grid place-items-center', tone, 'hover:bg-zinc-500/15 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:bg-zinc-500/15 focus-visible:text-zinc-900 dark:focus-visible:text-zinc-100')}
+    >
+      <span className="col-start-1 row-start-1 inline-flex items-center gap-1 transition-opacity duration-150 motion-reduce:transition-none group-hover/paid:opacity-0 group-focus-visible/paid:opacity-0">
+        <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />{labels.paid}
+      </span>
+      <span aria-hidden="true" className="col-start-1 row-start-1 inline-flex items-center gap-1 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover/paid:opacity-100 group-focus-visible/paid:opacity-100">
+        <Undo2 className="h-3 w-3" />{labels.undo}
+      </span>
+    </button>
+  );
 }
 
 // --- list rows ---------------------------------------------------------------------------------------------------

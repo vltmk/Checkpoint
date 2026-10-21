@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, Ban, Check, CircleCheck, ClipboardCopy, Clock, Download, ImageIcon, Pencil, Plus, Search, StickyNote, Users } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Ban, Check, CircleCheck, ClipboardCopy, Clock, Download, ImageIcon, Pencil, Plus, Search, StickyNote, Trash2, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { CURRENCIES } from '../../lib/currencies';
 import { partyStatement, peopleList } from '../../lib/ledger/selectors';
 import { buildStatementCsv, buildStatementText } from '../../lib/ledger/statementText';
 import { fromMinor } from '../../lib/ledger/money';
@@ -11,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { copyText, saveTextFile, withBom } from './files';
-import { BalanceRail, EmptyState, Initial, Meta, Money, SectionTitle, StatusTile, UndoLink } from './parts';
+import { BalanceRail, EmptyState, Initial, Meta, Money, SectionTitle, StatusTile, TOOLBAR_INPUT, UndoLink } from './parts';
 import { paymentsAppliedTo } from '../../lib/ledger/engine';
 
 const shareState = (e) => {
@@ -38,6 +36,7 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
   const [flash, setFlash] = useState('');
   const [confirmVoid, setConfirmVoid] = useState(null);
   const [renaming, setRenaming] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [renameText, setRenameText] = useState('');
   const [proofCounts, setProofCounts] = useState({});
   const [error, setError] = useState('');
@@ -63,6 +62,7 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
   // Switching to another person must not carry a half-open rename or a pending void with it
   useEffect(() => {
     setRenaming(false);
+    setConfirmRemove(false);
     setConfirmVoid(null);
     setError('');
   }, [selectedPartyId]);
@@ -87,10 +87,20 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
   const addPerson = () => guard(async () => {
     const name = newName.trim();
     if (!name) return;
-    const p = await ledger.addPerson('booster', name);
+    let p = await ledger.addPerson('booster', name);
+    // a removed (archived) booster with the same name comes back instead of staying hidden
+    if (p.archived) p = await ledger.archivePerson(p, false) || { ...p, archived: 0 };
     setNewName('');
     setAdding(false);
     setSelectedPartyId(p.id);
+  });
+
+  const removePerson = () => guard(async () => {
+    setConfirmRemove(false);
+    // archiving never hides money still owed or held, so refuse rather than leave a "removed" booster on the list
+    if (statement.display.netMinor !== 0) throw new Error(f.t('lg.person.removeBlocked', 'Settle up first. This booster still has a balance.'));
+    await ledger.archivePerson(selected, true);
+    setSelectedPartyId(null);
   });
 
   const copyStatement = async () => {
@@ -114,13 +124,14 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
       <div className="flex items-center gap-2 mb-3">
         <Input
           data-ledger-search
+          className={TOOLBAR_INPUT}
           prefixIcon={<Search className="w-3.5 h-3.5" />}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={f.t('lg.people.search', 'Search boosters')}
           aria-label={f.t('lg.people.search', 'Search boosters')}
         />
-        <Button variant="outline" size="icon" aria-label={f.t('lg.people.add', 'Add booster')} onClick={() => setAdding((v) => !v)}><Plus className="w-3.5 h-3.5" /></Button>
+        <Button variant="outline" size="icon" className="rounded-lg" aria-label={f.t('lg.people.add', 'Add booster')} onClick={() => setAdding((v) => !v)}><Plus className="w-3.5 h-3.5" /></Button>
       </div>
       {adding && (
         <form onSubmit={(e) => { e.preventDefault(); addPerson(); }} className="flex gap-2 mb-3">
@@ -137,14 +148,14 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
           {people.length === 0 && <Button variant="primary" onClick={onNewOrder}>{f.t('lg.newOrder', 'New order')}</Button>}
         </EmptyState>
       ) : (
-        <ul className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
+        <ul className="flex flex-col gap-1.5">
           {filtered.map(({ party, display, agingDays }) => (
             <li key={party.id}>
               <button
                 type="button"
                 onClick={() => setSelectedPartyId(party.id)}
                 aria-current={selectedPartyId === party.id}
-                className={cn('w-full text-start py-2.5 px-2 -mx-2 rounded-md grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 transition-colors', selectedPartyId === party.id ? 'bg-zinc-100 dark:bg-zinc-900' : 'hover:bg-zinc-100/60 dark:hover:bg-zinc-900/50')}
+                className={cn('w-full text-start py-3 px-3 rounded-lg border border-zinc-200/70 dark:border-zinc-800/70 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 transition-colors', selectedPartyId === party.id ? 'bg-zinc-100 dark:bg-zinc-900' : 'hover:bg-zinc-100/60 dark:hover:bg-zinc-900/50')}
               >
                 <span className="flex min-w-0 items-center gap-2"><Initial name={f.name(party)} className="h-5 w-5" /><span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{f.name(party)}</span></span>
                 <span className={cn('text-sm tabular-nums font-medium', display.netMinor > 0 ? 'text-amber-700 dark:text-amber-400' : display.netMinor < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-400')}>
@@ -176,20 +187,13 @@ export function PeopleView({ onPay, onOpenOrder, onOpenProofs, onNewOrder }) {
             <h1 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
               <span className="truncate">{f.name(selected)}</span>
               <button type="button" aria-label={f.t('lg.rename', 'Rename')} onClick={() => { setRenameText(selected.name); setRenaming(true); }} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"><Pencil className="w-3.5 h-3.5" /></button>
+              {confirmRemove ? (
+                <button type="button" autoFocus onBlur={() => setConfirmRemove(false)} onClick={removePerson} className="h-6 rounded-md bg-rose-500/10 px-2 text-[11px] font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-500/20">{f.t('lg.person.removeConfirm', 'Remove?')}</button>
+              ) : (
+                <button type="button" aria-label={f.t('lg.person.remove', 'Remove booster')} title={f.t('lg.person.remove', 'Remove booster')} onClick={() => setConfirmRemove(true)} className="text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400"><Trash2 className="w-3.5 h-3.5" /></button>
+              )}
             </h1>
           )}
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
-        <span>{f.t('lg.person.paysIn', 'Paid in')}</span>
-        <div className="w-40">
-          <Select
-            value={selected.defaultCurrency || ''}
-            onChange={(v) => guard(() => ledger.setPartyCurrency(selected, v))}
-            options={[{ value: '', label: f.t('lg.person.anyCurrency', 'Any currency') }, ...Object.keys(CURRENCIES).map((c) => ({ value: c, label: c }))]}
-            ariaLabel={f.t('lg.person.paysIn', 'Paid in')}
-          />
         </div>
       </div>
 

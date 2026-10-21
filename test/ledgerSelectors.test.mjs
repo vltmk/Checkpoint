@@ -121,3 +121,27 @@ test('booster report: earned = paid + owed, sorted by earnings', () => {
   assert.equal(rows[1].paidMinor, 50000);
   assert.equal(rows[1].owedMinor, 150000);
 });
+
+import { reportSummary, toCsv } from '../src/lib/ledger/selectors.js';
+
+test('margin report can be limited to a period, and the summary reads off it', () => {
+  const f = fixture();
+  f.orders[0].game = 'WoW';
+  f.orders[1].game = 'Diablo';
+  const ctx = buildContext(f);
+  const opts = { rates: RATES, displayCurrency: 'TOMAN', groupBy: 'game' };
+  const recent = marginReport(ctx, partyById, { ...opts, sinceMs: NOW - 5 * DAY });
+  assert.deepEqual(recent.rows.map((r) => r.key), ['Diablo']);
+  assert.equal(recent.totals.orders, 1);
+  const all = marginReport(ctx, partyById, opts);
+  assert.equal(all.totals.orders, 2);
+  const s = reportSummary(all);
+  assert.equal(s.keepMinor, 600000);
+  assert.equal(s.avgPerOrderMinor, 300000);
+  assert.equal(s.top.key, 'WoW');
+  assert.equal(reportSummary(recent).top, null); // one group: nothing to rank
+});
+
+test('csv quotes cells and defuses spreadsheet formulas', () => {
+  assert.equal(toCsv([['a,b', 'say "hi"', '=SUM(A1)', 5, -2]]), `"a,b","say ""hi""",'=SUM(A1),5,-2`);
+});

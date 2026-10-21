@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { copyText, saveTextFile, withBom } from './files';
-import { BalanceRail, EmptyState, Initial, Meta, Money, Segmented, SectionTitle, StatusTile, UndoLink } from './parts';
+import { BalanceRail, EmptyState, Initial, Meta, Money, Segmented, TOOLBAR_INPUT, SectionTitle, StatusTile, UndoLink } from './parts';
 import { paymentsAppliedTo } from '../../lib/ledger/engine';
 import { PeopleView } from './PeopleView';
 
@@ -78,7 +78,7 @@ export function ClientsView({ onReceive, onPay, onOpenJob, onOpenProofs, onNewJo
   const list = (
     <div className={cn('min-w-0', selected && 'hidden min-[900px]:block')}>
       <div className="mb-3">
-        <Input data-ledger-search prefixIcon={<Search className="w-3.5 h-3.5" />} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={f.t('lg.clients.search', 'Search clients')} aria-label={f.t('lg.clients.search', 'Search clients')} />
+        <Input data-ledger-search className={TOOLBAR_INPUT} prefixIcon={<Search className="w-3.5 h-3.5" />} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={f.t('lg.clients.search', 'Search clients')} aria-label={f.t('lg.clients.search', 'Search clients')} />
       </div>
       {filtered.length === 0 ? (
         <EmptyState icon={Users} title={clients.length === 0 ? f.t('lg.clients.empty', 'No clients yet') : f.t('lg.people.none', 'No match')} body={clients.length === 0 ? f.t('lg.clients.emptyBody', 'When you add a job and say who pays, they show up here with what they owe you.') : undefined}>
