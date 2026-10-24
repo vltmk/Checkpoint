@@ -17,10 +17,13 @@ import {
   activeSharesOf,
   shareAppliedMinor,
   isShareEarned,
+  isShareActive,
   orderRateOpts,
   paymentRateOpts,
   payerKey,
   DEAD_LIFECYCLES,
+  paymentCovers,
+  lastPaidAtByTarget,
 } from './engine.js';
 import { UNASSIGNED_PARTY_ID } from './legacyMapper.js';
 import { collapseBuckets, convertMinor, normalizeCurrency } from './money.js';
@@ -141,6 +144,8 @@ export function orderRows(ctx, partyById) {
  */
 export function partyStatement(ctx, partyId, { rates, displayCurrency }) {
   const events = [];
+  const shareById = new Map(ctx.shares.map((s) => [s.id, s]));
+  const sharePaidAt = lastPaidAtByTarget(ctx, 'share');
   for (const share of ctx.shares) {
     if (share.partyId !== partyId || share.state === 'cancelled') continue;
     const order = ctx.orderById.get(share.orderId);
@@ -155,6 +160,7 @@ export function partyStatement(ctx, partyId, { rates, displayCurrency }) {
       currency: normalizeCurrency(order.currency),
       earned: isShareEarned(share, order),
       appliedMinor: Math.min(share.amountMinor, shareAppliedMinor(ctx, share.id)),
+      paidAt: sharePaidAt.get(share.id) ?? null,
     });
   }
   const voided = new Set(ctx.payments.filter((p) => p.voidsPaymentId).map((p) => p.voidsPaymentId));
@@ -169,6 +175,7 @@ export function partyStatement(ctx, partyId, { rates, displayCurrency }) {
       currency: normalizeCurrency(p.currency),
       voided: voided.has(p.id),
       allocations: ctx.allocations.filter((a) => a.paymentId === p.id),
+      covers: paymentCovers(ctx, p.id, shareById),
     });
   }
   events.sort((a, b) => a.at - b.at || (a.type === 'share' ? -1 : 1));
@@ -198,6 +205,30 @@ export function statementSummaryLines(statement, { maxPayments = 5 } = {}) {
   const unpaid = statement.events.filter((e) => e.type === 'share' && e.earned && e.appliedMinor < e.amountMinor);
   const payments = statement.events.filter((e) => e.type === 'payment' && !e.voided).slice(-maxPayments);
   return { unpaid, payments };
+}
+
+/** How long money has been waiting, in four bands (days since the order). */
+export const AGE_BUCKETS = ['0-7', '8-30', '31-90', '90+'];
+const ageBand = (days) => (days <= 7 ? '0-7' : days <= 30 ? '8-30' : days <= 90 ? '31-90' : '90+');
+const emptyBands = () => Object.fromEntries(AGE_BUCKETS.map((b) => [b, 0]));
+
+/**
+ * How long each earned, unpaid share of a booster has waited, in the display currency (each job at its own rates).
+ */
+export function partyAging(ctx, partyId, { rates, displayCurrency, now = Date.now() }) {
+  const buckets = emptyBands();
+  let isApproximate = false;
+  for (const share of ctx.shares) {
+    if (share.partyId !== partyId) continue;
+    const order = ctx.orderById.get(share.orderId);
+    if (!order || !isShareActive(share, order) || !isShareEarned(share, order)) continue;
+    const outstanding = share.amountMinor - shareAppliedMinor(ctx, share.id);
+    if (outstanding <= 0) continue;
+    const days = Math.max(0, Math.floor((now - Date.parse(order.dateTime)) / 86400000));
+    if (normalizeCurrency(order.currency) !== normalizeCurrency(displayCurrency)) isApproximate = true;
+    buckets[ageBand(days)] += convertMinor(outstanding, order.currency, displayCurrency, rates, orderRateOpts(order));
+  }
+  return { buckets, isApproximate };
 }
 
 export { sumBuckets };

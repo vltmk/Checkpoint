@@ -43,7 +43,8 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
   const [lightbox, setLightbox] = useState({ open: false, src: '', caption: '' });
 
   const openPay = useCallback((partyId = null, opts = {}) => setPayment({ open: true, mode: 'pay', partyId, advance: Boolean(opts.advance) }), []);
-  const openReceive = useCallback((partyId = null) => setPayment({ open: true, mode: 'receive', partyId, advance: false }), []);
+  // presetIds: the orders ticked on the list, so the payout starts with exactly those covered
+  const openReceive = useCallback((partyId = null, presetIds = null) => setPayment({ open: true, mode: 'receive', partyId, advance: false, presetIds }), []);
   const openNewOrder = useCallback((initial = null) => setOrder({ open: true, existing: null, initial }), []);
 
   const openOrder = useCallback((orderId) => {
@@ -124,22 +125,22 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
       {isBooster ? (
         <>
           {tab === 'cockpit' && <BoosterOverview onNavigate={onTabChange} onReceive={openReceive} onNewJob={newItem} onExpense={() => setExpenseOpen(true)} onOpenJob={openOrder} onImport={() => setImportOpen(true)} />}
-          {tab === 'orders' && <JobsView categories={categories} onNewJob={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenClient={openClient} />}
-          {tab === 'people' && <ClientsView onReceive={openReceive} onPay={openPay} onOpenJob={openOrder} onOpenProofs={openProofs} onNewJob={newItem} />}
+          {tab === 'orders' && <JobsView categories={categories} onNewJob={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenClient={openClient} onReceive={openReceive} />}
+          {tab === 'people' && <ClientsView onReceive={openReceive} onPay={openPay} onOpenJob={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onNewJob={newItem} />}
           {tab === 'money' && <MoneyView onPay={openPay} onReceive={openReceive} onOpenProofs={openProofs} />}
           {tab === 'analytics' && <ReportsView />}
         </>
       ) : (
         <>
           {tab === 'cockpit' && <CockpitView onNavigate={onTabChange} onPay={openPay} onReceive={openReceive} onNewOrder={newItem} onOpenOrder={openOrder} onImport={() => setImportOpen(true)} />}
-          {tab === 'orders' && <OrdersView categories={categories} onNewOrder={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenPerson={openPerson} />}
-          {tab === 'people' && <PeopleView onPay={openPay} onOpenOrder={openOrder} onOpenProofs={openProofs} onNewOrder={newItem} />}
+          {tab === 'orders' && <OrdersView categories={categories} onNewOrder={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenPerson={openPerson} onReceive={openReceive} />}
+          {tab === 'people' && <PeopleView onPay={openPay} onOpenOrder={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onNewOrder={newItem} />}
           {tab === 'money' && <MoneyView onPay={openPay} onReceive={openReceive} onOpenProofs={openProofs} />}
           {tab === 'analytics' && <ReportsView />}
         </>
       )}
 
-      <PaymentDialog open={payment.open} mode={payment.mode} partyId={payment.partyId} advance={payment.advance} onClose={() => setPayment((p) => ({ ...p, open: false }))} />
+      <PaymentDialog open={payment.open} mode={payment.mode} partyId={payment.partyId} advance={payment.advance} presetIds={payment.presetIds} onClose={() => setPayment((p) => ({ ...p, open: false }))} />
       {isBooster
         ? <JobModal open={order.open} existing={order.existing} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />
         : <OrderModal open={order.open} existing={order.existing} initial={order.initial} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />}

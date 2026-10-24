@@ -131,7 +131,7 @@ export function rowFromSql(table, row) {
 // --- Validation of rows that come from outside (backup files) ----------------------------------------------
 
 const LIFECYCLE_SET = new Set(['pending', 'working', 'on_hold', 'done', 'failed', 'disputed', 'refunded']);
-const PAYMENT_KIND_SET = new Set(['settlement', 'advance', 'expense', 'refund', 'adjustment']);
+const PAYMENT_KIND_SET = new Set(['settlement', 'advance', 'expense', 'refund', 'adjustment', 'writeoff']);
 const CURRENCY_SET = new Set(['TOMAN', 'GOLD', 'USD', 'EUR']);
 const PARTY_KIND_SET = new Set(['booster', 'client', 'platform', 'advertiser']);
 const MAX_TEXT = 4000;

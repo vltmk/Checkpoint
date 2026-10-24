@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { CircleCheck, ClipboardList, Clock, Percent, Plus, Search, SearchX, Store } from 'lucide-react';
+import { CheckSquare, CircleCheck, ClipboardList, Clock, Percent, Plus, Search, SearchX, Store } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { orderRows } from '../../lib/ledger/selectors';
 import { convertMinor, normalizeCurrency } from '../../lib/ledger/money';
-import { orderRateOpts, paymentsAppliedTo } from '../../lib/ledger/engine';
+import { orderRateOpts, paymentsAppliedTo, payerKey } from '../../lib/ledger/engine';
+import { selectionRecap } from '../../lib/ledger/selection';
 import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
@@ -14,12 +15,17 @@ import { DayHeader, EmptyState, Initial, LIFE_ICON, LIFE_STYLE, GameTile, Meta, 
 import { RowActions, openOnBlankClick } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
+import { useRowSelection } from './useRowSelection';
+import { SelectionBar } from './SelectionBar';
+import { markRowsCollected, selectionCsv } from './selectionTools';
+import { copyText } from './files';
+import { CloseShort } from './CloseShort';
 
 const PAGE = 40;
 const ACTIVE = new Set(['pending', 'working', 'on_hold', 'disputed']);
 const LIFE_LABEL = { pending: 'Pending', working: 'Working', on_hold: 'On hold', done: 'Done', failed: 'Failed', disputed: 'Disputed', refunded: 'Refunded' };
 
-export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenProofs, onOpenPerson }) {
+export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenProofs, onOpenPerson, onReceive }) {
   const ledger = useLedger();
   const proofIds = useOrderProofs();
   const f = useLedgerFormat();
@@ -30,6 +36,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
   const [local, setLocal] = useState('');
   const [limit, setLimit] = useState(PAGE);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const rows = useMemo(() => (ctx ? orderRows(ctx, partyById) : []), [ctx, partyById]);
 
@@ -53,6 +60,30 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
     }
     return true;
   }), [rows, view, money, personId, q]);
+
+  // ticked rows: "select all" and shift-range work over every filtered row, not just the page on screen
+  const sel = useRowSelection(useMemo(() => filtered.map((r) => r.order.id), [filtered]));
+  const selectedRows = useMemo(() => filtered.filter((r) => sel.selected.has(r.order.id)), [filtered, sel.selected]);
+  const recap = useMemo(() => selectionRecap(selectedRows, { rates: ledger.rates, displayCurrency: ledger.displayCurrency }), [selectedRows, ledger.rates, ledger.displayCurrency]);
+  const payers = [...new Set(selectedRows.map((r) => payerKey(r.order)))];
+  const payoutBlocked = payers.length > 1 ? f.t('lg.sel.onePayer', 'Pick orders from one payer to record a payout') : '';
+
+  const markSelected = async () => {
+    setError('');
+    const { marked, lastError } = await markRowsCollected(selectedRows, (id) => ledger.markOrderCollected(id));
+    if (lastError) setError(lastError.message || f.t('lg.err.generic', 'That could not be saved.'));
+    setNotice(f.t('lg.sel.marked', 'Marked {marked}, skipped {skipped}', { marked: f.formatNumber(marked), skipped: f.formatNumber(selectedRows.length - marked) }));
+  };
+  const recordPayout = () => onReceive(payers[0] ?? '', selectedRows.map((r) => r.order.id));
+  const copySelection = async () => {
+    const csv = selectionCsv(selectedRows, {
+      headers: [f.t('lg.sel.csv.date', 'Date'), f.t('lg.sel.csv.title', 'Title'), f.t('lg.sel.csv.ref', 'Order ref'), f.t('lg.sel.csv.game', 'Game'), f.t('lg.sel.csv.payer', 'Payer'), f.t('lg.sel.csv.currency', 'Currency'), f.t('lg.wf.price', 'Order pays'), f.t('lg.sel.fees', 'Fees'), f.t('lg.sel.keep', 'Keep'), f.t('lg.sel.toCollect', 'To collect'), f.t('lg.sel.collected', 'Collected')],
+      payerName: (r) => (r.payer ? f.name(r.payer) : r.order.source || ''),
+      date: (iso) => f.date(iso),
+    });
+    await copyText(csv);
+    setNotice(f.t('lg.copied', 'Copied'));
+  };
 
   const guard = async (fn) => {
     setError('');
@@ -108,6 +139,9 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
         <div className="w-48">
           <Input data-ledger-search className={TOOLBAR_INPUT} prefixIcon={<Search className="w-3.5 h-3.5" />} value={local} onChange={(e) => setLocal(e.target.value)} placeholder={f.t('lg.orders.search', 'Search orders')} aria-label={f.t('lg.orders.search', 'Search orders')} />
         </div>
+        <Button variant={sel.active ? 'primary' : 'outline'} size="sm" className="rounded-lg" onClick={sel.active ? sel.exit : sel.enter} aria-pressed={sel.active}>
+          <CheckSquare className="w-3.5 h-3.5" />{sel.active ? f.t('lg.sel.done', 'Done') : f.t('lg.sel.select', 'Select')}
+        </Button>
         <Button variant="primary" size="sm" className="ms-auto rounded-lg" onClick={onNewOrder}><Plus className="w-3.5 h-3.5" />{f.t('lg.newOrder', 'New order')}</Button>
       </div>
       {error && <p role="alert" className="mb-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
@@ -130,8 +164,18 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                     const feePct = o.grossMinor > 0 && o.platformFeeMinor > 0 ? Math.round((o.platformFeeMinor / o.grossMinor) * 1000) / 10 : 0;
                     const payerName = r.payer ? f.name(r.payer) : o.source;
                     return (
-                      <li key={o.id} onClick={openOnBlankClick(() => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40 first:rounded-t-xl last:rounded-b-xl', r.dead && 'opacity-60')}>
-                        <GameTile game={o.game} categories={categories} lifecycle={o.lifecycle} className="mt-0.5" />
+                      <li key={o.id} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
+                        <span className="relative mt-0.5 shrink-0">
+                          <GameTile game={o.game} categories={categories} size="lg" />
+                          {/* the row's box sits on the tile's corner: hidden until hovered, and every row shows one once select mode is on */}
+                          <input
+                            type="checkbox"
+                            checked={sel.has(o.id)}
+                            onChange={(e) => sel.pick(o.id, e.nativeEvent)}
+                            aria-label={f.t('lg.sel.row', 'Select this row')}
+                            className={cn('absolute -start-1.5 -top-1.5 h-4 w-4 cursor-pointer accent-zinc-900 dark:accent-zinc-100 transition-opacity', !sel.active && 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100')}
+                          />
+                        </span>
 
                         <div className="flex min-w-0 flex-1 flex-col">
                           <div className="flex items-baseline gap-2 min-w-0">
@@ -181,6 +225,9 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                               <span className="text-zinc-700 dark:text-zinc-400">
                                 {f.t('lg.waitingOn', 'Waiting on {name}', { name: r.payer ? f.name(r.payer) : f.t('lg.order.payer', 'the payer') })}
                                 {r.money.partlyCollected && <> · <Money minor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} compact /> {f.t('lg.left', 'left')}</>}
+                                {o.lifecycle === 'done' && (
+                                  <> · <CloseShort amountMinor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} onConfirm={(note) => guard(() => ledger.writeOff(o.id, note))} /></>
+                                )}
                               </span>
                             )}
                           </div>
@@ -216,6 +263,22 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
             );
           })}
         </div>
+      )}
+      {selectedRows.length > 0 && (
+        <SelectionBar
+          profile="advertiser"
+          count={selectedRows.length}
+          recap={recap}
+          currency={ledger.displayCurrency}
+          notice={notice}
+          allCount={filtered.length}
+          onSelectAll={sel.selectAll}
+          onClear={() => { sel.clear(); setNotice(''); }}
+          onMarkCollected={markSelected}
+          onRecordPayout={recordPayout}
+          payoutDisabledReason={payoutBlocked}
+          onCopy={copySelection}
+        />
       )}
       {filtered.length > limit && (
         <div className="mt-4 text-center">

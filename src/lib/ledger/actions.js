@@ -13,6 +13,7 @@ import {
   orderReceivableMinor,
   isShareActive,
   payerKey,
+  DEAD_LIFECYCLES,
 } from './engine.js';
 import { LedgerValidationError } from './ledgerStore.js';
 import { normalizeCurrency } from './money.js';
@@ -72,31 +73,84 @@ export async function undoPaid(store, targetType, targetId) {
  *   takenOut = false : "what the platform released". The fee comes out of my pocket on top.
  * Either way the orders are credited with the released amount, the fee is an expense, and net cash = released - fee.
  */
-export function computeWithdrawal({ enteredMinor, pct = 0, flatMinor = 0, takenOut = true }) {
+const layerRate = (pct) => Math.min(99.99, Math.max(0, Number(pct) || 0)) / 100;
+const layerFlat = (flat) => Math.max(0, Math.round(Number(flat) || 0));
+
+/** Every layer's percent added up (capped below 100%), and every layer's flat amount added up. */
+function layerTotals(layers) {
+  const rules = layers.map((l) => ({ label: l.label || '', rate: layerRate(l.pct), flat: layerFlat(l.flatMinor) }));
+  return { rules, rate: Math.min(0.9999, rules.reduce((s, r) => s + r.rate, 0)), flat: rules.reduce((s, r) => s + r.flat, 0) };
+}
+
+/**
+ * Fees taken on the way to you, one per layer (platform, bank, exchange...). Each layer's percent is of the amount the
+ * platform released, not of what is left after the layer before it, and its flat amount is added on top. The layers
+ * therefore add up to one percent and one flat amount, and `takenOut` says whether the typed amount is what reached you.
+ * Each layer's share of the fee is returned so every layer can be booked on its own.
+ */
+export function computeWithdrawalLayers({ enteredMinor, layers = [], takenOut = true }) {
   const entered = Math.max(0, Math.round(enteredMinor || 0));
-  const rate = Math.min(99.99, Math.max(0, Number(pct) || 0)) / 100;
-  const flat = Math.max(0, Math.round(flatMinor || 0));
-  if (rate === 0 && flat === 0) return { releasedMinor: entered, feeMinor: 0, netMinor: entered };
+  const { rules, rate, flat } = layerTotals(layers);
+  if (rate === 0 && flat === 0) return { releasedMinor: entered, feeMinor: 0, netMinor: entered, feeLines: [] };
+
+  let released;
+  let total;
+  let raw;
   if (takenOut) {
-    const released = Math.round((entered + flat) / (1 - rate));
-    return { releasedMinor: released, feeMinor: released - entered, netMinor: entered };
+    released = Math.round((entered + flat) / (1 - rate));
+    total = released - entered;
+    raw = rules.map((r) => Math.round(released * r.rate) + r.flat);
+  } else {
+    released = entered;
+    raw = rules.map((r) => Math.round(entered * r.rate) + r.flat);
+    total = Math.min(entered, raw.reduce((s, x) => s + x, 0));
   }
-  const fee = Math.min(entered, Math.round(entered * rate) + flat);
-  return { releasedMinor: entered, feeMinor: fee, netMinor: entered - fee };
+  // rounding can leave the per-layer figures a unit off the total: the last layer takes the difference
+  const shares = raw.map((x) => x);
+  const sumRaw = shares.reduce((s, x) => s + x, 0);
+  if (shares.length) shares[shares.length - 1] += total - sumRaw;
+  const feeLines = rules.map((r, i) => ({ label: r.label, feeMinor: Math.max(0, shares[i]) })).filter((l) => l.feeMinor > 0);
+  const net = takenOut ? entered : entered - total;
+  return { releasedMinor: released, feeMinor: total, netMinor: net, feeLines };
+}
+
+/** One platform fee rule (a single pct and flat amount), kept for callers that do not use layers. */
+export function computeWithdrawal({ enteredMinor, pct = 0, flatMinor = 0, takenOut = true }) {
+  const { releasedMinor, feeMinor, netMinor } = computeWithdrawalLayers({ enteredMinor, layers: [{ pct, flatMinor }], takenOut });
+  return { releasedMinor, feeMinor, netMinor };
+}
+
+/**
+ * The amount to type so the platform's released amount comes to `releasedMinor`: the inverse of computeWithdrawal.
+ * Used by "Fill exact", so the typed figure covers the selected orders to the unit, fee included.
+ */
+export function enteredForReleased({ releasedMinor, layers = null, pct = 0, flatMinor = 0, takenOut = true }) {
+  const target = Math.max(0, Math.round(releasedMinor || 0));
+  const list = layers || [{ pct, flatMinor }];
+  const { rate, flat } = layerTotals(list);
+  if (!takenOut || (rate === 0 && flat === 0)) return target;
+  const released = (e) => computeWithdrawalLayers({ enteredMinor: e, layers: list, takenOut }).releasedMinor;
+  let entered = Math.max(0, Math.round(target * (1 - rate)) - flat);
+  // rounding can land a unit either side of the target: step up until it covers, then down while one less still does
+  while (released(entered) < target) entered += 1;
+  while (entered > 0 && released(entered - 1) >= target) entered -= 1;
+  return entered;
 }
 
 /** A lump from a platform or client, applied to their oldest unpaid orders. A withdrawal fee is booked as an expense linked to it. */
-export async function receivePayout(store, { payerId, amountMinor, currency, rates, feeMinor = 0, dateTime, note = '', method = '', excludeIds = [] }) {
+export async function receivePayout(store, { payerId, amountMinor, currency, rates, feeLines = null, feeMinor = 0, dateTime, note = '', method = '', excludeIds = [] }) {
   const ctx = await store.loadContext();
   const { allocations } = previewReceivePayout(ctx, { payerId, amountMinor, currency, rates, excludeIds });
   const payment = await store.recordPayment({
     payment: { direction: 'in', partyId: payerId || null, amountMinor, currency: normalizeCurrency(currency), rates: ratesSnapshot(rates), kind: 'settlement', dateTime, note, method },
     allocations,
   });
-  if (feeMinor > 0) {
+  // one expense per fee layer, each linked to the payout so reports can spread it over the orders it paid
+  const lines = feeLines || (feeMinor > 0 ? [{ label: note, feeMinor }] : []);
+  for (const line of lines) {
+    if (!(line.feeMinor > 0)) continue;
     await store.recordPayment({
-      // linked to the payout, so reports can spread the fee over the orders it paid
-      payment: { direction: 'out', partyId: payerId || null, amountMinor: feeMinor, currency: normalizeCurrency(currency), rates: ratesSnapshot(rates), kind: 'expense', dateTime, note, relatedPaymentId: payment.id },
+      payment: { direction: 'out', partyId: payerId || null, amountMinor: line.feeMinor, currency: normalizeCurrency(currency), rates: ratesSnapshot(rates), kind: 'expense', dateTime, note: line.label || note, relatedPaymentId: payment.id },
     });
   }
   return payment;
@@ -114,6 +168,22 @@ export async function markSharePaid(store, shareId, { rates, dateTime, note = ''
   return store.recordPayment({
     payment: { direction: 'out', partyId: share.partyId, amountMinor: outstanding, currency: order.currency, rates: ratesSnapshot(rates), kind: 'settlement', dateTime, note },
     allocations: [{ targetType: 'share', targetId: share.id, appliedMinor: outstanding, consumedMinor: outstanding }],
+  });
+}
+
+/**
+ * Close what is still owed on an order because the payer paid less than it was written for. The shortfall is booked as
+ * a write-off: a payment of its own that clears the order without any cash moving. Voiding it, in Money, reopens the balance.
+ */
+export async function writeOffOrder(store, orderId, { rates, dateTime, note = '' } = {}) {
+  const ctx = await store.loadContext();
+  const order = ctx.orderById.get(orderId);
+  if (!order || DEAD_LIFECYCLES.has(order.lifecycle)) throw new LedgerValidationError('That order is not open.');
+  const shortfall = orderReceivableMinor(order) - orderReceivedMinor(ctx, order.id);
+  if (shortfall <= 0) throw new LedgerValidationError('Nothing is left to close.');
+  return store.recordPayment({
+    payment: { direction: 'in', partyId: payerKey(order) || null, amountMinor: shortfall, currency: order.currency, rates: ratesSnapshot(rates), kind: 'writeoff', dateTime, note },
+    allocations: [{ targetType: 'order', targetId: order.id, appliedMinor: shortfall, consumedMinor: 0 }],
   });
 }
 

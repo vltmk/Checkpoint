@@ -17,8 +17,12 @@ import {
   payerKey,
   voidedPaymentIds,
   DEAD_LIFECYCLES,
+  paymentCovers,
+  lastPaidAtByTarget,
+  payerCreditBuckets,
+  writtenOffByOrder,
 } from './engine.js';
-import { convertMinor, normalizeCurrency } from './money.js';
+import { collapseBuckets, convertMinor, normalizeCurrency } from './money.js';
 import { UNKNOWN_PAYER_ID } from './legacyMapper.js';
 import { peopleList } from './selectors.js';
 
@@ -34,6 +38,7 @@ const liveJobs = (ctx) => ctx.orders.filter((o) => o.kind !== 'expense' && !DEAD
 /** Everyone who pays me, with what they owe now, what is still in progress, and how long the oldest unpaid job has waited. */
 export function payerList(ctx, parties, { rates, displayCurrency, now = Date.now() }) {
   const partyById = new Map(parties.map((p) => [p.id, p]));
+  const writtenOff = writtenOffByOrder(ctx);
   const groups = new Map();
   for (const o of liveJobs(ctx)) {
     const key = payerKey(o);
@@ -45,7 +50,8 @@ export function payerList(ctx, parties, { rates, displayCurrency, now = Date.now
     if (normalizeCurrency(o.currency) !== normalizeCurrency(displayCurrency)) g.isApproximate = true;
     const conv = (m) => convertMinor(m, o.currency, displayCurrency, rates, lock);
     g.jobs += 1;
-    g.collectedMinor += conv(received);
+    // cash collected: what was received less what was closed short (a write-off is not money in the bank)
+    g.collectedMinor += conv(Math.max(0, received - (writtenOff.get(o.id) || 0)));
     if (o.lifecycle === 'done') {
       g.owedMinor += conv(outstanding);
       const t = Date.parse(o.dateTime);
@@ -67,18 +73,23 @@ export function payerList(ctx, parties, { rates, displayCurrency, now = Date.now
 export function payerStatement(ctx, key, { rates, displayCurrency }) {
   const events = [];
   const voided = voidedPaymentIds(ctx.payments);
+  const shareById = new Map(ctx.shares.map((s) => [s.id, s]));
+  const jobPaidAt = lastPaidAtByTarget(ctx, 'order');
   for (const o of liveJobs(ctx)) {
     if (payerKey(o) !== (key || '')) continue;
     const receivable = orderReceivableMinor(o);
     events.push({
       type: 'job', id: o.id, at: Date.parse(o.dateTime), order: o, amountMinor: receivable, currency: normalizeCurrency(o.currency),
-      appliedMinor: Math.min(receivable, orderReceivedMinor(ctx, o.id)), done: o.lifecycle === 'done',
+      appliedMinor: Math.min(receivable, orderReceivedMinor(ctx, o.id)), done: o.lifecycle === 'done', paidAt: jobPaidAt.get(o.id) ?? null,
     });
   }
   for (const p of ctx.payments) {
     if (p.voidsPaymentId || p.direction !== 'in' || p.kind === 'expense') continue;
     if ((p.partyId || '') !== (key || '') && !(key === '' && p.partyId === UNKNOWN_PAYER_ID)) continue;
-    events.push({ type: 'payment', id: p.id, at: Date.parse(p.dateTime), payment: p, amountMinor: p.amountMinor, currency: normalizeCurrency(p.currency), voided: voided.has(p.id) });
+    events.push({
+      type: 'payment', id: p.id, at: Date.parse(p.dateTime), payment: p, amountMinor: p.amountMinor, currency: normalizeCurrency(p.currency),
+      voided: voided.has(p.id), covers: paymentCovers(ctx, p.id, shareById),
+    });
   }
   events.sort((a, b) => a.at - b.at || (a.type === 'job' ? -1 : 1));
   let running = 0;
@@ -99,7 +110,28 @@ export function payerStatement(ctx, key, { rates, displayCurrency }) {
     e.runningMinor = running;
   }
   // money received beyond what they owed shows as a negative balance (they are ahead of you)
-  return { events, owedMinor: owed, progressMinor: progress, balanceMinor: running, isApproximate: approximate };
+  // money they sent that no job has taken yet: credit with me, valued at the rates it was paid at
+  const credit = collapseBuckets(payerCreditBuckets(ctx, key), displayCurrency, rates);
+  return { events, owedMinor: owed, progressMinor: progress, balanceMinor: running, creditMinor: credit.minor, isApproximate: approximate || credit.isApproximate };
+}
+
+/**
+ * How long a client's finished, unpaid jobs have waited, in the display currency (each job at its own rates).
+ * Jobs still in progress are not owed yet, so they are left out, as they are in payerStatement.
+ */
+export function payerAging(ctx, key, { rates, displayCurrency, now = Date.now() }) {
+  const buckets = Object.fromEntries(['0-7', '8-30', '31-90', '90+'].map((b) => [b, 0]));
+  let isApproximate = false;
+  for (const o of liveJobs(ctx)) {
+    if (payerKey(o) !== (key || '') || o.lifecycle !== 'done') continue;
+    const outstanding = orderReceivableMinor(o) - orderReceivedMinor(ctx, o.id);
+    if (outstanding <= 0) continue;
+    const days = Math.max(0, Math.floor((now - Date.parse(o.dateTime)) / 86400000));
+    const band = days <= 7 ? '0-7' : days <= 30 ? '8-30' : days <= 90 ? '31-90' : '90+';
+    if (normalizeCurrency(o.currency) !== normalizeCurrency(displayCurrency)) isApproximate = true;
+    buckets[band] += convertMinor(outstanding, o.currency, displayCurrency, rates, orderRateOpts(o));
+  }
+  return { buckets, isApproximate };
 }
 
 /** The Booster's home screen numbers. `monthKey` maps an ISO date to the user's calendar month (Shamsi or Gregorian). */
@@ -132,7 +164,7 @@ export function boosterOverview(ctx, parties, { rates, displayCurrency, now = Da
       allTimeSpent += v;
       if (monthKey(p.dateTime) === thisMonth) spent += v;
     }
-    if (p.direction === 'in' || isExpense) recent.push(p);
+    if ((p.direction === 'in' && p.kind !== 'writeoff') || isExpense) recent.push(p);
   }
   recent.sort((a, b) => Date.parse(b.dateTime) - Date.parse(a.dateTime));
 
@@ -150,4 +182,17 @@ export function boosterOverview(ctx, parties, { rates, displayCurrency, now = Da
     allTimeEarnedMinor: allTimeEarned, allTimeSpentMinor: allTimeSpent,
     teamOwedMinor, team, payers, attention, recentPayments: recent.slice(0, 6), isApproximate: approximate,
   };
+}
+
+/** What a client owes me on finished jobs, per currency, in each currency as it was priced (no conversion). */
+export function payerOwedByCurrency(ctx, key) {
+  const out = {};
+  for (const o of liveJobs(ctx)) {
+    if (payerKey(o) !== (key || '') || o.lifecycle !== 'done') continue;
+    const outstanding = orderReceivableMinor(o) - orderReceivedMinor(ctx, o.id);
+    if (outstanding <= 0) continue;
+    const c = normalizeCurrency(o.currency);
+    out[c] = (out[c] || 0) + outstanding;
+  }
+  return out;
 }

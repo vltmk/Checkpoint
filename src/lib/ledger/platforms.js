@@ -35,16 +35,35 @@ export function suggestedFeePct(partyOrName, party) {
   return known?.feePct ?? 0;
 }
 
-/** A platform's saved withdrawal rule, with safe defaults. */
+export const MAX_FEE_LAYERS = 5;
+
+const cleanPct = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n < 100 ? n : 0;
+};
+const cleanFlat = (v) => {
+  const n = Number(v);
+  return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+};
+
+/**
+ * A platform's saved withdrawal rule, with safe defaults. `layers` are the fees taken on the way to you (platform,
+ * bank, exchange...). A rule saved before layers existed (one pct and one flat amount) reads as a single layer.
+ */
 export function withdrawalRule(party) {
   const w = party?.settings?.withdraw || {};
-  const pct = Number(w.pct);
-  const flat = Number(w.flatMinor);
+  const pct = cleanPct(w.pct);
+  const flatMinor = cleanFlat(w.flatMinor);
+  const saved = Array.isArray(w.layers)
+    ? w.layers.slice(0, MAX_FEE_LAYERS).map((l) => ({ label: typeof l?.label === 'string' ? l.label.slice(0, 40) : '', pct: cleanPct(l?.pct), flatMinor: cleanFlat(l?.flatMinor) })).filter((l) => l.pct > 0 || l.flatMinor > 0)
+    : [];
+  const layers = saved.length ? saved : (pct > 0 || flatMinor > 0 ? [{ label: '', pct, flatMinor }] : []);
   return {
-    pct: Number.isFinite(pct) && pct >= 0 && pct < 100 ? pct : 0,
-    flatMinor: Number.isSafeInteger(flat) && flat >= 0 ? flat : 0,
+    pct,
+    flatMinor,
     flatCurrency: typeof w.flatCurrency === 'string' ? w.flatCurrency : null,
     // most platforms send the net amount, and people type what reached their account
     takenOut: w.takenOut === undefined ? true : Boolean(w.takenOut),
+    layers,
   };
 }

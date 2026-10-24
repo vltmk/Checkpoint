@@ -3,17 +3,28 @@ import { AlertTriangle, CircleCheck, CircleDashed, CirclePause, CirclePlay, Circ
 import { MoneyDisplay } from '../ui/MoneyDisplay';
 import { GameIcon } from '../ui/GameIcon';
 import { fromMinor } from '../../lib/ledger/money';
+import { AGE_BUCKETS } from '../../lib/ledger/selectors';
+import { useLedgerFormat } from './format';
 import { cn } from '../../lib/utils';
 
-/** Integer minor units rendered through the app's money component (keeps Toman/Gold/USD/EUR styling). */
-export function Money({ minor, currency, compact = false, className, approx = false }) {
+/**
+ * Integer minor units rendered through the app's money component (keeps Toman/Gold/USD/EUR styling).
+ * Ledger amounts are always exact: a "1.2M" for a 1,234,567 Toman debt hides what is actually owed,
+ * so the old `compact` prop is no longer passed through. Callers may still pass it; it is ignored.
+ */
+export function Money({ minor, currency, className, approx = false }) {
   return (
     <span className={cn('tabular-nums', className)}>
       {approx && <span className="text-zinc-400 me-0.5" aria-hidden="true">≈</span>}
       {/* the Toman mark follows the text size (it was a fixed 24px, which dwarfed small figures) */}
-      <MoneyDisplay amount={fromMinor(minor, currency)} currency={currency} compact={compact} iconSize="min(1.5em, 26px)" />
+      <MoneyDisplay amount={fromMinor(minor, currency)} currency={currency} iconSize="min(1.5em, 26px)" />
     </span>
   );
+}
+
+/** "Title A, Title B" for the orders a payment covered (paymentCovers in engine.js). Falls back to the order ref. */
+export function coversTitles(covers = []) {
+  return covers.map((c) => c.order.title || c.order.orderRef || '—').join(', ');
 }
 
 /**
@@ -219,17 +230,44 @@ export function StatusTile({ lifecycle, className }) {
  * The leading mark of an Orders / Jobs row: the game's own icon (the category icon, tinted with its accent colour),
  * with the order status as a small badge on the corner. The game says what it is; the badge says where it stands.
  */
-export function GameTile({ game, categories, lifecycle, className }) {
-  const Status = LIFE_ICON[lifecycle] || LIFE_ICON.pending;
+/**
+ * A game's icon on its category tint. The status is shown once, by the status control on the row, so the tile carries
+ * no badge. `size="lg"` is the ledger row's size, where the tile is the row's main visual anchor.
+ */
+export function GameTile({ game, categories, className, size = 'md' }) {
   const category = Array.isArray(categories) && game ? categories.find((c) => c.name?.trim().toLowerCase() === String(game).trim().toLowerCase()) : null;
   const tint = /^#[0-9a-f]{6}$/i.test(category?.color || '') ? `${category.color}1f` : undefined;
+  const large = size === 'lg';
   return (
-    <span className={cn('relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10', className)} style={tint ? { backgroundColor: tint } : undefined}>
-      <GameIcon game={game} categories={categories} className="h-[22px] w-[22px] object-contain" />
-      <span aria-hidden="true" className={cn('absolute -bottom-1 -end-1 inline-flex h-[15px] w-[15px] items-center justify-center rounded-full text-white ring-2 ring-zinc-50 dark:ring-zinc-950', (LIFE_STYLE[lifecycle] || LIFE_STYLE.pending).dot)}>
-        <Status className="h-[9px] w-[9px]" strokeWidth={3} />
-      </span>
+    <span className={cn('inline-flex shrink-0 items-center justify-center rounded-lg bg-zinc-500/10', large ? 'h-11 w-11' : 'h-9 w-9', className)} style={tint ? { backgroundColor: tint } : undefined}>
+      <GameIcon game={game} categories={categories} className={cn('object-contain', large ? 'h-7 w-7' : 'h-[22px] w-[22px]')} />
     </span>
+  );
+}
+
+/**
+ * How long money has been waiting, in four bands on a statement. Hidden when nothing is waiting; the oldest band is
+ * the only one in red, because that is the money most at risk of never coming.
+ */
+export function AgingStrip({ label, buckets, currency, approx = false }) {
+  const f = useLedgerFormat();
+  const total = Object.values(buckets).reduce((s, n) => s + n, 0);
+  if (total <= 0) return null;
+  const band = { '0-7': f.t('lg.age.week', '0–7 days'), '8-30': f.t('lg.age.month', '8–30 days'), '31-90': f.t('lg.age.quarter', '31–90 days'), '90+': f.t('lg.age.old', 'Over 90 days') };
+  return (
+    <div className="mt-3">
+      <div className="text-[11px] text-zinc-500 dark:text-zinc-400">{label}</div>
+      <dl className="mt-1 grid grid-cols-4 gap-2">
+        {AGE_BUCKETS.map((b) => (
+          <div key={b} className="min-w-0">
+            <dt className="truncate text-[10.5px] text-zinc-500 dark:text-zinc-400">{band[b]}</dt>
+            <dd className={cn('text-xs tabular-nums', buckets[b] <= 0 ? 'text-zinc-400 dark:text-zinc-600' : b === '90+' ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-zinc-900 dark:text-zinc-100')}>
+              <Money minor={buckets[b]} currency={currency} approx={approx} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 

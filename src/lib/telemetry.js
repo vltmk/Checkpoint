@@ -23,8 +23,6 @@ const STORAGE_KEYS = {
   PENDING_WORKS: 'checkpoint_telemetry_pending_works_count',
   PENDING_RECEIPTS: 'checkpoint_telemetry_pending_receipts_count',
   LAST_APP_STARTED_DATE: 'checkpoint_telemetry_last_app_started_date',
-  LAST_REPORTED_VERSION: 'checkpoint_telemetry_last_reported_version',
-  LAST_REPORTED_ENV: 'checkpoint_telemetry_last_reported_env',
 };
 
 let initPromise = null;
@@ -34,6 +32,8 @@ let sessionId = null;
 let lastActivityMs = 0;
 let workCountQueue = Promise.resolve();
 let receiptCountQueue = Promise.resolve();
+let dailyActiveInFlight = null;
+let onlineListenerAttached = false;
 
 function isDevBuild() {
   return !!(import.meta.env && import.meta.env.DEV);
@@ -105,6 +105,37 @@ function detectPlatform() {
 }
 
 /**
+ * OS and web engine details, so the Aptabase OS/engine breakdowns are filled in
+ * (the official SDK sends the same fields).
+ */
+function detectSystemProps() {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+  let osName = '';
+  let osVersion = '';
+  let m;
+  if ((m = ua.match(/Windows NT ([\d.]+)/))) {
+    osName = 'Windows';
+    osVersion = m[1];
+  } else if ((m = ua.match(/Mac OS X ([\d_.]+)/))) {
+    osName = 'macOS';
+    osVersion = m[1].replace(/_/g, '.');
+  } else if (/Linux/i.test(ua)) {
+    osName = 'Linux';
+  }
+
+  let engineName = '';
+  let engineVersion = '';
+  if ((m = ua.match(/(?:Chrome|Chromium)\/([\d.]+)/))) {
+    engineName = 'Chromium';
+    engineVersion = m[1];
+  } else if ((m = ua.match(/AppleWebKit\/([\d.]+)/))) {
+    engineName = 'WebKit';
+    engineVersion = m[1];
+  }
+  return { osName, osVersion, engineName, engineVersion };
+}
+
+/**
  * POST one event to Aptabase. Resolves true only when the server answers 2xx.
  * Never throws and never touches global state.
  */
@@ -127,6 +158,7 @@ async function sendEvent(eventName, props) {
         eventName,
         systemProps: {
           locale: (typeof navigator !== 'undefined' && navigator.language) || '',
+          ...detectSystemProps(),
           isDebug: false,
           appVersion: currentVersion,
           sdkVersion: SDK_VERSION,
@@ -138,6 +170,41 @@ async function sendEvent(eventName, props) {
   } catch (err) {
     return false;
   }
+}
+
+/**
+ * Local calendar day (not UTC), so a user near midnight UTC is not counted twice.
+ */
+function localDateString() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Send `daily_active` once per local calendar day. The day is stamped only after confirmed
+ * delivery, so a failed send is retried on the next flush or when the connection returns.
+ */
+function sendDailyActive() {
+  if (dailyActiveInFlight) return dailyActiveInFlight;
+  dailyActiveInFlight = (async () => {
+    try {
+      const today = localDateString();
+      const last = await trackerDB.getSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, '');
+      if (last === today) return;
+      const sent = await sendEvent('daily_active', {
+        platform: detectPlatform(),
+        version: currentVersion,
+        env: 'production',
+      });
+      if (sent) await trackerDB.setSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, today);
+    } catch (e) {
+      // Fail silently
+    } finally {
+      dailyActiveInFlight = null;
+    }
+  })();
+  return dailyActiveInFlight;
 }
 
 /**
@@ -164,27 +231,22 @@ export async function initTelemetry() {
       const platform = detectPlatform();
       isInitialized = true;
 
-      // Send daily app_started event (once per calendar day or if version/env changes)
+      // Every launch is a session. daily_active is the once-a-day signal for counting active days.
       if (isOnline()) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const lastStartedDate = await trackerDB.getSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, '');
-        const lastReportedVersion = await trackerDB.getSetting(STORAGE_KEYS.LAST_REPORTED_VERSION, '');
-        const lastReportedEnv = await trackerDB.getSetting(STORAGE_KEYS.LAST_REPORTED_ENV, '');
+        await sendEvent('app_started', {
+          platform,
+          version: currentVersion,
+          env: currentEnv,
+        });
+        await sendDailyActive();
+      }
 
-        if (lastStartedDate !== todayStr || lastReportedVersion !== currentVersion || lastReportedEnv !== currentEnv) {
-          const sent = await sendEvent('app_started', {
-            platform,
-            version: currentVersion,
-            env: currentEnv,
-          });
-
-          // Only stamp date if the event was confirmed delivered
-          if (sent) {
-            await trackerDB.setSetting(STORAGE_KEYS.LAST_APP_STARTED_DATE, todayStr);
-            await trackerDB.setSetting(STORAGE_KEYS.LAST_REPORTED_VERSION, currentVersion);
-            await trackerDB.setSetting(STORAGE_KEYS.LAST_REPORTED_ENV, currentEnv);
-          }
-        }
+      // A failed send is retried as soon as the connection comes back, not only at the next launch
+      if (!onlineListenerAttached && typeof window !== 'undefined') {
+        onlineListenerAttached = true;
+        window.addEventListener('online', () => {
+          flushDailyTelemetry();
+        });
       }
 
       // Check if daily summary flush is due
@@ -249,6 +311,8 @@ export async function flushDailyTelemetry() {
 
   const enabled = await isTelemetryEnabled();
   if (!enabled || !isOnline()) return;
+
+  await sendDailyActive();
 
   try {
     const now = Date.now();

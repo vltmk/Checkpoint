@@ -132,6 +132,7 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       markSharePaid: (shareId) => run((s) => actions.markSharePaid(s, shareId, { rates: ratesRef.current })),
       undoPaid: (targetType, targetId) => run((s) => actions.undoPaid(s, targetType, targetId)),
       markOrderCollected: (orderId) => run((s) => actions.markOrderCollected(s, orderId, { rates: ratesRef.current })),
+      writeOff: (orderId, note) => run((s) => actions.writeOffOrder(s, orderId, { rates: ratesRef.current, note })),
       voidPayment: (paymentId, note) => run((s) => s.voidPayment(paymentId, note)),
       // an expense that is not tied to any person or order (repairs, consumables...)
       addExpense: ({ amountMinor, currency, dateTime, note }) => run((s) => s.recordPayment({ payment: { direction: 'out', partyId: null, amountMinor, currency, rates: ratesRef.current, kind: 'expense', dateTime, note } })),

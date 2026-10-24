@@ -1,3 +1,4 @@
+import { incrementLocalWorkCount } from '../../lib/telemetry';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '../ui/Dialog';
@@ -259,6 +260,7 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
         },
         shares,
       });
+      if (!existing) incrementLocalWorkCount();
       // remember what this seller uses for the platform, so the next order starts from it
       if (payerId && payerKind === 'platform' && Math.abs(feePctNum - suggestedFeePct(payerName, partyByName(payerName))) > 0.0001) {
         await ledger.setPartySettings(payerId, { feePct: feePctNum });

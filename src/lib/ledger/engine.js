@@ -360,6 +360,72 @@ export function paymentsAppliedTo(ctx, targetType, targetId) {
   return out.sort((a, b) => Date.parse(b.payment.dateTime) - Date.parse(a.payment.dateTime) || order.get(b.payment.id) - order.get(a.payment.id));
 }
 
+/**
+ * What one payment covered, as lines a person can read: the order behind each share (or the order itself),
+ * and the amount it took, in the order's own currency. Works for both directions: an advertiser's payment
+ * to a booster covers shares, a booster's payout from a client covers orders.
+ * `shareById` is passed in so a statement can build it once instead of once per payment.
+ */
+export function paymentCovers(ctx, paymentId, shareById = new Map(ctx.shares.map((s) => [s.id, s]))) {
+  const out = [];
+  for (const a of ctx.allocations) {
+    if (a.paymentId !== paymentId || !(a.appliedMinor > 0)) continue;
+    const share = a.targetType === 'share' ? shareById.get(a.targetId) || null : null;
+    const order = share ? ctx.orderById.get(share.orderId) : ctx.orderById.get(a.targetId);
+    if (!order) continue;
+    out.push({ targetType: a.targetType, targetId: a.targetId, order, share, appliedMinor: a.appliedMinor, currency: normalizeCurrency(order.currency) });
+  }
+  return out;
+}
+
+/**
+ * When each share (targetType 'share') or order (targetType 'order') was last paid, as epoch ms.
+ * Only live allocations from effective payments count, so a voided payment does not date anything.
+ */
+export function lastPaidAtByTarget(ctx, targetType) {
+  const paidAtOf = new Map(ctx.effectivePayments.map((p) => [p.id, Date.parse(p.dateTime)]));
+  const out = new Map();
+  for (const a of ctx.liveAllocations) {
+    if (a.targetType !== targetType || !(a.appliedMinor > 0)) continue;
+    const at = paidAtOf.get(a.paymentId);
+    if (at === undefined || Number.isNaN(at)) continue;
+    if (!(out.get(a.targetId) >= at)) out.set(a.targetId, at);
+  }
+  return out;
+}
+
+/**
+ * Money a payer has sent that no order has taken yet, as buckets: each incoming payment less what its allocations
+ * consumed. This is credit with them. It stays until an order is paid from it, and voided payments carry none.
+ */
+export function payerCreditBuckets(ctx, payerId) {
+  const used = new Map();
+  for (const a of ctx.liveAllocations) used.set(a.paymentId, (used.get(a.paymentId) || 0) + (Number(a.consumedMinor) || 0));
+  const out = {};
+  for (const p of ctx.effectivePayments) {
+    if (p.direction !== 'in' || p.kind === 'expense' || p.kind === 'writeoff' || (p.partyId || '') !== (payerId || '')) continue;
+    const left = Math.max(0, Math.round(Number(p.amountMinor) || 0) - (used.get(p.id) || 0));
+    if (left <= 0) continue;
+    const k = bucketKey(p.currency, paymentRateOpts(p));
+    out[k] = (out[k] || 0) + left;
+  }
+  return out;
+}
+
+/**
+ * What was closed short on each order (kind 'writeoff' payments), as a Map orderId -> minor. This is not cash: it
+ * clears what is owed, and cash totals (collected, Money's in) must leave it out.
+ */
+export function writtenOffByOrder(ctx) {
+  const kindOf = new Map(ctx.effectivePayments.map((p) => [p.id, p.kind]));
+  const out = new Map();
+  for (const a of ctx.liveAllocations) {
+    if (a.targetType !== 'order' || kindOf.get(a.paymentId) !== 'writeoff') continue;
+    out.set(a.targetId, (out.get(a.targetId) || 0) + (Number(a.appliedMinor) || 0));
+  }
+  return out;
+}
+
 /** FIFO needs oldest-first within the given order, so shareTargetsFor's group order must be kept. */
 export function allocateToParty(ctx, { partyId, amountMinor, currency, rates, includeOpen = true, excludeIds = [] }) {
   const skip = new Set(excludeIds);

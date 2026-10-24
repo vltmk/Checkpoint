@@ -145,3 +145,27 @@ test('margin report can be limited to a period, and the summary reads off it', (
 test('csv quotes cells and defuses spreadsheet formulas', () => {
   assert.equal(toCsv([['a,b', 'say "hi"', '=SUM(A1)', 5, -2]]), `"a,b","say ""hi""",'=SUM(A1),5,-2`);
 });
+
+test('statement: a payment lists the orders it covered, and a share is dated by its latest live payment', () => {
+  const f = fixture();
+  f.allocations.push({ id: 'a2', paymentId: 'p1', targetType: 'share', targetId: 's1', appliedMinor: 0, consumedMinor: 0 });
+  const ctx = buildContext(f);
+  const sara = partyStatement(ctx, 'sara', { rates: RATES, displayCurrency: 'TOMAN' });
+  const pay = sara.events.find((e) => e.type === 'payment');
+  assert.equal(pay.covers.length, 1, 'zero-amount allocations to other parties are not listed');
+  assert.equal(pay.covers[0].order.id, 'o1');
+  assert.equal(pay.covers[0].share.id, 's2');
+  assert.equal(pay.covers[0].appliedMinor, 50000);
+  assert.equal(sara.events.find((e) => e.type === 'share').paidAt, Date.parse(iso(-5)));
+
+  const ali = partyStatement(ctx, 'ali', { rates: RATES, displayCurrency: 'TOMAN' });
+  assert.equal(ali.events.find((e) => e.id === 's1').paidAt, null, 'an unpaid share has no paid date');
+});
+
+test('statement: a voided payment does not date the share it touched', () => {
+  const f = fixture();
+  f.payments.push({ id: 'pv', direction: 'out', partyId: 'sara', amountMinor: 50000, currency: 'TOMAN', kind: 'adjustment', voidsPaymentId: 'p1', dateTime: iso(-4) });
+  const ctx = buildContext(f);
+  const sara = partyStatement(ctx, 'sara', { rates: RATES, displayCurrency: 'TOMAN' });
+  assert.equal(sara.events.find((e) => e.type === 'share').paidAt, null);
+});

@@ -145,7 +145,7 @@ test('platform settings merge and persist: default fee and withdrawal rule', asy
   await store.savePartySettings(g2g.id, { withdraw: { takenOut: false } });
   const saved = (await store.loadAll()).parties.find((p) => p.id === g2g.id);
   assert.equal(saved.settings.feePct, 8.5);
-  assert.deepEqual(withdrawalRule(saved), { pct: 2, flatMinor: 100, flatCurrency: null, takenOut: false });
+  assert.deepEqual(withdrawalRule(saved), { pct: 2, flatMinor: 100, flatCurrency: null, takenOut: false, layers: [{ label: "", pct: 2, flatMinor: 100 }] });
   assert.equal(suggestedFeePct(saved.name, saved), 8.5);
 });
 
@@ -156,8 +156,8 @@ test('platform suggestions: remembered fee wins, then the known table, then zero
   assert.equal(suggestedFeePct('Some client', null), 0);
   assert.equal(findKnownPlatform('  blazing boost ')?.id, 'blazingboost');
   assert.equal(findKnownPlatform('Personal client'), null);
-  assert.deepEqual(withdrawalRule({ settings: { withdraw: { pct: -5, flatMinor: 1.5, takenOut: undefined } } }), { pct: 0, flatMinor: 0, flatCurrency: null, takenOut: true });
-  assert.deepEqual(withdrawalRule(null), { pct: 0, flatMinor: 0, flatCurrency: null, takenOut: true });
+  assert.deepEqual(withdrawalRule({ settings: { withdraw: { pct: -5, flatMinor: 1.5, takenOut: undefined } } }), { pct: 0, flatMinor: 0, flatCurrency: null, takenOut: true, layers: [] });
+  assert.deepEqual(withdrawalRule(null), { pct: 0, flatMinor: 0, flatCurrency: null, takenOut: true, layers: [] });
 });
 
 test('settling a booster is unaffected by fees (expenses never touch a booster balance)', async () => {
@@ -169,4 +169,13 @@ test('settling a booster is unaffected by fees (expenses never touch a booster b
   const { partyBalance } = await import('../src/lib/ledger/engine.js');
   assert.deepEqual(partyBalance(ctx, ali.id).payable, {});
   assert.deepEqual(partyBalance(ctx, ali.id).advance, {});
+});
+
+test('fee layers are remembered per platform, in order; an older single rule still reads as one layer', async () => {
+  const store = await makeStore();
+  const g2g = await store.ensureParty('platform', 'G2G');
+  await store.savePartySettings(g2g.id, { withdraw: { pct: 11, flatMinor: 500, flatCurrency: 'TOMAN', takenOut: true, layers: [{ label: 'Platform', pct: 10, flatMinor: 0 }, { label: 'Bank', pct: 1, flatMinor: 500 }] } });
+  const saved = (await store.loadAll()).parties.find((p) => p.id === g2g.id);
+  assert.deepEqual(withdrawalRule(saved).layers, [{ label: 'Platform', pct: 10, flatMinor: 0 }, { label: 'Bank', pct: 1, flatMinor: 500 }]);
+  assert.deepEqual(withdrawalRule({ settings: { withdraw: { pct: 2, flatMinor: 100 } } }).layers, [{ label: '', pct: 2, flatMinor: 100 }]);
 });

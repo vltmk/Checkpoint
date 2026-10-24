@@ -138,6 +138,11 @@ export function BoosterOverview({ onNavigate, onReceive, onNewJob, onExpense, on
             {f.t('lg.ov.team', 'You owe your teammates {amount}', { amount: f.money(ov.teamOwedMinor, cur, true) })}
           </button>
         )}
+        {ov.teamOwedMinor > 0 && (
+          <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
+            {f.t('lg.ov.net', 'Net after your team: {amount}', { amount: f.money(ov.owedMinor - ov.teamOwedMinor, cur, true) })}
+          </p>
+        )}
       </section>
 
       <section className="border-t border-zinc-200/80 dark:border-zinc-800/80 pt-6">

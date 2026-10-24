@@ -1,3 +1,4 @@
+import { incrementLocalWorkCount } from '../../lib/telemetry';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '../ui/Dialog';
@@ -198,6 +199,7 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
         },
         shares,
       });
+      if (!existing) incrementLocalWorkCount();
       if (!existing && paid && receivable > 0) await ledger.markOrderCollected(id);
       if (payerId && payerKind === 'platform' && Math.abs(feePctNum - suggestedFeePct(payerName, partyByName(payerName))) > 0.0001) {
         await ledger.setPartySettings(payerId, { feePct: feePctNum });

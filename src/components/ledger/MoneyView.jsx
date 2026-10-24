@@ -1,20 +1,21 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowDownToLine, ArrowUpRight, Ban, Clock, ImageIcon, Percent, StickyNote, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowDownToLine, ArrowUpRight, Ban, Clock, ImageIcon, Percent, StickyNote, Wallet, Scissors } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { voidedPaymentIds, paymentRateOpts } from '../../lib/ledger/engine';
+import { voidedPaymentIds, paymentRateOpts, paymentCovers } from '../../lib/ledger/engine';
 import { collapseBuckets, bucketKey } from '../../lib/ledger/money';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DayHeader, EmptyState, Meta, Money, Segmented } from './parts';
+import { DayHeader, EmptyState, Meta, Money, Segmented, coversTitles } from './parts';
 import { groupByDay } from '../../lib/ledger/grouping';
 
 // what a payment looks like in the list: money in, money out, or a fee
-const DIRECTION_ICON = { in: ArrowDownLeft, out: ArrowUpRight, expense: Percent };
+const DIRECTION_ICON = { in: ArrowDownLeft, out: ArrowUpRight, expense: Percent, writeoff: Scissors };
 const DIRECTION_TILE = {
   in: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   out: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   expense: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
+  writeoff: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400',
 };
 
 const PAGE = 50;
@@ -39,7 +40,8 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
       .sort((a, b) => Date.parse(b.p.dateTime) - Date.parse(a.p.dateTime));
   }, [ctx]);
 
-  const kindOf = (p) => (p.kind === 'expense' ? 'expense' : p.direction === 'in' ? 'in' : 'out');
+  // a write-off is listed but is not cash: it stays out of the in/out/fee totals
+  const kindOf = (p) => (p.kind === 'expense' ? 'expense' : p.kind === 'writeoff' ? 'writeoff' : p.direction === 'in' ? 'in' : 'out');
   const shown = rows.filter(({ p }) => filter === 'all' || kindOf(p) === filter);
 
   const totals = useMemo(() => {
@@ -55,6 +57,15 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
     };
     return { in: pick('in'), out: pick('out'), expense: pick('expense') };
   }, [rows, cur, rates]);
+
+  // what each live payment covered, built once for every row (the share map is shared, not rebuilt per payment)
+  const covers = useMemo(() => {
+    if (!ctx) return new Map();
+    const shareById = new Map(ctx.shares.map((s) => [s.id, s]));
+    return new Map(rows.filter(({ p, voided }) => !voided && p.kind !== 'expense').map(({ p }) => [p.id, paymentCovers(ctx, p.id, shareById)]));
+  }, [ctx, rows]);
+  // money in or out that no order has taken: a payout that overshot, or a payment on account
+  const leftoverOf = (p) => Math.max(0, p.amountMinor - (ctx.consumedByPayment.get(p.id) || 0));
 
   if (!ctx) return null;
 
@@ -116,9 +127,16 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
                           {k === 'in' && f.t('lg.money.from', 'From {name}', { name })}
                           {k === 'out' && (p.kind === 'advance' ? f.t('lg.money.advanceTo', 'Advance to {name}', { name }) : f.t('lg.money.to', 'To {name}', { name }))}
                           {k === 'expense' && f.t('lg.money.expense', 'Fee ({name})', { name })}
+                          {k === 'writeoff' && f.t('lg.money.writeoff', 'Closed short ({name})', { name })}
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                           <Meta icon={Clock} title={`${f.date(p.dateTime)} ${f.time(p.dateTime)}`}>{f.time(p.dateTime)}</Meta>
+                          {(k === 'in' || k === 'out') && !voided && covers.get(p.id)?.length > 0 && (
+                            <Meta title={coversTitles(covers.get(p.id))}>{f.t('lg.statement.covers', 'Covers {list}', { list: coversTitles(covers.get(p.id)) })}</Meta>
+                          )}
+                          {(k === 'in' || k === 'out') && !voided && leftoverOf(p) > 0 && (
+                            <Meta title={f.t('lg.money.leftHelp', 'Not taken by any order yet')}>{f.t('lg.money.left', 'Left {amount}', { amount: f.money(leftoverOf(p), p.currency) })}</Meta>
+                          )}
                           {p.origin === 'migrated' && <Meta>{f.t('lg.money.migrated', 'from your old data')}</Meta>}
                           {p.note && <Meta icon={StickyNote} title={p.note}>{p.note}</Meta>}
                         </div>

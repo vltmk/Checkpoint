@@ -14,9 +14,10 @@ export function fill(template, vars = {}) {
 export function useLedgerFormat() {
   const { language, t, formatNumber, formatDate, isRtl } = useLanguage();
   const isFa = language === 'fa';
+  // Always exact (see Money in parts.jsx): a shortened amount in a sentence or CSV hides what is owed.
   const money = useCallback(
-    (minor, currency, compact = false) => {
-      const text = formatMoney(fromMinor(minor, currency), currency, compact, isFa);
+    (minor, currency) => {
+      const text = formatMoney(fromMinor(minor, currency), currency, false, isFa);
       // English sentences should not carry the Farsi unit word
       return isFa ? text : text.replace('تومان', 'Toman');
     },

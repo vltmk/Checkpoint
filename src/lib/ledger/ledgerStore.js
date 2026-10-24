@@ -31,7 +31,7 @@ const LOCAL_META = new Set(['inflight', 'interrupted']);
 const isSafeMinor = (n) => Number.isSafeInteger(n);
 
 export const LIFECYCLES = ['pending', 'working', 'on_hold', 'done', 'failed', 'disputed', 'refunded'];
-export const PAYMENT_KINDS = ['settlement', 'advance', 'expense', 'refund', 'adjustment'];
+export const PAYMENT_KINDS = ['settlement', 'advance', 'expense', 'refund', 'adjustment', 'writeoff'];
 
 let idCounter = 0;
 export function newLedgerId(prefix) {
@@ -345,19 +345,25 @@ export function createLedgerStore(backend, { now = () => new Date().toISOString(
     if (!target) throw new LedgerValidationError('Payment not found.');
     if (target.voidsPaymentId) throw new LedgerValidationError('A void marker cannot be voided.');
     if (all.some((p) => p.voidsPaymentId === paymentId)) throw new LedgerValidationError('Already voided.');
-    return backend.upsert('payments', {
+    const marker = (p) => ({
       id: newLedgerId('void'),
-      direction: target.direction,
-      partyId: target.partyId,
+      direction: p.direction,
+      partyId: p.partyId,
       dateTime: stamp(),
-      amountMinor: target.amountMinor,
-      currency: target.currency,
+      amountMinor: p.amountMinor,
+      currency: p.currency,
       kind: 'adjustment',
       note,
-      voidsPaymentId: paymentId,
+      voidsPaymentId: p.id,
       origin: 'user',
       createdAt: stamp(),
     });
+    // the fees booked on a payout go with it, so a voided payout leaves no fee behind; the payout's own marker comes last
+    const alreadyVoided = new Set(all.filter((p) => p.voidsPaymentId).map((p) => p.voidsPaymentId));
+    for (const fee of all.filter((p) => p.relatedPaymentId === paymentId && p.kind === 'expense' && !alreadyVoided.has(p.id))) {
+      await backend.upsert('payments', marker(fee));
+    }
+    return backend.upsert('payments', marker(target));
   }
 
   // --- migration ---
