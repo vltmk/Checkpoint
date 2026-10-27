@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { WELCOME_RELEASE, crossesNotificationReset, welcomeMode } from '../src/lib/welcome.js';
-import { RELEASE_NOTES_REGISTRY } from '../src/lib/releaseNotes.js';
+import { RELEASE_NOTES_REGISTRY, latestReleaseVersion } from '../src/lib/releaseNotes.js';
 
 test('a first run always gets the full welcome', () => {
   assert.equal(welcomeMode({ onboardingCompleted: false, seenVersion: null, appVersion: '5.2.0' }), 'new');
@@ -26,8 +26,9 @@ test('the notification center resets only when crossing into the reset release',
 });
 
 test('the welcome has patch notes to show, in both languages and of the same length', () => {
-  const notes = RELEASE_NOTES_REGISTRY[WELCOME_RELEASE];
-  assert.ok(notes, `add ${WELCOME_RELEASE} to the release notes`);
+  // the welcome shows the notes of the release being run, so there must always be a current entry to show
+  const notes = RELEASE_NOTES_REGISTRY[latestReleaseVersion()];
+  assert.ok(notes, 'add the current release to the release notes');
   assert.ok(notes.items.en.length > 0 && notes.items.en.length <= 5, 'short notes');
   assert.equal(notes.items.en.length, notes.items.fa.length);
 });

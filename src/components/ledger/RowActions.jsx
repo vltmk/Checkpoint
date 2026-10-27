@@ -1,9 +1,19 @@
 import React, { useState } from 'react';
-import { ImageIcon, Pencil, ReceiptText, Trash2 } from 'lucide-react';
+import { ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLedgerFormat } from './format';
 
 const BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 dark:text-zinc-400 transition-colors hover:bg-zinc-200/70 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500';
+
+/**
+ * Keyboard twin of a row click: Enter (or Space) on the focused row itself opens it. Keys pressed on a control
+ * inside the row are that control's own.
+ */
+export const openOnRowKey = (open) => (e) => {
+  if (e.target !== e.currentTarget || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  open();
+};
 
 /**
  * Click handler for a whole row: a click on blank space runs `open`, a click on a button, link or field (or the end of
@@ -16,15 +26,15 @@ export const openOnBlankClick = (open) => (e) => {
 };
 
 /**
- * Receipt, screenshots, edit and delete for one Orders / Jobs row. They sit quietly until the row is hovered or
- * focused, then come up to full strength; delete asks once, in place.
+ * Screenshots, edit and delete for one Orders / Jobs row (the receipt opens from the row itself: a click, or Enter
+ * when the row has focus). They sit quietly until the row is hovered or focused, then come up to full strength;
+ * delete asks once, in place.
  */
-export function RowActions({ onReceipt, onProofs, hasProofs = true, onEdit, onDelete, editLabel, className }) {
+export function RowActions({ onProofs, hasProofs = true, onEdit, onDelete, editLabel, className }) {
   const f = useLedgerFormat();
   const [confirm, setConfirm] = useState(false);
   return (
     <div className={cn('flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100', className)}>
-      <button type="button" onClick={onReceipt} aria-label={f.t('lg.receipt', 'Receipt')} title={f.t('lg.receipt', 'Receipt')} className={BUTTON}><ReceiptText className="h-3.5 w-3.5" /></button>
       {hasProofs && <button type="button" onClick={onProofs} aria-label={f.t('lg.proofs', 'Screenshots')} title={f.t('lg.proofs', 'Screenshots')} className={BUTTON}><ImageIcon className="h-3.5 w-3.5" /></button>}
       <button type="button" onClick={onEdit} aria-label={editLabel} title={editLabel} className={BUTTON}><Pencil className="h-3.5 w-3.5" /></button>
       {confirm ? (

@@ -13,7 +13,7 @@ import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
-import { RowActions } from './RowActions';
+import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
 import { useRowSelection } from './useRowSelection';
@@ -141,7 +141,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                     const mixed = normalizeCurrency(o.currency) !== normalizeCurrency(cur);
                     const feePct = o.grossMinor > 0 && o.platformFeeMinor > 0 ? Math.round((o.platformFeeMinor / o.grossMinor) * 1000) / 10 : 0;
                     return (
-                      <li key={o.id} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
+                      <li key={o.id} tabIndex={0} onKeyDown={openOnRowKey(() => (sel.active ? sel.pick(o.id, {}) : onReceipt(o.id)))} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
                         <span className="relative mt-0.5 shrink-0">
                           <GameTile game={o.game} categories={categories} size="lg" />
                           {/* the row's box sits on the tile's corner: hidden until hovered, and every row shows one once select mode is on */}
@@ -212,7 +212,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                                 labels={{ paid: f.t('lg.jobs.paidStamp', 'Paid'), markPaid: f.t('lg.jobs.markPaid', 'Mark paid'), undo: f.t('lg.undo', 'Undo'), sharedHelp: f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.') }}
                               />
                             )}
-                            <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} onReceipt={() => onReceipt(o.id)} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                            <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
                           </div>
                         </div>
                       </li>

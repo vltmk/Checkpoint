@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createSqliteBackend } from '../src/lib/ledger/ledgerBackends.js';
 import { createLedgerStore } from '../src/lib/ledger/ledgerStore.js';
 import { receivePayout, writeOffOrder } from '../src/lib/ledger/actions.js';
-import { orderReceivedMinor, payerCreditBuckets, writtenOffByOrder } from '../src/lib/ledger/engine.js';
+import { canCloseShort, orderReceivedMinor, payerCreditBuckets, writtenOffByOrder } from '../src/lib/ledger/engine.js';
 import { payerList } from '../src/lib/ledger/boosterSelectors.js';
 
 const RATES = { goldRateTOMAN: 3200, usdRateTOMAN: 100000, eurRateUSD: 1.08 };
@@ -72,4 +72,50 @@ test('voiding a payout also voids every fee layer booked on it', async () => {
   ctx = await store.loadContext();
   assert.equal(ctx.effectivePayments.filter((p) => p.kind === 'expense').length, 0, 'no fee layer survives the void');
   assert.equal(orderReceivedMinor(ctx, 'o1'), 0, 'the order is owed again');
+});
+
+test('Close short is only offered on a finished order a payout has partly paid', async () => {
+  const store = await makeStore();
+  const g2g = await store.ensureParty('platform', 'G2G');
+  const base = { lifecycle: 'done', currency: 'TOMAN', grossMinor: 900000, platformFeeMinor: 0, payerId: g2g.id, title: 't' };
+  await store.saveOrder({ order: { ...base, id: 'o1', dateTime: '2026-09-01T10:00:00Z' }, shares: [] });
+  await store.saveOrder({ order: { ...base, id: 'o2', dateTime: '2026-09-02T10:00:00Z' }, shares: [] }); // left out of the payout
+  await store.saveOrder({ order: { ...base, id: 'o3', dateTime: '2026-09-03T10:00:00Z', lifecycle: 'working' }, shares: [] });
+  // the payout covers part of o1 only; o2 was unticked, so nothing is applied to it
+  await receivePayout(store, { payerId: g2g.id, amountMinor: 500000, currency: 'TOMAN', rates: RATES, excludeIds: ['o2'] });
+  let ctx = await store.loadContext();
+  assert.equal(canCloseShort(ctx, ctx.orderById.get('o1')), true, 'partly paid: the payer paid less than it was written for');
+  assert.equal(canCloseShort(ctx, ctx.orderById.get('o2')), false, 'untouched by the payout: it is just waiting');
+  assert.equal(canCloseShort(ctx, ctx.orderById.get('o3')), false, 'not finished yet');
+  // once closed short it is settled, so there is nothing left to close
+  await writeOffOrder(store, 'o1', { rates: RATES });
+  ctx = await store.loadContext();
+  assert.equal(canCloseShort(ctx, ctx.orderById.get('o1')), false);
+  // a failed order is never offered, even with money on it
+  await store.setLifecycle('o2', 'failed');
+  ctx = await store.loadContext();
+  assert.equal(canCloseShort(ctx, ctx.orderById.get('o2')), false);
+});
+
+test('Orders tabs: a finished order stays Active until it is paid both ways, then moves to Done', async () => {
+  const { orderRows, orderTab, isUnsettled } = await import('../src/lib/ledger/selectors.js');
+  const { markSharePaid, markOrderCollected } = await import('../src/lib/ledger/actions.js');
+  const store = await makeStore();
+  await scenario(store); // o1: done, 900,000 to collect, 300,000 owed to Ali
+  const tab = async () => {
+    const data = await store.loadAll();
+    const ctx = await store.loadContext();
+    const row = orderRows(ctx, new Map(data.parties.map((p) => [p.id, p]))).find((r) => r.order.id === 'o1');
+    return { tab: orderTab(row), unsettled: isUnsettled(row) };
+  };
+  assert.deepEqual(await tab(), { tab: 'active', unsettled: true }, 'nothing paid yet');
+  await markOrderCollected(store, 'o1', { rates: RATES });
+  assert.deepEqual(await tab(), { tab: 'active', unsettled: true }, 'collected, but Ali is still owed');
+  const share = (await store.loadAll()).shares[0];
+  await markSharePaid(store, share.id, { rates: RATES });
+  assert.deepEqual(await tab(), { tab: 'done', unsettled: false }, 'paid both ways');
+  await store.setLifecycle('o1', 'working');
+  assert.equal((await tab()).tab, 'active', 'work in progress is Active whatever the money says');
+  await store.setLifecycle('o1', 'failed');
+  assert.deepEqual(await tab(), { tab: 'closed', unsettled: false }, 'failed orders only show under All');
 });

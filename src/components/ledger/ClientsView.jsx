@@ -11,7 +11,7 @@ import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { copyText, saveTextFile, withBom } from './files';
 import { AgingStrip, BalanceRail, EmptyState, Initial, Meta, Money, Segmented, TOOLBAR_INPUT, SectionTitle, StatusTile, UndoLink, coversTitles } from './parts';
-import { isShareOwed, paymentsAppliedTo } from '../../lib/ledger/engine';
+import { canCloseShort, isShareOwed, paymentsAppliedTo } from '../../lib/ledger/engine';
 import { PeopleView } from './PeopleView';
 import { openOnBlankClick } from './RowActions';
 import { CloseShort } from './CloseShort';
@@ -214,7 +214,7 @@ export function ClientsView({ onReceive, onPay, onOpenJob, onReceipt, onOpenProo
                             <button type="button" onClick={() => guard(() => ledger.markOrderCollected(e.order.id))} className="inline-flex h-6 items-center gap-1 rounded-md border border-zinc-300 dark:border-zinc-700 px-2 font-medium text-zinc-800 dark:text-zinc-200 transition-colors hover:bg-zinc-200/70 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500">
                               <CircleCheck className="h-3 w-3" />{f.t('lg.jobs.markPaid', 'Mark paid')}
                             </button>
-                            <CloseShort amountMinor={e.amountMinor - e.appliedMinor} currency={e.currency} onConfirm={(note) => guard(() => ledger.writeOff(e.order.id, note))} />
+                            {canCloseShort(ctx, e.order) && <CloseShort amountMinor={e.amountMinor - e.appliedMinor} currency={e.currency} onConfirm={(note) => guard(() => ledger.writeOff(e.order.id, note))} />}
                           </>
                         ) : <span className="text-zinc-500">{f.t('lg.share.progress', 'In progress')}</span>}
                       </span>

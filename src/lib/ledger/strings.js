@@ -503,6 +503,9 @@ export const LEDGER_STRINGS = {
     "lg.draft.restored": "Draft restored",
     "lg.draft.saved": "Draft saved",
     "lg.draft.clear": "Clear",
+    "lg.proofs.open": "Open {name}",
+    "lg.orders.unsettled": "Unsettled",
+    "lg.orders.unsettledHelp": "Finished, but the payer has not paid it all or a booster is still owed. It moves to Done once both are settled.",
   },
   fa: {
     "lg.empty.title": "آنچه بدهکارید و آنچه درمی‌آورید را دنبال کنید",
@@ -1004,5 +1007,8 @@ export const LEDGER_STRINGS = {
     "lg.draft.restored": "پیش‌نویس بازیابی شد",
     "lg.draft.saved": "پیش‌نویس ذخیره شد",
     "lg.draft.clear": "پاک کردن",
+    "lg.proofs.open": "باز کردن {name}",
+    "lg.orders.unsettled": "تسویه‌نشده",
+    "lg.orders.unsettledHelp": "تمام شده، اما پرداخت‌کننده همه را نپرداخته یا هنوز به یک بوستر بدهکارید. وقتی هر دو تسویه شد به «انجام‌شده» می‌رود.",
   },
 };

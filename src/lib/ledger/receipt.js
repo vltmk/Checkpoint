@@ -172,6 +172,12 @@ export function receiptSubtitle(mode, lang) {
   return mode === 'client' ? w.clientSub : mode === 'slip' ? w.slipSub : w.workSub;
 }
 
+/**
+ * Whether a receipt shows your notes. The boosters' payout slip is handed to the boosters, and your notes on an order
+ * (what the client agreed, what to watch for) are not theirs to read, so it leaves them out.
+ */
+export const showsNotes = (mode) => mode !== 'slip';
+
 // --- copyable text -----------------------------------------------------------------------------------------------
 
 /**
@@ -194,7 +200,7 @@ export function receiptLines(vm, mode, lang, fmt, { onlyShare = null } = {}) {
     const rows = onlyShare ? [onlyShare] : vm.shares;
     for (const s of rows) {
       lines.push([onlyShare ? w.slipFor : w.boosters, `${s.name}: ${fmt.money(s.amountMinor, vm.currency)} (${statusText(vm, lang, fmt, { share: s })})`]);
-      if (s.note) lines.push([w.notes, s.note]);
+      if (s.note && showsNotes(mode)) lines.push([w.notes, s.note]);
     }
     if (!onlyShare) lines.push([w.payout, fmt.money(vm.sharesTotalMinor, vm.currency)]);
   } else {
@@ -216,7 +222,7 @@ export function receiptLines(vm, mode, lang, fmt, { onlyShare = null } = {}) {
     if (parts.length) lines.push([w.rates, parts.join(' · ')]);
   }
   lines.push([w.status, statusText(vm, lang, fmt)]);
-  if (vm.note) lines.push([w.notes, vm.note]);
+  if (vm.note && showsNotes(mode)) lines.push([w.notes, vm.note]);
   return lines;
 }
 

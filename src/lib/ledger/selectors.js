@@ -106,6 +106,32 @@ export function cockpitSummary(ctx, parties, { rates, displayCurrency, now = Dat
   };
 }
 
+/** Order statuses that mean the work itself is still open. */
+export const WORK_OPEN = new Set(['pending', 'working', 'on_hold', 'disputed']);
+
+/**
+ * A finished order whose money is not settled yet: the payer has not paid it all, or a booster on it is still owed.
+ * Failed and refunded orders are never "unsettled": there is nothing left to move.
+ * `row` is an orderRows() row.
+ */
+export function isUnsettled(row) {
+  if (!row || row.dead || row.order.lifecycle !== 'done') return false;
+  const m = row.money;
+  const toCollect = m.receivableMinor > 0 && !m.collected;
+  const toPay = m.shareTotalMinor > 0 && !m.boostersPaid;
+  return toCollect || toPay;
+}
+
+/**
+ * Which Orders tab a row belongs to. Active = the work is open, or it is finished but money still has to move.
+ * Done = finished and settled both ways. Failed and refunded orders only show under All.
+ */
+export function orderTab(row) {
+  if (WORK_OPEN.has(row.order.lifecycle) || isUnsettled(row)) return 'active';
+  if (row.order.lifecycle === 'done') return 'done';
+  return 'closed';
+}
+
 /** One row per order for the Orders table: waterfall numbers, per-person share status, and money state. */
 export function orderRows(ctx, partyById) {
   return ctx.orders

@@ -13,7 +13,7 @@ import { useLanguage, formatShamsiDate, formatClock, resolveHour12 } from '../..
 import { toPersianDigits } from '../../lib/persianCalendar';
 import { fromMinor } from '../../lib/ledger/money';
 import {
-  RECEIPT_WORDS, heroLabel, heroMinor, receiptDiscord, receiptPlainText, receiptSubtitle, receiptTitle, statusText, statusTone,
+  RECEIPT_WORDS, showsNotes, heroLabel, heroMinor, receiptDiscord, receiptPlainText, receiptSubtitle, receiptTitle, statusText, statusTone,
 } from '../../lib/ledger/receipt';
 import { cn } from '../../lib/utils';
 import { Initial } from './parts';
@@ -230,7 +230,7 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
                       <Initial name={s.name} className="h-6 w-6 text-[11px]" />
                       <div className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] font-medium">{s.name}</span>
-                        {s.note && <span className="block truncate text-[11px] text-zinc-500">{s.note}</span>}
+                        {s.note && showsNotes(mode) && <span className="block truncate text-[11px] text-zinc-500">{s.note}</span>}
                       </div>
                       {mode === 'slip' && <StatusChip tone={sTone}>{statusText(vm, lang, fmt, { share: s })}</StatusChip>}
                       <span className="text-[13px] font-medium tabular-nums">{fmt.money(s.amountMinor, vm.currency)}</span>
@@ -247,7 +247,7 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
           )}
 
           {/* small print: fee, rates, notes */}
-          {((mode === 'work' && vm.feeMinor > 0) || (ratesText && mode !== 'client') || vm.note) && (
+          {((mode === 'work' && vm.feeMinor > 0) || (ratesText && mode !== 'client') || (vm.note && showsNotes(mode))) && (
             <dl className="space-y-1.5 border-t border-dashed border-zinc-300 px-5 py-4 text-[12px] dark:border-zinc-700">
               {mode === 'work' && vm.feeMinor > 0 && (
                 <div className="flex items-baseline justify-between gap-4"><dt className="text-zinc-500 dark:text-zinc-400">{w.fee}</dt><dd className="tabular-nums">{fmt.num(vm.feePct)}% · {fmt.money(vm.feeMinor, vm.currency)}</dd></div>
@@ -255,7 +255,7 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
               {ratesText && mode !== 'client' && (
                 <div className="flex items-baseline justify-between gap-4"><dt className="text-zinc-500 dark:text-zinc-400">{w.rates}</dt><dd className="tabular-nums" dir="ltr">{ratesText}</dd></div>
               )}
-              {vm.note && (
+              {vm.note && showsNotes(mode) && (
                 <div className="flex gap-2 pt-0.5"><StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" aria-hidden="true" /><p className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{vm.note}</p></div>
               )}
             </dl>

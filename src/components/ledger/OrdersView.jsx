@@ -3,16 +3,16 @@ import { AnimatePresence } from 'motion/react';
 import { CircleCheck, ClipboardList, Clock, Percent, Plus, SearchX, Store } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
-import { orderRows } from '../../lib/ledger/selectors';
+import { isUnsettled, orderRows, orderTab } from '../../lib/ledger/selectors';
 import { convertMinor, normalizeCurrency } from '../../lib/ledger/money';
-import { orderRateOpts, paymentsAppliedTo, payerKey } from '../../lib/ledger/engine';
+import { canCloseShort, orderRateOpts, paymentsAppliedTo, payerKey } from '../../lib/ledger/engine';
 import { selectionRecap } from '../../lib/ledger/selection';
 import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { DayHeader, EmptyState, Initial, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle, TOOLBAR_SELECT } from './parts';
-import { RowActions } from './RowActions';
+import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
 import { useRowSelection } from './useRowSelection';
@@ -22,7 +22,6 @@ import { copyText } from './files';
 import { CloseShort } from './CloseShort';
 
 const PAGE = 40;
-const ACTIVE = new Set(['pending', 'working', 'on_hold', 'disputed']);
 const LIFE_LABEL = { pending: 'Pending', working: 'Working', on_hold: 'On hold', done: 'Done', failed: 'Failed', disputed: 'Disputed', refunded: 'Refunded' };
 
 export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenProofs, onOpenPerson, onReceive }) {
@@ -42,15 +41,14 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
 
   const q = local.trim().toLowerCase();
   const counts = useMemo(() => ({
-    active: rows.filter((r) => ACTIVE.has(r.order.lifecycle)).length,
-    done: rows.filter((r) => r.order.lifecycle === 'done').length,
+    // finished orders stay Active until the payer has paid and every booster on them is paid
+    active: rows.filter((r) => orderTab(r) === 'active').length,
+    done: rows.filter((r) => orderTab(r) === 'done').length,
     all: rows.length,
   }), [rows]);
 
   const filtered = useMemo(() => rows.filter((r) => {
-    const l = r.order.lifecycle;
-    if (view === 'active' && !ACTIVE.has(l)) return false;
-    if (view === 'done' && l !== 'done') return false;
+    if (view !== 'all' && orderTab(r) !== view) return false;
     if (money === 'collect' && (r.dead || r.money.collected)) return false;
     if (money === 'pay' && (r.dead || r.money.shareTotalMinor === 0 || r.money.boostersPaid)) return false;
     if (personId && !r.shares.some((s) => s.party.id === personId)) return false;
@@ -164,7 +162,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                     const feePct = o.grossMinor > 0 && o.platformFeeMinor > 0 ? Math.round((o.platformFeeMinor / o.grossMinor) * 1000) / 10 : 0;
                     const payerName = r.payer ? f.name(r.payer) : o.source;
                     return (
-                      <li key={o.id} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
+                      <li key={o.id} tabIndex={0} onKeyDown={openOnRowKey(() => (sel.active ? sel.pick(o.id, {}) : onReceipt(o.id)))} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
                         <span className="relative mt-0.5 shrink-0">
                           <GameTile game={o.game} categories={categories} size="lg" />
                           {/* the row's box sits on the tile's corner: hidden until hovered, and every row shows one once select mode is on */}
@@ -221,11 +219,20 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                                 className={cn('!h-6 !px-1.5 !text-[11.5px] !border-transparent', style.pill, style.text)}
                               />
                             </div>
+                            {/* finished, but money still has to move: why a done order is still under Active */}
+                            {isUnsettled(r) && (
+                              <span
+                                title={f.t('lg.orders.unsettledHelp', 'Finished, but the payer has not paid it all or a booster is still owed. It moves to Done once both are settled.')}
+                                className="inline-flex h-5 items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-1.5 text-[11px] font-medium text-amber-800 dark:text-amber-300"
+                              >
+                                {f.t('lg.orders.unsettled', 'Unsettled')}
+                              </span>
+                            )}
                             {!r.dead && !r.money.collected && (
                               <span className="text-zinc-700 dark:text-zinc-400">
                                 {f.t('lg.waitingOn', 'Waiting on {name}', { name: r.payer ? f.name(r.payer) : f.t('lg.order.payer', 'the payer') })}
                                 {r.money.partlyCollected && <> · <Money minor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} compact /> {f.t('lg.left', 'left')}</>}
-                                {o.lifecycle === 'done' && (
+                                {canCloseShort(ctx, o) && (
                                   <> · <CloseShort amountMinor={r.money.receivableMinor - r.money.receivedMinor} currency={o.currency} onConfirm={(note) => guard(() => ledger.writeOff(o.id, note))} /></>
                                 )}
                               </span>
@@ -252,7 +259,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                                 labels={{ paid: f.t('lg.collected', 'Collected'), markPaid: f.t('lg.markCollected', 'Mark collected'), undo: f.t('lg.undo', 'Undo'), sharedHelp: f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.') }}
                               />
                             )}
-                            <RowActions editLabel={f.t('lg.order.edit', 'Edit order')} onReceipt={() => onReceipt(o.id)} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                            <RowActions editLabel={f.t('lg.order.edit', 'Edit order')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
                           </div>
                         </div>
                       </li>

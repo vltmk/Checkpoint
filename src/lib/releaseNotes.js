@@ -29,34 +29,39 @@ export function compareSemver(v1, v2) {
  * that has no entry, so a release can never go out without Farsi notes.
  */
 export const RELEASE_NOTES_REGISTRY = {
-  '5.3.0': {
-    date: '2026-10-27',
+  '5.3.1': {
+    date: '2026-10-28',
     title: {
-      en: "What's New in Checkpoint v5.3.0",
-      fa: 'تغییرات نسخه ۵.۳.۰',
+      en: "What's New in Checkpoint v5.3.1",
+      fa: 'تغییرات نسخه ۵.۳.۱',
     },
     summary: {
-      en: 'A cleaner way to log work, saved clients, and nothing lost if a form closes.',
-      fa: 'ثبت ساده‌تر کار، مشتری‌های ذخیره‌شده، و هیچ‌چیز با بسته شدن فرم از دست نمی‌رود.',
+      en: 'Screenshots open full size, and finished orders stay visible until they are paid.',
+      fa: 'اسکرین‌شات‌ها در اندازه کامل باز می‌شوند و سفارش‌های تمام‌شده تا زمان تسویه دیده می‌مانند.',
     },
     items: {
       en: [
-        { tag: 'new', text: 'Redesigned Add job and New order, with a live summary.' },
-        { tag: 'new', text: 'Star clients and boosters to save them; names fill in as you type.' },
-        { tag: 'new', text: 'Teammates: choose whether the client or you pays each one.' },
-        { tag: 'new', text: 'Unsaved forms are kept as drafts until you save or clear them.' },
-        { tag: 'improved', text: 'Gold is priced on each job, from the last rate for that game.' },
+        { tag: 'new', text: 'Screenshots open full size, with Copy and Download.' },
+        { tag: 'improved', text: 'Finished orders stay under Active, marked Unsettled, until paid both ways.' },
+        { tag: 'improved', text: 'Payout slips no longer show your notes.' },
+        { tag: 'improved', text: 'Close short appears only on partly paid orders.' },
+        { tag: 'fixed', text: 'Old announcements no longer come back in the notification center.' },
       ],
       fa: [
-        { tag: 'new', text: 'فرم‌های افزودن کار و سفارش جدید، با خلاصه زنده.' },
-        { tag: 'new', text: 'مشتری‌ها و بوسترها را با ستاره ذخیره کنید؛ نام‌ها هنگام تایپ پیشنهاد می‌شوند.' },
-        { tag: 'new', text: 'هم‌تیمی‌ها: انتخاب کنید پرداخت هر نفر با مشتری است یا با شما.' },
-        { tag: 'new', text: 'فرم‌های ذخیره‌نشده تا ذخیره یا پاک کردن، به‌صورت پیش‌نویس می‌مانند.' },
-        { tag: 'improved', text: 'نرخ گلد روی هر کار پرسیده می‌شود، از آخرین نرخ همان بازی.' },
+        { tag: 'new', text: 'اسکرین‌شات‌ها در اندازه کامل باز می‌شوند، با امکان کپی و دانلود.' },
+        { tag: 'improved', text: 'سفارش‌های تمام‌شده تا تسویه کامل، با برچسب «تسویه‌نشده» در بخش فعال می‌مانند.' },
+        { tag: 'improved', text: 'برگه پرداخت بوسترها دیگر یادداشت‌های شما را نشان نمی‌دهد.' },
+        { tag: 'improved', text: 'گزینه «بستن با کسری» فقط روی سفارش‌هایی که بخشی از آن‌ها پرداخت شده نمایش داده می‌شود.' },
+        { tag: 'fixed', text: 'اطلاعیه‌های قدیمی دیگر در مرکز اعلان‌ها برنمی‌گردند.' },
       ],
     },
   },
 };
+
+/** The newest release in the registry: the one the app was built as. */
+export function latestReleaseVersion() {
+  return Object.keys(RELEASE_NOTES_REGISTRY).sort((a, b) => compareSemver(b, a))[0] || null;
+}
 
 /**
  * Smart markdown changelog parser for remote GitHub release bodies.

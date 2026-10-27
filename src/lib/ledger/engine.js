@@ -204,6 +204,17 @@ export function orderMoneyState(ctx, order) {
   };
 }
 
+/**
+ * Whether "Close short" makes sense for an order: it is finished and the payer has paid part of it but not all.
+ * An order nothing was paid on yet is simply waiting for its payout (or, if the payer never pays, it is a failed
+ * order), so closing it short would be a mistake the button should not invite.
+ */
+export function canCloseShort(ctx, order) {
+  if (!order || order.lifecycle !== 'done' || DEAD_LIFECYCLES.has(order.lifecycle)) return false;
+  const { partlyCollected } = orderMoneyState(ctx, order);
+  return partlyCollected;
+}
+
 // --- Party balances (what I owe a booster) -------------------------------------------------
 
 /**

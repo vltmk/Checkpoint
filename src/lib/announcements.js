@@ -7,6 +7,9 @@
 import { trackerDB } from './db';
 import { isRTL } from './utils';
 import localAnnouncementsFeed from '../../announcements.json';
+import { filterActiveAnnouncements, pickAnnouncementFeed } from './announcementFeed';
+
+export { filterActiveAnnouncements };
 
 export const ANNOUNCEMENT_STORAGE_KEY = 'checkpoint_announcements_state';
 
@@ -176,63 +179,31 @@ export async function fetchAnnouncements(timeoutMs = 5000) {
     try {
       rawData = await fetchUrl(FALLBACK_FEED_URL);
     } catch (fallbackErr) {
-      console.info('[Announcements] Remote feed unavailable, using local bundled / cached feed.');
-      const fallbackList =
-        localState.cachedAnnouncements.length > 0
-          ? localState.cachedAnnouncements
-          : localBundledList;
-      return filterActiveAnnouncements(fallbackList, localState.dismissedIds);
+      console.info('[Announcements] Remote feed unavailable, using the cached or bundled feed.');
+      rawData = null;
     }
   }
 
-  if (!rawData || !Array.isArray(rawData.announcements)) {
-    const fallbackList =
-      localState.cachedAnnouncements.length > 0
-        ? localState.cachedAnnouncements
-        : localBundledList;
-    return filterActiveAnnouncements(fallbackList, localState.dismissedIds);
-  }
-
-  const sanitizedList = rawData.announcements
-    .map(sanitizeAnnouncement)
-    .filter(Boolean);
-
-  // In development, merge local announcements so additions appear immediately
-  const merged = [...sanitizedList];
-  for (const localItem of localBundledList) {
-    if (!merged.some((r) => r.id === localItem.id)) {
-      merged.push(localItem);
-    }
-  }
-
-  // Update local cache
-  localState.cachedAnnouncements = merged;
-  localState.lastFetchedAt = now;
-  await saveAnnouncementState(localState);
-
-  return filterActiveAnnouncements(merged, localState.dismissedIds);
-}
-
-/**
- * Filter out expired and dismissed announcements
- */
-export function filterActiveAnnouncements(announcements, dismissedIds = []) {
-  if (!Array.isArray(announcements)) return [];
-  const now = Date.now();
-  const dismissedSet = new Set(dismissedIds);
-
-  return announcements.filter((item) => {
-    if (!item || !item.id) return false;
-    if (dismissedSet.has(item.id)) return false;
-    if (item.expiresAt) {
-      const expTime = new Date(item.expiresAt).getTime();
-      if (!isNaN(expTime) && expTime < now) {
-        return false;
-      }
-    }
-    return true;
+  const remote = rawData && Array.isArray(rawData.announcements)
+    ? rawData.announcements.map(sanitizeAnnouncement).filter(Boolean)
+    : null;
+  const list = pickAnnouncementFeed({
+    remote,
+    cached: localState.cachedAnnouncements,
+    bundled: localBundledList,
+    devMerge: Boolean(import.meta.env?.DEV),
   });
+
+  if (remote) {
+    // only a successful fetch replaces the cache, so an outage never empties it
+    localState.cachedAnnouncements = list;
+    localState.lastFetchedAt = now;
+    await saveAnnouncementState(localState);
+  }
+
+  return filterActiveAnnouncements(list, localState.dismissedIds);
 }
+
 
 /**
  * Mark an announcement as seen

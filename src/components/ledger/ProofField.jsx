@@ -3,6 +3,7 @@ import { ImagePlus, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
+import { Lightbox } from '../Lightbox';
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024;
 
@@ -104,6 +105,7 @@ export function useProofDraft({ open, ownerId = null, onAdded }) {
 export function ProofField({ draft }) {
   const f = useLedgerFormat();
   const [over, setOver] = useState(false);
+  const [viewing, setViewing] = useState(null); // index of the screenshot open full size, or null
   const thumbs = [
     ...draft.saved.map((p) => ({ key: p.id, name: p.name, data: p.data, remove: () => draft.removeSaved(p.id) })),
     ...draft.added.map((p) => ({ key: p.key, name: p.name, data: p.data, remove: () => draft.removeAdded(p.key) })),
@@ -115,9 +117,16 @@ export function ProofField({ draft }) {
       onDrop={(e) => { e.preventDefault(); setOver(false); draft.addFiles([...(e.dataTransfer?.files || [])]); }}
       className={cn('flex min-h-[4.5rem] flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors', over ? 'border-zinc-500 bg-zinc-100 dark:border-zinc-400 dark:bg-zinc-900' : 'border-zinc-300 dark:border-zinc-700')}
     >
-      {thumbs.map((p) => (
+      {thumbs.map((p, i) => (
         <span key={p.key} className="relative">
-          <img src={p.data} alt={p.name} className="h-14 w-14 rounded-md object-cover border border-zinc-200 dark:border-zinc-800" />
+          <button
+            type="button"
+            onClick={() => setViewing(i)}
+            aria-label={f.t('lg.proofs.open', 'Open {name}', { name: p.name || f.t('lg.proofs', 'Screenshots') })}
+            className="block overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 cursor-zoom-in"
+          >
+            <img src={p.data} alt={p.name} className="h-14 w-14 object-cover" />
+          </button>
           <button
             type="button"
             aria-label={f.t('lg.removeProof', 'Remove screenshot')}
@@ -134,6 +143,7 @@ export function ProofField({ draft }) {
         <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { draft.addFiles([...e.target.files]); e.target.value = ''; }} />
       </label>
       {draft.error && <p role="alert" className="basis-full text-xs text-rose-600 dark:text-rose-400">{draft.error}</p>}
+      <Lightbox isOpen={viewing !== null && thumbs.length > 0} start={viewing ?? 0} images={thumbs.map((p) => ({ src: p.data, name: p.name }))} onClose={() => setViewing(null)} />
     </div>
   );
 }

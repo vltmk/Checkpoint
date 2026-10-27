@@ -134,3 +134,15 @@ test('receipt codes are short, upper case and stable', () => {
   assert.equal(receiptCode('x'), 'X');
   assert.equal(receiptCode(''), 'JOB');
 });
+
+test('the boosters payout slip leaves out your notes; the other receipts keep them', async () => {
+  const { store, ali } = await fixture();
+  // a note on the order ("fast run") and one on Ali's share
+  await store.saveOrder({ order: order(), shares: [{ partyId: ali.id, amountMinor: 300000, note: 'paid in USDT' }] });
+  const vm = buildReceipt(await store.loadAll(), 'ord_abc12345');
+  const slip = receiptPlainText(vm, 'slip', 'en', fmt);
+  assert.ok(!/fast run|paid in USDT/.test(slip), 'no notes on the slip');
+  assert.ok(!/fast run|paid in USDT/.test(receiptPlainText(vm, 'slip', 'en', fmt, { onlyShare: vm.shares[0] })), 'nor on a single booster slip');
+  assert.match(receiptPlainText(vm, 'work', 'en', fmt), /fast run/);
+  assert.match(receiptPlainText(vm, 'client', 'en', fmt), /fast run/);
+});

@@ -3,6 +3,7 @@ import { ImagePlus, Trash2 } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent } from '../ui/Dialog';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
+import { Lightbox } from '../Lightbox';
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024;
 
@@ -14,12 +15,16 @@ const readAsDataUrl = (file) =>
     r.readAsDataURL(file);
   });
 
-/** Screenshots attached to one order or payment. Paste an image anywhere in the dialog to add it. */
+/**
+ * Screenshots attached to one order or payment. Paste an image anywhere in the dialog to add it; click one to see it
+ * full size, copy it or save it.
+ */
 export function ProofGallery({ open, onClose, ownerType, ownerId, title, legacyProofs = [] }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const [proofs, setProofs] = useState([]);
   const [error, setError] = useState('');
+  const [viewing, setViewing] = useState(null); // index of the screenshot open full size, or null
   // the provider object changes on every ledger reload; keep a ref so that does not re-run the load
   const ledgerRef = useRef(ledger);
   ledgerRef.current = ledger;
@@ -65,6 +70,7 @@ export function ProofGallery({ open, onClose, ownerType, ownerId, title, legacyP
   const all = [...legacyProofs.map((p) => ({ ...p, legacy: true })), ...proofs];
 
   return (
+    <>
     <Dialog open={open} onClose={onClose} maxWidth="max-w-2xl">
       <div onPaste={onPaste} className="flex flex-col max-h-[90vh]">
         <DialogHeader onClose={onClose}>
@@ -73,9 +79,16 @@ export function ProofGallery({ open, onClose, ownerType, ownerId, title, legacyP
         <DialogContent>
           {all.length === 0 && <p className="text-xs text-zinc-500">{f.t('lg.proofs.empty', 'No screenshots yet. Paste one here with Ctrl+V.')}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {all.map((p) => (
+            {all.map((p, i) => (
               <figure key={p.id} className="relative group">
-                <img src={p.data} alt={p.name} className="w-full h-32 object-cover rounded-md border border-zinc-200 dark:border-zinc-800" />
+                <button
+                  type="button"
+                  onClick={() => setViewing(i)}
+                  aria-label={f.t('lg.proofs.open', 'Open {name}', { name: p.name || f.t('lg.proofs', 'Screenshots') })}
+                  className="block w-full overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500 cursor-zoom-in"
+                >
+                  <img src={p.data} alt={p.name} className="h-32 w-full object-cover" />
+                </button>
                 {!p.legacy && (
                   <button
                     type="button"
@@ -98,5 +111,7 @@ export function ProofGallery({ open, onClose, ownerType, ownerId, title, legacyP
         </DialogContent>
       </div>
     </Dialog>
+    <Lightbox isOpen={open && viewing !== null} start={viewing ?? 0} images={all.map((p) => ({ src: p.data, name: p.name }))} caption={title} onClose={() => setViewing(null)} />
+    </>
   );
 }

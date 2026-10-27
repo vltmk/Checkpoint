@@ -5,8 +5,7 @@ import { Dialog } from './ui/Dialog';
 import { Button } from './ui/Button';
 import { CheckpointLogo, TomanIcon } from './ui/Icons';
 import { useLanguage } from '../lib/i18n';
-import { RELEASE_NOTES_REGISTRY } from '../lib/releaseNotes';
-import { WELCOME_RELEASE } from '../lib/welcome';
+import { RELEASE_NOTES_REGISTRY, latestReleaseVersion } from '../lib/releaseNotes';
 import { EASE_OUT } from '../lib/motion';
 import { cn } from '../lib/utils';
 
@@ -38,8 +37,10 @@ export function WelcomeFlow({ open, mode = 'new', currentProfile = 'booster', cu
   // in Farsi the screen reads right to left, so "forward" slides the other way
   const shift = (d) => (reduce ? 0 : (isRtl ? -d : d) * 24);
   const lang = language === 'fa' ? 'fa' : 'en';
-  const notes = RELEASE_NOTES_REGISTRY[WELCOME_RELEASE];
-  const version = language === 'fa' ? formatNumber(WELCOME_RELEASE) : WELCOME_RELEASE;
+  // what is new in the release being run, whichever release that is (the welcome itself first shipped in 5.3.0)
+  const latest = latestReleaseVersion();
+  const notes = latest ? RELEASE_NOTES_REGISTRY[latest] : null;
+  const version = language === 'fa' ? formatNumber(latest || '') : latest || '';
 
   const hello = (
     <div className="flex flex-col items-center text-center">
