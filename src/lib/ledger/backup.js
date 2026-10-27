@@ -25,6 +25,8 @@ export function ledgerFingerprint(exported) {
     // states change without amounts changing (done -> failed, cancelled share), so fold them in too
     (o || []).filter((x) => x.lifecycle === 'done').length, (o || []).filter((x) => DEAD_LIFECYCLES.has(x.lifecycle)).length,
     (s || []).filter((x) => x.state === 'cancelled').length,
+    // who pays a teammate changes balances without changing any amount
+    (s || []).filter((x) => x.paidBy === 'payer').length,
     stamp(o), stamp(s), stamp(exported.parties), stamp(p),
   ];
   return parts.join('_');

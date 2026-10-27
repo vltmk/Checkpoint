@@ -9,7 +9,7 @@ import { CheckpointLogo, DiscordIcon } from '../ui/Icons';
 import { formatMoney } from '../../lib/currencies';
 import { copyTextNative, copyImageNative, downloadImageBlob } from '../../lib/desktop';
 import { incrementLocalReceiptCount } from '../../lib/telemetry';
-import { useLanguage, formatShamsiDate } from '../../lib/i18n';
+import { useLanguage, formatShamsiDate, formatClock, resolveHour12 } from '../../lib/i18n';
 import { toPersianDigits } from '../../lib/persianCalendar';
 import { fromMinor } from '../../lib/ledger/money';
 import {
@@ -26,7 +26,7 @@ const TONE = {
 };
 
 /** Formatting for the receipt's own language (a Farsi receipt can be sent from an English app). */
-function makeFmt(lang) {
+function makeFmt(lang, hour12 = lang !== 'fa') {
   const fa = lang === 'fa';
   return {
     money: (minor, currency) => {
@@ -38,11 +38,7 @@ function makeFmt(lang) {
       if (!iso || Number.isNaN(d.getTime())) return '';
       return fa ? formatShamsiDate(d, { month: 'long', day: 'numeric', year: 'numeric' }) : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     },
-    time: (iso) => {
-      const d = new Date(iso);
-      if (!iso || Number.isNaN(d.getTime())) return '';
-      return fa ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d) : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    },
+    time: (iso) => formatClock(iso, lang, hour12),
     num: (n) => (fa ? toPersianDigits(n) : String(n)),
   };
 }
@@ -73,7 +69,7 @@ function CopyFeedback({ done, Icon, className }) {
  * boosters get a proof-of-work receipt. The same facts are on the card, in the copied text, and in the Discord block.
  */
 export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbox, onEdit }) {
-  const { language, isRtl } = useLanguage();
+  const { language, isRtl, timeFormat } = useLanguage();
   const isAdvertiser = profileId === 'advertiser';
   const cardRef = useRef(null);
   const [lang, setLang] = useState(language);
@@ -84,7 +80,8 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
 
   useEffect(() => { if (open) { setLang(language); setMode(isAdvertiser ? 'client' : 'work'); } }, [open, language, isAdvertiser, vm?.id]);
 
-  const fmt = useMemo(() => makeFmt(lang), [lang]);
+  // the receipt can be in another language than the app, so "auto" follows the receipt's language
+  const fmt = useMemo(() => makeFmt(lang, resolveHour12(timeFormat, lang)), [lang, timeFormat]);
   const w = RECEIPT_WORDS[lang] || RECEIPT_WORDS.en;
   const isFa = lang === 'fa';
 

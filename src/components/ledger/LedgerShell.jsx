@@ -3,6 +3,8 @@ import { trackerDB } from '../../lib/db';
 import { buildReceipt } from '../../lib/ledger/receipt';
 import { Lightbox } from '../Lightbox';
 import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
+import { motion } from 'motion/react';
+import { SCREEN } from '../../lib/motion';
 import { Button } from '../ui/Button';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
@@ -12,7 +14,7 @@ import { JobsView } from './JobsView';
 import { ClientsView } from './ClientsView';
 import { JobModal } from './JobModal';
 import { ExpenseDialog } from './ExpenseDialog';
-import { Segmented } from './parts';
+import { CurrencyStepper } from './CurrencyStepper';
 import { OrdersView } from './OrdersView';
 import { PeopleView } from './PeopleView';
 import { MoneyView } from './MoneyView';
@@ -25,8 +27,7 @@ import { SheetImportDialog } from './SheetImportDialog';
 // The receipt modal is large; it loads the first time someone opens a receipt
 const LedgerReceipt = lazy(() => import('./LedgerReceipt').then((m) => ({ default: m.LedgerReceipt })));
 
-/** The Advertiser profile's screens and the dialogs they open. App.jsx only decides which tab is active. */
-const CURRENCY_CHOICES = ['TOMAN', 'USD', 'EUR', 'GOLD'];
+/** Both profiles' screens and the dialogs they open. App.jsx only decides which tab is active. */
 
 export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categories, onRefreshCategories, newOrderSignal, quote }) {
   const ledger = useLedger();
@@ -110,18 +111,10 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
   return (
     <>
       {/* amounts can be shown in any currency; this changes every total on every screen at once */}
-      {onCurrencyChange && (
-        <div className="flex items-center justify-end gap-2 mb-5">
-          <span className="text-[11px] text-zinc-400">{f.t('lg.cur.show', 'Show amounts in')}</span>
-          <Segmented
-            ariaLabel={f.t('lg.cur.show', 'Show amounts in')}
-            value={ledger.displayCurrency}
-            onChange={onCurrencyChange}
-            options={CURRENCY_CHOICES.map((c) => ({ value: c, label: f.t(`lg.cur.${c}`, c) }))}
-          />
-        </div>
-      )}
+      {onCurrencyChange && <CurrencyStepper value={ledger.displayCurrency} onChange={onCurrencyChange} rates={ledger.rates} />}
 
+      {/* a short fade on every screen change, opacity only: number keys switch tabs often, so nothing moves or waits */}
+      <motion.div key={`${ledger.profileId}:${tab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={SCREEN}>
       {isBooster ? (
         <>
           {tab === 'cockpit' && <BoosterOverview onNavigate={onTabChange} onReceive={openReceive} onNewJob={newItem} onExpense={() => setExpenseOpen(true)} onOpenJob={openOrder} onImport={() => setImportOpen(true)} />}
@@ -139,6 +132,7 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
           {tab === 'analytics' && <ReportsView />}
         </>
       )}
+      </motion.div>
 
       <PaymentDialog open={payment.open} mode={payment.mode} partyId={payment.partyId} advance={payment.advance} presetIds={payment.presetIds} onClose={() => setPayment((p) => ({ ...p, open: false }))} />
       {isBooster

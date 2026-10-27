@@ -6,7 +6,7 @@
  * object, so they can never disagree. Formatting (digits, calendar, currency words) is injected as `fmt`, because a
  * receipt has its own language: a Farsi receipt can be sent from an English app.
  */
-import { buildContext, orderMoneyState, orderMarginMinor, paymentsAppliedTo, shareAppliedMinor, isShareActive, DEAD_LIFECYCLES } from './engine.js';
+import { buildContext, orderMoneyState, orderMarginMinor, paymentsAppliedTo, shareAppliedMinor, isShareActive, isPaidByPayer, DEAD_LIFECYCLES } from './engine.js';
 import { convertMinor, normalizeCurrency } from './money.js';
 
 /** Short code printed on a receipt: the tail of the order id, upper case. */
@@ -40,12 +40,15 @@ export function buildReceipt(data, orderId, { proofs = [] } = {}) {
     .filter((s) => s.orderId === orderId && s.state !== 'cancelled')
     .map((s) => {
       const applied = paymentsAppliedTo(ctx, 'share', s.id);
-      const paidMinor = shareAppliedMinor(ctx, s.id);
+      // a teammate the client pays directly is settled as far as this receipt goes: nothing is owed to them by me
+      const byPayer = isPaidByPayer(s);
+      const paidMinor = byPayer ? s.amountMinor : shareAppliedMinor(ctx, s.id);
       return {
         id: s.id,
         partyId: s.partyId,
         name: parties.get(s.partyId)?.name || '',
         amountMinor: s.amountMinor,
+        byPayer,
         paid: s.amountMinor > 0 && paidMinor >= s.amountMinor,
         paidAt: latest(applied),
         note: s.note || '',
@@ -93,9 +96,6 @@ export function buildReceipt(data, orderId, { proofs = [] } = {}) {
     proofs: proofs.map((p) => ({ id: p.id, name: p.name, data: p.data })),
   };
 }
-
-/** Which kind of document: the client's receipt, the boosters' payout slip, or the booster's own proof of work. */
-export const RECEIPT_MODES = ['client', 'slip', 'work'];
 
 // --- words -------------------------------------------------------------------------------------------------------
 

@@ -31,6 +31,8 @@ export const LEDGER_TABLES = {
   order_shares: {
     columns: {
       orderId: 'text', partyId: 'text', amountMinor: 'int', state: 'text', note: 'text',
+      // 'payer' = the client pays this teammate directly (no debt of mine); missing or 'me' = I pay them
+      paidBy: 'text',
       createdAt: 'text', updatedAt: 'text',
     },
     indexes: ['orderId', 'partyId'],
@@ -81,10 +83,6 @@ export function createIndexSql(table) {
   return LEDGER_TABLES[table].indexes.map(
     (c) => `CREATE INDEX IF NOT EXISTS idx_${table}_${c} ON ${table}(${c});`,
   );
-}
-
-export function allDdl() {
-  return LEDGER_TABLE_NAMES.flatMap((t) => [createTableSql(t), ...createIndexSql(t)]);
 }
 
 export const tableDdl = () => LEDGER_TABLE_NAMES.map(createTableSql);
@@ -203,6 +201,7 @@ export function sanitizeRow(table, row) {
       break;
     case 'order_shares':
       if (!isId(out.orderId) || !isId(out.partyId) || !nonNeg('amountMinor') || !['open', 'done', 'cancelled'].includes(out.state)) return null;
+      if (out.paidBy !== 'payer') out.paidBy = null;
       break;
     case 'payments':
       if (!['in', 'out'].includes(out.direction) || !PAYMENT_KIND_SET.has(out.kind) || !isInt(out.amountMinor) || out.amountMinor <= 0 || !CURRENCY_SET.has(out.currency)) return null;

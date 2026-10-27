@@ -1,3 +1,4 @@
+import { compareSemver } from '../src/lib/semver.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -30,8 +31,11 @@ test('the version being built has release notes, so a release can never go out w
   assert.ok(RELEASE_NOTES_REGISTRY[version], `add v${version} to RELEASE_NOTES_REGISTRY`);
 });
 
-test('old versions are not carried around: the registry holds the current release only', () => {
-  assert.deepEqual(Object.keys(RELEASE_NOTES_REGISTRY), [version]);
+test('old versions are not carried around: the registry holds the current release, and at most the next one', () => {
+  const keys = Object.keys(RELEASE_NOTES_REGISTRY);
+  assert.equal(keys[0], version);
+  assert.ok(keys.length <= 2, 'only the current and the next release');
+  if (keys[1]) assert.ok(compareSemver(keys[1], version) > 0, 'the extra entry is the release being prepared');
 });
 
 test('in-app notes are Farsi whatever language the app asks for, and upgrading from an old version shows the new notes', () => {

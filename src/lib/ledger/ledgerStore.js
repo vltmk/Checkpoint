@@ -8,7 +8,7 @@
  */
 import { LEDGER_SCHEMA_VERSION, sanitizeRow } from './ledgerSchema.js';
 import { mapLegacyEntries, partyIdFor, slug } from './legacyMapper.js';
-import { buildContext, orderReceivableMinor, isShareActive } from './engine.js';
+import { buildContext, orderReceivableMinor, isShareActive, isPaidByPayer } from './engine.js';
 import { normalizeCurrency } from './money.js';
 import { isDemoId } from './sampleData.js';
 
@@ -185,6 +185,24 @@ export function createLedgerStore(backend, { now = () => new Date().toISOString(
         throw new LedgerValidationError(`Payments were already recorded in ${prevOrder.currency}. Void them before changing this order's currency.`);
       }
     }
+    // Moving a teammate to "the client pays them" takes that share out of what I owe and out of what the client
+    // owes me. Money already moved on either side would then point at nothing, so it is refused until voided.
+    // read through the context: it leaves out voided payments and allocations to cancelled shares, which move no money
+    const ctxNow = await loadContext();
+    const appliedTo = (id) => ctxNow.appliedByTarget.get(`share:${id}`) || ctxNow.appliedByTarget.get(`order:${id}`) || 0;
+    let payerTotal = 0;
+    for (const s of shares) {
+      if (s.paidBy !== 'payer') continue;
+      payerTotal += Math.round(Number(s.amountMinor));
+      const prev = existingShares.find((x) => x.partyId === s.partyId);
+      if (prev && prev.paidBy !== 'payer' && appliedTo(prev.id) > 0) {
+        throw new LedgerValidationError('You already paid this teammate on this job. Void that payment in Money before saying the client pays them.');
+      }
+    }
+    if (payerTotal > gross - fee) throw new LedgerValidationError('What the client pays teammates directly cannot be more than the job.');
+    if (payerTotal > 0 && appliedTo(order.id) > gross - fee - payerTotal) {
+      throw new LedgerValidationError('The client already paid you more than that would leave. Void that payment in Money first.');
+    }
     await markInflight('saveOrder', order.id);
     const shareState = order.lifecycle === 'done' ? 'done' : 'open';
     for (const s of shares) {
@@ -195,6 +213,7 @@ export function createLedgerStore(backend, { now = () => new Date().toISOString(
         id: prev?.id || s.id || newLedgerId('shr'),
         orderId: order.id,
         amountMinor: Math.round(Number(s.amountMinor)),
+        paidBy: s.paidBy === 'payer' ? 'payer' : null,
         state: s.state && s.state !== 'cancelled' ? s.state : shareState,
         createdAt: prev?.createdAt || stamp(),
         updatedAt: stamp(),
@@ -298,12 +317,13 @@ export function createLedgerStore(backend, { now = () => new Date().toISOString(
         const share = ctx.shares.find((s) => s.id === a.targetId);
         if (!share) throw new LedgerValidationError('Allocation points at a missing share.');
         if (!isShareActive(share, ctx.orderById.get(share.orderId))) throw new LedgerValidationError('That share is cancelled.');
+        if (isPaidByPayer(share)) throw new LedgerValidationError('The client pays this teammate directly.');
         const outstanding = share.amountMinor - (ctx.appliedByTarget.get(`share:${share.id}`) || 0);
         if (a.appliedMinor > outstanding) throw new LedgerValidationError('That would pay a share more than it is owed.');
       } else if (a.targetType === 'order') {
         const order = ctx.orderById.get(a.targetId);
         if (!order) throw new LedgerValidationError('Allocation points at a missing order.');
-        const outstanding = orderReceivableMinor(order) - (ctx.appliedByTarget.get(`order:${order.id}`) || 0);
+        const outstanding = orderReceivableMinor(order, ctx) - (ctx.appliedByTarget.get(`order:${order.id}`) || 0);
         if (a.appliedMinor > outstanding) throw new LedgerValidationError('That would collect more than the order is worth.');
       } else {
         throw new LedgerValidationError('Unknown allocation target.');
@@ -561,7 +581,7 @@ export function createLedgerStore(backend, { now = () => new Date().toISOString(
     const ctx = buildContext(data);
     // a share edited below what was paid is not an error: the extra is the person's credit (see partyBalance)
     for (const o of data.orders) {
-      if ((ctx.appliedByTarget.get(`order:${o.id}`) || 0) > orderReceivableMinor(o)) issues.push({ type: 'overcollected_order', id: o.id });
+      if ((ctx.appliedByTarget.get(`order:${o.id}`) || 0) > orderReceivableMinor(o, ctx)) issues.push({ type: 'overcollected_order', id: o.id });
     }
     return issues;
   }

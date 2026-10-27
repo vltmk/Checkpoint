@@ -1,11 +1,13 @@
 import React from 'react';
-import { AlertTriangle, CircleCheck, CircleDashed, CirclePause, CirclePlay, CircleX, Undo2 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { AlertTriangle, CheckSquare, CircleCheck, CircleDashed, CirclePause, CirclePlay, CircleX, Search, Undo2 } from 'lucide-react';
 import { MoneyDisplay } from '../ui/MoneyDisplay';
 import { GameIcon } from '../ui/GameIcon';
 import { fromMinor } from '../../lib/ledger/money';
 import { AGE_BUCKETS } from '../../lib/ledger/selectors';
 import { useLedgerFormat } from './format';
 import { cn } from '../../lib/utils';
+import { SPRING_PILL } from '../../lib/motion';
 
 /**
  * Integer minor units rendered through the app's money component (keeps Toman/Gold/USD/EUR styling).
@@ -74,28 +76,105 @@ export function SectionTitle({ children, aside, className }) {
 export const TOOLBAR_INPUT = 'h-8 rounded-lg';
 export const TOOLBAR_SELECT = 'h-8 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border-zinc-200/80 dark:border-zinc-800/80';
 
-export function Segmented({ value, onChange, options, ariaLabel }) {
+/**
+ * The selected option sits on a pill that slides to the new choice, so the eye follows the change instead of
+ * hunting for it. Each control gets its own layout id, so two segmented controls on a screen never share a pill.
+ * Options may carry an `icon` (rendered before the label) and a `title` (native tooltip).
+ */
+export function Segmented({ value, onChange, options, ariaLabel, className }) {
+  const pillId = React.useId();
   return (
-    <div role="tablist" aria-label={ariaLabel} className="inline-flex h-8 items-center rounded-lg bg-zinc-100 dark:bg-zinc-900 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          role="tab"
-          aria-selected={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'h-7 px-3 rounded-md text-xs font-medium transition-colors select-none',
-            value === o.value
-              ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
-          )}
-        >
-          {o.label}
-          {o.count > 0 && <span className="ms-1 text-[10px] text-zinc-400 tabular-nums">{o.count}</span>}
-        </button>
-      ))}
+    <div role="tablist" aria-label={ariaLabel} className={cn('inline-flex h-8 shrink-0 items-center rounded-lg bg-zinc-100 dark:bg-zinc-900 p-0.5', className)}>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            title={o.title}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              'relative h-7 px-3 rounded-md text-xs font-medium whitespace-nowrap transition-colors duration-150 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500',
+              on ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+            )}
+          >
+            {on && (
+              <motion.span
+                layoutId={pillId}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-md bg-white dark:bg-zinc-800 shadow-xs ring-1 ring-zinc-200/70 dark:ring-zinc-700/60"
+                transition={SPRING_PILL}
+              />
+            )}
+            <span className="relative inline-flex items-center gap-1.5">
+              {o.icon}
+              {o.label}
+              {o.count > 0 && <span className="text-[10px] text-zinc-400 tabular-nums">{o.count}</span>}
+            </span>
+          </button>
+        );
+      })}
     </div>
+  );
+}
+
+/**
+ * A list screen's toolbar: filters on the start side, actions on the end side. It fits on one line at the smallest
+ * window in English; when it cannot (longer Farsi labels), only the filters wrap, and the actions stay level with
+ * their first row instead of floating between the two.
+ */
+export function ListToolbar({ filters, actions }) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>
+      <div className="flex shrink-0 items-center gap-2">{actions}</div>
+    </div>
+  );
+}
+
+/**
+ * The search box on a list toolbar. A fixed width: growing on focus would push the filters onto a second line
+ * the moment you click it.
+ */
+export function ToolbarSearch({ value, onChange, placeholder }) {
+  return (
+    <div className="relative w-40">
+      <Search aria-hidden="true" className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+      <input
+        data-ledger-search
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape' && value) { e.stopPropagation(); onChange(''); } }}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="h-8 w-full rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/80 ps-8 pe-2.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none focus:border-zinc-300 dark:focus:border-zinc-700 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600 transition-[background-color,border-color,box-shadow] duration-100 [&::-webkit-search-cancel-button]:hidden"
+      />
+    </div>
+  );
+}
+
+/** Select mode toggle: an icon button (a label would push the primary action off the row). */
+export function SelectModeButton({ active, onToggle, label, doneLabel }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      aria-label={active ? doneLabel : label}
+      title={active ? doneLabel : label}
+      className={cn(
+        'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border text-xs font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500',
+        active
+          ? 'px-3 border-transparent bg-zinc-900 text-zinc-100 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white'
+          : 'w-8 border-zinc-200/80 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100'
+      )}
+    >
+      <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+      {active && doneLabel}
+    </button>
   );
 }
 

@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 import { TomanIcon } from './Icons';
+import { POPOVER } from '../../lib/motion';
 
 export function Select({
   value,
@@ -21,6 +23,9 @@ export function Select({
   const [isOpen, setIsOpen] = useState(false);
   const [effectiveAlign, setEffectiveAlign] = useState(isRtl ? 'right' : 'left');
   const [effectiveDropUp, setEffectiveDropUp] = useState(dropUp);
+  // The menu is portaled to <body> with fixed coordinates, so no parent's opacity, overflow or stacking
+  // (a dimmed row, a scrolling dialog) can make it see-through or clip it.
+  const [anchor, setAnchor] = useState(null);
   const containerRef = useRef(null);
   const popoverRef = useRef(null);
 
@@ -76,8 +81,30 @@ export function Select({
     const spaceBelow = boundaryBottom - rect.bottom;
     const spaceAbove = rect.top - boundaryTop;
 
-    setEffectiveDropUp(dropUp || (spaceBelow < popoverHeight && spaceAbove > spaceBelow));
+    const up = dropUp || (spaceBelow < popoverHeight && spaceAbove > spaceBelow);
+    setEffectiveDropUp(up);
+    setAnchor({
+      minWidth: Math.max(minWidth, rect.width),
+      maxHeight: Math.max(120, Math.min(popoverHeight, (up ? rect.top : window.innerHeight - rect.bottom) - padding - 6)),
+      ...(targetAlign === 'left' ? { left: rect.left } : { right: window.innerWidth - rect.right }),
+      ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+    });
   }, [isOpen, align, isRtl, dropUp]);
+
+  // A fixed menu would drift away from its trigger when something scrolls or the window resizes: close it instead
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const close = (e) => {
+      if (popoverRef.current && e?.target instanceof Node && popoverRef.current.contains(e.target)) return;
+      setIsOpen(false);
+    };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [isOpen]);
 
   // Normalize options to object format
   const normalizedOptions = useMemo(() => {
@@ -130,7 +157,7 @@ export function Select({
     if (!isOpen) return;
 
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      if (containerRef.current && !containerRef.current.contains(e.target) && !popoverRef.current?.contains(e.target)) {
         setIsOpen(false);
       }
     };
@@ -209,7 +236,7 @@ export function Select({
   };
 
   return (
-    <div ref={containerRef} className={cn('relative inline-block w-full', isOpen && 'z-50')}>
+    <div ref={containerRef} className="relative inline-block w-full">
       {/* Trigger Button */}
       <button
         type="button"
@@ -218,7 +245,7 @@ export function Select({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={cn(
-          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-all duration-150',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 px-3 text-xs text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500 transition-[background-color,border-color,box-shadow,color] duration-150',
           isRtl && 'font-farsi',
           isOpen && 'border-zinc-400 dark:border-zinc-500 ring-1 ring-zinc-400 dark:ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
@@ -246,24 +273,23 @@ export function Select({
       </button>
 
       {/* Popover Dropdown */}
+      {createPortal(
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && anchor && (
           <motion.div
             ref={popoverRef}
             initial={{ opacity: 0, y: effectiveDropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: effectiveDropUp ? 4 : -4, scale: 0.98 }}
-            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            transition={POPOVER}
             dir={isRtl ? 'rtl' : 'ltr'}
+            style={anchor}
             className={cn(
-              'absolute z-[100] min-w-[180px] max-h-64 overflow-y-auto p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl',
-              effectiveDropUp ? 'origin-bottom' : 'origin-top',
-              // Boundary and alignment handling
-              effectiveAlign === 'left'
-                ? 'left-0 right-auto'
-                : 'right-0 left-auto',
-              isRtl ? 'text-right font-farsi' : 'text-left',
-              effectiveDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+              'fixed z-[300] overflow-y-auto p-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-xl',
+              effectiveDropUp
+                ? (effectiveAlign === 'left' ? 'origin-bottom-left' : 'origin-bottom-right')
+                : (effectiveAlign === 'left' ? 'origin-top-left' : 'origin-top-right'),
+              isRtl ? 'text-right font-farsi' : 'text-left'
             )}
           >
             {groups ? (
@@ -293,7 +319,9 @@ export function Select({
             )}
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 }

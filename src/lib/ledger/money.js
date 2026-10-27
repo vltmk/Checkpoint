@@ -89,6 +89,8 @@ export function parseAmountShorthand(input) {
   let s = input.trim().toLowerCase();
   if (!s) return null;
   s = s.replace(/[۰-۹٠-٩]/g, (d) => DIGIT_MAP[d]);
+  // a unit typed with the number ("1,200,000 تومان", "$40", "15%") says nothing the currency field does not
+  s = s.replace(/^[$€]\s*/, '').replace(/\s*(?:تومان|toman|tmn|usd|eur|gold|طلا|[$€%٪])$/, '').trim();
   s = s.replace(/[٬,،_\s]+(?=\d{3}(\D|$))/g, '').replace(/٫/g, '.');
   const m = s.match(/^(\d+(?:\.\d+)?|\.\d+)\s*([a-zآ-ی]*)$/);
   if (!m) return null;
@@ -99,16 +101,6 @@ export function parseAmountShorthand(input) {
   const hit = SUFFIXES.find(([k]) => k === word);
   if (!hit) return null;
   return base * hit[1];
-}
-
-/** Sum integer minor amounts per currency. rows: [{ currency, minor }] -> { USD: 1250, TOMAN: 5000 } */
-export function sumByCurrency(rows) {
-  const out = {};
-  for (const r of rows) {
-    const c = normalizeCurrency(r.currency);
-    out[c] = (out[c] || 0) + (Number(r.minor) || 0);
-  }
-  return out;
 }
 
 /**

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { DIALOG } from '../lib/motion';
 import { Download, X } from 'lucide-react';
 import { isTauri, saveImageNative } from '../lib/desktop';
 import { useLanguage } from '../lib/i18n';
@@ -45,7 +46,7 @@ export function Lightbox({ isOpen, onClose, imgSrc, caption = 'Screenshot Proof'
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
+            transition={DIALOG}
             className="relative z-10 max-w-4xl w-full max-h-[90vh] flex flex-col bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl"
           >
             {/* Top Bar */}

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { formatMoney } from '../../lib/currencies';
 import { fromMinor } from '../../lib/ledger/money';
-import { useLanguage, formatLedgerGroupDate } from '../../lib/i18n';
+import { useLanguage, formatLedgerGroupDate, formatClock } from '../../lib/i18n';
 import { SHAMSI_MONTHS, dateToJalali, toPersianDigits } from '../../lib/persianCalendar';
 import { UNASSIGNED_PARTY_ID, UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 
@@ -12,7 +12,7 @@ export function fill(template, vars = {}) {
 
 /** Text formatting for integer minor-unit money, following the app language (Persian digits in Farsi). */
 export function useLedgerFormat() {
-  const { language, t, formatNumber, formatDate, isRtl } = useLanguage();
+  const { language, t, formatNumber, formatDate, isRtl, dateFormat, hour12 } = useLanguage();
   const isFa = language === 'fa';
   // Always exact (see Money in parts.jsx): a shortened amount in a sentence or CSV hides what is owed.
   const money = useCallback(
@@ -27,16 +27,10 @@ export function useLedgerFormat() {
     (iso) => (iso ? formatDate(iso, { year: 'numeric', month: 'short', day: 'numeric' }) : ''),
     [formatDate]
   );
-  // The time of day on a row: 10:45 AM in English, 24-hour in Persian digits in Farsi
-  const time = useCallback((iso) => {
-    const d = new Date(iso);
-    if (!iso || Number.isNaN(d.getTime())) return '';
-    return isFa
-      ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
-      : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  }, [isFa]);
-  // "Today", "Yesterday", else "Mon, Oct 19" (Shamsi in Farsi): the heading of a day group
-  const dayLabel = useCallback((iso) => formatLedgerGroupDate(iso, 'relative', language, t), [language, t]);
+  // The time of day on a row, on the clock chosen in Settings (12-hour in English and 24-hour in Farsi by default)
+  const time = useCallback((iso) => formatClock(iso, language, hour12), [language, hour12]);
+  // The heading of a day group, in the date format chosen in Settings ("Today", "Yesterday", "Mon, Oct 19" by default)
+  const dayLabel = useCallback((iso) => formatLedgerGroupDate(iso, dateFormat, language, t), [dateFormat, language, t]);
   const tt = useCallback((key, fallback, vars) => fill(t(key, fallback), vars), [t]);
   // The upgrade creates two placeholder people. Their stored names are English, so show them in the user's language.
   const name = useCallback((party) => {
@@ -60,11 +54,5 @@ export function useLedgerFormat() {
     if (isFa) return `${SHAMSI_MONTHS[m - 1]} ${toPersianDigits(y)}`;
     return new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
   }, [isFa]);
-  return { money, date, time, dayLabel, name, t: tt, language, isFa, isRtl, formatNumber, monthKey, monthLabel };
-}
-
-/** Days between an ISO date and now, whole days. */
-export function daysSince(iso, now = Date.now()) {
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 86400000)) : 0;
+  return { money, date, time, dayLabel, name, t: tt, language, isFa, isRtl, formatNumber, monthKey, monthLabel, hour12 };
 }

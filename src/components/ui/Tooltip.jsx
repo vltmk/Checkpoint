@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { EASE_OUT, POPOVER } from '../../lib/motion';
 import { cn } from '../../lib/utils';
 import { useLanguage } from '../../lib/i18n';
 
@@ -103,7 +104,7 @@ export function Tooltip({
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: globalTooltipActive ? 0.08 : 0.12, ease: [0.23, 1, 0.32, 1] }}
+            transition={{ duration: globalTooltipActive ? 0.08 : POPOVER.duration, ease: EASE_OUT }}
             dir={isRtl ? 'rtl' : 'ltr'}
             className={cn(
               'absolute z-50 px-2 py-1 text-[11px] font-medium text-zinc-900 bg-white/95 border border-zinc-200/80 dark:text-zinc-100 dark:bg-zinc-950/95 dark:border-zinc-800/80 rounded-md shadow-md pointer-events-none select-none',

@@ -39,7 +39,6 @@ export function CockpitView({ onNavigate, onPay, onReceive, onNewOrder, onOpenOr
       >
         <Button variant="primary" onClick={onNewOrder}><Plus className="w-3.5 h-3.5" />{f.t('lg.newOrder', 'New order')}</Button>
         <Button variant="outline" onClick={onImport}>{f.t('lg.import.link', 'Import from a spreadsheet')}</Button>
-        <Button variant="ghost" onClick={() => ledger.loadSample()}>{f.t('lg.sample.try', 'Try with sample data')}</Button>
       </EmptyState>
     );
   }

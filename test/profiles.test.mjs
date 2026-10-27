@@ -11,14 +11,12 @@ const rootDir = path.resolve(__dirname, '..');
 const profilesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'profiles.js'), 'utf8');
 const dbCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'db.js'), 'utf8');
 const settingsCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'SettingsModal.jsx'), 'utf8');
-const onboardingCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'ProfileOnboardingModal.jsx'), 'utf8');
 const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
 
-test('ProfileOnboardingModal supports onSelectRole and onComplete dismiss callbacks', () => {
-  assert.ok(onboardingCode.includes('onSelectRole'));
-  assert.ok(onboardingCode.includes('onComplete'));
-  assert.ok(appCode.includes('onSelectRole='));
-  assert.ok(appCode.includes('onComplete='));
+test('the welcome screen sets the role and remembers it was seen', () => {
+  assert.ok(appCode.includes('<WelcomeFlow'));
+  assert.ok(appCode.includes('setProfileOnboardingCompleted(true)'));
+  assert.ok(appCode.includes('WELCOME_SEEN_KEY, WELCOME_RELEASE'));
 });
 
 test('profiles.js: defines booster and advertiser profiles with correct metadata', () => {

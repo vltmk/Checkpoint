@@ -10,21 +10,9 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        background: "#09090b",
-        foreground: "#e4e4e7",
-        card: {
-          DEFAULT: "#121215",
-          foreground: "#e4e4e7"
-        },
-        muted: {
-          DEFAULT: "#18181b",
-          foreground: "#a1a1aa"
-        },
-        border: {
-          DEFAULT: "#27272a",
-          subtle: "#1f1f23"
-        }
+      // shadcn's smallest shadow; Tailwind 3 has no `shadow-xs`, so the 26 places that use it drew nothing
+      boxShadow: {
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
       },
       fontFamily: {
         sans: ['Inter', 'IRANYekanRd', 'IranYekanRd', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

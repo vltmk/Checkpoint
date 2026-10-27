@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { trackerDB } from '../../lib/db';
 import { buildContext } from '../../lib/ledger/engine';
 import * as actions from '../../lib/ledger/actions';
-import { buildSampleLedger, isDemoId } from '../../lib/ledger/sampleData';
+import { isDemoId } from '../../lib/ledger/sampleData';
 
 const LedgerContext = createContext(null);
 
@@ -19,6 +19,8 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
   const [selectedPartyId, setSelectedPartyId] = useState(null);
   // Booster side: which client is open ('' is "no payer", null is none)
   const [selectedClientKey, setSelectedClientKey] = useState(null);
+  // Booster side: the Clients screen shows clients or the team I pay ('clients' | 'team')
+  const [clientsView, setClientsView] = useState('clients');
   const storeRef = useRef(null);
   const ratesRef = useRef(rates);
   ratesRef.current = rates;
@@ -100,7 +102,6 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       partyById,
       unresolvedFlags,
       hasDemo,
-      loadSample: () => run((s) => s.mergeAll(buildSampleLedger())),
       removeSample: () => run((s) => s.removeDemo()),
       notice,
       dismissNotice: () => setNotice(null),
@@ -111,6 +112,8 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       setSelectedPartyId,
       selectedClientKey,
       setSelectedClientKey,
+      clientsView,
+      setClientsView,
       rates,
       displayCurrency,
       reload,
@@ -124,7 +127,11 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       // orders
       saveOrder: (payload) => run((s) => s.saveOrder(payload)),
       setLifecycle: (orderId, lifecycle) => run((s) => s.setLifecycle(orderId, lifecycle)),
-      deleteOrder: (orderId) => run((s) => s.deleteOrder(orderId)),
+      // a deleted record takes its unsaved edit drafts with it
+      deleteOrder: async (orderId) => {
+        await run((s) => s.deleteOrder(orderId));
+        for (const k of ['job', 'order']) trackerDB.setSetting(`checkpoint_draft_${profileId}_${k}_${orderId}`, null).catch(() => {});
+      },
       // money
       settleUp: (p) => run((s) => actions.settleUp(s, { rates: ratesRef.current, ...p })),
       addAdvance: (p) => run((s) => actions.addAdvance(s, { rates: ratesRef.current, ...p })),
@@ -142,7 +149,7 @@ export function LedgerProvider({ profileId, dataVersion = 0, rates, displayCurre
       removeProof: (id) => run((s) => s.removeProof(id)),
       listProofs: (type, id) => storeRef.current.listProofs(type, id),
     }),
-    [profileId, status, error, ctx, data, partyById, unresolvedFlags, hasDemo, notice, interrupted, selectedPartyId, selectedClientKey, rates, displayCurrency, reload, run]
+    [profileId, status, error, ctx, data, partyById, unresolvedFlags, hasDemo, notice, interrupted, selectedPartyId, selectedClientKey, clientsView, rates, displayCurrency, reload, run]
   );
 
   return <LedgerContext.Provider value={api}>{children}</LedgerContext.Provider>;

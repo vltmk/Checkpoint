@@ -10,7 +10,6 @@ const rootDir = path.resolve(__dirname, '..');
 
 const currenciesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'currencies.js'), 'utf8').replace(/\r\n/g, '\n');
 const i18nCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n.jsx'), 'utf8').replace(/\r\n/g, '\n');
-const badgeCode = fs.readFileSync(path.join(rootDir, 'src', 'components', 'ui', 'Badge.jsx'), 'utf8').replace(/\r\n/g, '\n');
 const ledgerQueryCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'ledgerQuery.js'), 'utf8');
 
 test('STATUSES includes Failed in currencies.js', () => {
@@ -30,15 +29,6 @@ test('STATUS_LABELS has Persian label for Failed in currencies.js', () => {
 test('i18n.jsx has translations for Failed in both English and Persian', () => {
   assert.ok(i18nCode.includes("'status.Failed': 'Failed'"));
   assert.ok(i18nCode.includes("'status.Failed': 'ناموفق'"));
-});
-
-test('STATUS_STYLES in Badge.jsx defines dual-theme classes for Failed', () => {
-  assert.ok(badgeCode.includes('Failed: {'));
-  assert.ok(badgeCode.includes('text-rose-700'));
-  assert.ok(badgeCode.includes('dark:text-rose-400'));
-  assert.ok(badgeCode.includes('bg-rose-500/10'));
-  assert.ok(badgeCode.includes('dark:bg-rose-950/30'));
-  assert.ok(badgeCode.includes('bg-rose-600 dark:bg-rose-400'));
 });
 
 test('Financial calculation simulation ignores Failed from earned and pending', () => {

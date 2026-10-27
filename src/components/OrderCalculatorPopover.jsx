@@ -3,7 +3,6 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Calculator,
   ArrowRight,
-  Coins,
   Settings2,
   ChevronDown,
   Check,
@@ -11,16 +10,13 @@ import {
   Copy,
   Users,
   Percent,
-  DollarSign,
-  TrendingUp,
-  Sparkles,
   Minus,
   Plus,
   RotateCcw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../lib/i18n';
-import { CURRENCIES, formatMoney, sanitizePriceInput, convertCurrency } from '../lib/currencies';
+import { formatMoney, sanitizePriceInput, convertCurrency } from '../lib/currencies';
 import {
   calculateForwardQuote,
   calculateReverseQuote,
@@ -28,7 +24,7 @@ import {
 } from '../lib/orderCalculator';
 import MoneyDisplay from './ui/MoneyDisplay';
 import { Button } from './ui/Button';
-import { FrostedGlass } from './ui/FrostedGlass';
+import { DRAWER, SCRIM } from '../lib/motion';
 import { useModalFocus } from './ui/useModalFocus';
 
 export function OrderCalculatorPopover({
@@ -248,22 +244,20 @@ export function OrderCalculatorPopover({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={SCRIM}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-[2px]"
+            className="fixed inset-0 bg-black/40 dark:bg-black/60"
           />
 
           {/* Sliding Drawer */}
-          <FrostedGlass
-            as="motion.div"
-            variant="drawer"
+          <motion.div
             ref={drawerRef}
-            initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%', opacity: 0.8 }}
-            animate={shouldReduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%', opacity: 0.8 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { x: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
+            transition={shouldReduceMotion ? SCRIM : DRAWER}
             className={cn(
-              'relative z-10 w-full sm:w-[480px] h-full flex flex-col justify-between shadow-2xl bg-white dark:bg-zinc-950 overflow-hidden select-none',
+              'relative z-10 w-full sm:w-[480px] h-full flex flex-col justify-between shadow-2xl bg-white dark:bg-zinc-950 border-s border-zinc-200/90 dark:border-zinc-800/90 overflow-hidden select-none',
               isRtl ? 'border-r border-zinc-200 dark:border-zinc-800' : 'border-l border-zinc-200 dark:border-zinc-800',
               className
             )}
@@ -334,7 +328,7 @@ export function OrderCalculatorPopover({
               {/* ========================================================================= */}
               <div
                 className={cn(
-                  'rounded-xl border transition-all duration-200 overflow-hidden',
+                  'rounded-xl border transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-200 overflow-hidden',
                   activeStep === 1
                     ? 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 shadow-xs'
                     : 'border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/20 hover:border-zinc-300 dark:hover:border-zinc-700'
@@ -413,7 +407,7 @@ export function OrderCalculatorPopover({
                                   type="button"
                                   onClick={() => handleCurrencyChange(c)}
                                   className={cn(
-                                    'py-1.5 px-2 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center',
+                                    'py-1.5 px-2 text-xs font-semibold rounded-lg transition-[color,background-color,border-color,box-shadow,opacity,transform] cursor-pointer text-center',
                                     isSelected
                                       ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm'
                                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
@@ -515,7 +509,7 @@ export function OrderCalculatorPopover({
                           <button
                             type="button"
                             onClick={() => goToNextStep(1)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-100 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 transition-all shadow-xs active:scale-98 cursor-pointer select-none"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-100 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 transition-[color,background-color,border-color,box-shadow,opacity,transform] shadow-xs active:scale-98 cursor-pointer select-none"
                           >
                             <span>{language === 'fa' ? 'مرحله بعد: تعیین مبلغ' : 'Next: Set Price'}</span>
                             <ArrowRight className={cn('w-3.5 h-3.5', isRtl && 'rotate-180')} />
@@ -532,7 +526,7 @@ export function OrderCalculatorPopover({
               {/* ========================================================================= */}
               <div
                 className={cn(
-                  'rounded-xl border transition-all duration-200 overflow-hidden',
+                  'rounded-xl border transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-200 overflow-hidden',
                   activeStep === 2
                     ? 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 shadow-xs'
                     : 'border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/20 hover:border-zinc-300 dark:hover:border-zinc-700'
@@ -605,7 +599,7 @@ export function OrderCalculatorPopover({
                             type="button"
                             onClick={() => setMode('forward')}
                             className={cn(
-                              'py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center',
+                              'py-2 px-3 text-xs font-semibold rounded-lg transition-[color,background-color,border-color,box-shadow,opacity,transform] cursor-pointer text-center',
                               mode === 'forward'
                                 ? 'bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 shadow-sm'
                                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
@@ -620,7 +614,7 @@ export function OrderCalculatorPopover({
                             type="button"
                             onClick={() => setMode('reverse')}
                             className={cn(
-                              'py-2 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer text-center',
+                              'py-2 px-3 text-xs font-semibold rounded-lg transition-[color,background-color,border-color,box-shadow,opacity,transform] cursor-pointer text-center',
                               mode === 'reverse'
                                 ? 'bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 shadow-sm'
                                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
@@ -728,7 +722,7 @@ export function OrderCalculatorPopover({
                             onClick={() => goToNextStep(2)}
                             disabled={!((mode === 'forward' ? cleanPrice > 0 : cleanDesiredPayout > 0))}
                             className={cn(
-                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer select-none',
+                              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] shadow-xs cursor-pointer select-none',
                               (mode === 'forward' ? cleanPrice > 0 : cleanDesiredPayout > 0)
                                 ? 'bg-zinc-900 hover:bg-zinc-800 text-zinc-100 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-950 active:scale-98'
                                 : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
@@ -749,7 +743,7 @@ export function OrderCalculatorPopover({
               {/* ========================================================================= */}
               <div
                 className={cn(
-                  'rounded-xl border transition-all duration-200 overflow-hidden',
+                  'rounded-xl border transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-200 overflow-hidden',
                   activeStep === 3
                     ? 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 shadow-xs'
                     : 'border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/60 dark:bg-zinc-900/20 hover:border-zinc-300 dark:hover:border-zinc-700'
@@ -1167,7 +1161,7 @@ export function OrderCalculatorPopover({
                 </div>
               </div>
             </div>
-          </FrostedGlass>
+          </motion.div>
         </div>
       )}
     </AnimatePresence>

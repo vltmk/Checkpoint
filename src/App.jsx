@@ -5,7 +5,8 @@ import { ContextMenu } from './components/ui/ContextMenu';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, hasOpenDialog } from './components/ui/Dialog';
 import { Button } from './components/ui/Button';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { ProfileOnboardingModal } from './components/ui/ProfileOnboardingModal';
+import { WelcomeFlow } from './components/WelcomeFlow';
+import { WELCOME_RELEASE, WELCOME_SEEN_KEY, crossesNotificationReset, welcomeMode } from './lib/welcome';
 import {
   getActiveProfileId,
   setActiveProfileId,
@@ -13,6 +14,7 @@ import {
   setProfileOnboardingCompleted,
 } from './lib/profiles';
 import { motion, AnimatePresence } from 'motion/react';
+import { SCREEN } from './lib/motion';
 import { useTheme } from 'next-themes';
 import { FileSpreadsheet, Download } from 'lucide-react';
 import { checkForUpdate, getAppVersion, getStaticAppVersion } from './lib/updater';
@@ -54,11 +56,16 @@ import { useLanguage } from './lib/i18n';
 import { LedgerProvider } from './components/ledger/LedgerProvider';
 import { ledgerFingerprint, buildOrdersCsv } from './lib/ledger/backup';
 
-// The Advertiser screens are code-split: Booster users never download them
+// The ledger screens (both profiles) are code-split so the frame paints before they load
 const LedgerShell = lazy(() => import('./components/ledger/LedgerShell').then((m) => ({ default: m.LedgerShell })));
 
 // Screens of both profiles (v2 ledger): home, orders / jobs, people / clients, money, reports
 const LEDGER_TABS = ['cockpit', 'orders', 'people', 'money', 'analytics'];
+// What every total can be shown in (gold is per game, so it is not one of them)
+const DISPLAY_CURRENCIES = ['TOMAN', 'USD', 'EUR'];
+// "Open on" in Settings: where the profile left off, or always one screen
+const START_TAB_CHOICES = ['last', ...LEDGER_TABS];
+const openingTab = (start, lastTab) => (start && start !== 'last' ? start : LEDGER_TABS.includes(lastTab) ? lastTab : null);
 
 // Focus the search box of the screen that is showing; when it has none, open the Orders / Jobs list and focus its box.
 function focusLedgerSearch(openOrdersTab) {
@@ -167,7 +174,8 @@ export default function App() {
 
   // Dual-Profile Architecture ('booster' | 'advertiser')
   const [activeProfileId, setActiveProfileIdState] = useState(() => getActiveProfileId());
-  const [isProfileOnboardingOpen, setIsProfileOnboardingOpen] = useState(() => !isProfileOnboardingCompleted());
+  // The welcome screen: 'new' on first run, 'returning' once for existing users on the release that brings it
+  const [welcome, setWelcome] = useState(() => (isProfileOnboardingCompleted() ? null : 'new'));
   const [profileCounts, setProfileCounts] = useState({ booster: 0, advertiser: 0 });
   const activeProfileCount = profileCounts[activeProfileId] || 0;
   const profileSwitchSeqRef = useRef(0);
@@ -213,25 +221,15 @@ export default function App() {
     return parseBooleanSetting(null, true);
   });
 
-  // Ledger Group Date Format ('relative' | 'yyyy-mm-dd' | 'dd-mm-yyyy' | 'mm-dd-yyyy' | 'month-d-yyyy')
-  const [ledgerDateFormat, setLedgerDateFormatState] = useState(() => {
-    return parseStringSetting(
-      null,
-      'relative',
-      ['relative', 'yyyy-mm-dd', 'dd-mm-yyyy', 'mm-dd-yyyy', 'month-d-yyyy']
-    );
-  });
-
-  const handleLedgerDateFormatChange = useCallback((newFmt) => {
-    setLedgerDateFormatState(newFmt);
-    try {
-    } catch (e) {}
-  }, []);
-
   // Active view: cockpit (home) | orders (Orders / Jobs) | people (Boosters / Clients) | money | analytics (Reports)
   const [activeTab, setActiveTab] = useState('cockpit');
   // A saved tab from an older version (the old 'ledger' tab) falls back to the home screen
   const visibleTab = LEDGER_TABS.includes(activeTab) ? activeTab : 'cockpit';
+  // Which screen each profile opens on: 'last' (where you left off) or one tab. Kept per profile, because the two
+  // profiles have different screens and the last tab of one means nothing in the other.
+  const [startTabs, setStartTabs] = useState({ advertiser: 'last', booster: 'last' });
+  const startTabsRef = useRef(startTabs);
+  startTabsRef.current = startTabs;
 
   // Advertiser: "New order" requests from the top bar, the N shortcut and the calculator
   const [newOrderSignal, setNewOrderSignal] = useState(0);
@@ -241,10 +239,10 @@ export default function App() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const currentTheme = resolvedTheme || theme || 'dark';
 
-  // User Currency Preferences (TOMAN | GOLD | USD | EUR)
+  // User Currency Preferences (TOMAN | USD | EUR). Gold is not a display currency: each game's gold is its own
+  // currency with its own rate, so totals are shown in Toman, USD or EUR and a saved "Gold" falls back to Toman.
   const [globalCurrency, setGlobalCurrency] = useState(() => {
     const saved = null;
-    if (saved === 'WOW_GOLD' || saved === 'GOLD') return 'GOLD';
     if (saved === 'USD') return 'USD';
     if (saved === 'EUR') return 'EUR';
     return 'TOMAN';
@@ -318,9 +316,13 @@ export default function App() {
           setAppVersion(v);
           try {
             const lastKnown = await trackerDB.getSetting('checkpoint_last_known_version', null);
+            // existing users see the new welcome once (it carries the patch notes, so the drawer stays closed then)
+            const mode = welcomeMode({ onboardingCompleted: isProfileOnboardingCompleted(), seenVersion: await trackerDB.getSetting(WELCOME_SEEN_KEY, null), appVersion: v });
+            if (mode === 'returning') setWelcome('returning');
             if (lastKnown && compareSemver(v, lastKnown) > 0) {
-              // App was just upgraded! Post rich What's New notification
-              const stored = await getStoredNotifications();
+              // App was just upgraded! Post rich What's New notification. On the release that resets the
+              // notification center, everything stored before is dropped and only the new patch notes remain.
+              const stored = crossesNotificationReset(lastKnown, v) ? [] : await getStoredNotifications();
               const updated = mergeNotificationsIntoHistory(stored, {
                 currentVersion: v,
                 postUpdateInfo: {
@@ -333,8 +335,9 @@ export default function App() {
               setNotifications(updated);
               await saveStoredNotifications(updated);
 
-              // Spotlight What's New by opening Notification Center drawer on first launch after upgrade
-              setIsNotificationCenterOpen(true);
+              // Spotlight What's New by opening Notification Center drawer on first launch after upgrade,
+              // unless the welcome screen is about to show the same notes
+              if (mode !== 'returning') setIsNotificationCenterOpen(true);
             }
             await trackerDB.setSetting('checkpoint_last_known_version', v);
           } catch (e) {}
@@ -359,6 +362,9 @@ export default function App() {
         savedAutoBackupRetention,
         savedTelemetry,
         savedTab,
+        savedProfileTab,
+        savedStartAdvertiser,
+        savedStartBooster,
       ] = await Promise.all([
         trackerDB.getSetting('checkpoint_currency', null),
         trackerDB.getSetting('checkpoint_gold_rate_toman', null),
@@ -372,8 +378,11 @@ export default function App() {
         trackerDB.getSetting('checkpoint_auto_backup_retention', null),
         trackerDB.getSetting('checkpoint_telemetry_enabled', null),
         trackerDB.getSetting('checkpoint_tab', null),
+        trackerDB.getSetting(`checkpoint_tab_${getActiveProfileId()}`, null),
+        trackerDB.getSetting('checkpoint_start_tab_advertiser', null),
+        trackerDB.getSetting('checkpoint_start_tab_booster', null),
       ]);
-      if (savedCur && ['TOMAN', 'GOLD', 'USD', 'EUR'].includes(savedCur)) {
+      if (savedCur && DISPLAY_CURRENCIES.includes(savedCur)) {
         setGlobalCurrency(savedCur);
       }
       if (savedRate !== null) {
@@ -414,9 +423,15 @@ export default function App() {
         const val = parseBooleanSetting(savedTelemetry, true);
         setTelemetryEnabledState(val);
       }
-      if (LEDGER_TABS.includes(savedTab)) {
-        setActiveTab(savedTab);
-      }
+      const starts = {
+        advertiser: START_TAB_CHOICES.includes(savedStartAdvertiser) ? savedStartAdvertiser : 'last',
+        booster: START_TAB_CHOICES.includes(savedStartBooster) ? savedStartBooster : 'last',
+      };
+      setStartTabs(starts);
+      // the old app-wide last tab is the fallback until this profile has its own
+      const lastTab = LEDGER_TABS.includes(savedProfileTab) ? savedProfileTab : savedTab;
+      const opening = openingTab(starts[getActiveProfileId()], lastTab);
+      if (opening) setActiveTab(opening);
       trackerDB.getProfileCounts?.().then((counts) => {
         if (counts) setProfileCounts(counts);
       }).catch(() => {});
@@ -444,9 +459,14 @@ export default function App() {
       setLedgerVersion((v) => v + 1);
       refreshCategories().catch(() => {});
 
+      // each profile opens on its own screen: its chosen start tab, or the one it was left on
+      const lastTab = await trackerDB.getSetting(`checkpoint_tab_${newProfileId}`, null);
+      if (profileSwitchSeqRef.current !== seq) return;
+      setActiveTab(openingTab(startTabsRef.current[newProfileId], lastTab) || 'cockpit');
+
       // Restore profile-specific preferred currency if configured
       const savedProfileCurrency = await trackerDB.getSetting(`checkpoint_currency_${newProfileId}`, null);
-      if (savedProfileCurrency && ['TOMAN', 'GOLD', 'USD', 'EUR'].includes(savedProfileCurrency)) {
+      if (savedProfileCurrency && DISPLAY_CURRENCIES.includes(savedProfileCurrency)) {
         setGlobalCurrency(savedProfileCurrency);
       }
 
@@ -495,7 +515,9 @@ export default function App() {
       // 1. Fetch remote announcements (async, non-blocking)
       try {
         const activeAnnouncements = await fetchAnnouncements(4000);
-        currentMerged = mergeNotificationsIntoHistory(currentMerged, {
+        // read the list again after the wait: something else (the one-time reset on an upgrade, a dismissal) may
+        // have saved a newer one meanwhile, and merging into the old copy would bring back what it removed
+        currentMerged = mergeNotificationsIntoHistory(await getStoredNotifications(), {
           updateInfo: updateInfoRef.current,
           announcements: activeAnnouncements,
           currentVersion: appVersion,
@@ -510,7 +532,7 @@ export default function App() {
         const res = await checkForUpdate({ timeoutMs: 12000 });
         if (res && res.available) {
           setUpdateInfo(res);
-          currentMerged = mergeNotificationsIntoHistory(currentMerged, {
+          currentMerged = mergeNotificationsIntoHistory(await getStoredNotifications(), {
             updateInfo: res,
             currentVersion: appVersion || res.currentVersion,
           });
@@ -832,12 +854,19 @@ export default function App() {
   // Tab Switcher
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-    trackerDB.setSetting('checkpoint_tab', tab);
+    trackerDB.setSetting('checkpoint_tab', tab).catch(() => {});
+    if (activeProfileId) trackerDB.setSetting(`checkpoint_tab_${activeProfileId}`, tab).catch(() => {});
   };
+
+  const handleStartTabChange = useCallback((profileId, tab) => {
+    const next = START_TAB_CHOICES.includes(tab) ? tab : 'last';
+    setStartTabs((m) => ({ ...m, [profileId]: next }));
+    trackerDB.setSetting(`checkpoint_start_tab_${profileId}`, next).catch(() => {});
+  }, []);
 
   // Currency Handlers
   const handleCurrencyChange = (newCurr) => {
-    const cur = newCurr === 'WOW_GOLD' ? 'GOLD' : (['TOMAN', 'GOLD', 'USD', 'EUR'].includes(newCurr) ? newCurr : 'TOMAN');
+    const cur = DISPLAY_CURRENCIES.includes(newCurr) ? newCurr : 'TOMAN';
     setGlobalCurrency(cur);
     if (activeProfileId) {
       trackerDB.setSetting(`checkpoint_currency_${activeProfileId}`, cur).catch(() => {});
@@ -1112,8 +1141,7 @@ export default function App() {
   }, []);
 
   const handleContextToggleCurrency = useCallback(() => {
-    const order = ['TOMAN', 'USD', 'EUR', 'GOLD'];
-    handleCurrencyChange(order[(order.indexOf(globalCurrency) + 1) % order.length]);
+    handleCurrencyChange(DISPLAY_CURRENCIES[(DISPLAY_CURRENCIES.indexOf(globalCurrency) + 1) % DISPLAY_CURRENCIES.length]);
   }, [globalCurrency, handleCurrencyChange]);
 
   const handleContextExport = useCallback(() => {
@@ -1278,10 +1306,9 @@ export default function App() {
           setIsCalculatorOpen((prev) => !prev);
         }
       } else if ((e.code === 'KeyT' || e.key === 't' || e.key === 'T') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // T: cycle the main currency every amount is shown in (Toman, USD, EUR, Gold), for both profiles
+        // T: cycle the main currency every amount is shown in (Toman, USD, EUR), for both profiles
         e.preventDefault();
-        const order = ['TOMAN', 'USD', 'EUR', 'GOLD'];
-        const next = order[(order.indexOf(state.globalCurrency) + 1) % order.length];
+        const next = DISPLAY_CURRENCIES[(DISPLAY_CURRENCIES.indexOf(state.globalCurrency) + 1) % DISPLAY_CURRENCIES.length];
         state.handleCurrencyChange?.(next);
       } else if (e.code === 'KeyN' || e.key === 'n' || e.key === 'N') {
         e.preventDefault();
@@ -1310,7 +1337,6 @@ export default function App() {
         globalCurrency={globalCurrency}
         onCurrencyChange={handleCurrencyChange}
         goldRateTOMAN={goldRateTOMAN}
-        onGoldRateTOMANChange={handleGoldRateTOMANChange}
         usdRateTOMAN={usdRateTOMAN}
         eurRateUSD={eurRateUSD}
         onSaveRates={handleSaveRates}
@@ -1337,7 +1363,7 @@ export default function App() {
       {/* 3. Main Centered Mini-App Workspace */}
       <main className="flex-1 min-h-0 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative bg-zinc-50 dark:bg-zinc-950 gpu-scroll">
         {/* Centered Tablet-Width Mini-App Frame */}
-        <div className="max-w-4xl mx-auto w-full">
+        <div className="max-w-[1080px] mx-auto w-full">
           {isLoading ? (
             <div className="space-y-2 py-4">
               {[1, 2, 3, 4].map((i) => (
@@ -1361,7 +1387,7 @@ export default function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.1, ease: [0.23, 1, 0.32, 1] }}
+                  transition={SCREEN}
                 >
                   <ErrorBoundary>
                     <Suspense fallback={null}>
@@ -1440,8 +1466,8 @@ export default function App() {
         theme={currentTheme}
         onThemeChange={handleThemeChange}
         handleThemeChange={handleThemeChange}
-        ledgerDateFormat={ledgerDateFormat}
-        onLedgerDateFormatChange={handleLedgerDateFormatChange}
+        startTabs={startTabs}
+        onStartTabChange={handleStartTabChange}
       />
 
       {/* Context Menu (Apple-grade floating spring menu) */}
@@ -1549,18 +1575,20 @@ export default function App() {
         </DialogFooter>
       </Dialog>
 
-      {/* Apple-style First Launch Role Onboarding Dialog */}
-      <ProfileOnboardingModal
-        isOpen={isProfileOnboardingOpen}
-        onSelectRole={(chosenRole) => {
+      {/* Welcome: first run (role, language, currency) or, once per release that brings it, what is new */}
+      <WelcomeFlow
+        open={Boolean(welcome)}
+        mode={welcome || 'new'}
+        currentProfile={activeProfileId || 'booster'}
+        currency={globalCurrency}
+        onCurrencyChange={handleCurrencyChange}
+        onOpenNotes={() => setIsNotificationCenterOpen(true)}
+        onDone={({ role }) => {
+          const wasNew = welcome === 'new';
+          setWelcome(null);
           setProfileOnboardingCompleted(true);
-          setIsProfileOnboardingOpen(false);
-          handleProfileChange(chosenRole);
-        }}
-        onComplete={(chosenRole) => {
-          setProfileOnboardingCompleted(true);
-          setIsProfileOnboardingOpen(false);
-          handleProfileChange(chosenRole);
+          trackerDB.setSetting(WELCOME_SEEN_KEY, WELCOME_RELEASE).catch(() => {});
+          if (wasNew) handleProfileChange(role);
         }}
       />
 

@@ -1,9 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, Megaphone, Check, Keyboard } from 'lucide-react';
-import { PROFILES, setActiveProfileId } from '../../lib/profiles';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { POPOVER } from '../../lib/motion';
 import { FrostedGlass } from './FrostedGlass';
 
 export function ProfilePopover({
@@ -61,7 +61,7 @@ export function ProfilePopover({
           initial={{ opacity: 0, y: -6, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.96 }}
-          transition={{ type: 'spring', duration: 0.25, bounce: 0 }}
+          transition={POPOVER}
           data-no-drag
           dir={isRtl ? 'rtl' : 'ltr'}
           onMouseDown={(e) => e.stopPropagation()}

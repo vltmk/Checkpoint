@@ -11,11 +11,11 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  RotateCcw,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { FrostedGlass } from './FrostedGlass';
-import { useLanguage, formatShamsiDateTime, toPersianDigits, normalizeDigits } from '../../lib/i18n';
+import { useLanguage, formatShamsiDateTime, toPersianDigits, normalizeDigits, resolveHour12 } from '../../lib/i18n';
+import { POPOVER } from '../../lib/motion';
 import {
   SHAMSI_MONTHS,
   GREGORIAN_MONTHS,
@@ -40,7 +40,7 @@ export function toLocalISOString(date = new Date()) {
 }
 
 // Helper to format for human readable display on triggers and labels
-export function formatReadableDateTime(isoString, language = 'fa') {
+export function formatReadableDateTime(isoString, language = 'fa', hour12 = language !== 'fa') {
   if (!isoString) return language === 'fa' ? 'انتخاب تاریخ و ساعت' : 'Select date & time';
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return isoString;
@@ -52,6 +52,7 @@ export function formatReadableDateTime(isoString, language = 'fa') {
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      hour12,
     });
   }
 
@@ -61,7 +62,7 @@ export function formatReadableDateTime(isoString, language = 'fa') {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true,
+    hour12,
   });
 }
 
@@ -73,7 +74,7 @@ export function DateTimePicker({
   dropUp = false,
   autoScrollOnOpen = true,
 }) {
-  const { language, t, isRtl } = useLanguage();
+  const { language, t, isRtl, timeFormat } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isPulsingNow, setIsPulsingNow] = useState(false);
   const containerRef = useRef(null);
@@ -449,7 +450,7 @@ export function DateTimePicker({
           }
         }}
         className={cn(
-          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-visible:outline-none focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500 transition-all duration-150 cursor-pointer select-none',
+          'w-full h-9 flex items-center justify-between gap-2 rounded-lg bg-zinc-900/60 border border-zinc-800 px-3 text-xs text-zinc-100 placeholder:text-zinc-500 hover:border-zinc-700 focus-visible:outline-none focus-visible:border-zinc-500 focus-visible:ring-1 focus-visible:ring-zinc-500 transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 cursor-pointer select-none',
           isOpen && 'border-zinc-500 ring-1 ring-zinc-500',
           disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
           className
@@ -458,7 +459,7 @@ export function DateTimePicker({
         <div className="flex items-center gap-2 min-w-0 truncate">
           <CalendarIcon className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
           <span className={cn('truncate text-xs', !value && 'text-zinc-500', isRtl && 'font-farsi')}>
-            {formatReadableDateTime(value, language)}
+            {formatReadableDateTime(value, language, resolveHour12(timeFormat, language))}
           </span>
           {relativeLabel && (
             <span className="hidden sm:inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-400 border border-zinc-700/50">
@@ -474,7 +475,7 @@ export function DateTimePicker({
             onClick={handleSetNow}
             title={t('common.now')}
             className={cn(
-              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all active:scale-95 border',
+              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 border',
               isRtl && 'font-farsi',
               isPulsingNow
                 ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500 ring-2 ring-emerald-500/50 scale-105'
@@ -510,7 +511,7 @@ export function DateTimePicker({
             initial={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: dropUp ? 4 : -4, scale: 0.98 }}
-            transition={{ duration: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            transition={POPOVER}
             dir={isRtl ? 'rtl' : 'ltr'}
             style={{ position: 'fixed', left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
             className={cn('z-[70] rounded-xl p-3 space-y-3 overflow-y-auto overscroll-contain', pos.up ? 'origin-bottom' : 'origin-top')}
@@ -565,7 +566,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetNow}
                 className={cn(
-                  'inline-flex items-center justify-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-all active:scale-95 border',
+                  'inline-flex items-center justify-center gap-1 px-1.5 py-1 rounded-md text-[11px] font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 border',
                   isRtl && 'font-farsi',
                   isPulsingNow
                     ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500'
@@ -579,7 +580,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetToday}
                 className={cn(
-                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
+                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 text-center',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -589,7 +590,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetYesterday}
                 className={cn(
-                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-all active:scale-95 text-center',
+                  'px-1.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[11px] font-medium border border-zinc-800 transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 text-center',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -599,7 +600,7 @@ export function DateTimePicker({
                 type="button"
                 onClick={handleSetOneHourAgo}
                 className={cn(
-                  'px-1 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[10px] font-medium border border-zinc-800 transition-all active:scale-95 text-center truncate',
+                  'px-1 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-[10px] font-medium border border-zinc-800 transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 text-center truncate',
                   isRtl && 'font-farsi'
                 )}
               >
@@ -722,7 +723,7 @@ export function DateTimePicker({
                               type="button"
                               onClick={() => handleShamsiDayClick(cell)}
                               className={cn(
-                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative',
+                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] cursor-pointer relative',
                                 !cell.isCurrentMonth && 'text-zinc-600 hover:text-zinc-400',
                                 cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100',
                                 cell.isWeekend && cell.isCurrentMonth && !isSelected && 'text-rose-300/90',
@@ -749,7 +750,7 @@ export function DateTimePicker({
                               type="button"
                               onClick={() => handleGregorianDayClick(cell)}
                               className={cn(
-                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-all cursor-pointer relative',
+                                'h-7 w-full flex items-center justify-center rounded-md text-[11px] font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] cursor-pointer relative',
                                 !cell.isCurrentMonth && 'text-zinc-600 hover:text-zinc-400',
                                 cell.isCurrentMonth && !isSelected && 'text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100',
                                 cell.isWeekend && cell.isCurrentMonth && !isSelected && 'text-rose-300/90',
@@ -785,7 +786,7 @@ export function DateTimePicker({
                         type="button"
                         onClick={() => handleSelectMonth(idx)}
                         className={cn(
-                          'py-2 px-1 rounded-md text-xs font-medium transition-all text-center cursor-pointer border',
+                          'py-2 px-1 rounded-md text-xs font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] text-center cursor-pointer border',
                           isCurrent
                             ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-200'
                             : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800'
@@ -815,7 +816,7 @@ export function DateTimePicker({
                         type="button"
                         onClick={() => handleSelectYear(yr)}
                         className={cn(
-                          'py-2 px-1 rounded-md text-xs font-medium transition-all text-center cursor-pointer border',
+                          'py-2 px-1 rounded-md text-xs font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] text-center cursor-pointer border',
                           isCurrent
                             ? 'bg-zinc-200 text-zinc-900 font-medium border-zinc-200'
                             : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border-zinc-800'
@@ -944,7 +945,7 @@ export function DateTimePicker({
             <div ref={popoverBottomRef} className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
               <div className="text-[11px] text-zinc-400 font-medium truncate max-w-[180px]">
                 <span className={cn(calendarType === 'shamsi' && 'font-farsi')}>
-                  {formatReadableDateTime(value, calendarType === 'shamsi' ? 'fa' : 'en')}
+                  {formatReadableDateTime(value, calendarType === 'shamsi' ? 'fa' : 'en', resolveHour12(timeFormat, calendarType === 'shamsi' ? 'fa' : 'en'))}
                 </span>
               </div>
 
@@ -955,7 +956,7 @@ export function DateTimePicker({
                   setViewMode('days');
                 }}
                 className={cn(
-                  'inline-flex items-center gap-1 px-3 py-1 rounded-md bg-zinc-200 text-zinc-900 text-[11px] font-medium hover:bg-zinc-100 transition-all active:scale-95 cursor-pointer shadow-sm',
+                  'inline-flex items-center gap-1 px-3 py-1 rounded-md bg-zinc-200 text-zinc-900 text-[11px] font-medium hover:bg-zinc-100 transition-[color,background-color,border-color,box-shadow,opacity,transform] active:scale-95 cursor-pointer shadow-sm',
                   isRtl && 'font-farsi'
                 )}
               >

@@ -185,6 +185,9 @@ export const TRANSLATIONS = {
     'ledger.dismiss': 'Dismiss',
 
     // Analytics View
+    'categories.goldUnit': 'Gold is priced',
+    'categories.goldPer1': 'Per 1 gold',
+    'categories.goldPer1k': 'Per 1,000 gold',
     'categories.supportsGold': 'Enable in-game Gold & conversion rate',
     'categories.supportsGoldDesc': 'Allow recording in Gold with live conversion rates for this category',
 
@@ -208,6 +211,42 @@ export const TRANSLATIONS = {
     'settings.currencyDesc': 'Primary currency for dashboard metrics and charts',
     'settings.ledgerDateFormat': 'Ledger Date Format',
     'settings.ledgerDateFormatDesc': 'Visual format for daily grouping headers in the ledger',
+    'settings.timeFormat': 'Time format',
+    'settings.timeFormatDesc': 'How times of day are shown on jobs, orders, receipts and the date picker.',
+    'settings.timeFormat.auto': 'Automatic',
+    'settings.timeFormat.12': '12-hour',
+    'settings.timeFormat.24': '24-hour',
+    'settings.startTab': 'Open on start',
+    'settings.startTabDesc': 'The screen Checkpoint opens on, for each profile.',
+    'settings.startTab.last': 'Where I left off',
+    'settings.startTab.advertiser': 'Advertiser',
+    'settings.startTab.booster': 'Booster',
+    'welcome.title': 'Welcome to Checkpoint',
+    'welcome.body': 'A ledger for your boosting and reselling work. Everything stays on this computer.',
+    'welcome.point1': 'Log a job or an order in seconds',
+    'welcome.point2': 'See who owes you, and who you owe',
+    'welcome.point3': 'Share receipts and reports',
+    'welcome.backTitle': 'Welcome back',
+    'welcome.backBody': 'Checkpoint {version} is here. Here is what changed, in one minute.',
+    'welcome.roleTitle': 'How do you work?',
+    'welcome.roleBody': 'Pick one to start. You can use both and switch anytime from the top bar.',
+    'welcome.booster': 'Booster',
+    'welcome.boosterBody': 'You do the work. Track your jobs, who pays you, and what you earned.',
+    'welcome.advertiser': 'Advertiser',
+    'welcome.advertiserBody': 'You sell the work. Track orders, pay your boosters, and see your margin.',
+    'welcome.setupTitle': 'Two quick choices',
+    'welcome.setupBody': 'Both can be changed later in Settings.',
+    'welcome.language': 'Language',
+    'welcome.currency': 'Show amounts in',
+    'welcome.toman': 'Toman',
+    'welcome.newsTitle': "What's new",
+    'welcome.allNotes': 'All patch notes are in the notification center',
+    'welcome.progress': 'Step {n} of {total}',
+    'welcome.back': 'Back',
+    'welcome.skip': 'Skip',
+    'welcome.next': 'Next',
+    'welcome.start': 'Start',
+    'welcome.continue': 'Continue',
     'settings.dateFormat.relative': 'Relative (Today, Yesterday)',
     'settings.dateFormat.yyyyMmDd': 'YYYY-MM-DD',
     'settings.dateFormat.ddMmYyyy': 'DD/MM/YYYY',
@@ -284,6 +323,9 @@ export const TRANSLATIONS = {
     // Common Buttons & Tooltips
     'common.save': 'Save',
     'common.cancel': 'Cancel',
+    'common.apply': 'Apply',
+    'common.reset': 'Reset',
+    'common.remove': 'Remove',
     'common.confirm': 'Confirm',
     'common.delete': 'Delete',
     'common.edit': 'Edit',
@@ -369,6 +411,9 @@ export const TRANSLATIONS = {
     'ledger.dismiss': 'انصراف',
 
     // Analytics View
+    'categories.goldUnit': 'قیمت گلد',
+    'categories.goldPer1': 'هر ۱ گلد',
+    'categories.goldPer1k': 'هر ۱٬۰۰۰ گلد',
     'categories.supportsGold': 'پشتیبانی از گلد و نرخ تبدیل',
     'categories.supportsGoldDesc': 'امکان ثبت با واحد گلد و نرخ تبدیل زنده برای این بازی',
 
@@ -424,6 +469,42 @@ export const TRANSLATIONS = {
     // Receipt Modal
     'settings.ledgerDateFormat': 'فرمت تاریخ سرستون‌های دفتر کار',
     'settings.ledgerDateFormatDesc': 'نحوه نمایش تاریخ گروه‌بندی روزانه در دفتر کار',
+    'settings.timeFormat': 'قالب ساعت',
+    'settings.timeFormatDesc': 'نحوه نمایش ساعت در کارها، سفارش‌ها، رسیدها و انتخابگر تاریخ.',
+    'settings.timeFormat.auto': 'خودکار',
+    'settings.timeFormat.12': '۱۲ ساعته',
+    'settings.timeFormat.24': '۲۴ ساعته',
+    'settings.startTab': 'صفحه شروع',
+    'settings.startTabDesc': 'صفحه‌ای که چک‌پوینت با آن باز می‌شود، برای هر پروفایل.',
+    'settings.startTab.last': 'همان جایی که بودم',
+    'settings.startTab.advertiser': 'تبلیغ‌کننده',
+    'settings.startTab.booster': 'بوستر',
+    'welcome.title': 'به چک‌پوینت خوش آمدید',
+    'welcome.body': 'دفتر حساب کارهای بوست و فروش شما. همه‌چیز روی همین کامپیوتر می‌ماند.',
+    'welcome.point1': 'ثبت کار یا سفارش در چند ثانیه',
+    'welcome.point2': 'ببینید چه کسی به شما بدهکار است و شما به چه کسی',
+    'welcome.point3': 'اشتراک‌گذاری رسید و گزارش',
+    'welcome.backTitle': 'خوش برگشتید',
+    'welcome.backBody': 'چک‌پوینت {version} آمد. تغییرات را در یک دقیقه ببینید.',
+    'welcome.roleTitle': 'چطور کار می‌کنید؟',
+    'welcome.roleBody': 'یکی را برای شروع انتخاب کنید. می‌توانید از هر دو استفاده کنید و از نوار بالا جابه‌جا شوید.',
+    'welcome.booster': 'بوستر',
+    'welcome.boosterBody': 'شما کار را انجام می‌دهید. کارها، پرداخت‌کننده‌ها و درآمدتان را ثبت کنید.',
+    'welcome.advertiser': 'ادورتایزر',
+    'welcome.advertiserBody': 'شما کار را می‌فروشید. سفارش‌ها، پرداخت به بوسترها و سودتان را ببینید.',
+    'welcome.setupTitle': 'دو انتخاب سریع',
+    'welcome.setupBody': 'هر دو را بعداً در تنظیمات می‌توانید تغییر دهید.',
+    'welcome.language': 'زبان',
+    'welcome.currency': 'نمایش مبالغ به',
+    'welcome.toman': 'تومان',
+    'welcome.newsTitle': 'چه چیزی تازه است',
+    'welcome.allNotes': 'همه یادداشت‌های نسخه در مرکز اعلان‌ها هست',
+    'welcome.progress': 'مرحله {n} از {total}',
+    'welcome.back': 'قبلی',
+    'welcome.skip': 'رد کردن',
+    'welcome.next': 'بعدی',
+    'welcome.start': 'شروع',
+    'welcome.continue': 'ادامه',
     'settings.dateFormat.relative': 'نسبی (امروز، دیروز)',
     'settings.dateFormat.yyyyMmDd': 'سال-ماه-روز (YYYY-MM-DD)',
     'settings.dateFormat.ddMmYyyy': 'روز/ماه/سال (DD/MM/YYYY)',
@@ -468,6 +549,9 @@ export const TRANSLATIONS = {
     // Common Buttons & Tooltips
     'common.save': 'ذخیره',
     'common.cancel': 'انصراف',
+    'common.apply': 'اعمال',
+    'common.reset': 'بازنشانی',
+    'common.remove': 'حذف',
     'common.confirm': 'تایید',
     'common.delete': 'حذف',
     'common.edit': 'ویرایش',
@@ -540,6 +624,32 @@ Object.assign(TRANSLATIONS.fa, LEDGER_STRINGS.fa);
 /**
  * Language Context & Provider
  */
+export const TIME_FORMATS = ['auto', '12', '24'];
+const DATE_FORMAT_IDS = ['relative', 'yyyy-mm-dd', 'dd-mm-yyyy', 'mm-dd-yyyy', 'month-d-yyyy'];
+
+/** 12-hour clock or not: "auto" follows the language (12-hour in English, 24-hour in Farsi). */
+export function resolveHour12(timeFormat, language) {
+  if (timeFormat === '12') return true;
+  if (timeFormat === '24') return false;
+  return language !== 'fa';
+}
+
+/** A time of day ("10:45 AM", "22:45", "۲۲:۴۵") in the given language and clock. */
+export function formatClock(dateInput, language, hour12) {
+  const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
+  if (!dateInput || Number.isNaN(d?.getTime())) return '';
+  return new Intl.DateTimeFormat(language === 'fa' ? 'fa-IR' : 'en-US', { hour: hour12 ? 'numeric' : '2-digit', minute: '2-digit', hour12 }).format(d);
+}
+
+const readLocal = (key, allowed, fallback) => {
+  try {
+    const v = localStorage.getItem(key);
+    return allowed.includes(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const LanguageContext = createContext({
   language: 'fa',
   setLanguage: () => {},
@@ -583,6 +693,30 @@ export function LanguageProvider({ children }) {
       trackerDB.setSetting('checkpoint_language', validLang).catch(() => {});
     } catch (e) {}
   }, []);
+
+  // How dates and times are shown everywhere. Kept next to the language: they are display preferences too,
+  // and every formatter below already reads from this provider.
+  const [dateFormat, setDateFormatState] = useState(() => readLocal('checkpoint_ledger_date_format', DATE_FORMAT_IDS, 'relative'));
+  const [timeFormat, setTimeFormatState] = useState(() => readLocal('checkpoint_time_format', TIME_FORMATS, 'auto'));
+  useEffect(() => {
+    trackerDB.getSetting('checkpoint_ledger_date_format', null).then((v) => { if (DATE_FORMAT_IDS.includes(v)) setDateFormatState(v); }).catch(() => {});
+    trackerDB.getSetting('checkpoint_time_format', null).then((v) => { if (TIME_FORMATS.includes(v)) setTimeFormatState(v); }).catch(() => {});
+  }, []);
+  const persist = (key, value) => {
+    try { localStorage.setItem(key, value); } catch { /* the database copy is the one that counts */ }
+    trackerDB.setSetting(key, value).catch(() => {});
+  };
+  const setDateFormat = useCallback((v) => {
+    const next = DATE_FORMAT_IDS.includes(v) ? v : 'relative';
+    setDateFormatState(next);
+    persist('checkpoint_ledger_date_format', next);
+  }, []);
+  const setTimeFormat = useCallback((v) => {
+    const next = TIME_FORMATS.includes(v) ? v : 'auto';
+    setTimeFormatState(next);
+    persist('checkpoint_time_format', next);
+  }, []);
+  const hour12 = resolveHour12(timeFormat, language);
 
   const isRtl = language === 'fa';
 
@@ -632,14 +766,16 @@ export function LanguageProvider({ children }) {
   const formatDateTime = useCallback(
     (dateInput, options = {}) => {
       if (!dateInput) return '';
+      // any time part follows the chosen clock
+      const opts = options.hour || options.timeStyle ? { hour12, ...options } : options;
       if (language === 'fa') {
-        return formatShamsiDateTime(dateInput, options);
+        return formatShamsiDateTime(dateInput, { hour12, ...opts });
       }
       const d = typeof dateInput === 'string' || typeof dateInput === 'number' ? new Date(dateInput) : dateInput;
       if (isNaN(d?.getTime())) return String(dateInput);
-      return d.toLocaleString('en-US', options);
+      return d.toLocaleString('en-US', opts);
     },
-    [language]
+    [language, hour12]
   );
 
   const value = useMemo(
@@ -651,13 +787,19 @@ export function LanguageProvider({ children }) {
       formatNumber,
       formatDate,
       formatDateTime,
-      formatLedgerGroupDate: (d, fmtId) => formatLedgerGroupDate(d, fmtId, language, t),
+      formatLedgerGroupDate: (d, fmtId = dateFormat) => formatLedgerGroupDate(d, fmtId, language, t),
+      formatTime: (d) => formatClock(d, language, hour12),
+      dateFormat,
+      setDateFormat,
+      timeFormat,
+      setTimeFormat,
+      hour12,
       getDatePatternPreview: (fmtId) => getDatePatternPreview(fmtId, language, t),
       ledgerDateFormatOptions: LEDGER_DATE_FORMAT_OPTIONS,
       toPersianDigits,
       normalizeDigits,
     }),
-    [language, setLanguage, t, isRtl, formatNumber, formatDate, formatDateTime]
+    [language, setLanguage, t, isRtl, formatNumber, formatDate, formatDateTime, dateFormat, setDateFormat, timeFormat, setTimeFormat, hour12]
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

@@ -9,7 +9,7 @@ import { cockpitSummary, marginReport, partyStatement } from '../src/lib/ledger/
 import { settleUp, markSharePaid, markOrderCollected } from '../src/lib/ledger/actions.js';
 import { mapLegacyEntries, partyIdFor, slug, UNASSIGNED_PARTY_ID } from '../src/lib/ledger/legacyMapper.js';
 import { buildOrdersCsv } from '../src/lib/ledger/backup.js';
-import { buildSampleLedger } from '../src/lib/ledger/sampleData.js';
+import { buildSampleLedger } from './fixtures/demoLedger.mjs';
 
 const RATES = { goldRateTOMAN: 3200, usdRateTOMAN: 100000, eurRateUSD: 1.08 };
 const NOW = Date.parse('2026-10-21T00:00:00Z');

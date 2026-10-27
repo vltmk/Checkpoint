@@ -95,10 +95,12 @@ export function useProofDraft({ open, ownerId = null, onAdded }) {
     commit,
     removeAdded: (key) => setAdded((a) => a.filter((x) => x.key !== key)),
     removeSaved: (id) => setRemoved((r) => [...r, id]),
+    // Clear on the form: drop screenshots pasted since it opened, and bring back any marked for removal
+    reset: () => { setAdded([]); setRemoved([]); setError(''); },
   };
 }
 
-/** The "Screenshots" row inside a form's "More details": thumbnails, a drop and paste target, and a file picker. */
+/** A form's screenshots: thumbnails, a drop and paste target, and a file picker. */
 export function ProofField({ draft }) {
   const f = useLedgerFormat();
   const [over, setOver] = useState(false);
@@ -111,11 +113,11 @@ export function ProofField({ draft }) {
       onDragOver={(e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); setOver(true); } }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); draft.addFiles([...(e.dataTransfer?.files || [])]); }}
-      className={cn('flex flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors', over ? 'border-zinc-500 bg-zinc-100 dark:border-zinc-400 dark:bg-zinc-900' : 'border-zinc-300 dark:border-zinc-700')}
+      className={cn('flex min-h-[4.5rem] flex-wrap items-center gap-2 rounded-lg border border-dashed p-2 transition-colors', over ? 'border-zinc-500 bg-zinc-100 dark:border-zinc-400 dark:bg-zinc-900' : 'border-zinc-300 dark:border-zinc-700')}
     >
       {thumbs.map((p) => (
         <span key={p.key} className="relative">
-          <img src={p.data} alt={p.name} className="h-12 w-12 rounded-md object-cover border border-zinc-200 dark:border-zinc-800" />
+          <img src={p.data} alt={p.name} className="h-14 w-14 rounded-md object-cover border border-zinc-200 dark:border-zinc-800" />
           <button
             type="button"
             aria-label={f.t('lg.removeProof', 'Remove screenshot')}
@@ -126,7 +128,7 @@ export function ProofField({ draft }) {
           </button>
         </span>
       ))}
-      <label className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs text-zinc-500 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus-within:ring-2 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500">
+      <label className="inline-flex items-center gap-1.5 min-h-8 px-2.5 py-1.5 rounded-md text-xs text-zinc-500 dark:text-zinc-400 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 focus-within:ring-2 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500">
         <ImagePlus className="w-3.5 h-3.5" />
         {f.t('lg.addProof', 'Paste or add a screenshot')}
         <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { draft.addFiles([...e.target.files]); e.target.value = ''; }} />

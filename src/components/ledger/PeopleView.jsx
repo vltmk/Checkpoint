@@ -240,7 +240,7 @@ export function PeopleView({ onPay, onOpenOrder, onReceipt, onOpenProofs, onNewO
 
       <div className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>{f.t('lg.statement.history', 'History')}</SectionTitle>
+          <SectionTitle className="mb-0">{f.t('lg.statement.history', 'History')}</SectionTitle>
           <Segmented
             ariaLabel={f.t('lg.statement.period', 'Period')}
             value={period}
@@ -261,7 +261,7 @@ export function PeopleView({ onPay, onOpenOrder, onReceipt, onOpenProofs, onNewO
         {statement.events.length === 0 ? (
           <p className="text-xs text-zinc-400 py-3">{f.t('lg.statement.empty', 'No work or payments yet. Add this booster to an order to start their balance.')}</p>
         ) : (
-          <ul className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/40 dark:bg-zinc-900/20">
+          <ul className="mt-3 divide-y divide-zinc-200/60 dark:divide-zinc-800/60 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/40 dark:bg-zinc-900/20">
             {[...periodView.shown].reverse().map((e) => {
               const isShare = e.type === 'share';
               const at = isShare ? e.order.dateTime : e.payment.dateTime;

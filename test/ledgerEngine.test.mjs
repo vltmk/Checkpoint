@@ -46,6 +46,12 @@ test('shorthand amounts: k/m, separators, Persian digits and words', () => {
   assert.equal(parseAmountShorthand('۳ میلیون'), 3e6);
   assert.equal(parseAmountShorthand('۲۵۰ هزار'), 250000);
   assert.equal(parseAmountShorthand('12.5'), 12.5);
+  assert.equal(parseAmountShorthand('۱٬۲۰۰٬۰۰۰'), 1200000);
+  assert.equal(parseAmountShorthand('۱،۲۰۰،۰۰۰'), 1200000);
+  assert.equal(parseAmountShorthand('۱۲٫۵'), 12.5);
+  assert.equal(parseAmountShorthand('۱۲۰۰۰۰۰ تومان'), 1200000);
+  assert.equal(parseAmountShorthand('$40'), 40);
+  assert.equal(parseAmountShorthand('۱۵٪'), 15);
   assert.equal(parseAmountShorthand('abc'), null);
   assert.equal(parseAmountShorthand(''), null);
   assert.equal(parseAmountShorthand('-5'), null);

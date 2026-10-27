@@ -260,10 +260,3 @@ export async function markAnnouncementDismissed(id) {
   }
   await saveAnnouncementState(state);
 }
-
-/**
- * Reset local announcement state (useful for settings / testing)
- */
-export async function resetAnnouncementState() {
-  await saveAnnouncementState({ ...DEFAULT_STATE });
-}

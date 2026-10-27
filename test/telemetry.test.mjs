@@ -44,3 +44,21 @@ test('telemetry copy does not claim crash statistics are collected', () => {
   assert.ok(en, 'English telemetry description exists');
   assert.ok(!/crash/i.test(en[1]), 'no crash claim in English copy');
 });
+
+// Anonymous metrics are on by default on a fresh install and after an update: only an explicit "off" turns them off.
+test('anonymous metrics default to on when nothing was ever saved', () => {
+  const appCode = fs.readFileSync(path.join(rootDir, 'src', 'App.jsx'), 'utf8');
+  assert.match(appCode, /setTelemetryEnabledState\]\s*=\s*useState\(\(\)\s*=>\s*\{\s*return parseBooleanSetting\(null, true\);/);
+  assert.match(appCode, /parseBooleanSetting\(savedTelemetry, true\)/);
+  assert.match(telemetryCode, /getSetting\(STORAGE_KEYS\.ENABLED, true\)/);
+});
+
+test('no migration or update path writes telemetry off on its own', () => {
+  const sources = ['App.jsx', 'lib/db.js', 'lib/settingsMigration.js', 'lib/updater.js']
+    .map((f) => path.join(rootDir, 'src', f))
+    .filter((f) => fs.existsSync(f))
+    .map((f) => fs.readFileSync(f, 'utf8'));
+  for (const src of sources) {
+    assert.doesNotMatch(src, /setSetting\(\s*['"]checkpoint_telemetry_enabled['"]\s*,\s*false/);
+  }
+});

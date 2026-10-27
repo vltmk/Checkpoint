@@ -79,7 +79,7 @@ export function NumberStepperInput({
   return (
     <div
       className={cn(
-        'relative flex items-center w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 overflow-hidden',
+        'relative flex items-center w-full h-9 rounded-lg bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 focus-within:border-zinc-400 dark:focus-within:border-zinc-500 focus-within:ring-1 focus-within:ring-zinc-400 dark:focus-within:ring-zinc-500 overflow-hidden',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}

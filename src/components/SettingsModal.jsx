@@ -33,19 +33,18 @@ import {
   Gamepad2,
   Plus,
   Edit2,
-  Zap,
   Sliders,
   Palette,
   Info,
   Database,
-  Megaphone,
 } from 'lucide-react';
 import { isTauri, selectDirectoryNative, openExternalUrl, copyTextNative, openPathNative } from '../lib/desktop';
 import { DiscordIcon, GithubIcon, TomanIcon } from './ui/Icons';
 import { trackerDB } from '../lib/db';
 import { useTheme } from 'next-themes';
 import { Input } from './ui/Input';
-import { useLanguage } from '../lib/i18n';
+import { useLanguage, formatClock, resolveHour12 } from '../lib/i18n';
+import { SCREEN, SPRING_PILL } from '../lib/motion';
 import { cn } from '../lib/utils';
 import { CategoryModal } from './ui/CategoryModal';
 import { deleteCategory } from '../lib/categories';
@@ -90,10 +89,10 @@ export function SettingsModal({
   onThemeChange,
   handleThemeChange,
   initialScrollSection = null,
-  ledgerDateFormat = 'relative',
-  onLedgerDateFormatChange,
+  startTabs = { advertiser: 'last', booster: 'last' },
+  onStartTabChange,
 }) {
-  const { language, setLanguage, t, isRtl, formatNumber, getDatePatternPreview, ledgerDateFormatOptions } = useLanguage();
+  const { language, setLanguage, t, isRtl, formatNumber, getDatePatternPreview, ledgerDateFormatOptions, dateFormat: ledgerDateFormat, setDateFormat: onLedgerDateFormatChange, timeFormat, setTimeFormat } = useLanguage();
   const fileInputRef = useRef(null);
 
   // Vertically Tabbed Category State: 'general' | 'appearance' | 'system' | 'backups' | 'about'
@@ -247,11 +246,6 @@ export function SettingsModal({
       icon: <TomanIcon className="w-[24px] h-[24px] min-w-[24px] min-h-[24px]" />,
     },
     {
-      value: 'GOLD',
-      label: 'Gold',
-      icon: <Zap className="w-3.5 h-3.5" />,
-    },
-    {
       value: 'USD',
       label: 'USD ($)',
       icon: <span className="font-semibold text-xs">$</span>,
@@ -280,6 +274,26 @@ export function SettingsModal({
       };
     });
   }, [ledgerDateFormatOptions, getDatePatternPreview, language]);
+
+  // 12 or 24 hours, previewed with the current time so the choice is obvious
+  const timeFormatOptions = useMemo(() => {
+    const now = new Date();
+    return [
+      { value: 'auto', label: `${t('settings.timeFormat.auto', 'Automatic')} (${formatClock(now, language, resolveHour12('auto', language))})` },
+      { value: '12', label: `${t('settings.timeFormat.12', '12-hour')} (${formatClock(now, language, true)})` },
+      { value: '24', label: `${t('settings.timeFormat.24', '24-hour')} (${formatClock(now, language, false)})` },
+    ];
+  }, [t, language]);
+
+  // The screens each profile can open on; the names follow each profile's own navigation
+  const startTabOptions = (profileId) => [
+    { value: 'last', label: t('settings.startTab.last', 'Where I left off') },
+    { value: 'cockpit', label: profileId === 'booster' ? t('nav.overview', 'Overview') : t('nav.cockpit', 'Overview') },
+    { value: 'orders', label: profileId === 'booster' ? t('nav.jobs', 'Jobs') : t('nav.orders', 'Orders') },
+    { value: 'people', label: profileId === 'booster' ? t('nav.clients', 'Clients') : t('nav.people', 'Boosters') },
+    { value: 'money', label: t('nav.money', 'Money') },
+    { value: 'analytics', label: t('nav.reports', 'Reports') },
+  ];
 
   // Maps the App's import result to the status line. Cancelling the file dialog leaves no message.
   const toRestoreResult = (res) => {
@@ -456,7 +470,7 @@ export function SettingsModal({
                 <motion.div
                   layoutId="settingsThemePill"
                   className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-full shadow-sm border border-zinc-300 dark:border-zinc-600"
-                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                  transition={SPRING_PILL}
                 />
               )}
               <Sun className={cn('w-3.5 h-3.5 relative z-10 transition-transform duration-200 stroke-[2.2]', currentTheme === 'light' ? 'scale-105 rotate-12' : 'scale-90 opacity-70')} />
@@ -475,7 +489,7 @@ export function SettingsModal({
                 <motion.div
                   layoutId="settingsThemePill"
                   className="absolute inset-0 bg-white dark:bg-zinc-700 rounded-full shadow-sm border border-zinc-300 dark:border-zinc-600"
-                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                  transition={SPRING_PILL}
                 />
               )}
               <Moon className={cn('w-3.5 h-3.5 relative z-10 transition-transform duration-200 stroke-[2.2]', currentTheme === 'dark' ? 'scale-105 -rotate-12' : 'scale-90 opacity-70')} />
@@ -515,7 +529,7 @@ export function SettingsModal({
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    'flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all text-start cursor-pointer shrink-0 sm:w-full',
+                    'flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] text-start cursor-pointer shrink-0 sm:w-full',
                     isActive
                       ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs font-semibold'
                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'
@@ -540,7 +554,7 @@ export function SettingsModal({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.12 }}
+                  transition={SCREEN}
                   className="space-y-4"
                 >
                   {/* Category Title */}
@@ -652,6 +666,43 @@ export function SettingsModal({
                       />
                     </div>
                   </div>
+
+                  {/* Time Format Preference */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80">
+                    <div className="space-y-0.5 min-w-0 pe-1">
+                      <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+                        {t('settings.timeFormat', 'Time format')}
+                      </label>
+                      <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
+                        {t('settings.timeFormatDesc', 'How times of day are shown on jobs, orders, receipts and the date picker.')}
+                      </p>
+                    </div>
+                    <div className="w-full sm:w-60 shrink-0">
+                      <Select value={timeFormat} onChange={setTimeFormat} options={timeFormatOptions} className="h-8 text-xs bg-white dark:bg-zinc-900" />
+                    </div>
+                  </div>
+
+                  {/* Start screen per profile */}
+                  <div className="p-2.5 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 space-y-2.5">
+                    <div className="space-y-0.5 min-w-0">
+                      <label className={cn('block text-xs font-medium text-zinc-800 dark:text-zinc-200', isRtl && 'font-farsi')}>
+                        {t('settings.startTab', 'Open on start')}
+                      </label>
+                      <p className={cn('text-[11px] text-zinc-500 leading-tight', isRtl && 'font-farsi')}>
+                        {t('settings.startTabDesc', 'The screen Checkpoint opens on, for each profile.')}
+                      </p>
+                    </div>
+                    {['advertiser', 'booster'].map((pid) => (
+                      <div key={pid} className="flex items-center justify-between gap-3">
+                        <span className={cn('text-xs text-zinc-600 dark:text-zinc-400', isRtl && 'font-farsi')}>
+                          {pid === 'booster' ? t('settings.startTab.booster', 'Booster') : t('settings.startTab.advertiser', 'Advertiser')}
+                        </span>
+                        <div className="w-full sm:w-60 shrink-0">
+                          <Select value={startTabs[pid] || 'last'} onChange={(v) => onStartTabChange?.(pid, v)} options={startTabOptions(pid)} className="h-8 text-xs bg-white dark:bg-zinc-900" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </motion.div>
               )}
 
@@ -661,7 +712,7 @@ export function SettingsModal({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.12 }}
+                  transition={SCREEN}
                   className="space-y-4"
                 >
                   {/* Category Title */}
@@ -773,7 +824,7 @@ export function SettingsModal({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.12 }}
+                  transition={SCREEN}
                   className="space-y-4"
                 >
                   {/* Category Title */}
@@ -856,7 +907,7 @@ export function SettingsModal({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.12 }}
+                  transition={SCREEN}
                   className="space-y-4"
                 >
                   {/* Category Title */}
@@ -874,7 +925,7 @@ export function SettingsModal({
                     <div
                       id="settings-backup-section"
                       className={cn(
-                        'space-y-3 p-3 rounded-xl border transition-all duration-300',
+                        'space-y-3 p-3 rounded-xl border transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-300',
                         highlightBackup
                           ? 'bg-zinc-100 dark:bg-zinc-900 border-zinc-400 dark:border-zinc-600 ring-2 ring-zinc-400/50'
                           : 'bg-zinc-100/80 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800/80'
@@ -922,7 +973,7 @@ export function SettingsModal({
                               }
                             }}
                             className={cn(
-                              'w-full px-2.5 py-1.5 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 border rounded-md text-xs font-medium transition-all flex items-center justify-between gap-2 text-left group cursor-pointer',
+                              'w-full px-2.5 py-1.5 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 border rounded-md text-xs font-medium transition-[color,background-color,border-color,box-shadow,opacity,transform] flex items-center justify-between gap-2 text-left group cursor-pointer',
                               manualBackupState === 'no_folder_error'
                                 ? 'border-rose-500/80 ring-1 ring-rose-500/60'
                                 : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
@@ -1156,7 +1207,7 @@ export function SettingsModal({
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.12 }}
+                  transition={SCREEN}
                   className="space-y-4"
                 >
                   {/* Category Title */}

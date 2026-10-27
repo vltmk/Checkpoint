@@ -21,7 +21,7 @@ export const Input = React.forwardRef(
             ref={ref}
             aria-invalid={isInvalid ? true : undefined}
             className={cn(
-              'w-full h-9 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border pl-8 rtl:pl-3 rtl:pr-8 pr-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-all duration-100',
+              'w-full h-9 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border pl-8 rtl:pl-3 rtl:pr-8 pr-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-[background-color,border-color,box-shadow] duration-100',
               borderClasses,
               className
             )}
@@ -38,7 +38,7 @@ export const Input = React.forwardRef(
         ref={ref}
         aria-invalid={isInvalid ? true : undefined}
         className={cn(
-          'w-full h-9 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-all duration-100',
+          'w-full h-9 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border px-3 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-[background-color,border-color,box-shadow] duration-100',
           borderClasses,
           className
         )}
@@ -50,8 +50,23 @@ export const Input = React.forwardRef(
 Input.displayName = 'Input';
 
 export const Textarea = React.forwardRef(
-  ({ className, rows = 3, dir, hasError, error, ...props }, ref) => {
+  ({ className, rows = 3, dir, hasError, error, autoGrow = false, maxRows = 10, ...props }, ref) => {
     const isInvalid = Boolean(hasError || error || (props['aria-invalid'] && props['aria-invalid'] !== 'false'));
+    const innerRef = React.useRef(null);
+    React.useImperativeHandle(ref, () => innerRef.current);
+
+    // autoGrow: the box follows its content from `rows` up to `maxRows` lines, then scrolls,
+    // so a long note is readable without dragging a resize handle
+    React.useLayoutEffect(() => {
+      const el = innerRef.current;
+      if (!autoGrow || !el) return;
+      const cs = getComputedStyle(el);
+      const line = parseFloat(cs.lineHeight) || 18;
+      const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const borderY = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+      el.style.height = 'auto'; // scrollHeight is content + padding, measured at its natural size
+      el.style.height = `${Math.min(el.scrollHeight, line * maxRows + padY) + borderY}px`;
+    }, [autoGrow, maxRows, props.value]);
 
     const borderClasses = isInvalid
       ? 'border-rose-500/80 dark:border-rose-500/80 focus:border-rose-500 dark:focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 dark:focus:ring-rose-500/40'
@@ -59,12 +74,13 @@ export const Textarea = React.forwardRef(
 
     return (
       <textarea
-        ref={ref}
+        ref={innerRef}
         rows={rows}
         dir={dir}
         aria-invalid={isInvalid ? true : undefined}
         className={cn(
-          'w-full min-h-[84px] max-h-48 rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-all duration-100 resize-y selection:bg-zinc-200 dark:selection:bg-zinc-800',
+          'w-full rounded-lg bg-zinc-100/80 dark:bg-zinc-900/80 border px-3 py-2 text-xs leading-[18px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:outline-none transition-[background-color,border-color,box-shadow] duration-100 selection:bg-zinc-200 dark:selection:bg-zinc-800',
+          autoGrow ? 'resize-none overflow-y-auto' : 'min-h-[84px] max-h-48 resize-y',
           borderClasses,
           className
         )}

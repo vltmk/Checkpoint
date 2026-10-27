@@ -86,53 +86,6 @@
 }
 
 @layer base {
-  :root {
-    --background: #09090b;
-    --foreground: #e4e4e7;
-    --card: #121215;
-    --card-foreground: #e4e4e7;
-    --border: #27272a;
-    --muted: #18181b;
-    --muted-foreground: #a1a1aa;
-    --primary: #e4e4e7;
-    --primary-foreground: #18181b;
-
-    /* 3-Tier Surface Hierarchy Tokens (Dark) */
-    --surface-canvas: #09090b;
-    --surface-elevated: #121215;
-    --surface-interactive: #18181b;
-    --surface-active: #27272a;
-    --hairline: rgba(255, 255, 255, 0.08);
-
-    /* Precision Motion Tokens */
-    --duration-instant: 100ms;
-    --duration-normal: 140ms;
-    --ease-precision: cubic-bezier(0.23, 1, 0.32, 1);
-    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  html.light,
-  html:not(.dark) {
-    --background: #ffffff;
-    --foreground: #27272a;
-    --card: #f8f9fa;
-    --card-foreground: #27272a;
-    --border: #e4e4e7;
-    --muted: #f4f4f5;
-    --muted-foreground: #71717a;
-    --primary: #27272a;
-    --primary-foreground: #f4f4f5;
-
-    /* 3-Tier Surface Hierarchy Tokens (Light) */
-    --surface-canvas: #ffffff;
-    --surface-elevated: #f8f9fa;
-    --surface-interactive: #f4f4f5;
-    --surface-active: #e4e4e7;
-    --hairline: rgba(0, 0, 0, 0.08);
-  }
-
   * {
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
@@ -206,40 +159,6 @@
   will-change: scroll-position;
 }
 
-/* Mobile Safe Area Insets */
-.safe-bottom {
-  padding-bottom: max(1rem, env(safe-area-inset-bottom));
-}
-
-.safe-top {
-  padding-top: max(0.75rem, env(safe-area-inset-top));
-}
-
-/* Print Styles for Proof of Work Receipt */
-@media print {
-  body {
-    background: #ffffff !important;
-    color: #27272a !important;
-  }
-  
-  .mobile-nav {
-    display: none !important;
-  }
-
-  .print-receipt-container {
-    display: block !important;
-    position: static !important;
-    background: #ffffff !important;
-    color: #27272a !important;
-    box-shadow: none !important;
-    border: 1px solid #e2e8f0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 24px !important;
-  }
-}
-
 /* Desktop Window Dragging: Confined strictly to header to prevent IPC hit-test storms during scroll */
 header[data-tauri-drag-region],
 header [data-tauri-drag-region] {
@@ -252,8 +171,7 @@ header a,
 header input,
 header select,
 header textarea,
-[data-no-drag],
-.no-drag {
+[data-no-drag] {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
@@ -284,7 +202,6 @@ header textarea,
 button .font-farsi,
 button.font-farsi,
 button.font-farsi > span,
-.btn-farsi,
 span.font-farsi,
 p.font-farsi,
 div.font-farsi,
@@ -310,7 +227,7 @@ label.font-farsi {
 
   /* Neutralize transform and movement transitions while preserving opacity and color feedback */
   [class*="transition-transform"],
-  [class*="transition-all"] {
+  [class*=",transform]"] {
     transition-duration: 0.01ms !important;
   }
 }
@@ -378,16 +295,6 @@ html.light .bg-zinc-800\/40 {
 html.light button.bg-red-600,
 html.light [class*="bg-red-600"] {
   color: #f4f4f5 !important;
-}
-
-/* Splash screen progress bar in paper-white light theme */
-html.light .splash-progress-track {
-  background-color: #e4e4e7 !important;
-  border-color: #d4d4d8 !important;
-}
-
-html.light .splash-progress-filler {
-  background-color: #18181b !important;
 }
 
 /* Settings and UI toggle switches in paper-white light theme */
@@ -491,8 +398,7 @@ html.light .bg-black\/50 {
 }
 
 /* Keyboard badge utilities */
-html.light kbd,
-html.light [class*="Kbd"] {
+html.light kbd {
   background-color: #f4f4f5 !important;
   border-color: #e4e4e7 !important;
   color: #71717a !important;
@@ -502,113 +408,6 @@ html.light .bg-zinc-100 kbd {
   background-color: rgba(255, 255, 255, 0.2) !important;
   color: #27272a !important;
   border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
-/* ==========================================================================
-   Add Work Double Button - Inverted High-Contrast Styling
-   Dark Mode: White background with black/dark text & borders
-   White (Light) Mode: Black/dark background with white/light text & borders
-   ========================================================================== */
-
-.add-work-double-btn {
-  background-color: #18181b;
-  color: #fafafa;
-  border-color: #27272a;
-}
-
-.add-work-double-btn .add-work-btn-item {
-  color: #fafafa;
-}
-
-.add-work-double-btn .add-work-btn-item:hover {
-  background-color: #27272a;
-  color: #ffffff;
-}
-
-.add-work-double-btn .add-work-btn-item:active {
-  background-color: #3f3f46;
-}
-
-.add-work-double-btn .add-work-btn-divider {
-  background-color: #3f3f46;
-}
-
-/* White (Light) Mode: Black/dark background */
-html.light .add-work-double-btn,
-html:not(.dark) .add-work-double-btn {
-  background-color: #18181b !important;
-  color: #fafafa !important;
-  border-color: #27272a !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25) !important;
-}
-
-html.light .add-work-double-btn .add-work-btn-item,
-html:not(.dark) .add-work-double-btn .add-work-btn-item {
-  color: #fafafa !important;
-}
-
-html.light .add-work-double-btn .add-work-btn-item:hover,
-html:not(.dark) .add-work-double-btn .add-work-btn-item:hover {
-  background-color: #27272a !important;
-  color: #ffffff !important;
-}
-
-html.light .add-work-double-btn .add-work-btn-item:active,
-html:not(.dark) .add-work-double-btn .add-work-btn-item:active {
-  background-color: #3f3f46 !important;
-}
-
-html.light .add-work-double-btn .add-work-btn-divider,
-html:not(.dark) .add-work-double-btn .add-work-btn-divider {
-  background-color: #3f3f46 !important;
-}
-
-/* Dark Mode: White background */
-html.dark .add-work-double-btn {
-  background-color: #ffffff !important;
-  color: #09090b !important;
-  border-color: #e4e4e7 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.35) !important;
-}
-
-html.dark .add-work-double-btn .add-work-btn-item {
-  color: #09090b !important;
-}
-
-html.dark .add-work-double-btn .add-work-btn-item:hover {
-  background-color: #f4f4f5 !important;
-  color: #000000 !important;
-}
-
-html.dark .add-work-double-btn .add-work-btn-item:active {
-  background-color: #e4e4e7 !important;
-}
-
-html.dark .add-work-double-btn .add-work-btn-divider {
-  background-color: #e4e4e7 !important;
-}
-
-/* Mobile CTA button contrast support */
-html.light .mobile-add-work-btn,
-html:not(.dark) .mobile-add-work-btn {
-  background-color: #18181b !important;
-  color: #fafafa !important;
-  border-color: #27272a !important;
-}
-
-html.light .mobile-add-work-btn:hover,
-html:not(.dark) .mobile-add-work-btn:hover {
-  background-color: #27272a !important;
-}
-
-html.dark .mobile-add-work-btn {
-  background-color: #ffffff !important;
-  color: #09090b !important;
-  border-color: #e4e4e7 !important;
-}
-
-html.dark .mobile-add-work-btn:hover {
-  background-color: #f4f4f5 !important;
 }
 
 /* ==========================================================================
@@ -631,20 +430,7 @@ html:not(.dark) .checkpoint-frosted-base {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Semantic Material Presets */
-.checkpoint-frosted-modal {
-  --glass-blur: 16px;
-  --glass-saturate: 180%;
-  --glass-bg-dark: rgba(9, 9, 11, 0.55);
-  --glass-bg-light: rgba(255, 255, 255, 0.60);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 24px 48px -12px rgba(0, 0, 0, 0.65);
-}
-
-html.light .checkpoint-frosted-modal,
-html:not(.dark) .checkpoint-frosted-modal {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85), 0 20px 40px -12px rgba(0, 0, 0, 0.12) !important;
-}
-
+/* Semantic Material Presets (FrostedGlass menu and popover) */
 .checkpoint-frosted-menu {
   --glass-blur: 14px;
   --glass-saturate: 180%;
@@ -671,32 +457,6 @@ html:not(.dark) .checkpoint-frosted-popover {
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 16px 36px -6px rgba(0, 0, 0, 0.08) !important;
 }
 
-.checkpoint-frosted-drawer {
-  --glass-blur: 18px;
-  --glass-saturate: 180%;
-  --glass-bg-dark: rgba(9, 9, 11, 0.58);
-  --glass-bg-light: rgba(255, 255, 255, 0.64);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), -12px 0 32px -4px rgba(0, 0, 0, 0.5);
-}
-
-html.light .checkpoint-frosted-drawer,
-html:not(.dark) .checkpoint-frosted-drawer {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85), -12px 0 32px -4px rgba(0, 0, 0, 0.08) !important;
-}
-
-.checkpoint-frosted-subtle {
-  --glass-blur: 10px;
-  --glass-saturate: 150%;
-  --glass-bg-dark: rgba(18, 18, 21, 0.38);
-  --glass-bg-light: rgba(255, 255, 255, 0.42);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-}
-
-html.light .checkpoint-frosted-subtle,
-html:not(.dark) .checkpoint-frosted-subtle {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.7) !important;
-}
-
 /* Anti-Banding Micro-Noise Overlay (Pure SVG inline, zero HTTP request) */
 .checkpoint-glass-dither {
   position: absolute;
@@ -717,36 +477,24 @@ html:not(.dark) .checkpoint-glass-dither {
 /* Accessibility: Prefers Reduced Transparency (Apple Design §14) */
 @media (prefers-reduced-transparency: reduce) {
   .checkpoint-frosted-base,
-  .checkpoint-frosted-modal,
   .checkpoint-frosted-menu,
-  .checkpoint-frosted-popover,
-  .checkpoint-frosted-drawer,
-  .checkpoint-frosted-subtle {
+  .checkpoint-frosted-popover {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
 
   .checkpoint-frosted-base,
-  .checkpoint-frosted-modal,
   .checkpoint-frosted-menu,
-  .checkpoint-frosted-popover,
-  .checkpoint-frosted-drawer,
-  .checkpoint-frosted-subtle {
+  .checkpoint-frosted-popover {
     background-color: #09090b !important;
   }
 
   html.light .checkpoint-frosted-base,
-  html.light .checkpoint-frosted-modal,
   html.light .checkpoint-frosted-menu,
   html.light .checkpoint-frosted-popover,
-  html.light .checkpoint-frosted-drawer,
-  html.light .checkpoint-frosted-subtle,
   html:not(.dark) .checkpoint-frosted-base,
-  html:not(.dark) .checkpoint-frosted-modal,
   html:not(.dark) .checkpoint-frosted-menu,
-  html:not(.dark) .checkpoint-frosted-popover,
-  html:not(.dark) .checkpoint-frosted-drawer,
-  html:not(.dark) .checkpoint-frosted-subtle {
+  html:not(.dark) .checkpoint-frosted-popover {
     background-color: #ffffff !important;
   }
 
@@ -831,8 +579,7 @@ button,
 [role='menuitem'],
 [role='option'],
 [role='tablist'],
-nav,
-[data-no-select] {
+nav {
   -webkit-user-select: none;
   user-select: none;
 }

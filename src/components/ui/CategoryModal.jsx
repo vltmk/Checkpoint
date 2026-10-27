@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
-  X,
   Upload,
   Sparkles,
-  Trash2,
   Gamepad2,
   Check,
   Palette,
@@ -20,9 +17,8 @@ import {
 } from '../../lib/categories';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
-import { FrostedGlass } from './FrostedGlass';
+import { Dialog, DialogHeader, DialogTitle } from './Dialog';
 import wowIcon from '../../assets/world-of-warcraft-retail.svg';
-import { useModalFocus } from './useModalFocus';
 
 export function CategoryModal({
   isOpen,
@@ -31,14 +27,13 @@ export function CategoryModal({
   onSave, // (updatedCategory) => void
   onSaved,
 }) {
-  const modalRef = useRef(null);
-  useModalFocus({ open: isOpen, containerRef: modalRef, onClose: onClose });
   const { t, language, isRtl } = useLanguage();
   const [name, setName] = useState('');
   const [color, setColor] = useState(DEFAULT_WOW_COLOR);
   const [icon, setIcon] = useState(null); // base64 data URL
   const [suggestedColor, setSuggestedColor] = useState(null);
   const [supportsGold, setSupportsGold] = useState(false);
+  const [goldUnit, setGoldUnit] = useState('1k'); // how this game's gold is priced: per 1 or per 1,000
   const [nameError, setNameError] = useState('');
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [cropperInputImage, setCropperInputImage] = useState(null);
@@ -53,6 +48,7 @@ export function CategoryModal({
         setColor(category.color || DEFAULT_WOW_COLOR);
         setIcon(category.icon || null);
         setSuggestedColor(null);
+        setGoldUnit(category.goldUnit === '1' ? '1' : /classic/i.test(category.name || '') && !category.goldUnit ? '1' : '1k');
         setSupportsGold(
           category.supportsGold !== undefined
             ? Boolean(category.supportsGold)
@@ -64,6 +60,7 @@ export function CategoryModal({
         setIcon(null);
         setSuggestedColor(null);
         setSupportsGold(false);
+        setGoldUnit('1k');
       }
       setNameError('');
       setIsCropperOpen(false);
@@ -134,6 +131,7 @@ export function CategoryModal({
         icon: icon || null,
         isDefault: category?.isDefault || false,
         supportsGold: Boolean(supportsGold),
+        goldUnit: goldUnit === '1' ? '1' : '1k',
       };
 
       const updatedList = await addOrUpdateCategory(catObj, category?.name || null);
@@ -147,41 +145,25 @@ export function CategoryModal({
     }
   };
 
-  if (!isOpen) return null;
-
   const isWoW =
     name.trim().toLowerCase().includes('warcraft') ||
     category?.name?.toLowerCase().includes('warcraft');
 
   return (
     <>
-      <div ref={modalRef} role="dialog" aria-modal="true" tabIndex={-1} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
-        <FrostedGlass
-          variant="modal"
-          className="w-full max-w-[440px] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25 relative z-10">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <Gamepad2 className="w-4 h-4 text-zinc-500" />
-              <span>
-                {category
-                  ? t('categories.editCategory', 'Edit Category')
-                  : t('categories.newCategory', 'Add Category / Game')}
-              </span>
-            </h2>
-            <button aria-label={t('common.close', 'Close')}
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+      {/* the shared dialog: a solid panel over a plain scrim, one layer above the form that opened it */}
+      <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-[440px]" level={1}>
+          <DialogHeader onClose={onClose}>
+            <DialogTitle>
+              <Gamepad2 className="w-4 h-4 text-zinc-500" aria-hidden="true" />
+              {category
+                ? t('categories.editCategory', 'Edit Category')
+                : t('categories.newCategory', 'Add Category / Game')}
+            </DialogTitle>
+          </DialogHeader>
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="p-5 space-y-4 relative z-10">
+          <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
             {/* Row 1: Name & Icon Picker */}
             <div className="flex items-start gap-4">
               {/* Icon Uploader / Squircle Tile */}
@@ -195,7 +177,7 @@ export function CategoryModal({
                       fileInputRef.current?.click();
                     }
                   }}
-                  className="group relative w-16 h-16 rounded-[22.5%] border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-500 cursor-pointer overflow-hidden flex items-center justify-center transition-all bg-zinc-50 dark:bg-zinc-900/50 shadow-xs active:scale-[0.96]"
+                  className="group relative w-16 h-16 rounded-[22.5%] border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 dark:hover:border-zinc-500 cursor-pointer overflow-hidden flex items-center justify-center transition-colors bg-zinc-50 dark:bg-zinc-900/50 active:scale-[0.96]"
                   title="Click to upload or edit icon"
                 >
                   {icon ? (
@@ -314,7 +296,7 @@ export function CategoryModal({
                       onClick={() => setColor(preset.hex)}
                       title={preset.name}
                       className={cn(
-                        'relative w-6 h-6 rounded-full transition-all flex items-center justify-center active:scale-95 border border-black/15 dark:border-white/15 cursor-pointer',
+                        'relative w-6 h-6 rounded-full transition-transform flex items-center justify-center active:scale-95 border border-black/15 dark:border-white/15 cursor-pointer',
                         isSelected && 'ring-2 ring-zinc-900 dark:ring-zinc-100 ring-offset-2 ring-offset-white dark:ring-offset-zinc-950 scale-105'
                       )}
                       style={{ backgroundColor: preset.hex }}
@@ -345,7 +327,8 @@ export function CategoryModal({
             </div>
 
             {/* Row 3: Gold Currency & Conversion Toggle */}
-            <div className="pt-2.5 pb-0.5 border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between gap-3">
+            <div className="pt-2.5 pb-0.5 border-t border-zinc-200/80 dark:border-zinc-800/80 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <label className="text-[11px] font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 cursor-pointer select-none">
                   <Coins className="w-3.5 h-3.5 text-amber-500" />
@@ -373,6 +356,27 @@ export function CategoryModal({
                 />
               </button>
             </div>
+            {/* how this game's gold is priced: new gold jobs start from this unit */}
+            {supportsGold && (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] text-zinc-600 dark:text-zinc-400">{t('categories.goldUnit', 'Gold is priced')}</span>
+                <div role="radiogroup" aria-label={t('categories.goldUnit', 'Gold is priced')} className="inline-flex h-8 items-center rounded-lg bg-zinc-100 dark:bg-zinc-900 p-0.5">
+                  {[['1', t('categories.goldPer1', 'Per 1 gold')], ['1k', t('categories.goldPer1k', 'Per 1,000 gold')]].map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="radio"
+                      aria-checked={goldUnit === v}
+                      onClick={() => setGoldUnit(v)}
+                      className={cn('h-7 px-2.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors duration-150', goldUnit === v ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200')}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            </div>
 
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
@@ -381,17 +385,15 @@ export function CategoryModal({
               </Button>
               <Button
                 type="submit"
-                variant="default"
+                variant="primary"
                 size="sm"
                 disabled={isSaving}
-                className="active:scale-[0.97]"
               >
                 {t('common.save', 'Save Category')}
               </Button>
             </div>
           </form>
-        </FrostedGlass>
-      </div>
+      </Dialog>
 
       {/* Cropper Modal */}
       <ImageCropperModal

@@ -1,12 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, RotateCw, RotateCcw, ZoomIn, ZoomOut, Image as ImageIcon, Upload, Sparkles } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut, Image as ImageIcon, Upload } from 'lucide-react';
 import { Button } from './Button';
 import { extractDominantColor } from '../../lib/categories';
 import { useLanguage } from '../../lib/i18n';
-import { cn } from '../../lib/utils';
-import { FrostedGlass } from './FrostedGlass';
-import { useModalFocus } from './useModalFocus';
+import { Dialog, DialogHeader, DialogTitle } from './Dialog';
 
 // Apple Design rubber-band formula for elastic resistance
 function rubberband(overshoot, dimension, constant = 0.55) {
@@ -26,8 +23,6 @@ export function ImageCropperModal({
   initialImage = null, // image URL, base64, or File
   onApply, // ({ dataUrl, dominantColor }) => void
 }) {
-  const cropperRef = useRef(null);
-  useModalFocus({ open: isOpen, containerRef: cropperRef, onClose: onClose });
   const { t, language, isRtl } = useLanguage();
   const [imageSrc, setImageSrc] = useState(null);
   const [imageObj, setImageObj] = useState(null);
@@ -308,29 +303,15 @@ export function ImageCropperModal({
     onClose?.();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div ref={cropperRef} role="dialog" aria-modal="true" tabIndex={-1} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 dark:bg-black/30 backdrop-blur-[1px] animate-in fade-in duration-150">
-      <FrostedGlass
-        variant="modal"
-        className="w-full max-w-[380px] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/25 dark:bg-zinc-950/25 relative z-10">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
-            <span>{t('categories.editImage', 'Edit Image')}</span>
-          </h3>
-          <button aria-label={t('common.close', 'Close')}
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    // two layers up: it opens from the category dialog, which may itself be open over an order form
+    <Dialog open={isOpen} onClose={onClose} maxWidth="max-w-[380px]" level={2}>
+        <DialogHeader onClose={onClose} className="px-4 py-3">
+          <DialogTitle>
+            <ImageIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-400" aria-hidden="true" />
+            {t('categories.editImage', 'Edit Image')}
+          </DialogTitle>
+        </DialogHeader>
 
         {/* Viewport / Canvas */}
         <div className="p-4 flex flex-col items-center bg-zinc-100 dark:bg-zinc-900/60">
@@ -395,7 +376,7 @@ export function ImageCropperModal({
                 type="button"
                 onClick={handleRotate}
                 title="Rotate 90°"
-                className="p-1.5 rounded-md text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-[0.95] transition-all border border-zinc-200 dark:border-zinc-700 shrink-0"
+                className="p-1.5 rounded-md text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 active:scale-[0.95] transition-[color,background-color,border-color,box-shadow,opacity,transform] border border-zinc-200 dark:border-zinc-700 shrink-0"
               >
                 <RotateCw className="w-4 h-4" />
               </button>
@@ -429,18 +410,16 @@ export function ImageCropperModal({
               {t('common.cancel', 'Cancel')}
             </Button>
             <Button
-              variant="default"
+              variant="primary"
               size="sm"
               disabled={!imageSrc}
               onClick={handleApply}
-              className="active:scale-[0.97]"
             >
               {t('common.apply', 'Apply')}
             </Button>
           </div>
         </div>
-      </FrostedGlass>
-    </div>
+    </Dialog>
   );
 }
 

@@ -4,14 +4,13 @@
  */
 import {
   allocateToParty,
-  allocateFifo,
   allocateToPayer,
   paymentsAppliedTo,
-  orderTargetsFor,
   shareAppliedMinor,
   orderReceivedMinor,
   orderReceivableMinor,
   isShareActive,
+  isPaidByPayer,
   payerKey,
   DEAD_LIFECYCLES,
 } from './engine.js';
@@ -163,6 +162,7 @@ export async function markSharePaid(store, shareId, { rates, dateTime, note = ''
   if (!share) throw new LedgerValidationError('Share not found.');
   const order = ctx.orderById.get(share.orderId);
   if (!order || !isShareActive(share, order)) throw new LedgerValidationError('That share is cancelled.');
+  if (isPaidByPayer(share)) throw new LedgerValidationError('The client pays this teammate directly.');
   const outstanding = share.amountMinor - shareAppliedMinor(ctx, share.id);
   if (outstanding <= 0) throw new LedgerValidationError('Already paid.');
   return store.recordPayment({
@@ -179,7 +179,7 @@ export async function writeOffOrder(store, orderId, { rates, dateTime, note = ''
   const ctx = await store.loadContext();
   const order = ctx.orderById.get(orderId);
   if (!order || DEAD_LIFECYCLES.has(order.lifecycle)) throw new LedgerValidationError('That order is not open.');
-  const shortfall = orderReceivableMinor(order) - orderReceivedMinor(ctx, order.id);
+  const shortfall = orderReceivableMinor(order, ctx) - orderReceivedMinor(ctx, order.id);
   if (shortfall <= 0) throw new LedgerValidationError('Nothing is left to close.');
   return store.recordPayment({
     payment: { direction: 'in', partyId: payerKey(order) || null, amountMinor: shortfall, currency: order.currency, rates: ratesSnapshot(rates), kind: 'writeoff', dateTime, note },
@@ -192,7 +192,7 @@ export async function markOrderCollected(store, orderId, { rates, dateTime, note
   const ctx = await store.loadContext();
   const order = ctx.orderById.get(orderId);
   if (!order) throw new LedgerValidationError('Order not found.');
-  const outstanding = orderReceivableMinor(order) - orderReceivedMinor(ctx, orderId);
+  const outstanding = orderReceivableMinor(order, ctx) - orderReceivedMinor(ctx, orderId);
   if (outstanding <= 0) throw new LedgerValidationError('Already collected.');
   return store.recordPayment({
     payment: { direction: 'in', partyId: payerKey(order) || null, amountMinor: outstanding, currency: order.currency, rates: ratesSnapshot(rates), kind: 'settlement', dateTime, note },

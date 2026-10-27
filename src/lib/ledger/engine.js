@@ -3,7 +3,9 @@
  *
  * Shapes (camelCase here, snake_case in SQL):
  *   order      { id, lifecycle, currency, grossMinor, platformFeeMinor, payerId, dateTime, expectedPayoutAt, kind }
- *   share      { id, orderId, partyId, amountMinor, state: 'open' | 'done' | 'cancelled' }
+ *   share      { id, orderId, partyId, amountMinor, state: 'open' | 'done' | 'cancelled', paidBy?: 'me' | 'payer' }
+ *     paidBy 'payer': the client pays this teammate directly. It still lowers my margin, but I owe nothing on it
+ *     and the client owes me that much less. Missing = 'me' (every share before this field existed).
  *   payment    { id, direction: 'out' | 'in', partyId, amountMinor, currency, rates, kind, voidsPaymentId, dateTime }
  *   allocation { id, paymentId, targetType: 'share' | 'order', targetId, appliedMinor, consumedMinor }
  *     appliedMinor  - amount applied, in the target's currency
@@ -11,6 +13,7 @@
  *
  * Invariants:
  *   margin(order) = gross - platformFee - sum(active shares)   (derived, never stored)
+ *   receivable(order) = gross - platformFee - sum(active shares the payer pays directly)
  *   a voided payment, and the void marker itself, count for nothing
  *   unallocated outgoing money is advance credit
  */
@@ -46,6 +49,14 @@ export function isShareActive(share, order) {
   if (!share || share.state === 'cancelled') return false;
   if (order && DEAD_LIFECYCLES.has(order.lifecycle)) return false;
   return true;
+}
+
+/** A share the payer settles with the teammate themselves: never a debt of mine. */
+export const isPaidByPayer = (share) => share?.paidBy === 'payer';
+
+/** An active share that I pay (and so owe until it is paid). */
+export function isShareOwed(share, order) {
+  return isShareActive(share, order) && !isPaidByPayer(share);
 }
 
 export function isShareEarned(share, order) {
@@ -99,17 +110,24 @@ export function buildContext({ orders = [], shares = [], payments = [], allocati
   const orderById = indexById(orders);
   const shareById = indexById(shares);
   // An allocation to a dead share (cancelled, or its order failed/refunded) no longer covers anything:
-  // the money it applied goes back to being credit with the party.
+  // the money it applied goes back to being credit with the party. So does one to a share the client pays
+  // directly (a backup can bring such a pairing in): the share is nobody's debt of mine, so nothing was settled.
   const liveAllocs = allocations.filter((a) => {
     if (!effIds.has(a.paymentId)) return false;
     if (a.targetType !== 'share') return true;
     const share = shareById.get(a.targetId);
-    return Boolean(share) && isShareActive(share, orderById.get(share.orderId));
+    return Boolean(share) && isShareActive(share, orderById.get(share.orderId)) && !isPaidByPayer(share);
   });
   const appliedByTarget = new Map();
   for (const a of liveAllocs) {
     const k = `${a.targetType}:${a.targetId}`;
     appliedByTarget.set(k, (appliedByTarget.get(k) || 0) + a.appliedMinor);
+  }
+  // what the payer hands straight to teammates, per order: it never passes through me
+  const payerShareByOrder = new Map();
+  for (const sh of shares) {
+    if (!isPaidByPayer(sh) || !isShareActive(sh, orderById.get(sh.orderId))) continue;
+    payerShareByOrder.set(sh.orderId, (payerShareByOrder.get(sh.orderId) || 0) + (sh.amountMinor || 0));
   }
   const consumedByPayment = new Map();
   for (const a of liveAllocs) {
@@ -125,13 +143,23 @@ export function buildContext({ orders = [], shares = [], payments = [], allocati
     orderById,
     appliedByTarget,
     consumedByPayment,
+    payerShareByOrder,
   };
 }
 
 // --- Orders --------------------------------------------------------------------------------
 
-export function orderReceivableMinor(order) {
+/** What the job is worth to me and my team after the platform fee. */
+export function orderNetMinor(order) {
   return Math.max(0, (order.grossMinor || 0) - (order.platformFeeMinor || 0));
+}
+
+/**
+ * What the payer owes me for an order: the net, minus what they pay teammates directly. Pass the context whenever
+ * one is at hand; without it the payer-paid shares are unknown and the full net is returned.
+ */
+export function orderReceivableMinor(order, ctx = null) {
+  return Math.max(0, orderNetMinor(order) - (ctx?.payerShareByOrder?.get(order.id) || 0));
 }
 
 export function activeSharesOf(ctx, orderId) {
@@ -143,7 +171,7 @@ export function activeSharesOf(ctx, orderId) {
 export function orderMarginMinor(ctx, order) {
   if (DEAD_LIFECYCLES.has(order.lifecycle)) return 0;
   const shareSum = activeSharesOf(ctx, order.id).reduce((s, x) => s + x.amountMinor, 0);
-  return orderReceivableMinor(order) - shareSum;
+  return orderNetMinor(order) - shareSum;
 }
 
 export function shareAppliedMinor(ctx, shareId) {
@@ -156,17 +184,20 @@ export function orderReceivedMinor(ctx, orderId) {
 
 /** Money state derived from allocations: how much of the order has been collected and paid out. */
 export function orderMoneyState(ctx, order) {
-  const receivable = orderReceivableMinor(order);
+  const receivable = orderReceivableMinor(order, ctx);
   const received = Math.min(receivable, orderReceivedMinor(ctx, order.id));
   const shares = activeSharesOf(ctx, order.id);
   const shareTotal = shares.reduce((s, x) => s + x.amountMinor, 0);
-  const sharePaid = shares.reduce((s, x) => s + Math.min(x.amountMinor, shareAppliedMinor(ctx, x.id)), 0);
+  // a teammate the payer pays is settled as far as I am concerned
+  const sharePaid = shares.reduce((s, x) => s + (isPaidByPayer(x) ? x.amountMinor : Math.min(x.amountMinor, shareAppliedMinor(ctx, x.id))), 0);
+  const payerShare = shares.filter(isPaidByPayer).reduce((s, x) => s + x.amountMinor, 0);
   return {
     receivableMinor: receivable,
     receivedMinor: received,
     collected: receivable > 0 && received >= receivable,
     partlyCollected: received > 0 && received < receivable,
     shareTotalMinor: shareTotal,
+    payerShareMinor: payerShare,
     sharePaidMinor: sharePaid,
     boostersPaid: shareTotal > 0 && sharePaid >= shareTotal,
     boostersPartlyPaid: sharePaid > 0 && sharePaid < shareTotal,
@@ -193,7 +224,7 @@ export function partyBalance(ctx, partyId) {
   for (const share of ctx.shares) {
     if (share.partyId !== partyId) continue;
     const order = ctx.orderById.get(share.orderId);
-    if (!order || !isShareActive(share, order)) continue;
+    if (!order || !isShareOwed(share, order)) continue;
     const opts = orderRateOpts(order);
     const raw = shareAppliedMinor(ctx, share.id);
     const applied = Math.min(share.amountMinor, raw);
@@ -235,7 +266,7 @@ export function oldestUnpaidShareDate(ctx, partyId) {
   for (const share of ctx.shares) {
     if (share.partyId !== partyId) continue;
     const order = ctx.orderById.get(share.orderId);
-    if (!order || !isShareActive(share, order) || !isShareEarned(share, order)) continue;
+    if (!order || !isShareOwed(share, order) || !isShareEarned(share, order)) continue;
     if (share.amountMinor - shareAppliedMinor(ctx, share.id) <= 0) continue;
     const t = Date.parse(order.dateTime);
     if (Number.isFinite(t) && (oldest === null || t < oldest)) oldest = t;
@@ -288,7 +319,7 @@ export function shareTargetsFor(ctx, partyId, { includeOpen = true } = {}) {
   for (const share of ctx.shares) {
     if (share.partyId !== partyId) continue;
     const order = ctx.orderById.get(share.orderId);
-    if (!order || !isShareActive(share, order)) continue;
+    if (!order || !isShareOwed(share, order)) continue;
     const earned = isShareEarned(share, order);
     if (!earned && !includeOpen) continue;
     const outstanding = share.amountMinor - shareAppliedMinor(ctx, share.id);
@@ -313,7 +344,7 @@ export function orderTargetsFor(ctx, payerId) {
   for (const order of ctx.orders) {
     if (payerKey(order) !== (payerId || '') || order.kind === 'expense') continue;
     if (DEAD_LIFECYCLES.has(order.lifecycle)) continue;
-    const outstanding = orderReceivableMinor(order) - orderReceivedMinor(ctx, order.id);
+    const outstanding = orderReceivableMinor(order, ctx) - orderReceivedMinor(ctx, order.id);
     if (outstanding <= 0) continue;
     out.push({
       type: 'order',
@@ -462,7 +493,7 @@ export function payerReceivables(ctx, payerId, now = Date.now()) {
   for (const order of ctx.orders) {
     if (payerKey(order) !== (payerId || '') || order.kind === 'expense') continue;
     if (DEAD_LIFECYCLES.has(order.lifecycle)) continue;
-    const outstanding = orderReceivableMinor(order) - orderReceivedMinor(ctx, order.id);
+    const outstanding = orderReceivableMinor(order, ctx) - orderReceivedMinor(ctx, order.id);
     if (outstanding <= 0) continue;
     const due = order.expectedPayoutAt ? Date.parse(order.expectedPayoutAt) : null;
     if (order.lifecycle !== 'done') {
@@ -487,7 +518,7 @@ export function exposureByCurrency(ctx) {
   for (const order of ctx.orders) {
     if (order.kind === 'expense' || DEAD_LIFECYCLES.has(order.lifecycle)) continue;
     const paidOut = ctx.shares
-      .filter((s) => s.orderId === order.id && isShareActive(s, order))
+      .filter((s) => s.orderId === order.id && isShareOwed(s, order))
       .reduce((sum, s) => sum + Math.min(s.amountMinor, shareAppliedMinor(ctx, s.id)), 0);
     const received = orderReceivedMinor(ctx, order.id);
     const exposed = Math.max(0, paidOut - received);

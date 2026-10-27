@@ -35,3 +35,9 @@ test('returns null when no candidate has a value', () => {
 test('an empty string is a real value, not a missing one', () => {
   assert.equal(chooseMigratedValue([{ value: '', updatedAt: 5 }]), '');
 });
+
+test('form drafts are keyed by profile, so a Booster draft never opens in the Advertiser profile', async () => {
+  const fs = await import('node:fs');
+  const hook = fs.readFileSync(new URL('../src/components/ledger/useFormDraft.js', import.meta.url), 'utf8');
+  assert.match(hook, /DRAFT_PREFIX\}\$\{profileId\}_/);
+});

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowLeft, Ban, Check, CircleCheck, ClipboardCopy, Clock, Download, ImageIcon, Plus, ReceiptText, Search, StickyNote, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { payerAging, payerList, payerOwedByCurrency, payerStatement, payerParty } from '../../lib/ledger/boosterSelectors';
+import { payerAging, payerList, payerOwedByCurrency, payerStatement } from '../../lib/ledger/boosterSelectors';
 import { STATEMENT_PERIODS, periodStart, statementPeriod } from '../../lib/ledger/statementPeriod';
 import { buildClientStatementCsv, buildClientStatementText } from '../../lib/ledger/statementText';
 import { fromMinor } from '../../lib/ledger/money';
@@ -11,7 +11,7 @@ import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
 import { copyText, saveTextFile, withBom } from './files';
 import { AgingStrip, BalanceRail, EmptyState, Initial, Meta, Money, Segmented, TOOLBAR_INPUT, SectionTitle, StatusTile, UndoLink, coversTitles } from './parts';
-import { paymentsAppliedTo } from '../../lib/ledger/engine';
+import { isShareOwed, paymentsAppliedTo } from '../../lib/ledger/engine';
 import { PeopleView } from './PeopleView';
 import { openOnBlankClick } from './RowActions';
 import { CloseShort } from './CloseShort';
@@ -21,9 +21,8 @@ import { PartyNote } from './PartyNote';
 export function ClientsView({ onReceive, onPay, onOpenJob, onReceipt, onOpenProofs, onNewJob }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
-  const { ctx, data, partyById, rates, displayCurrency, selectedClientKey, setSelectedClientKey } = ledger;
+  const { ctx, data, partyById, rates, displayCurrency, selectedClientKey, setSelectedClientKey, clientsView: view, setClientsView: setView } = ledger;
   const cur = displayCurrency || 'TOMAN';
-  const [view, setView] = useState('clients');
   const [query, setQuery] = useState('');
   const [flash, setFlash] = useState('');
   const [confirmVoid, setConfirmVoid] = useState(null);
@@ -31,7 +30,8 @@ export function ClientsView({ onReceive, onPay, onOpenJob, onReceipt, onOpenProo
   const [proofCounts, setProofCounts] = useState({});
   const [period, setPeriod] = useState('all');
 
-  const hasTeam = useMemo(() => Boolean(ctx && ctx.shares.some((s) => s.state !== 'cancelled' && partyById.get(s.partyId)?.kind === 'booster' && s.partyId !== 'party_unassigned')), [ctx, partyById]);
+  // teammates the client pays directly are not a balance of mine, so they never bring up the Team view
+  const hasTeam = useMemo(() => Boolean(ctx && ctx.shares.some((s) => isShareOwed(s, ctx.orderById.get(s.orderId)) && partyById.get(s.partyId)?.kind === 'booster' && s.partyId !== 'party_unassigned')), [ctx, partyById]);
   const clients = useMemo(() => (ctx ? payerList(ctx, data.parties, { rates, displayCurrency: cur }) : []), [ctx, data, rates, cur]);
   const filtered = clients.filter((c) => !query.trim() || f.name(c.party).toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -146,7 +146,7 @@ export function ClientsView({ onReceive, onPay, onOpenJob, onReceipt, onOpenProo
 
       <div className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <SectionTitle>{f.t('lg.statement.history', 'History')}</SectionTitle>
+          <SectionTitle className="mb-0">{f.t('lg.statement.history', 'History')}</SectionTitle>
           <Segmented
             ariaLabel={f.t('lg.statement.period', 'Period')}
             value={period}
@@ -164,7 +164,7 @@ export function ClientsView({ onReceive, onPay, onOpenJob, onReceipt, onOpenProo
             {f.t('lg.statement.opening', 'Opening {amount}', { amount: f.money(periodView.opening, cur) })} · {f.t('lg.statement.closing', 'Closing {amount}', { amount: f.money(periodView.closing, cur) })}
           </p>
         )}
-        <ul className="mt-2 divide-y divide-zinc-200/60 dark:divide-zinc-800/60 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/40 dark:bg-zinc-900/20">
+        <ul className="mt-3 divide-y divide-zinc-200/60 dark:divide-zinc-800/60 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/40 dark:bg-zinc-900/20">
           {[...periodView.shown].reverse().map((e) => {
             const isJob = e.type === 'job';
             const at = isJob ? e.order.dateTime : e.payment.dateTime;

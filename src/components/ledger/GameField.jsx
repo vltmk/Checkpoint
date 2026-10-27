@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { GameIcon } from '../ui/GameIcon';
 import { useLedgerFormat } from './format';
+import { cn } from '../../lib/utils';
 
 const ADD_VALUE = '__add_category__';
 const NONE_VALUE = '';
@@ -41,15 +42,15 @@ export function GameField({ value, onChange, categories = [], onAdd, label, clas
   const selected = options.find((o) => o.value !== ADD_VALUE && String(o.value).toLowerCase() === (value || '').trim().toLowerCase())?.value ?? NONE_VALUE;
 
   return (
-    <div className={className}>
-      {label && <span className="text-xs text-zinc-500">{label}</span>}
+    <div className={cn('min-w-0', className)}>
+      {/* same label as Field (FormLayout.jsx), so the game lines up with the fields beside it */}
+      {label && <span className="mb-1 block text-xs text-zinc-600 dark:text-zinc-400">{label}</span>}
       <Select
         value={selected}
         onChange={(v) => (v === ADD_VALUE ? onAdd?.() : onChange(v))}
         options={options}
         ariaLabel={label || f.t('lg.order.game', 'Game')}
         prefixIcon={<GameIcon game={value} categories={categories} className="w-4 h-4" />}
-        className={label ? 'mt-1' : undefined}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowDownLeft, ArrowDownToLine, ArrowUpRight, Ban, Clock, ImageIcon, Percent, StickyNote, Wallet, Scissors } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { voidedPaymentIds, paymentRateOpts, paymentCovers } from '../../lib/ledger/engine';
+import { voidedPaymentIds, paymentRateOpts, paymentCovers, isShareOwed } from '../../lib/ledger/engine';
 import { collapseBuckets, bucketKey } from '../../lib/ledger/money';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
@@ -68,6 +68,8 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
   const leftoverOf = (p) => Math.max(0, p.amountMinor - (ctx.consumedByPayment.get(p.id) || 0));
 
   if (!ctx) return null;
+  const isBooster = ledger.profileId === 'booster';
+  const paysTeam = isBooster && ctx.shares.some((sh) => isShareOwed(sh, ctx.orderById.get(sh.orderId)));
 
   const guard = async (fn) => {
     setError('');
@@ -77,8 +79,18 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
   return (
     <div className="pb-8">
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Button variant="primary" onClick={() => onPay(null)}><ArrowUpRight className="w-3.5 h-3.5" />{f.t('lg.pay.title', 'Settle up')}</Button>
-        <Button variant="outline" onClick={() => onReceive(null)}><ArrowDownToLine className="w-3.5 h-3.5" />{f.t('lg.recv.title', 'Receive payout')}</Button>
+        {/* a booster mostly receives money; paying a teammate is the exception, and only when one is owed */}
+        {isBooster ? (
+          <>
+            <Button variant="primary" onClick={() => onReceive(null)}><ArrowDownToLine className="w-3.5 h-3.5" />{f.t('lg.ov.received', 'Payment received')}</Button>
+            {paysTeam && <Button variant="outline" onClick={() => onPay(null)}><ArrowUpRight className="w-3.5 h-3.5" />{f.t('lg.money.payTeammate', 'Pay a teammate')}</Button>}
+          </>
+        ) : (
+          <>
+            <Button variant="primary" onClick={() => onPay(null)}><ArrowUpRight className="w-3.5 h-3.5" />{f.t('lg.pay.title', 'Settle up')}</Button>
+            <Button variant="outline" onClick={() => onReceive(null)}><ArrowDownToLine className="w-3.5 h-3.5" />{f.t('lg.recv.title', 'Receive payout')}</Button>
+          </>
+        )}
       </div>
 
       <dl className="grid grid-cols-3 gap-4 border-y border-zinc-200/80 dark:border-zinc-800/80 py-3 mb-4">
@@ -108,7 +120,7 @@ export function MoneyView({ onPay, onReceive, onOpenProofs }) {
       {error && <p role="alert" className="mt-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
 
       {shown.length === 0 ? (
-        <EmptyState icon={Wallet} title={f.t('lg.money.empty', 'No payments yet')} body={f.t('lg.money.emptyBody', 'When you pay a booster or a platform pays you, it shows up here.')} />
+        <EmptyState icon={Wallet} title={f.t('lg.money.empty', 'No payments yet')} body={isBooster ? f.t('lg.money.emptyBodyBooster', 'When a client pays you or you log an expense, it shows up here.') : f.t('lg.money.emptyBody', 'When you pay a booster or a platform pays you, it shows up here.')} />
       ) : (
         <div className="mt-3">
           {groupByDay(shown.slice(0, limit), ({ p }) => p.dateTime).map((day, di) => (

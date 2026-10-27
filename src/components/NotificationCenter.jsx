@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { DiscordIcon } from './ui/Icons';
-import { FrostedGlass } from './ui/FrostedGlass';
+import { DRAWER, SCRIM } from '../lib/motion';
 import { openExternalUrl, copyTextNative } from '../lib/desktop';
 import { isNotificationRTL, isRTL } from '../lib/utils';
 import { useLanguage, formatShamsiDateTime } from '../lib/i18n';
@@ -158,16 +158,14 @@ export function NotificationCenter({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={SCRIM}
           onClick={onClose}
-          className="fixed inset-0 bg-black/20 dark:bg-black/30 backdrop-blur-[1px]"
+          className="fixed inset-0 bg-black/30 dark:bg-black/50"
           aria-hidden="true"
         />
 
         {/* Slide-over Drawer Frame */}
-        <FrostedGlass
-          as="motion.div"
-          variant="drawer"
+        <motion.div
           key="notification-drawer"
           dir={isRtl ? 'rtl' : 'ltr'}
           initial={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
@@ -175,11 +173,12 @@ export function NotificationCenter({
           exit={shouldReduceMotion ? { opacity: 0 } : { x: isRtl ? '-100%' : '100%' }}
           transition={
             shouldReduceMotion
-              ? { duration: 0.15 }
-              : { type: 'spring', damping: 30, stiffness: 350 }
+              ? SCRIM
+              : DRAWER
           }
           className={cn(
-            'relative w-full max-w-md h-full flex flex-col z-10 text-zinc-900 dark:text-zinc-100',
+            // a solid panel: a blurred drawer the full height of the window costs frames while it slides
+            'relative w-full max-w-md h-full flex flex-col z-10 overflow-hidden bg-white dark:bg-zinc-950 border-l border-zinc-200/90 dark:border-zinc-800/90 shadow-2xl text-zinc-900 dark:text-zinc-100',
             isRtl && 'border-l-0 border-r'
           )}
           data-no-drag
@@ -297,7 +296,7 @@ export function NotificationCenter({
                     key={item.id}
                     dir={isRTLItem ? 'rtl' : 'ltr'}
                     onClick={() => onMarkAsRead?.(item.id)}
-                    className={`group relative p-3 rounded-xl border transition-all text-xs space-y-2 cursor-default ${
+                    className={`group relative p-3 rounded-xl border transition-[color,background-color,border-color,box-shadow,opacity,transform] text-xs space-y-2 cursor-default ${
                       !item.read
                         ? 'bg-zinc-50/90 dark:bg-zinc-900/90 border-zinc-300 dark:border-zinc-700/80 shadow-xs'
                         : 'bg-white dark:bg-zinc-950/60 border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700/60'
@@ -523,7 +522,7 @@ export function NotificationCenter({
               <ExternalLink className="w-3 h-3 text-zinc-500 dark:text-zinc-400" />
             </Button>
           </div>
-        </FrostedGlass>
+        </motion.div>
       </div>
       )}
     </AnimatePresence>

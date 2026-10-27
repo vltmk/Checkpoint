@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { useLedgerFormat } from './format';
 import { Money } from './parts';
 import { cn } from '../../lib/utils';
+import { POPOVER } from '../../lib/motion';
 
 /** One figure in the recap: its converted total, and the native amount per currency when more than one is involved. */
 function Figure({ label, measure, currency, emphasis = false }) {
@@ -39,10 +40,11 @@ export function SelectionBar({ count, recap, currency, profile, notice, onClear,
     <motion.div
       role="region"
       aria-label={f.t('lg.sel.region', 'Selected rows')}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className="sticky bottom-4 z-20 mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md px-4 py-3"
+      initial={{ opacity: 0, transform: 'translateY(8px)' }}
+      animate={{ opacity: 1, transform: 'translateY(0px)' }}
+      exit={{ opacity: 0, transform: 'translateY(8px)' }}
+      transition={POPOVER}
+      className="sticky bottom-4 z-20 mt-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg shadow-black/5 dark:shadow-black/40 px-4 py-3"
     >
       <div className="flex flex-wrap items-start gap-x-5 gap-y-3">
         <div className="flex min-w-[9rem] flex-col">

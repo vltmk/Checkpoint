@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useRef, useState } 
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { FrostedGlass } from './FrostedGlass';
+import { DIALOG, SCRIM } from '../../lib/motion';
 import { useLanguage } from '../../lib/i18n';
 
 let openDialogCount = 0;
@@ -46,7 +46,11 @@ function unlockBodyScroll() {
   }
 }
 
-export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl', floatingActions = null }) {
+// A dialog opened from inside another one (a category from the order form, the cropper from the category form)
+// sits one layer up, so it is never drawn under the dialog that opened it.
+const LAYER = ['z-50', 'z-[60]', 'z-[70]'];
+
+export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-xl', floatingActions = null, level = 0 }) {
   const shouldReduceMotion = useReducedMotion();
   const titleId = useId();
   const [hasTitle, setHasTitle] = useState(false);
@@ -129,13 +133,13 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
     <DialogContext.Provider value={{ titleId, setHasTitle }}>
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+        <div className={cn('fixed inset-0 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto', LAYER[level] || LAYER[0])}>
           {/* Scrim Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
+            transition={SCRIM}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 dark:bg-black/60"
           />
@@ -148,7 +152,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
               initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
               animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
               exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+              transition={DIALOG}
               role="dialog"
               aria-modal="true"
               aria-labelledby={hasTitle ? titleId : undefined}
@@ -165,7 +169,7 @@ export function Dialog({ open, onClose, children, className, maxWidth = 'max-w-x
                 initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
                 animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
                 exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
-                transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+                transition={DIALOG}
                 className="absolute -right-12 sm:-right-14 top-0 z-30 flex flex-col pointer-events-auto"
                 dir="ltr"
               >

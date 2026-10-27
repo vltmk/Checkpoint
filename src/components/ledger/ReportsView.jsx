@@ -1,5 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { Copy, Download, ReceiptText } from 'lucide-react';
 import { boosterReport, marginReport, reportSummary, toCsv } from '../../lib/ledger/selectors';
+import { buildReportReceipt } from '../../lib/ledger/reportReceipt';
+import { Button } from '../ui/Button';
+import { ReportReceipt } from './ReportReceipt';
+import { copyText, saveTextFile, withBom } from './files';
 import { fromMinor } from '../../lib/ledger/money';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
@@ -18,6 +23,7 @@ export function ReportsView() {
   const [groupBy, setGroupBy] = useState('month');
   const [range, setRange] = useState('all');
   const [copied, setCopied] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const report = useMemo(
     () => (ctx
@@ -50,10 +56,17 @@ export function ReportsView() {
   const maxEarned = Math.max(1, ...people.map((r) => r.earnedMinor));
   const th = 'text-xs font-normal text-zinc-500 pb-1.5';
 
+  const groups = [
+    { value: 'month', label: f.t('lg.reports.month', 'Month') },
+    { value: 'platform', label: isBooster ? f.t('lg.reports.client', 'Client') : f.t('lg.reports.platform', 'Platform') },
+    { value: 'game', label: f.t('lg.reports.game', 'Game') },
+    ...(isBooster ? [] : [{ value: 'booster', label: f.t('lg.reports.booster', 'Booster') }]),
+  ];
+
   const summary = report.rows.length ? reportSummary(report) : null;
   const ranges = ['all', '30', '90', '365'].map((v) => ({ value: v, label: f.t(`lg.reports.range.${v}`, v === 'all' ? 'All time' : v === '365' ? '12 months' : `${v} days`) }));
 
-  const copyCsv = async () => {
+  const csvText = () => {
     const cols = [
       [groups.find((g) => g.value === groupBy)?.label, (r) => label(r.key)],
       [isBooster ? f.t('lg.reports.jobs', 'Jobs') : f.t('lg.reports.orders', 'Orders'), (r) => r.orders],
@@ -64,21 +77,43 @@ export function ReportsView() {
       ...(showExpenses ? [[f.t('lg.reports.fees', 'Fees and expenses'), (r) => fromMinor(r.expensesMinor, cur)], [f.t('lg.wf.margin', 'You keep'), (r) => fromMinor(r.keepMinor, cur)]] : []),
     ];
     const rows = [cols.map((c) => c[0]), ...report.rows.map((r) => cols.map((c) => c[1](r))), cols.map((c, i) => (i === 0 ? f.t('lg.reports.total', 'Total') : c[1](report.totals)))];
+    return toCsv(rows);
+  };
+  const copyCsv = async () => {
     try {
-      await navigator.clipboard.writeText(toCsv(rows));
+      await copyText(csvText());
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard unavailable: nothing to do, the table stays as is.
     }
   };
+  const saveCsv = () => saveTextFile(`checkpoint-report-${groupBy}-${range}.csv`, withBom(csvText())).catch(() => {});
 
-  const groups = [
-    { value: 'month', label: f.t('lg.reports.month', 'Month') },
-    { value: 'platform', label: isBooster ? f.t('lg.reports.client', 'Client') : f.t('lg.reports.platform', 'Platform') },
-    { value: 'game', label: f.t('lg.reports.game', 'Game') },
-    ...(isBooster ? [] : [{ value: 'booster', label: f.t('lg.reports.booster', 'Booster') }]),
-  ];
+  // the period in words, for the receipt: "All time", or "Sep 27, 2026 – Oct 27, 2026"
+  const periodText = range === 'all'
+    ? f.t('lg.reports.range.all', 'All time')
+    : `${f.date(new Date(Date.now() - Number(range) * 86400000).toISOString())} – ${f.date(new Date().toISOString())}`;
+  const receipt = summary ? buildReportReceipt(report, {
+    profile: profileId,
+    period: `${periodText} · ${groups.find((g) => g.value === groupBy)?.label}`,
+    generatedAt: f.t('lg.rr.generated', 'Made {date}', { date: `${f.date(new Date().toISOString())} ${f.time(new Date().toISOString())}` }),
+    fmt: { money: (m) => f.money(m, cur), num: (n) => f.formatNumber(n), label },
+    words: {
+      title: isBooster ? f.t('lg.rr.titleBooster', 'Earnings report') : f.t('lg.rr.title', 'Sales report'),
+      count: isBooster ? f.t('lg.reports.jobs', 'Jobs') : f.t('lg.reports.orders', 'Orders'),
+      volume: f.t('lg.reports.volume', 'Volume'),
+      fee: f.t('lg.reports.fee', 'Platform fee'),
+      team: isBooster ? f.t('lg.rr.team', 'Teammates') : f.t('lg.wf.boosters', 'Boosters'),
+      margin: marginLabel,
+      expenses: isBooster ? f.t('lg.reports.expenses', 'Expenses') : f.t('lg.reports.fees', 'Fees and expenses'),
+      average: isBooster ? f.t('lg.rr.avgJob', 'Average per job') : f.t('lg.reports.sumAvg', 'Average per order'),
+      keep: f.t('lg.wf.margin', 'You keep'),
+      topTitle: f.t('lg.rr.top', 'Best {group}', { group: (groups.find((g) => g.value === groupBy)?.label || '').toLowerCase() }),
+      approx: f.t('lg.approx', 'Amounts in mixed currencies are converted at your current rates.'),
+    },
+  }) : null;
+
 
   return (
     <div className="space-y-8 pb-8">
@@ -92,9 +127,17 @@ export function ReportsView() {
           <div className="flex items-center justify-between gap-3 mb-4">
             <Segmented ariaLabel={f.t('lg.reports.range', 'Period')} value={range} onChange={setRange} options={ranges} />
             {summary && (
-              <button type="button" onClick={copyCsv} className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                {copied ? f.t('lg.reports.copied', 'Copied') : f.t('lg.reports.copyCsv', 'Copy CSV')}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <Button variant="ghost" size="sm" onClick={copyCsv} title={f.t('lg.reports.copyCsv', 'Copy CSV')}>
+                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />{copied ? f.t('lg.reports.copied', 'Copied') : f.t('lg.reports.copyCsv', 'Copy CSV')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={saveCsv}>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />{f.t('lg.reports.saveCsv', 'Save CSV')}
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg" onClick={() => setReceiptOpen(true)}>
+                  <ReceiptText className="h-3.5 w-3.5" aria-hidden="true" />{f.t('lg.rr.open', 'Receipt')}
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -194,6 +237,7 @@ export function ReportsView() {
         )}
         {report?.isApproximate && <p className="mt-2 text-[11px] text-zinc-400">{f.t('lg.approx', 'Amounts in mixed currencies are converted at your current rates.')}</p>}
       </div>
+      <ReportReceipt open={receiptOpen && Boolean(receipt)} onClose={() => setReceiptOpen(false)} receipt={receipt} />
     </div>
   );
 }

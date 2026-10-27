@@ -226,7 +226,7 @@ export function UpdateModal({
             {/* Monochromatic Progress Bar */}
             <div dir="ltr" className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
-                className="h-full bg-zinc-800 dark:bg-zinc-200 transition-all duration-150"
+                className="h-full bg-zinc-800 dark:bg-zinc-200 transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>

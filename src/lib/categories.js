@@ -40,6 +40,7 @@ export const DEFAULT_CATEGORIES = [
     icon: null, // Uses built-in retail SVG
     isDefault: true,
     supportsGold: true,
+    goldUnit: '1k', // retail gold is quoted per 1,000
   },
   {
     id: 'cat_wow_classic',
@@ -48,6 +49,7 @@ export const DEFAULT_CATEGORIES = [
     icon: null, // Uses built-in retail/classic SVG
     isDefault: true,
     supportsGold: true,
+    goldUnit: '1', // classic gold is quoted per 1
   },
 ];
 
@@ -72,6 +74,8 @@ export async function loadCategories() {
     return {
       ...c,
       supportsGold: c.supportsGold !== undefined ? Boolean(c.supportsGold) : isWoW,
+      // categories saved before the unit existed: classic quotes per 1, everything else per 1,000
+      goldUnit: c.goldUnit === '1' || c.goldUnit === '1k' ? c.goldUnit : (/classic/i.test(c.name || '') ? '1' : '1k'),
     };
   });
 
@@ -200,15 +204,22 @@ export function getCategoryByName(name, categoriesList = []) {
 }
 
 /**
- * Whether a game offers Gold as a currency. A category's own setting wins; a game that is not a category yet
- * is judged by its name, and an empty game does not restrict anything.
+ * Whether a game offers Gold as a currency: only a category that has "Uses gold" turned on in Settings (World of
+ * Warcraft and Classic come with it on). No game, or a game that is not a category, never offers Gold.
+ * Saved categories from before the setting existed get it once, from their name, in loadCategories.
  */
 export function categorySupportsGold(name, categoriesList = []) {
   const clean = typeof name === 'string' ? name.trim().toLowerCase() : '';
-  if (!clean) return true;
+  if (!clean) return false;
   const cat = categoriesList.find((c) => c.name?.trim().toLowerCase() === clean);
-  if (cat && cat.supportsGold !== undefined) return Boolean(cat.supportsGold);
-  return clean.includes('world of warcraft');
+  return Boolean(cat?.supportsGold);
+}
+
+/** How a game's gold is priced: '1' (Toman per 1 gold, like WoW Classic) or '1k' (per 1,000, like retail WoW). */
+export function categoryGoldUnit(name, categoriesList = []) {
+  const clean = typeof name === 'string' ? name.trim().toLowerCase() : '';
+  const cat = clean ? categoriesList.find((c) => c.name?.trim().toLowerCase() === clean) : null;
+  return cat?.goldUnit === '1' ? '1' : '1k';
 }
 
 /**
@@ -234,6 +245,9 @@ export function mergeCategories(existing = [], imported = []) {
       color: item.color || DEFAULT_WOW_COLOR,
       icon: typeof item.icon === 'string' && item.icon.startsWith('data:image/') ? item.icon : (item.icon || null),
       isDefault: Boolean(item.isDefault),
+      // gold settings travel with the category, so a restored backup keeps which games trade in gold and how
+      ...(item.supportsGold !== undefined ? { supportsGold: Boolean(item.supportsGold) } : {}),
+      ...(item.goldUnit === '1' || item.goldUnit === '1k' ? { goldUnit: item.goldUnit } : {}),
     };
 
     if (existingIndex >= 0) {

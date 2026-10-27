@@ -21,6 +21,9 @@ import {
   lastPaidAtByTarget,
   payerCreditBuckets,
   writtenOffByOrder,
+  activeSharesOf,
+  isShareOwed,
+  shareAppliedMinor,
 } from './engine.js';
 import { collapseBuckets, convertMinor, normalizeCurrency } from './money.js';
 import { UNKNOWN_PAYER_ID } from './legacyMapper.js';
@@ -43,7 +46,7 @@ export function payerList(ctx, parties, { rates, displayCurrency, now = Date.now
   for (const o of liveJobs(ctx)) {
     const key = payerKey(o);
     const g = groups.get(key) || { key, party: payerParty(partyById, key), jobs: 0, owedMinor: 0, progressMinor: 0, collectedMinor: 0, oldestMs: null, isApproximate: false };
-    const receivable = orderReceivableMinor(o);
+    const receivable = orderReceivableMinor(o, ctx);
     const received = Math.min(receivable, orderReceivedMinor(ctx, o.id));
     const outstanding = receivable - received;
     const lock = orderRateOpts(o);
@@ -77,7 +80,7 @@ export function payerStatement(ctx, key, { rates, displayCurrency }) {
   const jobPaidAt = lastPaidAtByTarget(ctx, 'order');
   for (const o of liveJobs(ctx)) {
     if (payerKey(o) !== (key || '')) continue;
-    const receivable = orderReceivableMinor(o);
+    const receivable = orderReceivableMinor(o, ctx);
     events.push({
       type: 'job', id: o.id, at: Date.parse(o.dateTime), order: o, amountMinor: receivable, currency: normalizeCurrency(o.currency),
       appliedMinor: Math.min(receivable, orderReceivedMinor(ctx, o.id)), done: o.lifecycle === 'done', paidAt: jobPaidAt.get(o.id) ?? null,
@@ -124,7 +127,7 @@ export function payerAging(ctx, key, { rates, displayCurrency, now = Date.now() 
   let isApproximate = false;
   for (const o of liveJobs(ctx)) {
     if (payerKey(o) !== (key || '') || o.lifecycle !== 'done') continue;
-    const outstanding = orderReceivableMinor(o) - orderReceivedMinor(ctx, o.id);
+    const outstanding = orderReceivableMinor(o, ctx) - orderReceivedMinor(ctx, o.id);
     if (outstanding <= 0) continue;
     const days = Math.max(0, Math.floor((now - Date.parse(o.dateTime)) / 86400000));
     const band = days <= 7 ? '0-7' : days <= 30 ? '8-30' : days <= 90 ? '31-90' : '90+';
@@ -172,6 +175,17 @@ export function boosterOverview(ctx, parties, { rates, displayCurrency, now = Da
   const progressMinor = payers.reduce((s, p) => s + p.progressMinor, 0);
   const team = peopleList(ctx, parties, { rates, displayCurrency, now }).filter((p) => p.party.id !== 'party_unassigned');
   const teamOwedMinor = team.reduce((s, p) => s + p.display.owedNowMinor, 0);
+  // of the money clients still owe me on finished jobs, how much I will pass on to teammates I pay myself:
+  // "net after your team" is what is really mine of what is coming in
+  let teamOnOwedMinor = 0;
+  for (const o of liveJobs(ctx)) {
+    if (o.lifecycle !== 'done' || orderReceivableMinor(o, ctx) - orderReceivedMinor(ctx, o.id) <= 0) continue;
+    for (const sh of activeSharesOf(ctx, o.id)) {
+      if (!isShareOwed(sh, o)) continue;
+      const left = sh.amountMinor - Math.min(sh.amountMinor, shareAppliedMinor(ctx, sh.id));
+      if (left > 0) teamOnOwedMinor += conv(left, o.currency, orderRateOpts(o));
+    }
+  }
 
   const attention = [];
   for (const p of payers) if (p.owedMinor > 0 && p.agingDays >= staleDays) attention.push({ type: 'client_overdue', key: p.key, days: p.agingDays });
@@ -180,7 +194,7 @@ export function boosterOverview(ctx, parties, { rates, displayCurrency, now = Da
     oldestDays: payers.reduce((m, p) => Math.max(m, p.owedMinor > 0 ? p.agingDays : 0), 0),
     earnedMinor: earned, spentMinor: spent, keptMinor: earned - spent, jobsThisMonth: jobs,
     allTimeEarnedMinor: allTimeEarned, allTimeSpentMinor: allTimeSpent,
-    teamOwedMinor, team, payers, attention, recentPayments: recent.slice(0, 6), isApproximate: approximate,
+    teamOwedMinor, teamOnOwedMinor, team, payers, attention, recentPayments: recent.slice(0, 6), isApproximate: approximate,
   };
 }
 
@@ -189,7 +203,7 @@ export function payerOwedByCurrency(ctx, key) {
   const out = {};
   for (const o of liveJobs(ctx)) {
     if (payerKey(o) !== (key || '') || o.lifecycle !== 'done') continue;
-    const outstanding = orderReceivableMinor(o) - orderReceivedMinor(ctx, o.id);
+    const outstanding = orderReceivableMinor(o, ctx) - orderReceivedMinor(ctx, o.id);
     if (outstanding <= 0) continue;
     const c = normalizeCurrency(o.currency);
     out[c] = (out[c] || 0) + outstanding;

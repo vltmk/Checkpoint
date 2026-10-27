@@ -30,7 +30,6 @@ export function BoosterOverview({ onNavigate, onReceive, onNewJob, onExpense, on
       >
         <Button variant="primary" onClick={onNewJob}><Plus className="w-3.5 h-3.5" />{f.t('lg.job.new', 'Add a job')}</Button>
         <Button variant="outline" onClick={onImport}>{f.t('lg.import.link', 'Import from a spreadsheet')}</Button>
-        <Button variant="ghost" onClick={() => ledger.loadSample()}>{f.t('lg.sample.try', 'Try with sample data')}</Button>
       </EmptyState>
     );
   }
@@ -134,13 +133,13 @@ export function BoosterOverview({ onNavigate, onReceive, onNewJob, onExpense, on
           </ul>
         )}
         {ov.teamOwedMinor > 0 && (
-          <button type="button" onClick={() => { onNavigate('people'); }} className="mt-3 text-xs text-amber-700 dark:text-amber-300 hover:underline">
+          <button type="button" onClick={() => { ledger.setClientsView('team'); onNavigate('people'); }} className="mt-3 text-xs text-amber-700 dark:text-amber-300 hover:underline">
             {f.t('lg.ov.team', 'You owe your teammates {amount}', { amount: f.money(ov.teamOwedMinor, cur, true) })}
           </button>
         )}
-        {ov.teamOwedMinor > 0 && (
+        {ov.teamOnOwedMinor > 0 && ov.owedMinor > 0 && (
           <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
-            {f.t('lg.ov.net', 'Net after your team: {amount}', { amount: f.money(ov.owedMinor - ov.teamOwedMinor, cur, true) })}
+            {f.t('lg.ov.net', 'Net after your team: {amount}', { amount: f.money(Math.max(0, ov.owedMinor - ov.teamOnOwedMinor), cur, true) })}
           </p>
         )}
       </section>

@@ -22,15 +22,9 @@ test("FrostedGlass does not force overflow-hidden on the base container or menu 
     "FrostedGlass must not have overflow-hidden in base class"
   );
 
-  // Modal and drawer should retain overflow-hidden for layout containment
-  assert.ok(
-    frostedGlassCode.includes("modal: 'checkpoint-frosted-modal border-t sm:border border-zinc-200/80 dark:border-zinc-800/80 rounded-t-2xl sm:rounded-xl overflow-hidden'"),
-    "modal variant must have overflow-hidden"
-  );
-  assert.ok(
-    frostedGlassCode.includes("drawer: 'checkpoint-frosted-drawer border-l border-zinc-200/90 dark:border-zinc-800/90 overflow-hidden'"),
-    "drawer variant must have overflow-hidden"
-  );
+  // Dialogs and drawers are solid panels now (Dialog.jsx, the drawers' own motion.div): no glass variants for them
+  assert.ok(!frostedGlassCode.includes("modal: 'checkpoint-frosted-modal"), 'no modal glass variant');
+  assert.ok(!frostedGlassCode.includes("drawer: 'checkpoint-frosted-drawer"), 'no drawer glass variant');
 
   // Menu variant must NOT have overflow-hidden so submenus can fly out
   assert.ok(

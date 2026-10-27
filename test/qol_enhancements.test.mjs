@@ -14,10 +14,7 @@ const categoriesCode = fs.readFileSync(path.join(rootDir, 'src', 'lib', 'categor
 test('Categories include supportsGold flag and only 2 default categories', () => {
   assert.ok(categoriesCode.includes('supportsGold: true'), 'WoW categories must have supportsGold: true');
   assert.ok(categoriesCode.includes('supportsGold: c.supportsGold !== undefined ? Boolean(c.supportsGold) : isWoW'), 'loadCategories should preserve supportsGold');
-  
-  const tutorialSeed = JSON.parse(fs.readFileSync(path.join(rootDir, 'checkpoint_tutorial_seed.json'), 'utf8'));
-  assert.equal(tutorialSeed.categories.length, 2, 'Tutorial seed must only have 2 default categories');
-  assert.equal(tutorialSeed.preferences.categories.length, 2, 'Tutorial seed preferences must only have 2 default categories');
+
 });
 
 test('db.js implements retroactive rename methods for sources and teammates', () => {

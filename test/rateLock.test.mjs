@@ -9,7 +9,7 @@ import { bucketKey, decodeBucketKey, collapseBuckets, convertMinor } from '../sr
 import { cockpitSummary, marginReport } from '../src/lib/ledger/selectors.js';
 import { boosterOverview, payerList } from '../src/lib/ledger/boosterSelectors.js';
 import { sanitizeRow, cleanRates } from '../src/lib/ledger/ledgerSchema.js';
-import { rateFormFor, rateFieldsFromForm } from '../src/lib/ledger/rateLock.js';
+import { rateFormFor, rateFieldsFromForm, lastGoldRate, goldRateStart } from '../src/lib/ledger/rateLock.js';
 
 const DAY1 = { goldRateTOMAN: 3200, usdRateTOMAN: 100000, eurRateUSD: 1.1 };
 const TODAY = { goldRateTOMAN: 4000, usdRateTOMAN: 120000, eurRateUSD: 1.2 }; // everything got more expensive
@@ -124,9 +124,9 @@ test('imported rates are cleaned: junk, negative or absurd values are dropped, n
 });
 
 test('the order form: new jobs start from today, edits show the job\'s own rates, a bad entry keeps the saved rate', () => {
-  assert.deepEqual(rateFormFor(null, TODAY), { gold: '4000', usd: '120000', eur: '1.2' });
+  assert.deepEqual(rateFormFor(null, TODAY), { gold: '4000', goldUnit: '1k', usd: '120000', eur: '1.2' });
   const old = job('o', 'USD', 1000);
-  assert.deepEqual(rateFormFor(old, TODAY), { gold: '3200', usd: '100000', eur: '1.1' });
+  assert.deepEqual(rateFormFor(old, TODAY), { gold: '3200', goldUnit: '1k', usd: '100000', eur: '1.1' });
   const typed = rateFieldsFromForm({ gold: '3,200', usd: '۱۰۰۰۰۰', eur: 'oops' }, { base: old, currentRates: TODAY });
   assert.equal(typed.rates.usdRateTOMAN, 100000, 'Persian digits are read');
   assert.equal(typed.rates.eurRateUSD, 1.1, 'unreadable text keeps the saved EUR rate, not today\'s');
@@ -144,4 +144,36 @@ test('a payment keeps its own rates: a fee paid in USD is worth what it was on t
   const s = (rates) => cockpitSummary(ctx, parties, { rates, displayCurrency: 'TOMAN', now: NOW }).realizedMarginMinor;
   assert.equal(s(DAY1), 10000000 - 1000000); // $10 fee at 100,000
   assert.equal(s(TODAY), 10000000 - 1000000);
+});
+
+test('a new gold job starts from the last rate used for the same game, then any game', () => {
+  const orders = [
+    { id: 'a', currency: 'GOLD', game: 'World of Warcraft', exchangeRate: 3000, rateUnit: '1k', dateTime: '2026-10-01T00:00:00Z' },
+    { id: 'b', currency: 'GOLD', game: 'World of Warcraft', exchangeRate: 3400, rateUnit: '1k', dateTime: '2026-10-20T00:00:00Z' },
+    { id: 'c', currency: 'GOLD', game: 'WoW Classic', exchangeRate: 90, rateUnit: '1', dateTime: '2026-10-25T00:00:00Z' },
+    { id: 'd', currency: 'USD', game: 'World of Warcraft', exchangeRate: 9999, dateTime: '2026-10-26T00:00:00Z' },
+  ];
+  assert.deepEqual(lastGoldRate(orders, 'world of warcraft'), { rate: 3400, unit: '1k', sameGame: true });
+  assert.deepEqual(lastGoldRate(orders, 'WoW Classic'), { rate: 90, unit: '1', sameGame: true });
+  assert.deepEqual(lastGoldRate(orders, 'Lost Ark'), { rate: 90, unit: '1', sameGame: false });
+  assert.equal(lastGoldRate([], 'World of Warcraft'), null);
+});
+
+test('the gold unit chosen on the form is what the job saves', () => {
+  const perOne = rateFieldsFromForm({ gold: '90', goldUnit: '1', usd: '100000', eur: '1.1' });
+  assert.equal(perOne.rateUnit, '1');
+  assert.equal(perOne.rates.isPerOneGold, true);
+  assert.equal(rateFieldsFromForm({ gold: '3200', goldUnit: '1k' }, { currentRates: DAY1 }).rateUnit, '1k');
+});
+
+test('a new gold job starts in its game\'s own unit, and never borrows a rate in the wrong unit', () => {
+  const orders = [{ id: 'a', currency: 'GOLD', game: 'World of Warcraft', exchangeRate: 3400, rateUnit: '1k', dateTime: '2026-10-20T00:00:00Z' }];
+  // WoW Classic is per 1: the per-1,000 rate of retail must not be offered
+  assert.deepEqual(goldRateStart(orders, 'WoW Classic', { categoryUnit: '1', fallbackPer1k: 3200 }), { rate: null, unit: '1', source: '' });
+  // a game priced per 1,000 may borrow it, and the app's saved rate is the last resort
+  assert.deepEqual(goldRateStart(orders, 'Lost Ark', { categoryUnit: '1k' }), { rate: 3400, unit: '1k', source: 'any' });
+  assert.deepEqual(goldRateStart([], 'Lost Ark', { categoryUnit: '1k', fallbackPer1k: 3200 }), { rate: 3200, unit: '1k', source: 'app' });
+  // once Classic has a job, that job's rate and unit lead
+  const withClassic = [...orders, { id: 'c', currency: 'GOLD', game: 'WoW Classic', exchangeRate: 90, rateUnit: '1', dateTime: '2026-10-25T00:00:00Z' }];
+  assert.deepEqual(goldRateStart(withClassic, 'wow classic', { categoryUnit: '1' }), { rate: 90, unit: '1', source: 'game' });
 });

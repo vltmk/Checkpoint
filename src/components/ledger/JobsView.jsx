@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { CheckSquare, ClipboardList, Clock, Percent, Plus, Search, SearchX, Store, Users } from 'lucide-react';
+import { AnimatePresence } from 'motion/react';
+import { ClipboardList, Clock, Percent, Plus, SearchX, Store, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { orderRows } from '../../lib/ledger/selectors';
 import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
@@ -12,8 +12,8 @@ import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, Meta, Money, Segmented, PaidToggle, TOOLBAR_INPUT } from './parts';
-import { RowActions, openOnBlankClick } from './RowActions';
+import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
+import { RowActions } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
 import { useRowSelection } from './useRowSelection';
@@ -100,27 +100,27 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
 
   return (
     <div className="pb-8">
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Segmented ariaLabel={f.t('lg.orders.view', 'Order view')} value={view} onChange={(v) => { setView(v); setLimit(PAGE); }}
-          options={[
-            { value: 'all', label: f.t('lg.orders.all', 'All'), count: counts.all },
-            { value: 'active', label: f.t('lg.jobs.inProgress', 'In progress'), count: counts.active },
-            { value: 'done', label: f.t('lg.orders.done', 'Done'), count: counts.done },
-          ]} />
-        <Segmented ariaLabel={f.t('lg.orders.money', 'Money')} value={money} onChange={(v) => { setMoney(v); setLimit(PAGE); }}
-          options={[
-            { value: 'all', label: f.t('lg.orders.anyMoney', 'Any') },
-            { value: 'unpaid', label: f.t('lg.jobs.unpaid', 'Unpaid') },
-            { value: 'paid', label: f.t('lg.jobs.paid', 'Paid') },
-          ]} />
-        <div className="w-48">
-          <Input data-ledger-search className={TOOLBAR_INPUT} prefixIcon={<Search className="w-3.5 h-3.5" />} value={local} onChange={(e) => setLocal(e.target.value)} placeholder={f.t('lg.jobs.search', 'Search jobs')} aria-label={f.t('lg.jobs.search', 'Search jobs')} />
-        </div>
-        <Button variant={sel.active ? 'primary' : 'outline'} size="sm" className="rounded-lg" onClick={sel.active ? sel.exit : sel.enter} aria-pressed={sel.active}>
-          <CheckSquare className="w-3.5 h-3.5" />{sel.active ? f.t('lg.sel.done', 'Done') : f.t('lg.sel.select', 'Select')}
-        </Button>
-        <Button variant="primary" size="sm" className="ms-auto rounded-lg" onClick={onNewJob}><Plus className="w-3.5 h-3.5" />{f.t('lg.job.new', 'Add a job')}</Button>
-      </div>
+      <ListToolbar
+        filters={<>
+          <Segmented ariaLabel={f.t('lg.orders.view', 'Order view')} value={view} onChange={(v) => { setView(v); setLimit(PAGE); }}
+            options={[
+              { value: 'all', label: f.t('lg.orders.all', 'All'), count: counts.all },
+              { value: 'active', label: f.t('lg.jobs.inProgress', 'In progress'), count: counts.active },
+              { value: 'done', label: f.t('lg.orders.done', 'Done'), count: counts.done },
+            ]} />
+          <Segmented ariaLabel={f.t('lg.orders.money', 'Money')} value={money} onChange={(v) => { setMoney(v); setLimit(PAGE); }}
+            options={[
+              { value: 'all', label: f.t('lg.orders.anyMoney', 'Any') },
+              { value: 'unpaid', label: f.t('lg.jobs.unpaid', 'Unpaid') },
+              { value: 'paid', label: f.t('lg.jobs.paid', 'Paid') },
+            ]} />
+        </>}
+        actions={<>
+          <ToolbarSearch value={local} onChange={setLocal} placeholder={f.t('lg.jobs.search', 'Search jobs')} />
+          <SelectModeButton active={sel.active} onToggle={sel.active ? sel.exit : sel.enter} label={f.t('lg.sel.select', 'Select')} doneLabel={f.t('lg.sel.done', 'Done')} />
+          <Button variant="primary" size="sm" className="rounded-lg" onClick={onNewJob}><Plus className="w-3.5 h-3.5" />{f.t('lg.job.new', 'Add a job')}</Button>
+        </>}
+      />
       {error && <p role="alert" className="mb-2 text-xs text-rose-600 dark:text-rose-400">{error}</p>}
 
       {filtered.length === 0 ? (
@@ -224,8 +224,11 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
           })}
         </div>
       )}
+      {/* the bar leaves the way it came, instead of vanishing when the last row is unticked */}
+      <AnimatePresence>
       {selectedRows.length > 0 && (
         <SelectionBar
+          key="selection"
           profile="booster"
           count={selectedRows.length}
           recap={recap}
@@ -240,6 +243,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
           onCopy={copySelection}
         />
       )}
+      </AnimatePresence>
       {filtered.length > limit && <div className="mt-4 text-center"><Button variant="outline" onClick={() => setLimit((l) => l + PAGE)}>{f.t('lg.showMore', 'Show more')}</Button></div>}
     </div>
   );

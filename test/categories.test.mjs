@@ -64,7 +64,7 @@ test('i18n contains translations for categories and cropper', () => {
   assert.ok(i18nCode.includes("'categories.accentColor': 'رنگ شاخص'"));
 });
 
-test('categorySupportsGold follows the category setting, then the name, and never blocks an empty game', () => {
+test('categorySupportsGold only offers Gold for categories that turned it on', () => {
   const src = categoriesCode.match(/export function categorySupportsGold[\s\S]*?\n}\n/)[0].replace('export ', '');
   const categorySupportsGold = new Function(`${src}; return categorySupportsGold;`)();
   const list = [
@@ -73,12 +73,13 @@ test('categorySupportsGold follows the category setting, then the name, and neve
     { name: 'Gold Game', supportsGold: true },
     { name: 'Legacy Game' },
   ];
-  assert.equal(categorySupportsGold('', list), true);
-  assert.equal(categorySupportsGold(undefined, list), true);
+  assert.equal(categorySupportsGold('', list), false);
+  assert.equal(categorySupportsGold(undefined, list), false);
   assert.equal(categorySupportsGold(' valorant ', list), false);
   assert.equal(categorySupportsGold('GOLD GAME', list), true);
   assert.equal(categorySupportsGold('Legacy Game', list), false);
-  assert.equal(categorySupportsGold('World of Warcraft Classic', []), true);
+  assert.equal(categorySupportsGold('World of Warcraft', list), true);
+  assert.equal(categorySupportsGold('World of Warcraft Classic', []), false); // not a category: no guessing from the name
   assert.equal(categorySupportsGold('Elden Ring', []), false);
 });
 
@@ -94,4 +95,23 @@ test('both Add Work modals pick the game from the categories and can create one 
   const shell = read('LedgerShell.jsx');
   assert.equal((shell.match(/onRefreshCategories=\{onRefreshCategories\}/g) || []).length, 2);
   assert.ok(appCode.includes('onRefreshCategories={refreshCategories}'));
+});
+
+test('gold units: WoW Classic is per 1, retail per 1,000, and older saved categories get a sensible unit', () => {
+  assert.ok(categoriesCode.includes("goldUnit: '1', // classic gold is quoted per 1"));
+  assert.ok(categoriesCode.includes("goldUnit: '1k', // retail gold is quoted per 1,000"));
+  const src = categoriesCode.match(/export function categoryGoldUnit[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const categoryGoldUnit = new Function(`${src}; return categoryGoldUnit;`)();
+  const list = [{ name: 'WoW Classic', goldUnit: '1' }, { name: 'World of Warcraft', goldUnit: '1k' }, { name: 'Other' }];
+  assert.equal(categoryGoldUnit('wow classic', list), '1');
+  assert.equal(categoryGoldUnit('World of Warcraft', list), '1k');
+  assert.equal(categoryGoldUnit('Other', list), '1k');
+  assert.equal(categoryGoldUnit('Unknown', list), '1k');
+});
+
+test('importing categories keeps their gold flag and unit', () => {
+  const src = categoriesCode.match(/export function mergeCategories[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const mergeCategories = new Function('DEFAULT_WOW_COLOR', `${src}; return mergeCategories;`)('#c68a4c');
+  const out = mergeCategories([], [{ name: 'Lost Ark', supportsGold: true, goldUnit: '1' }, { name: 'Valorant', supportsGold: false }]);
+  assert.deepEqual(out.map((c) => [c.name, c.supportsGold, c.goldUnit]), [['Lost Ark', true, '1'], ['Valorant', false, undefined]]);
 });

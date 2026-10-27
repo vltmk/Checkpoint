@@ -17,7 +17,8 @@ import {
   activeSharesOf,
   shareAppliedMinor,
   isShareEarned,
-  isShareActive,
+  isShareOwed,
+  isPaidByPayer,
   orderRateOpts,
   paymentRateOpts,
   payerKey,
@@ -49,7 +50,7 @@ export function peopleList(ctx, parties, { rates, displayCurrency, now = Date.no
     const disp = partyBalanceDisplay(bal, displayCurrency, rates);
     // archiving hides a settled person, never money that is still owed or held
     if (party.archived && disp.netMinor === 0) continue;
-    const mine = ctx.shares.filter((s) => s.partyId === party.id && activeSharesOf(ctx, s.orderId).some((x) => x.id === s.id));
+    const mine = ctx.shares.filter((s) => s.partyId === party.id && isShareOwed(s, ctx.orderById.get(s.orderId)));
     const openOrders = new Set(mine.filter((s) => ctx.orderById.get(s.orderId)?.lifecycle !== 'done').map((s) => s.orderId)).size;
     const totalOrders = new Set(mine.map((s) => s.orderId)).size;
     rows.push({
@@ -114,10 +115,13 @@ export function orderRows(ctx, partyById) {
       const shares = ctx.shares
         .filter((s) => s.orderId === order.id && s.state !== 'cancelled')
         .map((share) => {
-          const applied = Math.min(share.amountMinor, shareAppliedMinor(ctx, share.id));
+          // the payer pays this teammate directly: nothing is outstanding from me
+          const byPayer = isPaidByPayer(share);
+          const applied = byPayer ? share.amountMinor : Math.min(share.amountMinor, shareAppliedMinor(ctx, share.id));
           return {
             share,
             party: partyById.get(share.partyId) || { id: share.partyId, name: '?' },
+            byPayer,
             appliedMinor: applied,
             outstandingMinor: Math.max(0, share.amountMinor - applied),
             paid: applied >= share.amountMinor,
@@ -128,7 +132,7 @@ export function orderRows(ctx, partyById) {
       return {
         order,
         dead,
-        receivableMinor: orderReceivableMinor(order),
+        receivableMinor: orderReceivableMinor(order, ctx),
         marginMinor: dead ? 0 : orderMarginMinor(ctx, order),
         shares,
         money: orderMoneyState(ctx, order),
@@ -147,7 +151,7 @@ export function partyStatement(ctx, partyId, { rates, displayCurrency }) {
   const shareById = new Map(ctx.shares.map((s) => [s.id, s]));
   const sharePaidAt = lastPaidAtByTarget(ctx, 'share');
   for (const share of ctx.shares) {
-    if (share.partyId !== partyId || share.state === 'cancelled') continue;
+    if (share.partyId !== partyId || share.state === 'cancelled' || isPaidByPayer(share)) continue;
     const order = ctx.orderById.get(share.orderId);
     if (!order || DEAD_LIFECYCLES.has(order.lifecycle)) continue;
     events.push({
@@ -221,7 +225,7 @@ export function partyAging(ctx, partyId, { rates, displayCurrency, now = Date.no
   for (const share of ctx.shares) {
     if (share.partyId !== partyId) continue;
     const order = ctx.orderById.get(share.orderId);
-    if (!order || !isShareActive(share, order) || !isShareEarned(share, order)) continue;
+    if (!order || !isShareOwed(share, order) || !isShareEarned(share, order)) continue;
     const outstanding = share.amountMinor - shareAppliedMinor(ctx, share.id);
     if (outstanding <= 0) continue;
     const days = Math.max(0, Math.floor((now - Date.parse(order.dateTime)) / 86400000));

@@ -16,6 +16,10 @@ import { previewSettleUp, previewReceivePayout, computeWithdrawalLayers, entered
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
+import { formatAmountText } from './AmountInput';
+import { lastGoldRate } from '../../lib/ledger/rateLock';
+import { useFormDraft } from './useFormDraft';
+import { DraftNotice } from './FormLayout';
 import { Money } from './parts';
 
 const MAX_PROOF_BYTES = 4 * 1024 * 1024;
@@ -64,9 +68,10 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
   const [result, setResult] = useState(null);
   const amountRef = useRef(null);
 
-  // Fresh form every time the dialog opens
-  useEffect(() => {
-    if (!open) return;
+  // Fresh form every time the dialog opens (also what Clear goes back to)
+  const restoredPickRef = useRef(undefined); // the payer a restored draft chose: its fee layers are kept, not reloaded
+  const loadForm = () => {
+    restoredPickRef.current = undefined;
     setPickedId(partyId);
     setAmountText('');
     setAmountTouched(false);
@@ -85,23 +90,59 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
     setDateTime(toLocalISOString());
     const party = partyId ? partyById.get(partyId) : null;
     setCurrency(normalizeCurrency(party?.defaultCurrency || displayCurrency || 'TOMAN'));
+  };
+  useEffect(() => {
+    if (!open) return undefined;
+    loadForm();
     const id = setTimeout(() => amountRef.current?.focus(), 60);
     return () => clearTimeout(id);
-  }, [open, partyId, partyById, displayCurrency, advance]);
+  }, [open, partyId, advance]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // what was typed survives an accidental close, one draft per kind of payment and person. A payout started from
+  // ticked rows is about exactly those rows, so it never picks up an older draft.
+  const draft = useFormDraft({
+    open,
+    key: presetIds ? null : `payment_${mode}${advance ? '_advance' : ''}_${partyId || 'any'}`,
+    hasContent: (v) => Boolean(v.amountText.trim() || v.note.trim() || v.feeLayers.length || v.excluded.length || (v.pickedId && v.pickedId !== partyId)),
+    value: { pickedId, amountText, amountTouched, currency, dateTime, feeLayers, takenOut, remember, rateOver, note, includeOpen, asAdvance, excluded },
+    restore: (d) => {
+      if ('pickedId' in d) { setPickedId(d.pickedId); restoredPickRef.current = d.pickedId; }
+      if (typeof d.amountText === 'string') setAmountText(d.amountText);
+      if ('amountTouched' in d) setAmountTouched(Boolean(d.amountTouched));
+      if (d.currency) setCurrency(d.currency);
+      if (d.dateTime) setDateTime(d.dateTime);
+      if (Array.isArray(d.feeLayers)) setFeeLayers(d.feeLayers);
+      if ('takenOut' in d) setTakenOut(Boolean(d.takenOut));
+      if ('remember' in d) setRemember(Boolean(d.remember));
+      if (d.rateOver && typeof d.rateOver === 'object') setRateOver(d.rateOver);
+      if (typeof d.note === 'string') setNote(d.note);
+      if ('includeOpen' in d) setIncludeOpen(Boolean(d.includeOpen));
+      if ('asAdvance' in d) setAsAdvance(Boolean(d.asAdvance));
+      if (Array.isArray(d.excluded)) setExcluded(d.excluded);
+    },
+  });
 
   // "" means money from nobody in particular (a job with no payer); null means nothing chosen yet
   const hasPick = pickedId !== null && pickedId !== undefined && (isPay ? pickedId !== '' : true);
   const party = !hasPick ? null : pickedId === '' ? NO_PAYER : partyById.get(pickedId) || null;
 
+  // Gold has no app-wide rate any more (each gold job carries its own): a payment starts from the last gold rate used,
+  // as a price per 1,000 gold (what this dialog's gold field means), else the app's saved rate
+  const usualGold = useMemo(() => {
+    const last = ctx ? lastGoldRate(ctx.orders, '') : null;
+    return last ? (last.unit === '1' ? last.rate * 1000 : last.rate) : rates?.goldRateTOMAN;
+  }, [ctx, rates]);
+
   // The rates actually used: the app's rates, unless this payment overrides them
   const effRates = useMemo(() => {
-    const n = (v, base) => (Number(v) > 0 ? Number(v) : base);
-    return { ...rates, usdRateTOMAN: n(rateOver.usd, rates?.usdRateTOMAN), goldRateTOMAN: n(rateOver.gold, rates?.goldRateTOMAN), eurRateUSD: n(rateOver.eur, rates?.eurRateUSD) };
-  }, [rates, rateOver]);
+    const n = (v, base) => { const x = parseAmountShorthand(v ?? ''); return x > 0 ? x : base; };
+    return { ...rates, usdRateTOMAN: n(rateOver.usd, rates?.usdRateTOMAN), goldRateTOMAN: n(rateOver.gold, usualGold), eurRateUSD: n(rateOver.eur, rates?.eurRateUSD) };
+  }, [rates, rateOver, usualGold]);
 
   // Receiving from a platform: start from what it was last time for that platform
   useEffect(() => {
     if (!open || isPay || !party) return;
+    if (restoredPickRef.current !== undefined && restoredPickRef.current === pickedId) return;
     const rule = withdrawalRule(party);
     setFeeLayers(rule.layers.map((l) => {
       const flat = l.flatMinor ? convertMinor(l.flatMinor, rule.flatCurrency || currency, currency, effRates) : 0;
@@ -124,7 +165,7 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
   // the layers as numbers: percent, and flat amount in this payout's currency
   const layers = useMemo(() => feeLayers.map((l) => {
     const flatMajor = l.flat.trim() ? parseAmountShorthand(l.flat) : 0;
-    return { label: l.label.trim(), pct: Number(String(l.pct).replace(',', '.')) || 0, flatMinor: flatMajor === null ? 0 : toMinor(flatMajor, currency) };
+    return { label: l.label.trim(), pct: parseAmountShorthand(String(l.pct)) || 0, flatMinor: flatMajor === null ? 0 : toMinor(flatMajor, currency) };
   }), [feeLayers, currency]);
   // what the platform released (the orders are credited with this), the fee, and what actually reached the account
   const wd = useMemo(() => (isPay ? { releasedMinor: amountMinor, feeMinor: 0, netMinor: amountMinor, feeLines: [] } : computeWithdrawalLayers({ enteredMinor: amountMinor, layers, takenOut })), [isPay, amountMinor, layers, takenOut]);
@@ -233,6 +274,7 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
         await ledger.setPartySettings(party.id, { withdraw: { pct, flatMinor, flatCurrency: currency, takenOut, layers: kept.map((l) => ({ label: l.label, pct: l.pct, flatMinor: l.flatMinor })) } });
       }
       for (const p of proofs) await ledger.addProof({ ownerType: 'payment', ownerId: payment.id, ...p });
+      await draft.discard();
       onDone?.(payment);
       if (!isPay && !asAdvance) {
         // a payout: say what it did, then let the user undo or close. The preview is exactly what was written.
@@ -305,6 +347,8 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
                 dir="ltr"
                 value={amountText}
                 onChange={(e) => { setAmountText(e.target.value); setAmountTouched(true); }}
+                // grouped thousands in the app's digits once the amount is typed (shorthand like 3m stays as written)
+                onBlur={() => { if (amountMajor !== null && /^[\s\d۰-۹٠-٩,،٬.٫]*$/.test(amountText)) setAmountText(formatAmountText(amountMajor, f.isFa)); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && canSave) save(); }}
                 placeholder={f.t('lg.amount.hint', 'e.g. 3m, 250k, 1,200,000')}
                 hasError={amountText.trim() !== '' && amountMajor === null}
@@ -494,7 +538,7 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
                 {involved.has('GOLD') ? (
                   <label className="block">
                     <span className="text-[11px] text-zinc-500">{f.t('lg.rates.gold', '1,000 gold in Toman')}</span>
-                    <Input dir="ltr" inputMode="decimal" value={rateOver.gold ?? ''} onChange={(e) => setRateOver((r) => ({ ...r, gold: e.target.value }))} placeholder={String(rates?.goldRateTOMAN ?? '')} className="mt-0.5 tabular-nums" />
+                    <Input dir="ltr" inputMode="decimal" value={rateOver.gold ?? ''} onChange={(e) => setRateOver((r) => ({ ...r, gold: e.target.value }))} placeholder={String(usualGold ?? '')} className="mt-0.5 tabular-nums" />
                   </label>
                 ) : null}
                 {involved.has('EUR') ? (
@@ -540,6 +584,7 @@ export function PaymentDialog({ open, onClose, mode = 'pay', partyId = null, adv
           {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{error}</p>}
         </DialogContent>
         <DialogFooter>
+          <DraftNotice draft={draft} onClear={() => draft.clear(loadForm)} />
           <Button variant="ghost" onClick={onClose}>{f.t('common.cancel', 'Cancel')}</Button>
           <Button variant="primary" disabled={!canSave} onClick={save}>
             {isPay ? f.t('lg.pay.cta', 'Record payment') : f.t('lg.recv.cta', 'Record payout')}

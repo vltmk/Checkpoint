@@ -5,7 +5,6 @@ import {
   Check,
   RotateCw,
   Download,
-  Coins,
   Banknote,
   Sun,
   Moon,
@@ -16,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { cn } from '../../lib/utils';
+import { POPOVER } from '../../lib/motion';
 import { FrostedGlass } from './FrostedGlass';
 
 /**
@@ -353,10 +353,10 @@ export function ContextMenu({
       <FrostedGlass
         as="motion.div"
         variant="menu"
-        initial={{ opacity: 0, scale: 0.94 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        transition={{ type: 'spring', bounce: 0, duration: 0.16 }}
+        transition={POPOVER}
         style={{
           transformOrigin,
           maxHeight: isConstrained ? 'calc(100vh - 20px)' : undefined,
@@ -378,13 +378,7 @@ export function ContextMenu({
         <MenuDivider />
 
         <ContextMenuItem
-          icon={
-            globalCurrency === 'GOLD' ? (
-              <Coins className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            ) : (
-              <Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            )
-          }
+          icon={<Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
           label={t('contextMenu.toggleCurrency')}
           shortcut="T"
           suffix={
@@ -605,10 +599,10 @@ function SubmenuFlyout({
       as="motion.div"
       variant="menu"
       dir={isRtl ? 'rtl' : 'ltr'}
-      initial={{ opacity: 0, scale: 0.94 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ type: 'spring', bounce: 0, duration: 0.14 }}
+      transition={POPOVER}
       style={{
         transformOrigin: `${originY} ${originX}`,
         left: `${leftPos}px`,

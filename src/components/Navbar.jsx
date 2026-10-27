@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+
 import {
-  Layers,
   BarChart3,
-  Plus,
   Settings,
-  Coins,
+  ArrowLeftRight,
   ChevronDown,
   Check,
   Minus,
@@ -17,7 +15,6 @@ import {
   Zap,
   Megaphone,
   Calculator,
-  Trash2,
   Info,
   Gauge,
   Users,
@@ -26,9 +23,8 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
-import { CheckpointLogo, TomanIcon, DiscordIcon } from './ui/Icons';
+import { CheckpointLogo } from './ui/Icons';
 import { ProfilePopover } from './ui/ProfilePopover';
-import { STATUSES, STATUS_CONFIG, formatMoney } from '../lib/currencies';
 import {
   minimizeWindow,
   toggleMaximizeWindow,
@@ -41,14 +37,6 @@ import {
 
 import { useLanguage } from '../lib/i18n';
 import { cn } from '../lib/utils';
-import { trackerDB } from '../lib/db';
-import { getStaticAppVersion } from '../lib/updater';
-import {
-  shouldShowGoldRatioTour,
-  getStoredGoldRatioTourSeenVersion,
-  markGoldRatioTourSeen,
-  GOLD_RATIO_TOUR_SEEN_KEY,
-} from '../lib/tours';
 
 // OrderCalculatorPopover right-side drawer integration (toggled via onToggleCalculator & isCalculatorOpen)
 
@@ -58,7 +46,6 @@ export function Navbar({
   globalCurrency = 'TOMAN',
   onCurrencyChange,
   goldRateTOMAN = 3200,
-  onGoldRateTOMANChange,
   closeToTray = true,
   minimizeToTray = false,
   onOpenWorkModal,
@@ -81,19 +68,15 @@ export function Navbar({
   onSaveRates,
   onTransferFromCalculator,
 }) {
+  const navTab = activeProfileId === 'booster' && activeTab === 'money' ? 'cockpit' : activeTab;
   const { t, formatNumber, isRtl, language } = useLanguage();
   const isDesktop = isTauri();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isRatesOpen, setIsRatesOpen] = useState(false);
   const [isProfilePopoverOpen, setIsProfilePopoverOpen] = useState(false);
-  const [tempRateTOMAN, setTempRateTOMAN] = useState(goldRateTOMAN);
   const [tempRateUSD, setTempRateUSD] = useState(usdRateTOMAN);
   const [tempRateEUR, setTempRateEUR] = useState(eurRateUSD);
   const ratesDropdownRef = useRef(null);
-
-  useEffect(() => {
-    setTempRateTOMAN(goldRateTOMAN);
-  }, [goldRateTOMAN]);
 
   useEffect(() => {
     setTempRateUSD(usdRateTOMAN);
@@ -102,71 +85,6 @@ export function Navbar({
   useEffect(() => {
     setTempRateEUR(eurRateUSD);
   }, [eurRateUSD]);
-
-  // Booster profile Gold Exchange Ratio tour management
-  const [isTourGuideDismissed, setIsTourGuideDismissed] = useState(false);
-  const [shouldShowTour, setShouldShowTour] = useState(() => {
-    const effVersion = appVersion || getStaticAppVersion();
-    const lastSeen = getStoredGoldRatioTourSeenVersion();
-    const lastKnown = null;
-    return shouldShowGoldRatioTour({
-      currentVersion: effVersion,
-      lastSeenVersion: lastSeen,
-      lastKnownVersion: lastKnown,
-    });
-  });
-
-  // Re-verify eligibility whenever appVersion arrives or changes from SQLite DB
-  useEffect(() => {
-    let isCancelled = false;
-    const checkEligibility = async () => {
-      try {
-        const effVersion = appVersion || getStaticAppVersion();
-        const dbSeen = await trackerDB.getSetting(GOLD_RATIO_TOUR_SEEN_KEY, null);
-        const lastKnown = (await trackerDB.getSetting('checkpoint_last_known_version', null));
-        const effectiveSeen = dbSeen || getStoredGoldRatioTourSeenVersion();
-        if (!isCancelled) {
-          const eligible = shouldShowGoldRatioTour({
-            currentVersion: effVersion,
-            lastSeenVersion: effectiveSeen,
-            lastKnownVersion: lastKnown,
-          });
-          setShouldShowTour(eligible);
-        }
-      } catch (e) {}
-    };
-
-    checkEligibility();
-    return () => {
-      isCancelled = true;
-    };
-  }, [appVersion]);
-
-  // Mark tour as seen for the current version once it loads for Booster profile
-  useEffect(() => {
-    if (activeProfileId === 'booster' && shouldShowTour && !isTourGuideDismissed) {
-      const effVersion = appVersion || getStaticAppVersion();
-      if (effVersion) {
-        markGoldRatioTourSeen(effVersion);
-      }
-    }
-  }, [activeProfileId, shouldShowTour, isTourGuideDismissed, appVersion]);
-
-  const dismissTour = () => {
-    setIsTourGuideDismissed(true);
-    setShouldShowTour(false);
-    const effVersion = appVersion || getStaticAppVersion();
-    if (effVersion) {
-      markGoldRatioTourSeen(effVersion);
-    }
-  };
-
-  const showTourGuide = activeProfileId !== 'advertiser' && shouldShowTour && !isTourGuideDismissed && !isRatesOpen;
-  const isRateUpdateNeeded = showTourGuide;
-
-  const handleDismissTour = () => {
-    dismissTour();
-  };
 
   // Desktop window maximize state listener
   useEffect(() => {
@@ -193,28 +111,24 @@ export function Navbar({
     };
   }, [isDesktop]);
 
-  // Click outside listener for Rates dropdown and tour guide
+  // Click outside listener for the rates dropdown
   useEffect(() => {
-    if (!isRatesOpen && !showTourGuide) return;
+    if (!isRatesOpen) return;
 
     const handleClickOutside = (e) => {
-      if (ratesDropdownRef.current && !ratesDropdownRef.current.contains(e.target)) {
-        if (isRatesOpen) setIsRatesOpen(false);
-        if (showTourGuide) dismissTour();
-      }
+      if (ratesDropdownRef.current && !ratesDropdownRef.current.contains(e.target)) setIsRatesOpen(false);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isRatesOpen, showTourGuide]);
+  }, [isRatesOpen]);
 
   const handleSaveRate = () => {
-    dismissTour();
-    // an empty or invalid field keeps the rate you already had; it never snaps back to a built-in default
-    const gRate = Number(tempRateTOMAN) > 0 ? Number(tempRateTOMAN) : goldRateTOMAN;
+    // an empty or invalid field keeps the rate you already had; it never snaps back to a built-in default.
+    // The gold rate is not edited here any more (each gold job carries its own), so it is passed through unchanged.
+    const gRate = goldRateTOMAN;
     const uRate = Number(tempRateUSD) > 0 ? Number(tempRateUSD) : usdRateTOMAN;
     const eRate = Number(tempRateEUR) > 0 ? Number(tempRateEUR) : eurRateUSD;
-    onGoldRateTOMANChange?.(gRate);
     onSaveRates?.({
       goldRateTOMAN: gRate,
       usdRateTOMAN: uRate,
@@ -330,8 +244,9 @@ export function Navbar({
           )}
         </div>
 
-        {/* View Switcher Pills. Booster: Ledger / Analytics. Advertiser: Overview, Orders, Boosters, Money, Reports. */}
+        {/* View Switcher Pills. Booster: Overview, Jobs, Clients, Reports (Money opens from the Overview). Advertiser: Overview, Orders, Boosters, Money, Reports. */}
         <div data-no-drag className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-md p-0.5 ml-1">
+          {/* the Booster's Money screen opens from the Overview, so Overview stays lit while it is open */}
           {(activeProfileId === 'advertiser'
             ? [
                 { id: 'cockpit', icon: Gauge, label: t('nav.cockpit') },
@@ -351,10 +266,10 @@ export function Navbar({
               key={id}
               type="button"
               onClick={() => onTabChange?.(id)}
-              aria-current={activeTab === id ? 'page' : undefined}
+              aria-current={navTab === id ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
-                activeTab === id
+                navTab === id
                   ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
@@ -395,90 +310,24 @@ export function Navbar({
         <div className="relative" ref={ratesDropdownRef} data-no-drag>
           <button
             type="button"
-            onClick={() => {
-              dismissTour();
-              setTempRateTOMAN(goldRateTOMAN);
-              setIsRatesOpen((prev) => !prev);
-            }}
+            onClick={() => setIsRatesOpen((prev) => !prev)}
             title={
               language === 'fa'
-                ? `نرخ تبدیل گلد: ۱k = ${goldRateTOMAN?.toLocaleString()} تومان`
-                : `Gold Ratio: 1k = ${goldRateTOMAN?.toLocaleString()} Toman`
+                ? `نرخ دلار: ۱ دلار = ${formatNumber(Number(usdRateTOMAN || 0).toLocaleString())} تومان`
+                : `Exchange rates: $1 = ${Number(usdRateTOMAN || 0).toLocaleString()} Toman`
             }
-            aria-label="Configure Gold Ratio"
+            aria-label={language === 'fa' ? 'نرخ‌های تبدیل ارز' : 'Exchange rates'}
             className={cn(
               'relative p-1.5 rounded-md transition-colors cursor-pointer select-none',
               isRatesOpen
-                ? 'bg-zinc-100 dark:bg-zinc-900 text-amber-600 dark:text-amber-400'
+                ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100'
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900'
             )}
           >
-            <Coins className={cn('w-3.5 h-3.5', isRatesOpen ? 'text-amber-600 dark:text-amber-400' : 'text-amber-500/90 dark:text-amber-400/90')} />
-            {isRateUpdateNeeded && (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400/70 motion-safe:animate-[ping_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
-                />
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white dark:ring-black" />
-              </>
-            )}
+            <ArrowLeftRight className="w-3.5 h-3.5" />
           </button>
 
-          {/* Tour Guide Card */}
-          <AnimatePresence>
-            {showTourGuide && (
-              <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
-                data-no-drag
-                dir={isRtl ? 'rtl' : 'ltr'}
-                onMouseDown={(e) => e.stopPropagation()}
-                onDoubleClick={(e) => e.stopPropagation()}
-                className="absolute top-full right-0 mt-2 w-72 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl space-y-2.5 z-50 text-zinc-900 dark:text-zinc-100"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-5 h-5 rounded bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                      <Coins className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={cn('text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider truncate', isRtl && 'font-farsi')}>
-                        {language === 'fa' ? 'نرخ روزانه گلد' : 'Daily Gold Ratio'}
-                      </h4>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDismissTour}
-                    aria-label={language === 'fa' ? 'بستن' : 'Close'}
-                    className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded transition-colors cursor-pointer shrink-0"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-                <p className={cn('text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed', isRtl && 'font-farsi')}>
-                  {language === 'fa'
-                    ? 'با کلیک روی این دکمه می‌توانید نرخ تبدیل گلد به تومان را برای تمام رکوردها تغییر دهید.'
-                    : 'Click this button anytime to adjust your gold conversion rate for all entries.'}
-                </p>
-                <div className="flex items-center justify-end pt-1">
-                  <Button
-                    variant="primary"
-                    size="xs"
-                    onClick={handleDismissTour}
-                    className={cn('h-6 px-3 text-xs font-medium', isRtl && 'font-farsi')}
-                  >
-                    {language === 'fa' ? 'متوجه شدم' : 'Got it'}
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Gold & Fiat Rates Dropdown */}
+          {/* USD and EUR rates dropdown (gold is priced on each gold job) */}
           {isRatesOpen && (
             <div
               data-no-drag
@@ -499,28 +348,12 @@ export function Navbar({
                 <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                 <p>
                   {language === 'fa'
-                    ? 'این نرخ‌ها ورودی‌های گلد، دلار و یورو را به تومان تبدیل می‌کنند تا مجموع‌ها، تحلیل‌ها و کارت‌های آمار درست بمانند. به‌صورت خودکار به‌روز نمی‌شوند؛ هر بار که بازار تغییر کرد، نرخ فعلی را وارد و ذخیره کنید.'
-                    : 'These rates convert Gold, USD and EUR entries into Toman for totals, analytics and metric cards. They do not update automatically: enter the current market rate and save whenever it changes.'}
+                    ? 'این نرخ‌ها مبالغ دلار و یورو را در کارهای جدید به تومان تبدیل می‌کنند. خودکار به‌روز نمی‌شوند؛ هر بار بازار تغییر کرد، نرخ فعلی را ذخیره کنید. نرخ گلد روی هر کار گلدی جداگانه پرسیده می‌شود.'
+                    : 'These rates convert USD and EUR into Toman on new jobs. They do not update automatically: save the current rate whenever it changes. Gold is priced on each gold job instead.'}
                 </p>
               </div>
 
-              {/* 1. Gold Rate */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
-                  <span className={cn('font-medium', isRtl && 'font-farsi')}>{language === 'fa' ? 'تبدیل ۱,۰۰۰ گلد' : '1,000 Gold (G)'}</span>
-                  <span className="font-mono text-zinc-400">{language === 'fa' ? 'تومان' : 'Toman'}</span>
-                </div>
-                <NumberStepperInput
-                  step={50}
-                  value={tempRateTOMAN}
-                  onChange={(e) => setTempRateTOMAN(e.target.value)}
-                  placeholder="3200"
-                  currency="TOMAN"
-                  className="text-xs"
-                />
-              </div>
-
-              {/* 2. USD Rate */}
+              {/* 1. USD Rate */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
                   <span className={cn('font-medium', isRtl && 'font-farsi')}>{language === 'fa' ? 'تبدیل ۱ دلار (USD)' : '1 USD ($)'}</span>
@@ -536,7 +369,7 @@ export function Navbar({
                 />
               </div>
 
-              {/* 3. EUR Rate */}
+              {/* 2. EUR Rate */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400">
                   <span className={cn('font-medium', isRtl && 'font-farsi')}>{language === 'fa' ? 'تبدیل ۱ یورو (EUR)' : '1 EUR (€)'}</span>
