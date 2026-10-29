@@ -14,7 +14,6 @@ import { JobsView } from './JobsView';
 import { ClientsView } from './ClientsView';
 import { JobModal } from './JobModal';
 import { ExpenseDialog } from './ExpenseDialog';
-import { CurrencyStepper } from './CurrencyStepper';
 import { OrdersView } from './OrdersView';
 import { PeopleView } from './PeopleView';
 import { MoneyView } from './MoneyView';
@@ -29,7 +28,7 @@ const LedgerReceipt = lazy(() => import('./LedgerReceipt').then((m) => ({ defaul
 
 /** Both profiles' screens and the dialogs they open. App.jsx only decides which tab is active. */
 
-export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categories, onRefreshCategories, newOrderSignal, quote }) {
+export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCategories, newOrderSignal, quote }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, status, error } = ledger;
@@ -110,9 +109,6 @@ export function LedgerShell({ activeTab, onTabChange, onCurrencyChange, categori
 
   return (
     <>
-      {/* amounts can be shown in any currency; this changes every total on every screen at once */}
-      {onCurrencyChange && <CurrencyStepper value={ledger.displayCurrency} onChange={onCurrencyChange} rates={ledger.rates} />}
-
       {/* a short fade on every screen change, opacity only: number keys switch tabs often, so nothing moves or waits */}
       <motion.div key={`${ledger.profileId}:${tab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={SCREEN}>
       {isBooster ? (

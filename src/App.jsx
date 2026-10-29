@@ -1394,7 +1394,6 @@ export default function App() {
                       <LedgerShell
                         activeTab={visibleTab}
                         onTabChange={handleTabChange}
-                        onCurrencyChange={handleCurrencyChange}
                         categories={categories}
                         onRefreshCategories={refreshCategories}
                         newOrderSignal={newOrderSignal}

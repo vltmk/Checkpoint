@@ -25,6 +25,7 @@ import { Button } from './ui/Button';
 import { NumberStepperInput } from './ui/NumberStepperInput';
 import { CheckpointLogo } from './ui/Icons';
 import { ProfilePopover } from './ui/ProfilePopover';
+import { CurrencyStepper } from './ledger/CurrencyStepper';
 import {
   minimizeWindow,
   toggleMaximizeWindow,
@@ -304,6 +305,15 @@ export function Navbar({
               <span className="font-mono">v{updateInfo.version}</span>
             </button>
           </div>
+        )}
+
+        {/* Display currency: changes every total on every screen at once */}
+        {onCurrencyChange && (
+          <CurrencyStepper
+            value={globalCurrency}
+            onChange={onCurrencyChange}
+            rates={{ usdRateTOMAN, eurRateUSD }}
+          />
         )}
 
         {/* Exchange Rates Button (Booster & Advertiser profiles) */}
