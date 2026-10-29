@@ -12,7 +12,7 @@ import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DateFilter, DayHeader, EmptyState, Initial, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle, TOOLBAR_SELECT } from './parts';
+import { DateFilter, DayHeader, EmptyState, FilterChip, Initial, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
 import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
@@ -51,6 +51,8 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
   }), [rows]);
 
   const bounds = useMemo(() => dateBounds(period, custom), [period, custom]);
+  const narrowing = money !== 'all' || personId !== '' || period !== 'all';
+  const clearFilters = () => { setMoney('all'); setPersonId(''); setPeriod('all'); setCustom({ from: '', to: '' }); setLimit(PAGE); };
   const filtered = useMemo(() => rows.filter((r) => {
     if (!inDateBounds(r.order.dateTime, bounds)) return false;
     if (view !== 'all' && orderTab(r) !== view) return false;
@@ -108,7 +110,10 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
   return (
     <div className="pb-8">
       <ListToolbar
-        filters={<>
+        shown={filtered.length}
+        total={rows.length}
+        onClear={narrowing ? clearFilters : undefined}
+        tabs={
           <Segmented
             ariaLabel={f.t('lg.orders.view', 'Order view')}
             value={view}
@@ -119,9 +124,12 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
               { value: 'all', label: f.t('lg.orders.all', 'All'), count: counts.all },
             ]}
           />
-          <Segmented
-            ariaLabel={f.t('lg.orders.money', 'Money')}
+        }
+        filters={<>
+          <FilterChip
+            label={f.t('lg.orders.money', 'Money')}
             value={money}
+            active={money !== 'all'}
             onChange={(v) => { setMoney(v); setLimit(PAGE); }}
             options={[
               { value: 'all', label: f.t('lg.orders.anyMoney', 'Any') },
@@ -130,15 +138,13 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
             ]}
           />
           {people.length > 0 && (
-            <div className="w-32">
-              <Select
-                value={personId}
-                onChange={(v) => { setPersonId(v); setLimit(PAGE); }}
-                options={[{ value: '', label: f.t('lg.orders.anyPerson', 'Any booster') }, ...people.map((p) => ({ value: p.id, label: f.name(p) }))]}
-                ariaLabel={f.t('lg.orders.person', 'Booster')}
-                className={TOOLBAR_SELECT}
-              />
-            </div>
+            <FilterChip
+              label={f.t('lg.orders.person', 'Booster')}
+              value={personId}
+              active={personId !== ''}
+              onChange={(v) => { setPersonId(v); setLimit(PAGE); }}
+              options={[{ value: '', label: f.t('lg.orders.anyPerson', 'Any booster') }, ...people.map((p) => ({ value: p.id, label: f.name(p) }))]}
+            />
           )}
           <DateFilter value={period} onChange={(v) => { setPeriod(v); setLimit(PAGE); }} custom={custom} onCustomChange={(c) => { setCustom(c); setLimit(PAGE); }} />
         </>}

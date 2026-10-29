@@ -13,7 +13,7 @@ import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DateFilter, DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
+import { DateFilter, DayHeader, EmptyState, FilterChip, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
 import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
@@ -51,6 +51,8 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
   }), [rows]);
 
   const bounds = useMemo(() => dateBounds(period, custom), [period, custom]);
+  const narrowing = money !== 'all' || period !== 'all';
+  const clearFilters = () => { setMoney('all'); setPeriod('all'); setCustom({ from: '', to: '' }); setLimit(PAGE); };
   const filtered = useMemo(() => rows.filter((r) => {
     if (!inDateBounds(r.order.dateTime, bounds)) return false;
     const l = r.order.lifecycle;
@@ -106,14 +108,23 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
   return (
     <div className="pb-8">
       <ListToolbar
-        filters={<>
+        shown={filtered.length}
+        total={rows.length}
+        onClear={narrowing ? clearFilters : undefined}
+        tabs={
           <Segmented ariaLabel={f.t('lg.orders.view', 'Order view')} value={view} onChange={(v) => { setView(v); setLimit(PAGE); }}
             options={[
               { value: 'all', label: f.t('lg.orders.all', 'All'), count: counts.all },
               { value: 'active', label: f.t('lg.jobs.inProgress', 'In progress'), count: counts.active },
               { value: 'done', label: f.t('lg.orders.done', 'Done'), count: counts.done },
             ]} />
-          <Segmented ariaLabel={f.t('lg.orders.money', 'Money')} value={money} onChange={(v) => { setMoney(v); setLimit(PAGE); }}
+        }
+        filters={<>
+          <FilterChip
+            label={f.t('lg.orders.money', 'Money')}
+            value={money}
+            active={money !== 'all'}
+            onChange={(v) => { setMoney(v); setLimit(PAGE); }}
             options={[
               { value: 'all', label: f.t('lg.orders.anyMoney', 'Any') },
               { value: 'unpaid', label: f.t('lg.jobs.unpaid', 'Unpaid') },

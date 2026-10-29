@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { AlertTriangle, CheckSquare, CircleCheck, CircleDashed, CirclePause, CirclePlay, CircleX, Search, Undo2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { AlertTriangle, ArrowRight, CheckSquare, CircleCheck, CircleDashed, CirclePause, CirclePlay, CircleX, Search, Undo2, X } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { MoneyDisplay } from '../ui/MoneyDisplay';
 import { GameIcon } from '../ui/GameIcon';
@@ -123,45 +123,105 @@ export function Segmented({ value, onChange, options, ariaLabel, className }) {
 }
 
 /**
- * A list screen's toolbar: filters on the start side, actions on the end side. It fits on one line at the smallest
- * window in English; when it cannot (longer Farsi labels), only the filters wrap, and the actions stay level with
- * their first row instead of floating between the two.
+ * A list screen's toolbar, in two tiers. The first row is what you do: the main view tabs on the start side, search,
+ * select and the primary action on the end side. The second row is how you narrow it: quiet filter chips, a clear
+ * button and the result count. The narrowing row is always there, so applying a filter never moves the list.
  */
-export function ListToolbar({ filters, actions }) {
+export function ListToolbar({ tabs, filters, actions, shown, total, onClear }) {
+  const f = useLedgerFormat();
+  const narrowed = typeof shown === 'number' && typeof total === 'number' && shown !== total;
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>
-      <div className="flex shrink-0 items-center gap-2">{actions}</div>
+    <div className="mb-4 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{tabs}</div>
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      </div>
+      <div className="flex min-h-7 items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {filters}
+          <AnimatePresence initial={false}>
+            {onClear && (
+              <motion.button
+                key="clear"
+                type="button"
+                onClick={onClear}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+                {f.t('lg.filter.clear', 'Clear')}
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+        {narrowed && (
+          <span aria-live="polite" className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+            {shown} {f.t('lg.filter.of', 'of')} {total}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-const DATE_INPUT = 'h-8 w-[8.25rem] rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/80 px-2 text-xs text-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark] focus:outline-none focus:border-zinc-300 dark:focus:border-zinc-700 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600';
+// A filter as a chip: dashed and quiet while it is off, solid once it narrows the list. The label stays in front of
+// the value so two chips never read as the same thing.
+const CHIP = 'h-7 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 bg-transparent dark:bg-transparent text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-900/60';
+const CHIP_ON = 'border-solid border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100';
+
+export function FilterChip({ label, value, onChange, options, active }) {
+  return (
+    <div className="w-auto">
+      <Select
+        value={value}
+        onChange={onChange}
+        options={options}
+        ariaLabel={label}
+        prefixIcon={<span className="text-zinc-500 dark:text-zinc-400">{label}</span>}
+        className={cn(CHIP, active && CHIP_ON)}
+      />
+    </div>
+  );
+}
+
+const DATE_INPUT = 'h-full w-[7.5rem] bg-transparent px-2 text-xs text-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark] focus:outline-none focus-visible:bg-zinc-200/60 dark:focus-visible:bg-zinc-800/60';
 
 /**
  * The date filter on the Orders / Jobs toolbars: a preset (today, 7 or 30 days, this or last month) or a custom
- * from-to range. `custom` is { from, to } as "YYYY-MM-DD" strings; either end may be empty.
+ * from-to range. `custom` is { from, to } as "YYYY-MM-DD" strings; either end may be empty. A custom range opens
+ * as one joined pill next to the chip, so the two dates read as a single range.
  */
 export function DateFilter({ value, onChange, custom, onCustomChange }) {
   const f = useLedgerFormat();
   const defaults = { all: 'Any date', today: 'Today', 7: 'Last 7 days', 30: 'Last 30 days', month: 'This month', lastMonth: 'Last month', custom: 'Custom range' };
   return (
     <>
-      <div className="w-36">
-        <Select
-          value={value}
-          onChange={onChange}
-          options={DATE_PRESETS.map((p) => ({ value: p, label: f.t(`lg.date.${p}`, defaults[p]) }))}
-          ariaLabel={f.t('lg.date.period', 'Date')}
-          className={TOOLBAR_SELECT}
-        />
-      </div>
-      {value === 'custom' && (
-        <>
-          <input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => onCustomChange({ ...custom, from: e.target.value })} aria-label={f.t('lg.date.from', 'From')} className={DATE_INPUT} />
-          <input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => onCustomChange({ ...custom, to: e.target.value })} aria-label={f.t('lg.date.to', 'To')} className={DATE_INPUT} />
-        </>
-      )}
+      <FilterChip
+        label={f.t('lg.date.period', 'Date')}
+        value={value}
+        onChange={onChange}
+        options={DATE_PRESETS.map((p) => ({ value: p, label: f.t(`lg.date.${p}`, defaults[p]) }))}
+        active={value !== 'all'}
+      />
+      <AnimatePresence initial={false}>
+        {value === 'custom' && (
+          <motion.div
+            key="range"
+            initial={{ opacity: 0, x: -4 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="inline-flex h-7 items-center overflow-hidden rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-100 dark:bg-zinc-900"
+          >
+            <input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => onCustomChange({ ...custom, from: e.target.value })} aria-label={f.t('lg.date.from', 'From')} className={DATE_INPUT} />
+            <ArrowRight className="h-3 w-3 shrink-0 text-zinc-400 rtl:rotate-180" aria-hidden="true" />
+            <input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => onCustomChange({ ...custom, to: e.target.value })} aria-label={f.t('lg.date.to', 'To')} className={DATE_INPUT} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
