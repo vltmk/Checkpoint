@@ -1810,6 +1810,19 @@ export class StorageDB {
     return store;
   }
 
+  // A profile's ledger for export, active or not. The inactive profile has no cached handle, so on desktop it is read
+  // through its own connection, the same way getProfileCounts reads it. The active profile is never rebound.
+  async openLedgerStoreForExport(profileId) {
+    await this.initPromise;
+    if (this.isDesktop && profileId !== this.activeProfile && !this.sqliteDbs[profileId]) {
+      const Database = (await import('@tauri-apps/plugin-sql')).default;
+      const store = createLedgerStore(createSqliteBackend(await Database.load(this.getSqliteDbPathForProfile(profileId))));
+      await store.init();
+      return store;
+    }
+    return this.getLedgerStore(profileId);
+  }
+
   /**
    * Upgrade a profile's legacy work_entries into the v2 ledger. Runs once per database (a version marker is
    * written last), takes a safety snapshot first, and never modifies or deletes legacy rows.

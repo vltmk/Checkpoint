@@ -63,7 +63,7 @@ export function SettingsModal({
   onCloseToTrayChange,
   minimizeToTray = false,
   onMinimizeToTrayChange,
-  onExportCsv,
+  onOpenCsvExport,
   onExportJson,
   onImportJson,
   onClearAllData,
@@ -115,7 +115,6 @@ export function SettingsModal({
   const [updateCheck, setUpdateCheck] = useState(null); // { state: 'upToDate' | 'error' | 'desktopOnly', at, message? }
   const [clearResult, setClearResult] = useState(null); // { state: 'running' | 'success' | 'error', purged? }
   const [exportJsonState, setExportJsonState] = useState('idle');
-  const [exportCsvState, setExportCsvState] = useState('idle');
   const [highlightBackup, setHighlightBackup] = useState(false);
   const [lastBackupStatus, setLastBackupStatus] = useState(null); // { ok, at, fileName?, error? } from the last backup attempt
   const [retentionDraft, setRetentionDraft] = useState(String(autoBackupRetention));
@@ -1160,12 +1159,11 @@ export function SettingsModal({
                       <Button
                         variant="secondary"
                         size="sm"
-                        disabled={exportCsvState === 'running'}
-                        onClick={() => runExport(setExportCsvState, onExportCsv)}
-                        className={cn('justify-start gap-2 text-xs sm:col-span-2 py-2 h-auto leading-relaxed', feedbackClass(exportCsvState), isRtl && 'font-farsi')}
+                        onClick={onOpenCsvExport}
+                        className={cn('justify-start gap-2 text-xs sm:col-span-2 py-2 h-auto leading-relaxed', isRtl && 'font-farsi')}
                       >
-                        {feedbackIcon(exportCsvState, FileSpreadsheet)}
-                        <span>{feedbackLabel(exportCsvState, t('settings.exportCsv'))}</span>
+                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                        <span>{t('settings.exportCsv')}</span>
                       </Button>
                     </div>
 

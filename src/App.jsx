@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { WelcomeFlow } from './components/WelcomeFlow';
 import { WELCOME_RELEASE, WELCOME_SEEN_KEY, crossesNotificationReset, welcomeMode } from './lib/welcome';
 import {
+  PROFILES,
   getActiveProfileId,
   setActiveProfileId,
   isProfileOnboardingCompleted,
@@ -137,6 +138,12 @@ const parseStringSetting = (val, fallback = '', allowedList = null) => {
   if (allowedList && !allowedList.includes(val)) return fallback;
   return val;
 };
+
+const CSV_PROFILE_CHOICES = [
+  { id: 'booster', label: PROFILES.booster.name },
+  { id: 'advertiser', label: PROFILES.advertiser.name },
+  { id: 'both', label: 'Both' },
+];
 
 const saveCsvFile = async (fileName, csvContent) => {
   if (isTauri()) {
@@ -290,6 +297,9 @@ export default function App() {
   const [settingsInitialScrollSection, setSettingsInitialScrollSection] = useState(null);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(null); // null | 'csv' | 'json'
+  const [csvProfiles, setCsvProfiles] = useState('both'); // which profile(s) the CSV export covers: 'booster' | 'advertiser' | 'both'
+  const csvProfileIds = csvProfiles === 'both' ? ['booster', 'advertiser'] : [csvProfiles];
+  const csvRecordCount = csvProfileIds.reduce((n, pid) => n + (profileCounts[pid] || 0), 0);
 
   // Context Menu State
   const [contextMenuState, setContextMenuState] = useState({ isOpen: false, x: 0, y: 0, rect: null });
@@ -931,12 +941,17 @@ export default function App() {
   };
 
   // Export CSV
-  const handleExportCsv = useCallback(async () => {
-    // One row per order or job from the ledger, with price, fee, team, margin and paid state
-    const data = await (await trackerDB.getLedgerStore()).loadAll();
-    if (data.orders.length === 0) return false;
-    const fileName = `checkpoint_orders_${new Date().toISOString().slice(0, 10)}.csv`;
-    return saveCsvFile(fileName, String.fromCharCode(0xfeff) + buildOrdersCsv(data));
+  const handleExportCsv = useCallback(async (profileIds) => {
+    // One file per chosen profile, each with a row per order or job from that profile's ledger: price, fee, team, margin and paid state
+    const date = new Date().toISOString().slice(0, 10);
+    let saved = false;
+    for (const pid of profileIds) {
+      const data = await (await trackerDB.openLedgerStoreForExport(pid)).loadAll();
+      if (data.orders.length === 0) continue;
+      const fileName = `checkpoint_${pid}_orders_${date}.csv`;
+      if (await saveCsvFile(fileName, String.fromCharCode(0xfeff) + buildOrdersCsv(data))) saved = true;
+    }
+    return saved;
   }, []);
 
   // Export JSON Backup
@@ -1440,7 +1455,10 @@ export default function App() {
         onCloseToTrayChange={handleCloseToTrayChange}
         minimizeToTray={minimizeToTray}
         onMinimizeToTrayChange={handleMinimizeToTrayChange}
-        onExportCsv={handleExportCsv}
+        onOpenCsvExport={() => {
+          setIsSettingsOpen(false);
+          setExportConfirm('csv');
+        }}
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onClearAllData={handleClearAllData}
@@ -1538,7 +1556,7 @@ export default function App() {
             <div className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
               <p className="text-zinc-900 dark:text-zinc-200 font-medium">
                 {exportConfirm === 'csv'
-                  ? `Export ${activeProfileCount} records to a formatted .csv spreadsheet?`
+                  ? `Export ${csvRecordCount} records to ${csvProfiles === 'both' ? 'a .csv file for each profile' : 'a .csv file'}?`
                   : `Save a complete backup with ${activeProfileCount} records and proofs?`}
               </p>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
@@ -1548,6 +1566,24 @@ export default function App() {
               </p>
             </div>
           </div>
+          {exportConfirm === 'csv' && (
+            <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Profiles to export">
+              {CSV_PROFILE_CHOICES.map((choice) => {
+                const selected = csvProfiles === choice.id;
+                return (
+                  <Button
+                    key={choice.id}
+                    variant={selected ? 'primary' : 'ghost'}
+                    size="sm"
+                    aria-pressed={selected}
+                    onClick={() => setCsvProfiles(choice.id)}
+                  >
+                    {choice.label}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
         </DialogContent>
 
         <DialogFooter>
@@ -1562,7 +1598,7 @@ export default function App() {
             variant="primary"
             size="sm"
             onClick={() => {
-              if (exportConfirm === 'csv') handleExportCsv();
+              if (exportConfirm === 'csv') handleExportCsv(csvProfileIds);
               if (exportConfirm === 'json') handleExportJson();
               setExportConfirm(null);
             }}
