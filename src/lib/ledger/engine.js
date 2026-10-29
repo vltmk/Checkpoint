@@ -133,9 +133,16 @@ export function buildContext({ orders = [], shares = [], payments = [], allocati
   for (const a of liveAllocs) {
     consumedByPayment.set(a.paymentId, (consumedByPayment.get(a.paymentId) || 0) + a.consumedMinor);
   }
+  // every share of an order, in ctx.shares order, so per-order lookups don't rescan all shares
+  const sharesByOrder = new Map();
+  for (const sh of shares) {
+    const list = sharesByOrder.get(sh.orderId);
+    if (list) list.push(sh); else sharesByOrder.set(sh.orderId, [sh]);
+  }
   return {
     orders,
     shares,
+    sharesByOrder,
     payments,
     allocations,
     effectivePayments: eff,
@@ -162,9 +169,14 @@ export function orderReceivableMinor(order, ctx = null) {
   return Math.max(0, orderNetMinor(order) - (ctx?.payerShareByOrder?.get(order.id) || 0));
 }
 
+/** Every share row of an order (cancelled ones too). Uses the context index; a hand-built context falls back to a scan. */
+export function sharesOfOrder(ctx, orderId) {
+  return ctx.sharesByOrder ? (ctx.sharesByOrder.get(orderId) || []) : ctx.shares.filter((s) => s.orderId === orderId);
+}
+
 export function activeSharesOf(ctx, orderId) {
   const order = ctx.orderById.get(orderId);
-  return ctx.shares.filter((s) => s.orderId === orderId && isShareActive(s, order));
+  return sharesOfOrder(ctx, orderId).filter((s) => isShareActive(s, order));
 }
 
 /** margin = receivable - sum(active shares). Dead orders (failed/refunded) have no margin. */

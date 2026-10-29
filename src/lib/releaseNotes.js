@@ -29,30 +29,30 @@ export function compareSemver(v1, v2) {
  * that has no entry, so a release can never go out without Farsi notes.
  */
 export const RELEASE_NOTES_REGISTRY = {
-  '5.3.1': {
-    date: '2026-10-28',
+  '5.4.0': {
+    date: '2026-10-29',
     title: {
-      en: "What's New in Checkpoint v5.3.1",
-      fa: 'تغییرات نسخه ۵.۳.۱',
+      en: "What's New in Checkpoint v5.4.0",
+      fa: 'تغییرات نسخه ۵.۴.۰',
     },
     summary: {
-      en: 'Screenshots open full size, and finished orders stay visible until they are paid.',
-      fa: 'اسکرین‌شات‌ها در اندازه کامل باز می‌شوند و سفارش‌های تمام‌شده تا زمان تسویه دیده می‌مانند.',
+      en: 'Filter Orders and Jobs by date, export CSV per profile, and big ledgers open much faster.',
+      fa: 'سفارش‌ها و کارها را بر اساس تاریخ فیلتر کنید، خروجی CSV را برای هر پروفایل بگیرید و دفترهای بزرگ بسیار سریع‌تر باز می‌شوند.',
     },
     items: {
       en: [
-        { tag: 'new', text: 'Screenshots open full size, with Copy and Download.' },
-        { tag: 'improved', text: 'Finished orders stay under Active, marked Unsettled, until paid both ways.' },
-        { tag: 'improved', text: 'Payout slips no longer show your notes.' },
-        { tag: 'improved', text: 'Close short appears only on partly paid orders.' },
-        { tag: 'fixed', text: 'Old announcements no longer come back in the notification center.' },
+        { tag: 'new', text: 'Date filter on Orders and Jobs: today, last 7 or 30 days, this or last month, or a custom range.' },
+        { tag: 'new', text: 'Export CSV from a dialog: pick Booster, Advertiser or both, one file per profile (Alt+E).' },
+        { tag: 'new', text: 'Drop a screenshot onto the add form to attach it, or paste with Ctrl+V.' },
+        { tag: 'improved', text: 'Orders and Jobs toolbar is now two rows with filter chips, and the display currency picker moved to the top bar.' },
+        { tag: 'improved', text: 'Orders and Jobs open far faster on ledgers with thousands of orders.' },
       ],
       fa: [
-        { tag: 'new', text: 'اسکرین‌شات‌ها در اندازه کامل باز می‌شوند، با امکان کپی و دانلود.' },
-        { tag: 'improved', text: 'سفارش‌های تمام‌شده تا تسویه کامل، با برچسب «تسویه‌نشده» در بخش فعال می‌مانند.' },
-        { tag: 'improved', text: 'برگه پرداخت بوسترها دیگر یادداشت‌های شما را نشان نمی‌دهد.' },
-        { tag: 'improved', text: 'گزینه «بستن با کسری» فقط روی سفارش‌هایی که بخشی از آن‌ها پرداخت شده نمایش داده می‌شود.' },
-        { tag: 'fixed', text: 'اطلاعیه‌های قدیمی دیگر در مرکز اعلان‌ها برنمی‌گردند.' },
+        { tag: 'new', text: 'فیلتر تاریخ در سفارش‌ها و کارها: امروز، ۷ یا ۳۰ روز اخیر، این ماه یا ماه قبل، یا بازه دلخواه.' },
+        { tag: 'new', text: 'خروجی CSV از یک پنجره: بوستر، تبلیغ‌دهنده یا هر دو را انتخاب کنید؛ یک فایل برای هر پروفایل (Alt+E).' },
+        { tag: 'new', text: 'اسکرین‌شات را روی فرم افزودن رها کنید تا پیوست شود، یا با Ctrl+V جای‌گذاری کنید.' },
+        { tag: 'improved', text: 'نوار ابزار سفارش‌ها و کارها دو ردیفه شد، با چیپ‌های فیلتر، و انتخاب ارز نمایش به نوار بالا منتقل شد.' },
+        { tag: 'improved', text: 'سفارش‌ها و کارها در دفترهای دارای هزاران سفارش بسیار سریع‌تر باز می‌شوند.' },
       ],
     },
   },

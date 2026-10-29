@@ -15,6 +15,7 @@ import {
   orderMoneyState,
   orderReceivableMinor,
   activeSharesOf,
+  sharesOfOrder,
   shareAppliedMinor,
   isShareEarned,
   isShareOwed,
@@ -138,8 +139,8 @@ export function orderRows(ctx, partyById) {
     .filter((o) => o.kind !== 'expense')
     .map((order) => {
       const dead = DEAD_LIFECYCLES.has(order.lifecycle);
-      const shares = ctx.shares
-        .filter((s) => s.orderId === order.id && s.state !== 'cancelled')
+      const shares = sharesOfOrder(ctx, order.id)
+        .filter((s) => s.state !== 'cancelled')
         .map((share) => {
           // the payer pays this teammate directly: nothing is outstanding from me
           const byPayer = isPaidByPayer(share);
