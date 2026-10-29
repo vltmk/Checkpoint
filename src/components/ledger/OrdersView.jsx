@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { CircleCheck, ClipboardList, Clock, Percent, Plus, SearchX, Store } from 'lucide-react';
+import { dateBounds, inDateBounds } from '../../lib/ledger/dateFilter';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import { isUnsettled, orderRows, orderTab } from '../../lib/ledger/selectors';
@@ -11,7 +12,7 @@ import { LIFECYCLES } from '../../lib/ledger/ledgerStore';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DayHeader, EmptyState, Initial, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle, TOOLBAR_SELECT } from './parts';
+import { DateFilter, DayHeader, EmptyState, Initial, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle, TOOLBAR_SELECT } from './parts';
 import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
@@ -34,6 +35,8 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
   const [personId, setPersonId] = useState('');
   const [local, setLocal] = useState('');
   const [limit, setLimit] = useState(PAGE);
+  const [period, setPeriod] = useState('all');
+  const [custom, setCustom] = useState({ from: '', to: '' });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -47,7 +50,9 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
     all: rows.length,
   }), [rows]);
 
+  const bounds = useMemo(() => dateBounds(period, custom), [period, custom]);
   const filtered = useMemo(() => rows.filter((r) => {
+    if (!inDateBounds(r.order.dateTime, bounds)) return false;
     if (view !== 'all' && orderTab(r) !== view) return false;
     if (money === 'collect' && (r.dead || r.money.collected)) return false;
     if (money === 'pay' && (r.dead || r.money.shareTotalMinor === 0 || r.money.boostersPaid)) return false;
@@ -57,7 +62,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
       if (!hay.includes(q)) return false;
     }
     return true;
-  }), [rows, view, money, personId, q]);
+  }), [rows, view, money, personId, q, bounds]);
 
   // ticked rows: "select all" and shift-range work over every filtered row, not just the page on screen
   const sel = useRowSelection(useMemo(() => filtered.map((r) => r.order.id), [filtered]));
@@ -135,6 +140,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
               />
             </div>
           )}
+          <DateFilter value={period} onChange={(v) => { setPeriod(v); setLimit(PAGE); }} custom={custom} onCustomChange={(c) => { setCustom(c); setLimit(PAGE); }} />
         </>}
         actions={<>
           <ToolbarSearch value={local} onChange={setLocal} placeholder={f.t('lg.orders.search', 'Search orders')} />

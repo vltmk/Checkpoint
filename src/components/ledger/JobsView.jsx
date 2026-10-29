@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { ClipboardList, Clock, Percent, Plus, SearchX, Store, Users } from 'lucide-react';
+import { dateBounds, inDateBounds } from '../../lib/ledger/dateFilter';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import { orderRows } from '../../lib/ledger/selectors';
@@ -12,7 +13,7 @@ import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 import { cn } from '../../lib/utils';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
-import { DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
+import { DateFilter, DayHeader, EmptyState, LIFE_ICON, LIFE_STYLE, GameTile, ListToolbar, Meta, Money, Segmented, SelectModeButton, ToolbarSearch, PaidToggle } from './parts';
 import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
@@ -36,6 +37,8 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
   const [money, setMoney] = useState('all');
   const [local, setLocal] = useState('');
   const [limit, setLimit] = useState(PAGE);
+  const [period, setPeriod] = useState('all');
+  const [custom, setCustom] = useState({ from: '', to: '' });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -47,7 +50,9 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
     all: rows.length,
   }), [rows]);
 
+  const bounds = useMemo(() => dateBounds(period, custom), [period, custom]);
   const filtered = useMemo(() => rows.filter((r) => {
+    if (!inDateBounds(r.order.dateTime, bounds)) return false;
     const l = r.order.lifecycle;
     if (view === 'active' && !ACTIVE.has(l)) return false;
     if (view === 'done' && l !== 'done') return false;
@@ -58,7 +63,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
       if (!hay.includes(q)) return false;
     }
     return true;
-  }), [rows, view, money, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  }), [rows, view, money, q, bounds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ticked rows: "select all" and shift-range work over every filtered row, not just the page on screen
   const sel = useRowSelection(useMemo(() => filtered.map((r) => r.order.id), [filtered]));
@@ -114,6 +119,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
               { value: 'unpaid', label: f.t('lg.jobs.unpaid', 'Unpaid') },
               { value: 'paid', label: f.t('lg.jobs.paid', 'Paid') },
             ]} />
+          <DateFilter value={period} onChange={(v) => { setPeriod(v); setLimit(PAGE); }} custom={custom} onCustomChange={(c) => { setCustom(c); setLimit(PAGE); }} />
         </>}
         actions={<>
           <ToolbarSearch value={local} onChange={setLocal} placeholder={f.t('lg.jobs.search', 'Search jobs')} />

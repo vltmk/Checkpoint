@@ -1,9 +1,11 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, CheckSquare, CircleCheck, CircleDashed, CirclePause, CirclePlay, CircleX, Search, Undo2 } from 'lucide-react';
+import { Select } from '../ui/Select';
 import { MoneyDisplay } from '../ui/MoneyDisplay';
 import { GameIcon } from '../ui/GameIcon';
 import { fromMinor } from '../../lib/ledger/money';
+import { DATE_PRESETS } from '../../lib/ledger/dateFilter';
 import { AGE_BUCKETS } from '../../lib/ledger/selectors';
 import { useLedgerFormat } from './format';
 import { cn } from '../../lib/utils';
@@ -131,6 +133,36 @@ export function ListToolbar({ filters, actions }) {
       <div className="flex min-w-0 flex-wrap items-center gap-2">{filters}</div>
       <div className="flex shrink-0 items-center gap-2">{actions}</div>
     </div>
+  );
+}
+
+const DATE_INPUT = 'h-8 w-[8.25rem] rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/80 dark:bg-zinc-900/80 px-2 text-xs text-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark] focus:outline-none focus:border-zinc-300 dark:focus:border-zinc-700 focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-600';
+
+/**
+ * The date filter on the Orders / Jobs toolbars: a preset (today, 7 or 30 days, this or last month) or a custom
+ * from-to range. `custom` is { from, to } as "YYYY-MM-DD" strings; either end may be empty.
+ */
+export function DateFilter({ value, onChange, custom, onCustomChange }) {
+  const f = useLedgerFormat();
+  const defaults = { all: 'Any date', today: 'Today', 7: 'Last 7 days', 30: 'Last 30 days', month: 'This month', lastMonth: 'Last month', custom: 'Custom range' };
+  return (
+    <>
+      <div className="w-36">
+        <Select
+          value={value}
+          onChange={onChange}
+          options={DATE_PRESETS.map((p) => ({ value: p, label: f.t(`lg.date.${p}`, defaults[p]) }))}
+          ariaLabel={f.t('lg.date.period', 'Date')}
+          className={TOOLBAR_SELECT}
+        />
+      </div>
+      {value === 'custom' && (
+        <>
+          <input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => onCustomChange({ ...custom, from: e.target.value })} aria-label={f.t('lg.date.from', 'From')} className={DATE_INPUT} />
+          <input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => onCustomChange({ ...custom, to: e.target.value })} aria-label={f.t('lg.date.to', 'To')} className={DATE_INPUT} />
+        </>
+      )}
+    </>
   );
 }
 
@@ -317,9 +349,12 @@ export function GameTile({ game, categories, className, size = 'md' }) {
   const category = Array.isArray(categories) && game ? categories.find((c) => c.name?.trim().toLowerCase() === String(game).trim().toLowerCase()) : null;
   const tint = /^#[0-9a-f]{6}$/i.test(category?.color || '') ? `${category.color}1f` : undefined;
   const large = size === 'lg';
+  // a category with its own image: the image is the tile, edge to edge. Without one (the built-in WoW mark or the
+  // generic pad) the small glyph sits on the tint.
+  const filled = Boolean(category?.icon);
   return (
-    <span className={cn('inline-flex shrink-0 items-center justify-center rounded-lg bg-zinc-500/10', large ? 'h-11 w-11' : 'h-9 w-9', className)} style={tint ? { backgroundColor: tint } : undefined}>
-      <GameIcon game={game} categories={categories} className={cn('object-contain', large ? 'h-7 w-7' : 'h-[22px] w-[22px]')} />
+    <span className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden', filled ? 'rounded-[22.5%]' : 'rounded-lg bg-zinc-500/10', large ? 'h-12 w-12' : 'h-9 w-9', className)} style={!filled && tint ? { backgroundColor: tint } : undefined}>
+      <GameIcon game={game} categories={categories} className={filled ? 'h-full w-full' : cn('object-contain', large ? 'h-8 w-8' : 'h-[22px] w-[22px]')} />
     </span>
   );
 }

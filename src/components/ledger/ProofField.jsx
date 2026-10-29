@@ -142,6 +142,10 @@ export function ProofField({ draft }) {
         {f.t('lg.addProof', 'Paste or add a screenshot')}
         <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { draft.addFiles([...e.target.files]); e.target.value = ''; }} />
       </label>
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+        <kbd dir="ltr" className="rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 px-1.5 py-0.5 font-mono text-[10px] leading-none text-zinc-600 dark:text-zinc-400">{f.t('lg.proofs.keys', 'Ctrl+V')}</kbd>
+        {f.t('lg.proofs.drop', 'or drop an image here')}
+      </span>
       {draft.error && <p role="alert" className="basis-full text-xs text-rose-600 dark:text-rose-400">{draft.error}</p>}
       <Lightbox isOpen={viewing !== null && thumbs.length > 0} start={viewing ?? 0} images={thumbs.map((p) => ({ src: p.data, name: p.name }))} onClose={() => setViewing(null)} />
     </div>
