@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
+import { SPRING_PILL } from '../lib/motion';
 
 import {
   BarChart3,
@@ -269,16 +271,25 @@ export function Navbar({
               onClick={() => onTabChange?.(id)}
               aria-current={navTab === id ? 'page' : undefined}
               className={cn(
-                'flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
+                'relative flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors select-none',
                 navTab === id
-                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                  ? 'text-zinc-900 dark:text-zinc-100'
                   : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
               )}
             >
-              <Icon className="w-3 h-3" />
-              <span className={cn(isRtl && 'font-farsi')}>{label}</span>
+              {/* one pill that glides to the active tab instead of each tab swapping its own background */}
+              {navTab === id && (
+                <motion.span
+                  layoutId="nav-tab-pill"
+                  transition={SPRING_PILL}
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded bg-white dark:bg-zinc-800 shadow-xs"
+                />
+              )}
+              <Icon className="relative w-3 h-3" />
+              <span className={cn('relative', isRtl && 'font-farsi')}>{label}</span>
               {count > 0 && (
-                <span className="text-[9px] px-1 py-0 leading-none rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono">
+                <span className="relative text-[9px] px-1 py-0 leading-none rounded bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-mono">
                   {formatNumber(count)}
                 </span>
               )}

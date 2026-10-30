@@ -18,6 +18,7 @@ import { RowActions, openOnRowKey } from './RowActions';
 import { useOrderProofs } from './useOrderProofs';
 import { groupByDay } from '../../lib/ledger/grouping';
 import { useRowSelection } from './useRowSelection';
+import { MotionDay, MotionRow, useNewRowIds } from './RowMotion';
 import { SelectionBar } from './SelectionBar';
 import { markRowsCollected, selectionCsv } from './selectionTools';
 import { copyText } from './files';
@@ -43,6 +44,7 @@ export function JobsView({ categories, onNewJob, onEdit, onDuplicate, onReceipt,
   const [notice, setNotice] = useState('');
 
   const rows = useMemo(() => (ctx ? orderRows(ctx, partyById) : []), [ctx, partyById]);
+  const newIds = useNewRowIds(useMemo(() => rows.map((r) => r.order.id), [rows]));
   const q = local.trim().toLowerCase();
   const counts = useMemo(() => ({
     active: rows.filter((r) => ACTIVE.has(r.order.lifecycle)).length,
@@ -144,12 +146,15 @@ export function JobsView({ categories, onNewJob, onEdit, onDuplicate, onReceipt,
         <EmptyState icon={SearchX} title={f.t('lg.jobs.none', 'No jobs match')} body={f.t('lg.orders.noneBody', 'Try a different filter.')} />
       ) : (
         <div>
+          <AnimatePresence initial={false}>
           {groupByDay(filtered.slice(0, limit), (r) => r.order.dateTime).map((day, di) => {
             const dayEarned = day.rows.filter((r) => !r.dead).reduce((sum, r) => sum + convertMinor(r.marginMinor, r.order.currency, cur, rates, orderRateOpts(r.order)), 0);
+            const dayIsNew = day.rows.every((r) => newIds.has(r.order.id));
             return (
-              <section key={day.key} aria-label={f.dayLabel(day.iso)}>
+              <MotionDay key={day.key} isNew={dayIsNew} aria-label={f.dayLabel(day.iso)}>
                 <DayHeader first={di === 0} label={f.dayLabel(day.iso)} aside={dayEarned !== 0 && <>{f.t('lg.day.earned', 'earned')} <Money minor={dayEarned} currency={cur} compact approx /></>} />
                 <ul className="divide-y divide-zinc-200/60 dark:divide-zinc-800/60 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/40 dark:bg-zinc-900/20">
+                  <AnimatePresence initial={false}>
                   {day.rows.map((r) => {
                     const o = r.order;
                     const style = LIFE_STYLE[o.lifecycle] || LIFE_STYLE.pending;
@@ -158,7 +163,7 @@ export function JobsView({ categories, onNewJob, onEdit, onDuplicate, onReceipt,
                     const mixed = normalizeCurrency(o.currency) !== normalizeCurrency(cur);
                     const feePct = o.grossMinor > 0 && o.platformFeeMinor > 0 ? Math.round((o.platformFeeMinor / o.grossMinor) * 1000) / 10 : 0;
                     return (
-                      <li key={o.id} tabIndex={0} onKeyDown={openOnRowKey(() => (sel.active ? sel.pick(o.id, {}) : onReceipt(o.id)))} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40', r.dead && 'opacity-60')}>
+                      <MotionRow key={o.id} isNew={!dayIsNew && newIds.has(o.id)} dimmed={r.dead} tabIndex={0} onKeyDown={openOnRowKey(() => (sel.active ? sel.pick(o.id, {}) : onReceipt(o.id)))} onClick={sel.rowClick(o.id, () => onReceipt(o.id))} className={cn('group cursor-pointer flex gap-3 px-3 py-3 transition-colors first:rounded-t-xl last:rounded-b-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-400 dark:focus-visible:ring-zinc-500', sel.has(o.id) ? 'bg-zinc-100/80 dark:bg-zinc-900/70' : 'hover:bg-zinc-100/50 dark:hover:bg-zinc-900/40')}>
                         <span className="relative mt-0.5 shrink-0">
                           <GameTile game={o.game} categories={categories} size="lg" />
                           {/* the row's box sits on the tile's corner: hidden until hovered, and every row shows one once select mode is on */}
@@ -232,13 +237,15 @@ export function JobsView({ categories, onNewJob, onEdit, onDuplicate, onReceipt,
                             <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} duplicateLabel={f.t('lg.job.duplicate', 'Duplicate job')} onDuplicate={() => onDuplicate(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
                           </div>
                         </div>
-                      </li>
+                      </MotionRow>
                     );
                   })}
+                  </AnimatePresence>
                 </ul>
-              </section>
+              </MotionDay>
             );
           })}
+          </AnimatePresence>
         </div>
       )}
       {/* the bar leaves the way it came, instead of vanishing when the last row is unticked */}

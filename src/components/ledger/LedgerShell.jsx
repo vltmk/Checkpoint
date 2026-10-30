@@ -4,7 +4,7 @@ import { buildReceipt } from '../../lib/ledger/receipt';
 import { Lightbox } from '../Lightbox';
 import { UNKNOWN_PAYER_ID } from '../../lib/ledger/legacyMapper';
 import { motion } from 'motion/react';
-import { SCREEN } from '../../lib/motion';
+import { SCREEN_ENTER } from '../../lib/motion';
 import { Button } from '../ui/Button';
 import { useLedger } from './LedgerProvider';
 import { useLedgerFormat } from './format';
@@ -116,8 +116,8 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
 
   return (
     <>
-      {/* a short fade on every screen change, opacity only: number keys switch tabs often, so nothing moves or waits */}
-      <motion.div key={`${ledger.profileId}:${tab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={SCREEN}>
+      {/* the wrapper fades; the screen's blocks rise in a short stagger (.screen-stagger in index.css). Enter-only, so number keys can switch tabs quickly and nothing waits */}
+      <motion.div className="screen-stagger" key={`${ledger.profileId}:${tab}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={SCREEN_ENTER}>
       {isBooster ? (
         <>
           {tab === 'cockpit' && <BoosterOverview onNavigate={onTabChange} onReceive={openReceive} onNewJob={newItem} onExpense={() => setExpenseOpen(true)} onOpenJob={openOrder} onImport={() => setImportOpen(true)} />}
