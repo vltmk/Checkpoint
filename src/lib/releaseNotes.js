@@ -29,30 +29,26 @@ export function compareSemver(v1, v2) {
  * that has no entry, so a release can never go out without Farsi notes.
  */
 export const RELEASE_NOTES_REGISTRY = {
-  '5.4.0': {
-    date: '2026-10-29',
+  '5.5.0': {
+    date: '2026-10-30',
     title: {
-      en: "What's New in Checkpoint v5.4.0",
-      fa: 'تغییرات نسخه ۵.۴.۰',
+      en: "What's New in Checkpoint v5.5.0",
+      fa: 'تغییرات نسخه ۵.۵.۰',
     },
     summary: {
-      en: 'Filter Orders and Jobs by date, export CSV per profile, and big ledgers open much faster.',
-      fa: 'سفارش‌ها و کارها را بر اساس تاریخ فیلتر کنید، خروجی CSV را برای هر پروفایل بگیرید و دفترهای بزرگ بسیار سریع‌تر باز می‌شوند.',
+      en: 'Duplicate an order or job in one click, a split-mode toggle on the order form, and smoother motion across screens.',
+      fa: 'با یک کلیک یک سفارش یا کار را تکرار کنید، حالت تقسیم را در فرم سفارش روشن یا خاموش کنید و انیمیشن‌های روان‌تری بین صفحه‌ها ببینید.',
     },
     items: {
       en: [
-        { tag: 'new', text: 'Date filter on Orders and Jobs: today, last 7 or 30 days, this or last month, or a custom range.' },
-        { tag: 'new', text: 'Export CSV from a dialog: pick Booster, Advertiser or both, one file per profile (Alt+E).' },
-        { tag: 'new', text: 'Drop a screenshot onto the add form to attach it, or paste with Ctrl+V.' },
-        { tag: 'improved', text: 'Orders and Jobs toolbar is now two rows with filter chips, and the display currency picker moved to the top bar.' },
-        { tag: 'improved', text: 'Orders and Jobs open far faster on ledgers with thousands of orders.' },
+        { tag: 'new', text: 'Duplicate an order or job to start a similar entry without retyping it.' },
+        { tag: 'new', text: 'Split-mode toggle on the order form, with a cut line between the split and the rest of the order.' },
+        { tag: 'improved', text: 'Smoother motion for the tab pill, screen entrance, and when rows are added or removed.' },
       ],
       fa: [
-        { tag: 'new', text: 'فیلتر تاریخ در سفارش‌ها و کارها: امروز، ۷ یا ۳۰ روز اخیر، این ماه یا ماه قبل، یا بازه دلخواه.' },
-        { tag: 'new', text: 'خروجی CSV از یک پنجره: بوستر، تبلیغ‌دهنده یا هر دو را انتخاب کنید؛ یک فایل برای هر پروفایل (Alt+E).' },
-        { tag: 'new', text: 'اسکرین‌شات را روی فرم افزودن رها کنید تا پیوست شود، یا با Ctrl+V جای‌گذاری کنید.' },
-        { tag: 'improved', text: 'نوار ابزار سفارش‌ها و کارها دو ردیفه شد، با چیپ‌های فیلتر، و انتخاب ارز نمایش به نوار بالا منتقل شد.' },
-        { tag: 'improved', text: 'سفارش‌ها و کارها در دفترهای دارای هزاران سفارش بسیار سریع‌تر باز می‌شوند.' },
+        { tag: 'new', text: 'تکرار یک سفارش یا کار برای ثبت سریع موارد مشابه، بدون تایپ دوباره.' },
+        { tag: 'new', text: 'دکمه حالت تقسیم در فرم سفارش، با خط برش میان بخش تقسیم و بقیه سفارش.' },
+        { tag: 'improved', text: 'انیمیشن‌های روان‌تر برای نشانگر تب، ورود صفحه‌ها و افزودن یا حذف ردیف‌ها.' },
       ],
     },
   },
