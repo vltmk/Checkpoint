@@ -1,21 +1,23 @@
 # CHECKPOINT // Nodra Freelance & Gaming Ledger
-##Image Gallery:
+
 <p align="center">
-<img width="1082" height="1032" alt="checkpoint_J4DFKCm6S9" src="https://github.com/user-attachments/assets/ce1ac60b-59a9-4f17-b9f6-67ad2d050207" />
-  <img width="1082" height="920" alt="checkpoint_KxiIbtnvIn" src="https://github.com/user-attachments/assets/45959ec2-57dc-4397-bd33-c9a986f2ed89" />
-<img width="1082" height="920" alt="checkpoint_MWYOD8OQgE" src="https://github.com/user-attachments/assets/dd13c973-31f6-4f5b-ac0b-aa824163d182" />
-<img width="1082" height="920" alt="checkpoint_dTKhllaOOf" src="https://github.com/user-attachments/assets/b31f7c3e-c7c3-4f28-b534-7fd23775dc85" />
-
-
+  <a href="docs/screenshots/hero-dark.png">
+    <picture>
+      <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/hero-light.png">
+      <img src="docs/screenshots/hero-dark.png" alt="Checkpoint, Booster overview" width="820" />
+    </picture>
+  </a>
+  <br />
+  <sub>تم تیره یا روشن، هر کدام که مرورگر شما روی آن است ☾ ☀</sub>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-Windows%20Desktop%20%7C%20Web-black?style=flat-square" alt="Checkpoint UI" />
+  <img src="https://img.shields.io/badge/Platform-Windows%20Desktop-black?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Storage-100%25%20Offline%20%26%20Local-10b981?style=flat-square" alt="Offline First" />
   <img src="https://img.shields.io/badge/UI-Monochromatic%20Shadcn-black?style=flat-square" alt="UI" />
-  <img src="https://img.shields.io/badge/Animation-Motion%20%28React%29-10b981?style=flat-square" alt="Animation" />
+  <img src="https://img.shields.io/badge/Desktop-Tauri%202-24c8db?style=flat-square" alt="Tauri 2" />
   <img src="https://img.shields.io/badge/Stack-Vite%20%2B%20React-3b82f6?style=flat-square" alt="Stack" />
-  <img src="https://img.shields.io/badge/Currencies-USD%20%7C%20TOMAN%20%7C%20GOLD-fafafa?style=flat-square" alt="Currencies" />
+  <img src="https://img.shields.io/badge/Currencies-TOMAN%20%7C%20USD%20%7C%20EUR%20%7C%20GOLD-fafafa?style=flat-square" alt="Currencies" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
 </p>
 
@@ -27,95 +29,126 @@
 
 ---
 
-## چک‌پوینت نرم‌افزار مدیریت و لجر فریلنسینگ گیمینگ
+## چک‌پوینت: دفتر حساب بوست و فریلنسینگ گیمینگ
 
-چک پوینت یک نرم‌افزار بسیار سبک، تخصصی و کاملا آفلاین هست و برای ثبت، مدیریت و محاسبه‌ی درآمد پروژه‌ها و بوست‌های گیمینگ طراحی شده.
+چک‌پوینت یک نرم‌افزار دسکتاپ سبک و **کاملاً آفلاین** است که برای ثبت کارها، دنبال کردن پول و صدور رسید ساخته شده. همه‌چیز روی کامپیوتر خودتان می‌ماند و برای کار کردن به اینترنت یا حساب کاربری نیاز ندارد.
 
-> **📥 راهنمای دانلود برای کاربران ویندوز:**
-> برای دریافت نرم‌افزار، روی دکمه سبز بالا یا [اینجا (صفحه Releases)](https://github.com/vltmk/Checkpoint/releases) کلیک کنید. در صفحه باز شده، از بخش **Assets** فایل نصبی (با پسوند `.exe` یا `.msi`) را دانلود و نصب کنید.
-
----
-
-# ✨ قابلیت‌های اصلی چک‌پوینت
-
-### ۱. 🔒 کاملاً آفلاین و امن (۱۰۰٪ Local & Private)
-- تمامی اطلاعات، مبالغ، یادداشت‌ها و اسکرین‌شات‌های شما **فقط روی کامپیوتر خودتان** ذخیره می‌شوند.
-- سرعت فوق‌العاده بالا به لطف استفاده از موتور پایگاه‌داده محلی (**SQLite** در نسخه دسکتاپ و **IndexedDB** در مرورگر).
+> **📥 دانلود برای ویندوز:** از صفحه [Releases](https://github.com/vltmk/Checkpoint/releases) در بخش **Assets** فایل نصبی (`.exe` یا `.msi`) را دانلود و نصب کنید. نسخه‌های بعدی را خود برنامه پیدا می‌کند و از داخل همان‌جا نصب می‌شوند.
 
 ---
 
-### ۲. 🪙 تبدیل هوشمند و دوطرفه گلد (Gold) و تومان (TOMAN)
-- **پشتیبانی اختصاصی از اقتصاد World of Warcraft**:
-  - نرخ گلد در نسخه Retail (به ازای هر ۱۰۰۰ گلد).
-  - نرخ گلد در نسخه Classic (به صورت تک گلد).
-- امکان تغییر نرخ پیش‌فرض لحظه‌ای با یک کلیک.
-- محاسبه آنی و خودکار درآمد کل، مبالغ تسویه‌شده (**Paid**) و مبالغ در انتظار پرداخت یا در حال انجام (**Pending / Working**).
+## 🖼️ نگاهی به برنامه
+
+هر تصویر را بزنید تا بزرگ باز شود. داده‌ی این تصاویر نمونه است. زبان برنامه فارسی و انگلیسی است و دو تصویر زیر برای نمونه انگلیسی گرفته شده‌اند.
+
+<table align="center">
+  <tr>
+    <td colspan="4" align="center"><b>⚡ پروفایل بوستر</b> · طلب شما از مشتری‌ها</td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/booster-jobs.png"><img src="docs/screenshots/booster-jobs.png" width="215" alt="Jobs" /></a><br /><sub>کارها</sub></td>
+    <td align="center"><a href="docs/screenshots/booster-clients-en.png"><img src="docs/screenshots/booster-clients-en.png" width="215" alt="Clients" /></a><br /><sub>مشتری‌ها (EN)</sub></td>
+    <td align="center"><a href="docs/screenshots/booster-reports-en.png"><img src="docs/screenshots/booster-reports-en.png" width="215" alt="Reports" /></a><br /><sub>گزارش‌ها (EN)</sub></td>
+    <td align="center"><a href="docs/screenshots/booster-receipt.png"><img src="docs/screenshots/booster-receipt.png" width="215" alt="Receipt" /></a><br /><sub>رسید و دیسکورد</sub></td>
+  </tr>
+  <tr>
+    <td colspan="4" align="center"><b>📢 پروفایل ادورتایزر</b> · بدهی شما به بوسترها</td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/advertiser-overview.png"><img src="docs/screenshots/advertiser-overview.png" width="215" alt="Overview" /></a><br /><sub>خلاصه</sub></td>
+    <td align="center"><a href="docs/screenshots/advertiser-orders.png"><img src="docs/screenshots/advertiser-orders.png" width="215" alt="Orders" /></a><br /><sub>سفارش‌ها</sub></td>
+    <td align="center"><a href="docs/screenshots/advertiser-boosters.png"><img src="docs/screenshots/advertiser-boosters.png" width="215" alt="Boosters" /></a><br /><sub>بوسترها</sub></td>
+    <td align="center"><a href="docs/screenshots/advertiser-money.png"><img src="docs/screenshots/advertiser-money.png" width="215" alt="Money" /></a><br /><sub>پول</sub></td>
+  </tr>
+</table>
 
 ---
 
-### ۳. 📋 ثبت و چسباندن اسکرین شات پایان کار/بوست `Ctrl+V` (Proof of Work)
-- نیازی به ذخیره کردن فایل اسکرین‌شات روی کامپیوتر نیست!
-- کافیست با ابزار عکس‌برداری ویندوز (`Win + Shift + S`) از پایان دانجن، ترید گلد یا تاییدیه مشتری عکس بگیرید و مستقیماً داخل پنجره ثبت کار `Ctrl + V` بزنید تا عکس ضمیمه شود.
-- امکان مشاهده تصاویر در اندازه کامل (Lightbox) و دانلود آن‌ها.
+# ✨ قابلیت‌های اصلی
+
+### ۱. 🔒 آفلاین و خصوصی
+- اطلاعات، مبلغ‌ها، یادداشت‌ها و اسکرین‌شات‌های شما **فقط روی کامپیوتر خودتان** ذخیره می‌شوند (پایگاه‌داده‌ی SQLite محلی).
+- بررسی نسخه‌ی جدید و اعلان‌ها در پس‌زمینه انجام می‌شود. اگر اینترنت نباشد، برنامه همان‌طور کار می‌کند.
 
 ---
 
-### ۴. 🧾 صدور رسید کار و خروجی دیسکورد (Receipt & Discord Export)
-- ایجاد فاکتور و رسید مرتب شامل عنوان کار، کارفرما/پلتفرم، زمان، دستمزد و اسکرین‌شات‌ها.
-- **کپی با یک کلیک برای دیسکورد (Discord Markdown)**: متن گزارش را به صورت آماده در دیسکورد برای ادورتایزر، لیدر یا مشتری بفرستید.
-- امکان ذخیره تصویر رسید برای ارسال در تلگرام یا دیسکورد.
+### ۲. 🎭 دو پروفایل، هرکدام با نگاه خودش
+یک کلیک (یا `Ctrl` + `Shift` + `P`) بین دو پروفایل جابه‌جا می‌شوید. دیتابیس هر پروفایل جداست.
+
+| | ⚡ بوستر | 📢 ادورتایزر |
+| :--- | :--- | :--- |
+| عدد اصلی | **طلب شما** از مشتری‌ها | **بدهی شما** به بوسترها |
+| صفحه‌ها | خلاصه، کارها، مشتری‌ها، گزارش‌ها | خلاصه، سفارش‌ها، بوسترها، پول، گزارش‌ها |
+| تقسیم سهم با هم‌تیمی‌ها | اختیاری. یک کار ساده فقط سه فیلد دارد | سهم هر بوستر روی هر سفارش |
+| کارمزد پلتفرم | اختیاری | روی هر سفارش و برای هر پلتفرم |
 
 ---
 
-### ۵. 👥 مدیریت کارهای تیمی و تقسیم سهم (Team Runs & Split Payouts)
-- برای ریدهای دونفره یا چندنفره (Duo / Team / GDKP)، نام هم‌تیمی‌ها را مشخص کنید.
-- امکان فیلتر کردن فوری کارها بر اساس نام هر هم‌تیمی برای محاسبه بدهی‌ها یا سهم نهایی.
+### ۳. 📢 ویژه‌ی ادورتایزرها
+- **سفارش از پلتفرم تا بوستر:** مبلغ سفارش، کارمزد پلتفرم و سهم هر بوستر را ثبت کنید. سود شما خودکار حساب می‌شود: `مبلغ − کارمزد − سهم بوسترها`.
+- **مانده‌ی هر بوستر:** ببینید به هر نفر چقدر بدهکارید، چقدر پیش‌پرداخت داده‌اید و چقدر از کارهای در حال انجام در راه است.
+- **تسویه‌ی حساب:** پرداخت به بوستر و واریزی پلتفرم را ثبت کنید و مشخص کنید هر پرداخت کدام سفارش یا سهم را می‌بندد.
+- **کارمزد برداشت:** اگر پلتفرم از واریزی کارمزد برمی‌دارد، همان‌جا ثبت می‌شود و روی سفارش‌های همان واریزی پخش می‌شود.
+- **هشدار پول:** اگر پیش از پرداخت مشتری به بوستر پول داده‌اید، یا مشتری پرداخته و بوسترها هنوز نه، در بخش «نیاز به توجه» نشان داده می‌شود.
+- **ماشین حساب سفارش:** با کلید `Q`.
 
 ---
 
-### ۶. 📊 نمودارها و آمار مالی دقیق (Analytics)
-- نمایش روند درآمد روزانه، هفتگی، ماهانه و سالانه به تومان یا گلد.
-- تفکیک سهم درآمدی بازی‌ها و پلتفرم‌ها (Retail vs Classic vs Addons).
+### ۴. 🪙 تومان، دلار، یورو و گلد
+- پشتیبانی از **تومان، دلار، یورو و گلد** و تبدیل دوطرفه بین آن‌ها. نرخ گلد را هم برای کلاسیک (هر ۱ گلد) و هم ریتیل (هر ۱۰۰۰ گلد) می‌توانید تنظیم کنید.
+- **هر سفارش و هر پرداخت نرخ همان روز خودش را نگه می‌دارد.** تغییر نرخ، پولی را که قبلاً درآورده‌اید جابه‌جا نمی‌کند.
+- با `T` یا دکمه‌ی بالای صفحه، ارز نمایش مبلغ‌ها را عوض کنید.
 
 ---
 
-## 💾 راهنمای پشتیبان‌گیری (Backup) و بازیابی (Restore)
-
-چون چک‌پوینت کاملاً آفلاین است، کنترل کامل فایل‌های داده در دست شماست. همیشه می‌توانید از کارهایتان بکاپ بگیرید یا آنها را به کامپیوتر دیگری منتقل کنید.
-
-### 📥 نحوه گرفتن نسخه پشتیبان (Backup)
-1. کلید میانبر `Ctrl + ,` را بزنید یا روی آیکون **Settings (چرخ‌دنده)** در بالای صفحه کلیک کنید.
-2. در بخش **Data Backup & Portability**:
-   - **Full JSON Backup**: یک فایل پشتیبان کامل شامل تمام کارهای ثبت‌شده به همراه اسکرین‌شات‌ها دانلود می‌شود. این فایل را در جای امن (مانند گوگل درایو یا فلش) نگه دارید.
-   - **Export CSV Spreadsheet**: فایل اکسل از لیست کارها برای حساب‌کتاب شخصی یا گزارش‌گیری.
-
-### 📤 نحوه بازگردانی اطلاعات (Restore)
-1. پنجره **Settings** را باز کنید.
-2. روی دکمه **Restore JSON** کلیک کنید و فایل بکاپ `.json` قبلی خود را انتخاب کنید.
-3. در چند ثانیه تمام اطلاعات و تصاویر بدون هیچ نقصی جایگذاری و بازگردانی می‌شوند.
-
-### 🛡️ اسنپ‌شات‌های خودکار روزانه (Automatic Snapshots)
-- نسخه دسکتاپ ویندوز به صورت خودکار روزانه یک نسخه پشتیبان داخلی ذخیره می‌کند تا حتی اگر اشتباهاً رکوردی را پاک کردید، بتوانید با یک کلیک از لیست اسنپ‌شات‌ها به روزهای قبل برگردید.
+### ۵. 📋 اسکرین‌شات به‌عنوان مدرک کار
+- اسکرین‌شات بگیرید (`Win` + `Shift` + `S`) و داخل پنجره‌ی ثبت `Ctrl` + `V` بزنید، یا فایل را بکشید و رها کنید.
+- مشاهده‌ی تصویر در اندازه‌ی کامل و نگه‌داری کنار سفارش یا پرداخت.
 
 ---
 
-## ⌨️ کلیدهای میانبر پرکاربرد (Shortcuts)
+### ۶. 🧾 رسید و خروجی دیسکورد
+- رسید مرتب با عنوان، مبلغ، سهم‌ها و گزارش‌ها.
+- **کپی برای دیسکورد** (Markdown آماده)، **کپی متن** و **کپی تصویر** رسید، با یک کلیک.
 
-برای اینکه سریع‌تر و بدون نیاز به موس با برنامه کار کنید، کلیدهای زیر در دسترس هستند:
+---
 
-| Shortcut | Action |
+### ۷. 📊 گزارش‌ها
+- درآمد به تفکیک **ماه، مشتری و بازی**، در بازه‌ی همه / ۳۰ روز / ۹۰ روز / ۱۲ ماه.
+- خروجی CSV (کپی یا ذخیره) و رسید گزارش.
+- ورود از جدول: جدول خود را از گوگل‌شیت یا اکسل کپی و داخل برنامه جای‌گذاری کنید.
+
+---
+
+## 💾 پشتیبان‌گیری و بازیابی
+
+چون چک‌پوینت آفلاین است، فایل‌های داده دست خودتان است.
+
+1. روی آیکون **Settings (چرخ‌دنده)** بالای صفحه بزنید.
+2. **پشتیبان کامل JSON** (`Alt` + `B`) همه‌چیز را با اسکرین‌شات‌ها ذخیره می‌کند. آن را جای امن نگه دارید.
+3. **خروجی CSV** (`Alt` + `E`) برای حساب‌کتاب شخصی.
+4. برای بازگردانی، از همان بخش فایل `.json` پشتیبان را انتخاب کنید. ورودی از فایل، پیش از نوشتن بررسی و پاک‌سازی می‌شود.
+5. **اسنپ‌شات‌های خودکار:** برنامه پیش از تغییرهای مهم یک نقطه‌ی بازیابی می‌سازد. اگر چیزی را اشتباهی پاک کردید، از لیست اسنپ‌شات‌ها برگردید.
+
+---
+
+## ⌨️ کلیدهای میانبر
+
+| Shortcut | کار |
 | :--- | :--- |
-| <kbd>?</kbd> | Open Keyboard Shortcuts Guide |
-| <kbd>N</kbd> | Log New Work Entry |
-| <kbd>1</kbd> | Overview View |
-| <kbd>2</kbd> | Ledger View |
-| <kbd>3</kbd> | Analytics View |
-| <kbd>4</kbd> | Exchange View |
-| <kbd>/</kbd> | Focus Search Bar |
-| <kbd>Alt</kbd>+<kbd>E</kbd> | Export Ledger to CSV |
-| <kbd>Alt</kbd>+<kbd>B</kbd> | Full JSON Backup with Screenshots |
-| <kbd>Ctrl</kbd>+<kbd>V</kbd> | Paste Screenshot Proof (in modal) |
-| <kbd>Esc</kbd> | Close any open modal or clear search |
+| <kbd>?</kbd> | راهنمای کلیدها |
+| <kbd>N</kbd> | افزودن کار (بوستر) یا سفارش جدید (ادورتایزر) |
+| <kbd>1</kbd> – <kbd>4</kbd> | بوستر: خلاصه، کارها، مشتری‌ها، گزارش‌ها |
+| <kbd>1</kbd> – <kbd>5</kbd> | ادورتایزر: خلاصه، سفارش‌ها، بوسترها، پول، گزارش‌ها |
+| <kbd>T</kbd> | تغییر ارز نمایش |
+| <kbd>Q</kbd> | ماشین حساب سفارش (ادورتایزر) |
+| <kbd>/</kbd> | رفتن به کادر جستجو |
+| <kbd>S</kbd> | حالت انتخاب چندتایی |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> | جابه‌جایی بین پروفایل‌ها |
+| <kbd>Ctrl</kbd>+<kbd>V</kbd> | چسباندن اسکرین‌شات |
+| <kbd>Alt</kbd>+<kbd>E</kbd> | خروجی CSV |
+| <kbd>Alt</kbd>+<kbd>B</kbd> | پشتیبان کامل JSON |
+| <kbd>Esc</kbd> | بستن پنجره یا لغو انتخاب |
 
 ---
 
@@ -125,15 +158,20 @@
 # 1. Install dependencies
 npm install
 
-# 2. Run local development server
-npm run dev
+# 2. Run the desktop app in development (needs Rust + Tauri prerequisites)
+npm run desktop:dev
 
-# 3. Build for production
-npm run build
+# 3. Build the installer
+npm run desktop:build
+
+# Run the test suite
+npm run test
 ```
+
+`npm run dev` فقط رابط کاربری را در مرورگر اجرا می‌کند (برای توسعه و تست). محصول نهایی یک برنامه‌ی دسکتاپ است و ذخیره‌سازی اصلی آن SQLite است.
 
 ---
 
 ## Developer Guide
 
-For code conventions, component hierarchy, and git manual workflow, see [`AGENTS.md`](./AGENTS.md).
+For code conventions, the v2 ledger model, and the manual git/release workflow, see [`AGENTS.md`](./AGENTS.md).
