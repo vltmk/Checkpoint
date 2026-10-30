@@ -65,7 +65,7 @@ test('i18n contains translations for categories and cropper', () => {
 });
 
 test('categorySupportsGold only offers Gold for categories that turned it on', () => {
-  const src = categoriesCode.match(/export function categorySupportsGold[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const src = categoriesCode.match(/export function categorySupportsGold[\s\S]*?\r?\n}\r?\n/)[0].replace('export ', '');
   const categorySupportsGold = new Function(`${src}; return categorySupportsGold;`)();
   const list = [
     { name: 'World of Warcraft', supportsGold: true },
@@ -100,7 +100,7 @@ test('both Add Work modals pick the game from the categories and can create one 
 test('gold units: WoW Classic is per 1, retail per 1,000, and older saved categories get a sensible unit', () => {
   assert.ok(categoriesCode.includes("goldUnit: '1', // classic gold is quoted per 1"));
   assert.ok(categoriesCode.includes("goldUnit: '1k', // retail gold is quoted per 1,000"));
-  const src = categoriesCode.match(/export function categoryGoldUnit[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const src = categoriesCode.match(/export function categoryGoldUnit[\s\S]*?\r?\n}\r?\n/)[0].replace('export ', '');
   const categoryGoldUnit = new Function(`${src}; return categoryGoldUnit;`)();
   const list = [{ name: 'WoW Classic', goldUnit: '1' }, { name: 'World of Warcraft', goldUnit: '1k' }, { name: 'Other' }];
   assert.equal(categoryGoldUnit('wow classic', list), '1');
@@ -110,7 +110,7 @@ test('gold units: WoW Classic is per 1, retail per 1,000, and older saved catego
 });
 
 test('importing categories keeps their gold flag and unit', () => {
-  const src = categoriesCode.match(/export function mergeCategories[\s\S]*?\n}\n/)[0].replace('export ', '');
+  const src = categoriesCode.match(/export function mergeCategories[\s\S]*?\r?\n}\r?\n/)[0].replace('export ', '');
   const mergeCategories = new Function('DEFAULT_WOW_COLOR', `${src}; return mergeCategories;`)('#c68a4c');
   const out = mergeCategories([], [{ name: 'Lost Ark', supportsGold: true, goldUnit: '1' }, { name: 'Valorant', supportsGold: false }]);
   assert.deepEqual(out.map((c) => [c.name, c.supportsGold, c.goldUnit]), [['Lost Ark', true, '1'], ['Valorant', false, undefined]]);
