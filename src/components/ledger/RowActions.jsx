@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ImageIcon, Pencil, Trash2 } from 'lucide-react';
+import { CopyPlus, ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLedgerFormat } from './format';
 
@@ -30,13 +30,14 @@ export const openOnBlankClick = (open) => (e) => {
  * when the row has focus). They sit quietly until the row is hovered or focused, then come up to full strength;
  * delete asks once, in place.
  */
-export function RowActions({ onProofs, hasProofs = true, onEdit, onDelete, editLabel, className }) {
+export function RowActions({ onProofs, hasProofs = true, onEdit, onDuplicate, onDelete, editLabel, duplicateLabel, className }) {
   const f = useLedgerFormat();
   const [confirm, setConfirm] = useState(false);
   return (
     <div className={cn('flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100', className)}>
       {hasProofs && <button type="button" onClick={onProofs} aria-label={f.t('lg.proofs', 'Screenshots')} title={f.t('lg.proofs', 'Screenshots')} className={BUTTON}><ImageIcon className="h-3.5 w-3.5" /></button>}
       <button type="button" onClick={onEdit} aria-label={editLabel} title={editLabel} className={BUTTON}><Pencil className="h-3.5 w-3.5" /></button>
+      {onDuplicate && <button type="button" onClick={onDuplicate} aria-label={duplicateLabel} title={duplicateLabel} className={BUTTON}><CopyPlus className="h-3.5 w-3.5" /></button>}
       {confirm ? (
         <button
           type="button"

@@ -27,7 +27,7 @@ const ACTIVE = new Set(['pending', 'working', 'on_hold', 'disputed']);
 const LIFE_LABEL = { pending: 'Pending', working: 'Working', on_hold: 'On hold', done: 'Done', failed: 'Failed', disputed: 'Disputed', refunded: 'Refunded' };
 
 /** The Booster's jobs: what I did, what it pays, and whether I have been paid. Splits and fees only appear when a job has them. */
-export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs, onOpenClient, onReceive }) {
+export function JobsView({ categories, onNewJob, onEdit, onDuplicate, onReceipt, onOpenProofs, onOpenClient, onReceive }) {
   const ledger = useLedger();
   const proofIds = useOrderProofs();
   const f = useLedgerFormat();
@@ -229,7 +229,7 @@ export function JobsView({ categories, onNewJob, onEdit, onReceipt, onOpenProofs
                                 labels={{ paid: f.t('lg.jobs.paidStamp', 'Paid'), markPaid: f.t('lg.jobs.markPaid', 'Mark paid'), undo: f.t('lg.undo', 'Undo'), sharedHelp: f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.') }}
                               />
                             )}
-                            <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                            <RowActions editLabel={f.t('lg.job.edit', 'Edit job')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} duplicateLabel={f.t('lg.job.duplicate', 'Duplicate job')} onDuplicate={() => onDuplicate(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
                           </div>
                         </div>
                       </li>

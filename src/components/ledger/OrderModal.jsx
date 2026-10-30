@@ -20,7 +20,7 @@ import { GoldRateField, RateLockFields } from './RateLockFields';
 import { ProofField, useProofDraft } from './ProofField';
 import { GameField } from './GameField';
 import { goldRateStart, rateFormFor, rateFieldsFromForm } from '../../lib/ledger/rateLock';
-import { LifeDot, Money } from './parts';
+import { LifeDot, Money, Segmented } from './parts';
 import { PartyCombobox, usePartyChoices } from './PartyCombobox';
 import { AmountInput } from './AmountInput';
 import { useFormDraft } from './useFormDraft';
@@ -44,7 +44,7 @@ const toInputText = (minor, currency) => (minor ? String(fromMinor(minor, curren
  *
  * `initial` carries a quote from the calculator: { clientPrice, currency, platformFeePct, platform, boosterCount, boosterPool }.
  */
-export function OrderModal({ open, onClose, existing = null, initial = null, categories = [], onRefreshCategories, onSaved }) {
+export function OrderModal({ open, onClose, existing = null, copyOf = null, initial = null, categories = [], onRefreshCategories, onSaved }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, partyById, displayCurrency } = ledger;
@@ -101,10 +101,12 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
     setTried(false);
     setSavePayer(false);
     proofOnlyRef.current = null;
-    if (existing) {
-      const { order, shares } = existing;
+    // a copy starts from another order's values but is saved as a new one
+    const source = existing || copyOf;
+    if (source) {
+      const { order, shares } = source;
       // details someone filled in stay in view when they edit the order again
-      setMoreOpen(Boolean(order.orderRef || order.link || order.expectedPayoutAt));
+      setMoreOpen(!copyOf && Boolean(order.orderRef || order.link || order.expectedPayoutAt));
       setTitle(order.title || '');
       setGame(order.game || '');
       const loadedPayer = order.payerId ? f.name(partyById.get(order.payerId)) : order.source || '';
@@ -112,8 +114,8 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
       const shownPayer = order.payerId === UNKNOWN_PAYER_ID ? '' : loadedPayer;
       loadedRef.current = { payer: shownPayer, payerId: order.payerId || null };
       setPayerName(shownPayer);
-      setOrderRef(order.orderRef || '');
-      setDateTime(order.dateTime ? toLocalISOString(new Date(order.dateTime)) : toLocalISOString());
+      setOrderRef(copyOf ? '' : order.orderRef || '');
+      setDateTime(order.dateTime && !copyOf ? toLocalISOString(new Date(order.dateTime)) : toLocalISOString());
       setCurrency(normalizeCurrency(order.currency));
       setGrossText(toInputText(order.grossMinor, order.currency));
       if (order.feeType === 'flat') {
@@ -124,13 +126,21 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
         setFeeMode('percent');
         setFeePct(String(Math.round(pct * 100) / 100));
       }
-      setLifecycle(order.lifecycle);
+      setLifecycle(copyOf ? 'working' : order.lifecycle);
       setRows(shares.length ? shares.map((s) => { const nm = f.name(partyById.get(s.partyId)); return { key: s.id, name: nm, origName: nm, amountText: toInputText(s.amountMinor, order.currency), partyId: s.partyId }; }) : [blankRow()]);
-      setAutoSplit(false);
+      // equal shares reopen as an even split with the cut taken from what is left; anything else stays custom
+      const amounts = shares.map((s) => s.amountMinor);
+      const pool = Math.max(0, order.grossMinor - (order.platformFeeMinor || 0));
+      const sum = amounts.reduce((a, b) => a + b, 0);
+      const even = amounts.length > 0 && Math.max(...amounts) - Math.min(...amounts) <= 1 && sum <= pool;
+      setAutoSplit(even);
+      setCutMode(even ? 'flat' : 'percent');
+      setCutValue(even ? toInputText(pool - sum, order.currency) : '20');
       setNote(order.note || '');
-      setLink(order.link || '');
-      setPayoutDate(order.expectedPayoutAt ? toLocalISOString(new Date(order.expectedPayoutAt)) : '');
-      setRateForm(rateFormFor(order, ledger.rates));
+      setLink(copyOf ? '' : order.link || '');
+      setPayoutDate(order.expectedPayoutAt && !copyOf ? toLocalISOString(new Date(order.expectedPayoutAt)) : '');
+      // a copy is a new order, so it takes today's rates
+      setRateForm(rateFormFor(copyOf ? null : order, ledger.rates));
     } else {
       setMoreOpen(false);
       // a quote brings its own currency; otherwise reuse the one on the latest order, then the display currency
@@ -251,7 +261,8 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
   // what was typed survives an accidental close: one draft per new order and per order being edited
   const draft = useFormDraft({
     open,
-    key: existing ? `order_${existing.order.id}` : 'order_new',
+    // no draft for a copy: it would put an old "new order" draft over the copied values
+    key: existing ? `order_${existing.order.id}` : copyOf ? null : 'order_new',
     stamp: existing?.order?.updatedAt || null,
     hasContent: (v) => Boolean(v.title.trim() || v.payerName.trim() || v.grossText.trim() || v.note.trim() || v.orderRef.trim() || v.link.trim() || v.rows.some((r) => r.name.trim())),
     value: { title, game, payerName, orderRef, dateTime, currency, grossText, feePct, feeMode, rateForm, lifecycle, rows, autoSplit, cutMode, cutValue, note, link, payoutDate, savePayer, moreOpen },
@@ -433,8 +444,19 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
       {/* Who does the work and what they get */}
       <FormSection
         title={f.t('lg.order.boosters', 'Who does the work?')}
-        aside={!autoSplit && namedRows.length > 0 && (
-          <button type="button" onClick={() => setAutoSplit(true)} className="text-[11px] text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">{f.t('lg.order.resplit', 'Split evenly after my cut')}</button>
+        aside={(
+          <Segmented
+            value={autoSplit ? 'even' : 'custom'}
+            onChange={(v) => {
+              if (v === 'even') setAutoSplit(true);
+              else if (autoSplit) { setRows(shownRows); setAutoSplit(false); }
+            }}
+            ariaLabel={f.t('lg.order.splitMode', 'How the shares are set')}
+            options={[
+              { value: 'even', label: f.t('lg.order.splitEven', 'Split evenly') },
+              { value: 'custom', label: f.t('lg.order.splitCustom', 'Custom amounts') },
+            ]}
+          />
         )}
       >
         <ul className="space-y-2">
@@ -467,6 +489,11 @@ export function OrderModal({ open, onClose, existing = null, initial = null, cat
             <Input dir="ltr" inputMode="decimal" value={cutValue} onChange={(e) => setCutValue(e.target.value)} className="!h-6 w-20 text-[11px] tabular-nums" aria-label={f.t('lg.order.myCut', 'My cut')} />
             <Chip onClick={() => setCutMode((m) => (m === 'percent' ? 'flat' : 'percent'))}>{cutMode === 'percent' ? '%' : currency}</Chip>
           </div>
+        )}
+        {!autoSplit && namedRows.length > 0 && !overpaid && receivable > 0 && (
+          <p className="text-xs text-zinc-500">
+            {f.t('lg.order.myCutNow', 'My cut: {amount} ({pct}%)', { amount: f.money(margin, currency), pct: f.formatNumber(Math.round((margin / receivable) * 1000) / 10) })}
+          </p>
         )}
         {overpaid && <p className="text-xs text-rose-600 dark:text-rose-400">{f.t('lg.wf.overpaid', 'The shares add up to more than the order pays after fees.')}</p>}
       </FormSection>

@@ -25,7 +25,7 @@ import { CloseShort } from './CloseShort';
 const PAGE = 40;
 const LIFE_LABEL = { pending: 'Pending', working: 'Working', on_hold: 'On hold', done: 'Done', failed: 'Failed', disputed: 'Disputed', refunded: 'Refunded' };
 
-export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenProofs, onOpenPerson, onReceive }) {
+export function OrdersView({ categories, onNewOrder, onEdit, onDuplicate, onReceipt, onOpenProofs, onOpenPerson, onReceive }) {
   const ledger = useLedger();
   const proofIds = useOrderProofs();
   const f = useLedgerFormat();
@@ -271,7 +271,7 @@ export function OrdersView({ categories, onNewOrder, onEdit, onReceipt, onOpenPr
                                 labels={{ paid: f.t('lg.collected', 'Collected'), markPaid: f.t('lg.markCollected', 'Mark collected'), undo: f.t('lg.undo', 'Undo'), sharedHelp: f.t('lg.undo.sharedHelp', 'Paid together with other work. Void that payment in Money to undo it.') }}
                               />
                             )}
-                            <RowActions editLabel={f.t('lg.order.edit', 'Edit order')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
+                            <RowActions editLabel={f.t('lg.order.edit', 'Edit order')} hasProofs={proofIds.has(o.id)} onProofs={() => onOpenProofs('order', o.id, o.title || o.orderRef, o.legacyId)} onEdit={() => onEdit(o.id)} duplicateLabel={f.t('lg.order.duplicate', 'Duplicate order')} onDuplicate={() => onDuplicate(o.id)} onDelete={() => guard(() => ledger.deleteOrder(o.id))} />
                           </div>
                         </div>
                       </li>

@@ -34,7 +34,7 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
   const { ctx, status, error } = ledger;
 
   const [payment, setPayment] = useState({ open: false, mode: 'pay', partyId: null, advance: false });
-  const [order, setOrder] = useState({ open: false, existing: null, initial: null });
+  const [order, setOrder] = useState({ open: false, existing: null, copyOf: null, initial: null });
   const [proofs, setProofs] = useState({ open: false, ownerType: 'order', ownerId: null, title: '', legacyProofs: [] });
   const [receipt, setReceipt] = useState({ open: false, data: null });
   const [importOpen, setImportOpen] = useState(false);
@@ -45,14 +45,21 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
   const openPay = useCallback((partyId = null, opts = {}) => setPayment({ open: true, mode: 'pay', partyId, advance: Boolean(opts.advance) }), []);
   // presetIds: the orders ticked on the list, so the payout starts with exactly those covered
   const openReceive = useCallback((partyId = null, presetIds = null) => setPayment({ open: true, mode: 'receive', partyId, advance: false, presetIds }), []);
-  const openNewOrder = useCallback((initial = null) => setOrder({ open: true, existing: null, initial }), []);
+  const openNewOrder = useCallback((initial = null) => setOrder({ open: true, existing: null, copyOf: null, initial }), []);
 
-  const openOrder = useCallback((orderId) => {
-    if (!ctx) return;
-    const o = ctx.orderById.get(orderId);
-    if (!o) return;
-    setOrder({ open: true, existing: { order: o, shares: ctx.shares.filter((s) => s.orderId === orderId && s.state !== 'cancelled') }, initial: null });
+  const orderWithShares = useCallback((orderId) => {
+    const o = ctx?.orderById.get(orderId);
+    return o ? { order: o, shares: ctx.shares.filter((s) => s.orderId === orderId && s.state !== 'cancelled') } : null;
   }, [ctx]);
+  const openOrder = useCallback((orderId) => {
+    const existing = orderWithShares(orderId);
+    if (existing) setOrder({ open: true, existing, copyOf: null, initial: null });
+  }, [orderWithShares]);
+  // a new order that starts from this one's values (nothing is saved until the form is)
+  const duplicateOrder = useCallback((orderId) => {
+    const copyOf = orderWithShares(orderId);
+    if (copyOf) setOrder({ open: true, existing: null, copyOf, initial: null });
+  }, [orderWithShares]);
 
   const openProofs = useCallback(async (ownerType, ownerId, title, legacyId = null) => {
     let legacyProofs = [];
@@ -114,7 +121,7 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
       {isBooster ? (
         <>
           {tab === 'cockpit' && <BoosterOverview onNavigate={onTabChange} onReceive={openReceive} onNewJob={newItem} onExpense={() => setExpenseOpen(true)} onOpenJob={openOrder} onImport={() => setImportOpen(true)} />}
-          {tab === 'orders' && <JobsView categories={categories} onNewJob={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenClient={openClient} onReceive={openReceive} />}
+          {tab === 'orders' && <JobsView categories={categories} onNewJob={newItem} onEdit={openOrder} onDuplicate={duplicateOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenClient={openClient} onReceive={openReceive} />}
           {tab === 'people' && <ClientsView onReceive={openReceive} onPay={openPay} onOpenJob={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onNewJob={newItem} />}
           {tab === 'money' && <MoneyView onPay={openPay} onReceive={openReceive} onOpenProofs={openProofs} />}
           {tab === 'analytics' && <ReportsView />}
@@ -122,7 +129,7 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
       ) : (
         <>
           {tab === 'cockpit' && <CockpitView onNavigate={onTabChange} onPay={openPay} onReceive={openReceive} onNewOrder={newItem} onOpenOrder={openOrder} onImport={() => setImportOpen(true)} />}
-          {tab === 'orders' && <OrdersView categories={categories} onNewOrder={newItem} onEdit={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenPerson={openPerson} onReceive={openReceive} />}
+          {tab === 'orders' && <OrdersView categories={categories} onNewOrder={newItem} onEdit={openOrder} onDuplicate={duplicateOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onOpenPerson={openPerson} onReceive={openReceive} />}
           {tab === 'people' && <PeopleView onPay={openPay} onOpenOrder={openOrder} onReceipt={openReceipt} onOpenProofs={openProofs} onNewOrder={newItem} />}
           {tab === 'money' && <MoneyView onPay={openPay} onReceive={openReceive} onOpenProofs={openProofs} />}
           {tab === 'analytics' && <ReportsView />}
@@ -132,14 +139,15 @@ export function LedgerShell({ activeTab, onTabChange, categories, onRefreshCateg
 
       <PaymentDialog open={payment.open} mode={payment.mode} partyId={payment.partyId} advance={payment.advance} presetIds={payment.presetIds} onClose={() => setPayment((p) => ({ ...p, open: false }))} />
       {isBooster
-        ? <JobModal open={order.open} existing={order.existing} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />
-        : <OrderModal open={order.open} existing={order.existing} initial={order.initial} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />}
+        ? <JobModal open={order.open} existing={order.existing} copyOf={order.copyOf} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />
+        : <OrderModal open={order.open} existing={order.existing} copyOf={order.copyOf} initial={order.initial} categories={categories} onRefreshCategories={onRefreshCategories} onClose={() => setOrder((o) => ({ ...o, open: false }))} />}
       <ExpenseDialog open={expenseOpen} onClose={() => setExpenseOpen(false)} />
       <Suspense fallback={null}>
         <LedgerReceipt
           open={receipt.open}
           onClose={() => setReceipt({ open: false, data: null })}
           onEdit={(id) => { setReceipt({ open: false, data: null }); openOrder(id); }}
+          onDuplicate={(id) => { setReceipt({ open: false, data: null }); duplicateOrder(id); }}
           receipt={receipt.data}
           profileId={ledger.profileId}
           onOpenLightbox={(src, caption) => setLightbox({ open: true, src, caption })}

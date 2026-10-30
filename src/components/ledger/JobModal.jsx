@@ -37,7 +37,7 @@ const toInputText = (minor, currency) => (minor ? String(fromMinor(minor, curren
  * Add or edit a job. The common case is three fields: what, who pays, how much. Everything else is opt-in:
  * "already paid", splitting with teammates, a platform fee, notes.
  */
-export function JobModal({ open, onClose, existing = null, categories = [], onRefreshCategories }) {
+export function JobModal({ open, onClose, existing = null, copyOf = null, categories = [], onRefreshCategories }) {
   const ledger = useLedger();
   const f = useLedgerFormat();
   const { ctx, partyById, displayCurrency } = ledger;
@@ -91,29 +91,32 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
     setPayTeamToo(false);
     setSavePayer(false);
     proofOnlyRef.current = null;
-    if (existing) {
-      const { order, shares } = existing;
+    // a copy starts from another job's values but is saved as a new one
+    const source = existing || copyOf;
+    if (source) {
+      const { order, shares } = source;
       // details someone filled in stay in view when they edit the job again
-      setMoreOpen(Boolean(order.orderRef || order.link));
+      setMoreOpen(!copyOf && Boolean(order.orderRef || order.link));
       const shown = order.payerId === UNKNOWN_PAYER_ID ? '' : order.payerId ? f.name(partyById.get(order.payerId)) : order.source || '';
       loadedRef.current = { payer: shown, payerId: order.payerId || null };
       setTitle(order.title || '');
       setPayerName(shown);
       setCurrency(normalizeCurrency(order.currency));
       setAmountText(toInputText(order.grossMinor, order.currency));
-      setLifecycle(order.lifecycle);
-      setDone(order.lifecycle === 'done');
-      setDateTime(order.dateTime ? toLocalISOString(new Date(order.dateTime)) : toLocalISOString());
-      setOrderRef(order.orderRef || '');
+      setLifecycle(copyOf ? 'working' : order.lifecycle);
+      setDone(!copyOf && order.lifecycle === 'done');
+      setDateTime(order.dateTime && !copyOf ? toLocalISOString(new Date(order.dateTime)) : toLocalISOString());
+      setOrderRef(copyOf ? '' : order.orderRef || '');
       setGame(order.game || '');
       setNote(order.note || '');
-      setLink(order.link || '');
+      setLink(copyOf ? '' : order.link || '');
       setFeePct(String(order.grossMinor > 0 ? Math.round(((order.platformFeeMinor || 0) / order.grossMinor) * 10000) / 100 : 0));
       setFeeOn((order.platformFeeMinor || 0) > 0);
       setTeamOn(shares.length > 0);
       setRows(shares.length ? shares.map((s) => { const nm = f.name(partyById.get(s.partyId)); return { key: s.id, name: nm, origName: nm, amountText: toInputText(s.amountMinor, order.currency), partyId: s.partyId, paidBy: s.paidBy === 'payer' ? 'payer' : 'me' }; }) : [blankRow()]);
       setPaid(false);
-      setRateForm(rateFormFor(order, ledger.rates));
+      // a copy is a new job, so it takes today's rates
+      setRateForm(rateFormFor(copyOf ? null : order, ledger.rates));
     } else {
       setMoreOpen(false);
       loadedRef.current = { payer: null, payerId: null };
@@ -206,7 +209,8 @@ export function JobModal({ open, onClose, existing = null, categories = [], onRe
   // what was typed survives an accidental close: one draft per new job and per job being edited
   const draft = useFormDraft({
     open,
-    key: existing ? `job_${existing.order.id}` : 'job_new',
+    // no draft for a copy: it would put an old "new job" draft over the copied values
+    key: existing ? `job_${existing.order.id}` : copyOf ? null : 'job_new',
     stamp: existing?.order?.updatedAt || null,
     hasContent: (v) => Boolean(v.title.trim() || v.payerName.trim() || v.amountText.trim() || v.note.trim() || v.orderRef.trim() || v.link.trim() || (v.teamOn && v.rows.some((r) => r.name.trim() || r.amountText.trim()))),
     value: { title, payerName, amountText, currency, paid, done, lifecycle, dateTime, orderRef, game, note, link, feePct, feeOn, rateForm, teamOn, rows, payTeamToo, savePayer, moreOpen },

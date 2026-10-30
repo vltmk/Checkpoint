@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toBlob } from 'html-to-image';
-import { Camera, Check, Pencil, CircleCheck, CirclePlay, CircleX, Clock, Copy, Loader2, MessageSquare, Store, StickyNote, Users } from 'lucide-react';
+import { Camera, Check, Pencil, CircleCheck, CirclePlay, CircleX, Clock, Copy, CopyPlus, Loader2, MessageSquare, Store, StickyNote, Users } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from '../ui/Dialog';
 import { Button } from '../ui/Button';
 import { GameIcon } from '../ui/GameIcon';
@@ -68,7 +68,7 @@ function CopyFeedback({ done, Icon, className }) {
  * A receipt for one order, built from the ledger. Advertisers get the client's receipt and the boosters' payout slip;
  * boosters get a proof-of-work receipt. The same facts are on the card, in the copied text, and in the Discord block.
  */
-export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbox, onEdit }) {
+export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbox, onEdit, onDuplicate }) {
   const { language, isRtl, timeFormat } = useLanguage();
   const isAdvertiser = profileId === 'advertiser';
   const cardRef = useRef(null);
@@ -290,6 +290,9 @@ export function LedgerReceipt({ open, onClose, receipt, profileId, onOpenLightbo
             <Button variant="secondary" size="sm" onClick={() => copyText('discord')}><CopyFeedback done={copied === 'discord'} Icon={MessageSquare} className="h-3.5 w-3.5" /><span>Discord</span></Button>
             <Button variant="primary" size="sm" onClick={() => copyText('text')}><CopyFeedback done={copied === 'text'} Icon={Copy} className="h-3.5 w-3.5" /><span>{isFa ? 'کپی متن' : 'Copy text'}</span></Button>
           </div>
+          {onDuplicate && vm?.id && (
+            <Button variant="outline" size="sm" onClick={() => onDuplicate(vm.id)}><CopyPlus className="h-3.5 w-3.5" /><span>{isFa ? 'تکرار' : 'Duplicate'}</span></Button>
+          )}
           {onEdit && vm?.id && (
             <Button variant="outline" size="sm" onClick={() => onEdit(vm.id)}><Pencil className="h-3.5 w-3.5" /><span>{isFa ? 'ویرایش' : 'Edit'}</span></Button>
           )}
